@@ -61,14 +61,14 @@ namespace Orleans.Core.Tests.Networking
                 .BuildServiceProvider();
 
             var builder = new TestConnectionBuilder(services);
-            builder.UseMiddleware<DiMiddleware>();
+            builder.UseMiddleware<InjectedMiddleware>();
 
             var pipeline = builder.Build();
             var context = CreateContext();
 
             await pipeline(context);
 
-            Assert.Equal(new[] { "di-middleware" }, callOrder);
+            Assert.Equal(new[] { "injected-middleware" }, callOrder);
         }
 
         private static ConnectionContext CreateContext()
@@ -114,18 +114,18 @@ namespace Orleans.Core.Tests.Networking
             }
         }
 
-        private sealed class DiMiddleware : IConnectionMiddleware
+        private sealed class InjectedMiddleware : IConnectionMiddleware
         {
             private readonly List<string> _callOrder;
 
-            public DiMiddleware(List<string> callOrder)
+            public InjectedMiddleware(List<string> callOrder)
             {
                 _callOrder = callOrder;
             }
 
             public async Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
             {
-                _callOrder.Add("di-middleware");
+                _callOrder.Add("injected-middleware");
                 await next(context);
             }
         }
