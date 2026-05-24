@@ -32,7 +32,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private int _disposed;
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
-        : this(shared, CreateStorage(storageProvider, grainContext))
+        : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)))
     {
     }
 
@@ -63,11 +63,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
     }
 
-    private static IJournalStorage CreateStorage(IJournalStorageProvider storageProvider, IGrainContext grainContext)
+    private static JournalId CreateJournalId(IGrainContext grainContext)
     {
-        ArgumentNullException.ThrowIfNull(storageProvider);
         ArgumentNullException.ThrowIfNull(grainContext);
-        return storageProvider.CreateStorage(grainContext) ?? throw new InvalidOperationException("The configured journal storage provider returned null.");
+        return JournalId.FromGrainId(grainContext.GrainId);
     }
 
     private static IJournalStorage CreateStorage(IJournalStorageProvider storageProvider, JournalId journalId)

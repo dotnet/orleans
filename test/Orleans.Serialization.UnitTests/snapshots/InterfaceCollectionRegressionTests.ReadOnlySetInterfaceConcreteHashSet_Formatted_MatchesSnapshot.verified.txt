@@ -1,0 +1,5 @@
+﻿0x0035 [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: System.Collections.Generic.HashSet`1[System.String] (name: Encoded "TypeName "System.Collections.Generic.HashSet`1[[string]]" (hash DCA1FD98)" (System.Collections.Generic.HashSet`1[[System.String]]))] Value: {
+0x0036  [#2 VarInt Id: 1 SchemaType: Expected] Value: 2 (0x2)
+0x0038  [#3 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["a"]
+0x003B  [#4 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["b"]
+0x003E }

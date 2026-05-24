@@ -11,7 +11,8 @@ namespace UnitTests.TesterInternal
     {
         internal static WorkItemGroup CreateWorkItemGroupForTesting(
             IGrainContext context,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            out IServiceProvider activationServices)
         {
             ArgumentNullException.ThrowIfNull(context);
             ArgumentNullException.ThrowIfNull(loggerFactory);
@@ -27,13 +28,10 @@ namespace UnitTests.TesterInternal
                 options.StoppedActivationWarningInterval = TimeSpan.FromMilliseconds(200);
             });
 
-            var s = services.BuildServiceProvider();
-            var result = new WorkItemGroup(
+            activationServices = services.BuildServiceProvider();
+            return new WorkItemGroup(
                 context,
-                s.GetRequiredService<ILogger<WorkItemGroup>>(),
-                s.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
-                s.GetRequiredService<IOptions<SchedulingOptions>>());
-            return result;
+                activationServices.GetRequiredService<IOptions<SchedulingOptions>>());
         }
     }
 }

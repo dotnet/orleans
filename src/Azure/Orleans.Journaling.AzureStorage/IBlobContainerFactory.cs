@@ -12,23 +12,7 @@ public interface IBlobContainerFactory
     /// </summary>
     /// <param name="journalId">The journal id.</param>
     /// <returns>A configured blob client.</returns>
-    public BlobContainerClient GetBlobContainerClient(JournalId journalId)
-    {
-        if (journalId.IsDefault)
-        {
-            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
-        }
-
-        throw new NotSupportedException(
-            $"This blob container factory does not support grain-independent journals. Implement {nameof(GetBlobContainerClient)}({nameof(JournalId)}) to support on-demand journals.");
-    }
-
-    /// <summary>
-    /// Gets the container which should be used for the specified grain.
-    /// </summary>
-    /// <param name="grainId">The grain id</param>
-    /// <returns>A configured blob client</returns>
-    public BlobContainerClient GetBlobContainerClient(GrainId grainId);
+    public BlobContainerClient GetBlobContainerClient(JournalId journalId);
 
     /// <summary>
     /// Initialize any required dependencies using the provided client and options.

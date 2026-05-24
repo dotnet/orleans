@@ -130,8 +130,6 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class TestJournalStorageProvider(IJournalStorage storage) : IJournalStorageProvider
     {
-        public IJournalStorage CreateStorage(IGrainContext grainContext) => storage;
-
         public IJournalStorage CreateStorage(JournalId journalId) => storage;
     }
 

@@ -69,8 +69,8 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
             await Task.Delay(100);
         }
 
-        report = await rebalancer.GetRebalancingReport(true);
-        Assert.False(report.SuspensionDuration.HasValue);
+        Assert.Equal(RebalancerStatus.Executing, report.Status);
+        Assert.Null(report.SuspensionDuration);
         Assert.Equal(host, report.Host);
 
         await rebalancer.SuspendRebalancing(); // Suspend indefinitely

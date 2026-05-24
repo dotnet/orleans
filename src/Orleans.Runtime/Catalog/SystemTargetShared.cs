@@ -17,11 +17,10 @@ internal sealed class SystemTargetShared(
     ITimerRegistry timerRegistry,
     ActivationDirectory activations)
 {
-    private readonly ILogger<WorkItemGroup> _workItemGroupLogger = loggerFactory.CreateLogger<WorkItemGroup>();
-    private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger = loggerFactory.CreateLogger<ActivationTaskScheduler>();
     public SiloAddress SiloAddress => localSiloDetails.SiloAddress;
 
     public ILoggerFactory LoggerFactory => loggerFactory;
+    internal ILogger SchedulerLogger { get; } = loggerFactory.CreateLogger<WorkItemGroup>();
     public GrainReferenceActivator GrainReferenceActivator => grainReferenceActivator;
     public ITimerRegistry TimerRegistry => timerRegistry;
 
@@ -33,8 +32,6 @@ internal sealed class SystemTargetShared(
         ArgumentNullException.ThrowIfNull(systemTarget);
         return new WorkItemGroup(
             systemTarget,
-            _workItemGroupLogger,
-            _activationTaskSchedulerLogger,
             schedulingOptions);
     }
 }

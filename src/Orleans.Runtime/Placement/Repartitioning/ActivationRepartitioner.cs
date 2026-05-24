@@ -510,7 +510,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
     /// </summary>
     /// <param name="giving">The grain ids to migrate to the remote host.</param>
     /// <param name="accepting">The grain ids to which are migrating to the local host.</param>
-    private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
+    internal async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
     {
         // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
         var affected = new HashSet<GrainId>(giving.Length + accepting.Length + _deactivatedGrains.Count);
@@ -524,8 +524,17 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             {
                 if (_activationDirectory.FindTarget(grainId) is { } localActivation)
                 {
-                    localActivation.Migrate(migrationRequestContext);
-                    deactivationTasks.Add(localActivation.Deactivated);
+                    if (localActivation is ActivationData activation)
+                    {
+                        if (activation.TryStartMigration(migrationRequestContext))
+                        {
+                            deactivationTasks.Add(activation.Deactivated);
+                        }
+                    }
+                    else
+                    {
+                        localActivation.Migrate(migrationRequestContext);
+                    }
                 }
             }
 

@@ -10,7 +10,9 @@ namespace Orleans
 {
     public partial interface ITransactionClient
     {
+        System.Threading.Tasks.Task RunTransaction(TransactionOption transactionOption, System.Func<System.Threading.Tasks.Task<bool>> transactionDelegate, bool useExclusiveLock);
         System.Threading.Tasks.Task RunTransaction(TransactionOption transactionOption, System.Func<System.Threading.Tasks.Task<bool>> transactionDelegate);
+        System.Threading.Tasks.Task RunTransaction(TransactionOption transactionOption, System.Func<System.Threading.Tasks.Task> transactionDelegate, bool useExclusiveLock);
         System.Threading.Tasks.Task RunTransaction(TransactionOption transactionOption, System.Func<System.Threading.Tasks.Task> transactionDelegate);
     }
 
@@ -77,6 +79,9 @@ namespace Orleans
         [Id(0)]
         public TransactionOption TransactionOption { get { throw null; } set { } }
 
+        [Id(2)]
+        public bool UseExclusiveLock { get { throw null; } set { } }
+
         protected abstract System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> BaseInvoke();
         public override void Dispose() { }
 
@@ -85,6 +90,8 @@ namespace Orleans
         System.Threading.Tasks.Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context) { throw null; }
 
         void Serialization.IOnDeserialized.OnDeserialized(Serialization.DeserializationContext context) { }
+
+        protected void SetExclusiveLock(bool value) { }
 
         protected void SetTransactionOptions(TransactionOption txOption) { }
 
@@ -142,6 +149,12 @@ namespace Orleans
         protected sealed override System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> BaseInvoke() { throw null; }
 
         protected abstract System.Threading.Tasks.Task<TResult> InvokeInner();
+    }
+
+    [InvokableCustomInitializer("SetExclusiveLock", true)]
+    [System.AttributeUsage(System.AttributeTargets.Method)]
+    public sealed partial class UseExclusiveLockAttribute : System.Attribute
+    {
     }
 }
 
@@ -613,6 +626,9 @@ namespace Orleans.Transactions
 
         [Id(6)]
         public bool TryToCommit { get { throw null; } }
+
+        [Id(7)]
+        public bool UseExclusiveLock { get { throw null; } set { } }
 
         public TransactionInfo Fork() { throw null; }
 

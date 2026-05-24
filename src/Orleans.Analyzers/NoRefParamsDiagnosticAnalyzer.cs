@@ -1,8 +1,5 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers
@@ -26,7 +23,7 @@ namespace Orleans.Analyzers
             context.EnableConcurrentExecution();
             context.RegisterCompilationStartAction(context =>
             {
-                var baseInterface = context.Compilation.GetTypeByMetadataName("Orleans.Runtime.IAddressable");
+                var baseInterface = context.Compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
                 if (baseInterface is not null)
                 {
                     context.RegisterSymbolAction(context => AnalyzeMethodSymbol(context, baseInterface), SymbolKind.Method);
@@ -48,7 +45,7 @@ namespace Orleans.Analyzers
                                               .Select(interfaceDef => interfaceDef.Name);
             if (!symbol.ContainingType.AllInterfaces.Contains(baseInterface)) return;
 
-            foreach(var param in symbol.Parameters)
+            foreach (var param in symbol.Parameters)
             {
                 if (param.RefKind == RefKind.None) continue;
 

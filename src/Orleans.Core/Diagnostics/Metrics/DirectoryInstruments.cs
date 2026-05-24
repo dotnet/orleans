@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
+using System.Threading;
 
 #nullable disable
 namespace Orleans.Runtime;
 
 internal static class DirectoryInstruments
 {
+    private static ImmutableArray<CacheSizeObserverRegistration> CacheSizeObservers = [];
+
     internal static readonly Counter<int> LookupsLocalIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
     internal static readonly Counter<int> LookupsLocalSuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
 
@@ -19,7 +23,6 @@ internal static class DirectoryInstruments
 
     internal static readonly Counter<int> LookupsCacheIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_CACHE_ISSUED);
     internal static readonly Counter<int> LookupsCacheSuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_CACHE_SUCCESSES);
-    internal static readonly Counter<int> ValidationsCacheSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_VALIDATIONS_CACHE_SENT);
     internal static readonly Counter<int> ValidationsCacheReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_VALIDATIONS_CACHE_RECEIVED);
 
     internal static readonly Counter<int> SnapshotTransferCount = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_COUNT);
@@ -34,10 +37,14 @@ internal static class DirectoryInstruments
         DirectoryPartitionSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_PARTITION_SIZE, observeValue);
     }
 
-    internal static ObservableGauge<int> CacheSize;
-    internal static void RegisterCacheSizeObserve(Func<int> observeValue)
+    internal static readonly ObservableGauge<int> CacheSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, ObserveCacheSize);
+    internal static IDisposable RegisterCacheSizeObserve(Func<int> observeValue)
     {
-        CacheSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, observeValue);
+        ArgumentNullException.ThrowIfNull(observeValue);
+
+        var registration = new CacheSizeObserverRegistration(observeValue);
+        ImmutableInterlocked.Update(ref CacheSizeObservers, static (observers, registration) => observers.Add(registration), registration);
+        return registration;
     }
 
     internal static ObservableGauge<int> RingSize;
@@ -75,4 +82,39 @@ internal static class DirectoryInstruments
     internal static readonly Counter<int> UnregistrationsManyIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_ISSUED);
     internal static readonly Counter<int> UnregistrationsManyRemoteSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_SENT);
     internal static readonly Counter<int> UnregistrationsManyRemoteReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_RECEIVED);
+
+    private static int ObserveCacheSize()
+    {
+        var result = 0;
+        foreach (var observer in CacheSizeObservers)
+        {
+            result += observer.Observe();
+        }
+
+        return result;
+    }
+
+    private sealed class CacheSizeObserverRegistration : IDisposable
+    {
+        private Func<int> observeValue;
+
+        public CacheSizeObserverRegistration(Func<int> observeValue)
+        {
+            this.observeValue = observeValue;
+        }
+
+        public int Observe()
+        {
+            var observer = Volatile.Read(ref observeValue);
+            return observer is null ? 0 : observer();
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref observeValue, null) is not null)
+            {
+                ImmutableInterlocked.Update(ref CacheSizeObservers, static (observers, registration) => observers.Remove(registration), this);
+            }
+        }
+    }
 }

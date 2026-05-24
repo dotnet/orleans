@@ -14,10 +14,15 @@ internal sealed class DefaultBlobContainerFactory(AzureBlobJournalStorageOptions
     private BlobContainerClient _defaultContainer = null!;
 
     /// <inheritdoc/>
-    public BlobContainerClient GetBlobContainerClient(GrainId grainId) => _defaultContainer;
+    public BlobContainerClient GetBlobContainerClient(JournalId journalId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
 
-    /// <inheritdoc/>
-    public BlobContainerClient GetBlobContainerClient(JournalId journalId) => _defaultContainer;
+        return _defaultContainer;
+    }
 
     /// <inheritdoc/>
     public async Task InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken)

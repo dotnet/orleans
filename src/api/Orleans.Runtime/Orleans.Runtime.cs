@@ -170,11 +170,10 @@ namespace Orleans.Configuration
     {
         public const int DEFAULT_CACHE_SIZE = 1000000;
         public const CachingStrategyType DEFAULT_CACHING_STRATEGY = 1;
-        public const int DEFAULT_PARTITIONS_PER_SILO = 1;
         [System.Obsolete("DEFAULT_INITIAL_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_INITIAL_CACHE_TTL;
-        [System.Obsolete("DEFAULT_MAXIMUM_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_MAXIMUM_CACHE_TTL;
+        public const int DEFAULT_PARTITIONS_PER_SILO = 1;
         [System.Obsolete("DEFAULT_TTL_EXTENSION_FACTOR is deprecated and will be removed in a future version.")]
         public const double DEFAULT_TTL_EXTENSION_FACTOR = 2D;
         public static readonly System.TimeSpan DEFAULT_UNREGISTER_RACE_DELAY;
@@ -545,9 +544,9 @@ namespace Orleans.Runtime
 
         public ClusterMembershipUpdate CreateUpdate(ClusterMembershipSnapshot previous) { throw null; }
 
-        public SiloStatus GetSiloStatus(SiloAddress silo) { throw null; }
-
         public SiloStatus GetSiloStatus(SiloAddress silo, MembershipVersion seenAtVersion) { throw null; }
+
+        public SiloStatus GetSiloStatus(SiloAddress silo) { throw null; }
 
         public override string ToString() { throw null; }
     }
@@ -857,9 +856,9 @@ namespace Orleans.Runtime
 
     public partial class SiloLifecycleSubject : LifecycleSubject, ISiloLifecycleSubject, ISiloLifecycle, ILifecycleObservable, ILifecycleObserver
     {
-        public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger) : base(default!) { }
+        public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger, ILocalSiloDetails? localSiloDetails) : base(default!) { }
 
-        public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger, Orleans.Runtime.ILocalSiloDetails localSiloDetails) : base(default!) { }
+        public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger) : base(default!) { }
 
         public int HighestCompletedStage { get { throw null; } }
 
@@ -961,6 +960,245 @@ namespace Orleans.Runtime.Development
         public System.Threading.Tasks.Task Release(string category, LeaseProviders.AcquiredLease[] acquiredLeases) { throw null; }
 
         public System.Threading.Tasks.Task<LeaseProviders.AcquireLeaseResult[]> Renew(string category, LeaseProviders.AcquiredLease[] acquiredLeases) { throw null; }
+    }
+}
+
+namespace Orleans.Runtime.Diagnostics
+{
+    public static partial class ActivationRebalancerEvents
+    {
+        public const string ListenerName = "Orleans.ActivationRebalancer";
+        public static System.IObservable<RebalancerEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class CycleStart : RebalancerEvent
+        {
+            public readonly int CycleNumber;
+            public CycleStart(SiloAddress siloAddress, int cycleNumber) : base(default!) { }
+        }
+
+        public sealed partial class CycleStop : RebalancerEvent
+        {
+            public readonly int ActivationsMigrated;
+            public readonly int CycleNumber;
+            public readonly System.TimeSpan Elapsed;
+            public readonly double EntropyDeviation;
+            public readonly bool SessionCompleted;
+            public CycleStop(SiloAddress siloAddress, int cycleNumber, int activationsMigrated, double entropyDeviation, System.TimeSpan elapsed, bool sessionCompleted) : base(default!) { }
+        }
+
+        public abstract partial class RebalancerEvent
+        {
+            public readonly SiloAddress SiloAddress;
+            protected RebalancerEvent(SiloAddress siloAddress) { }
+        }
+
+        public sealed partial class SessionStart : RebalancerEvent
+        {
+            public SessionStart(SiloAddress siloAddress) : base(default!) { }
+        }
+
+        public sealed partial class SessionStop : RebalancerEvent
+        {
+            public readonly string Reason;
+            public readonly int TotalCycles;
+            public SessionStop(SiloAddress siloAddress, string reason, int totalCycles) : base(default!) { }
+        }
+    }
+
+    public static partial class DeploymentLoadPublisherEvents
+    {
+        public const string ListenerName = "Orleans.DeploymentLoadPublisher";
+        public static System.IObservable<DeploymentLoadPublisherEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class ClusterRefreshed : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress SiloAddress;
+            public readonly System.Collections.Generic.IReadOnlyDictionary<SiloAddress, SiloRuntimeStatistics> Statistics;
+            public ClusterRefreshed(SiloAddress siloAddress, System.Collections.Generic.IReadOnlyDictionary<SiloAddress, SiloRuntimeStatistics> statistics) { }
+        }
+
+        public abstract partial class DeploymentLoadPublisherEvent
+        {
+        }
+
+        public sealed partial class Published : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress SiloAddress;
+            public readonly SiloRuntimeStatistics Statistics;
+            public Published(SiloAddress siloAddress, SiloRuntimeStatistics statistics) { }
+        }
+
+        public sealed partial class Received : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress FromSilo;
+            public readonly SiloAddress ReceiverSilo;
+            public readonly SiloRuntimeStatistics Statistics;
+            public Received(SiloAddress fromSilo, SiloAddress receiverSilo, SiloRuntimeStatistics statistics) { }
+        }
+
+        public sealed partial class Removed : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress ObserverSilo;
+            public readonly SiloAddress RemovedSilo;
+            public Removed(SiloAddress removedSilo, SiloAddress observerSilo) { }
+        }
+    }
+
+    public static partial class GrainLifecycleEvents
+    {
+        public const string ListenerName = "Orleans.GrainsLifecycle";
+        public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class Activated : LifecycleEvent
+        {
+            public Activated(IGrainContext grainContext) : base(default!) { }
+        }
+
+        public sealed partial class Created : LifecycleEvent
+        {
+            public Created(IGrainContext grainContext) : base(default!) { }
+        }
+
+        public sealed partial class Deactivated : LifecycleEvent
+        {
+            public readonly DeactivationReason Reason;
+            public Deactivated(IGrainContext grainContext, DeactivationReason reason) : base(default!) { }
+        }
+
+        public sealed partial class Deactivating : LifecycleEvent
+        {
+            public readonly DeactivationReason Reason;
+            public Deactivating(IGrainContext grainContext, DeactivationReason reason) : base(default!) { }
+        }
+
+        public abstract partial class LifecycleEvent
+        {
+            public readonly IGrainContext GrainContext;
+            protected LifecycleEvent(IGrainContext grainContext) { }
+        }
+    }
+
+    public static partial class GrainTimerEvents
+    {
+        public const string ListenerName = "Orleans.GrainTimers";
+        public static System.IObservable<TimerEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class Created : TimerEvent
+        {
+            public readonly System.TimeSpan DueTime;
+            public readonly System.TimeSpan Period;
+            public Created(IGrainContext grainContext, IGrainTimer timer, System.TimeSpan dueTime, System.TimeSpan period) : base(default!, default!) { }
+        }
+
+        public sealed partial class Disposed : TimerEvent
+        {
+            public Disposed(IGrainContext grainContext, IGrainTimer timer) : base(default!, default!) { }
+        }
+
+        public sealed partial class TickStart : TimerEvent
+        {
+            public TickStart(IGrainContext grainContext, IGrainTimer timer) : base(default!, default!) { }
+        }
+
+        public sealed partial class TickStop : TimerEvent
+        {
+            public readonly System.Exception? Exception;
+            public TickStop(IGrainContext grainContext, IGrainTimer timer, System.Exception? exception) : base(default!, default!) { }
+        }
+
+        public abstract partial class TimerEvent
+        {
+            public readonly IGrainContext GrainContext;
+            public readonly IGrainTimer Timer;
+            protected TimerEvent(IGrainContext grainContext, IGrainTimer timer) { }
+        }
+    }
+
+    public static partial class SiloLifecycleEvents
+    {
+        public const string ListenerName = "Orleans.SiloLifecycle";
+        public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
+
+        public abstract partial class LifecycleEvent
+        {
+            public readonly SiloAddress? SiloAddress;
+            public readonly int Stage;
+            public readonly string StageName;
+            protected LifecycleEvent(int stage, string stageName, SiloAddress? siloAddress) { }
+        }
+
+        public sealed partial class ObserverCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverCompleted(string observerName, int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverFailed(string observerName, int stage, string stageName, SiloAddress? siloAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStarting(string observerName, int stage, string stageName, SiloAddress? siloAddress, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopped(string observerName, int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopping(string observerName, int stage, string stageName, SiloAddress? siloAddress, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageCompleted(int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageFailed(int stage, string stageName, SiloAddress? siloAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStarting(int stage, string stageName, SiloAddress? siloAddress, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopped(int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopping(int stage, string stageName, SiloAddress? siloAddress, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
     }
 }
 

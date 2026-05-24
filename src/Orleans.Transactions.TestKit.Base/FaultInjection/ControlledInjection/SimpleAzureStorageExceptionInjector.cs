@@ -10,8 +10,10 @@ namespace Orleans.Transactions.TestKit
     {
         public bool InjectBeforeStore { get; set; }
         public bool InjectAfterStore { get; set; }
+        public bool InjectGenericAfterStore { get; set; }
         private int injectionBeforeStoreCounter = 0;
         private int injectionAfterStoreCounter = 0;
+        private int genericInjectionAfterStoreCounter = 0;
         private readonly ILogger logger;
         public SimpleAzureStorageExceptionInjector(ILogger<SimpleAzureStorageExceptionInjector> logger)
         {
@@ -27,6 +29,15 @@ namespace Orleans.Transactions.TestKit
                 var message = $"Storage exception thrown after store, thrown total {injectionAfterStoreCounter}";
                 LogInformationMessage(this.logger, message);
                 throw new SimpleAzureStorageException(message);
+            }
+
+            if (InjectGenericAfterStore)
+            {
+                InjectGenericAfterStore = false;
+                this.genericInjectionAfterStoreCounter++;
+                var message = $"Generic storage exception thrown after store, thrown total {genericInjectionAfterStoreCounter}";
+                LogInformationMessage(this.logger, message);
+                throw new InvalidOperationException(message);
             }
         }
 

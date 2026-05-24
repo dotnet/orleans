@@ -324,6 +324,13 @@ namespace Orleans.Runtime
         // Internal for testing. It's expected that when this returns true, activation shedding will occur.
         internal bool IsMemoryOverloaded(out int surplusActivationCount)
         {
+            var activationCount = _activationCount;
+            if (activationCount == 0)
+            {
+                surplusActivationCount = 0;
+                return false;
+            }
+
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
             var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
 
@@ -336,7 +343,6 @@ namespace Orleans.Runtime
             }
 
             // Calculate the surplus activations based the memory usage target.
-            var activationCount = _activationCount;
             var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
             surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
             if (surplusActivationCount <= 0)
@@ -375,6 +381,13 @@ namespace Orleans.Runtime
                     }
 
                     var activation = item.Value;
+                    lock (activation)
+                    {
+                        if (!activation.IsValid || !activation.IsInactive)
+                        {
+                            continue;
+                        }
+                    }
 
                     candidates.Add(activation);
                 }

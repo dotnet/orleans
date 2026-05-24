@@ -36,16 +36,6 @@ namespace Orleans.Runtime.GrainDirectory
         Task UnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin);
 
         /// <summary>
-        /// Fetches locally known directory information for a grain.
-        /// If there is no local information, either in the cache or in this node's directory partition,
-        /// then this method will return false and leave the list empty.
-        /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
-        /// <param name="addresses">An output parameter that receives the list of locally-known activations of the grain.</param>
-        /// <returns>True if remote addresses are complete within freshness constraint</returns>
-        bool LocalLookup(GrainId grain, out AddressAndTag addresses);
-
-        /// <summary>
         /// Invalidates cache entry for the given activation address.
         /// This method is intended to be called whenever a directory client tries to access 
         /// an activation returned from the previous directory lookup and gets a reject from the target silo 

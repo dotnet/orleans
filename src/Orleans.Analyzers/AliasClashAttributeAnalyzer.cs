@@ -1,12 +1,8 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Globalization;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers;
 
@@ -40,7 +36,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(context =>
         {
             var aliasMap = new ConcurrentDictionary<string, ConcurrentBag<TypeAliasInfo>>();
-            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.AliasAttribute");
+            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
             context.RegisterSymbolAction(
                 context => CollectTypeAliases(context, aliasMap, aliasAttributeSymbol),
                 SymbolKind.NamedType);
@@ -84,7 +80,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol aliasAttributeSymbol)
     {
         var typeSymbol = (INamedTypeSymbol)context.Symbol;
-        
+
         if (typeSymbol.TypeKind == TypeKind.Interface && !typeSymbol.ExtendsGrainInterface())
         {
             return; // Skip interfaces that dont extend IAddressable

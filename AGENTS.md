@@ -5,7 +5,8 @@
 - Do not push feature branches directly to `dotnet/orleans` or the `upstream` remote.
 - Push feature branches to your personal fork, which is configured as `origin`.
 - Create PRs using `dotnet/orleans` as the base repository and `origin`/personal fork branches as the head.
-- When creating PRs, keep the PR description simple. Describe the reason the PR was opened, meaning the problem it addresses, and the solution implemented in the PR. In the solution section, explain why this is the right solution and include the rationale. Include notes for remaining follow-up work if relevant, and call out areas reviewers should focus on. Do not include a section describing what commands to run to test the PR.
+- Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages from now on.
+- When creating PRs, keep the PR description simple: explain the problem it addresses and the solution it implements, including the rationale where helpful. Do not include a section describing what commands to run to test the PR.
 
 Example:
 

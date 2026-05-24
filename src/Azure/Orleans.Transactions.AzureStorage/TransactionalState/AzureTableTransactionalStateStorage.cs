@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 
 #nullable disable
@@ -339,6 +341,23 @@ namespace Orleans.Transactions.AzureStorage
                         batchOperation.Clear();
                         keyIndex = -1;
                     }
+                    catch (Exception ex) when (IsStorageConflict(ex))
+                    {
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            for (int i = 0; i < batchOperation.Count; i++)
+                            {
+                                LogTraceBatchOpFailed(logger, batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
+                            }
+                        }
+
+                        LogErrorTransactionalStateStoreFailed(logger, ex);
+                        throw new InconsistentStateException(
+                            "Azure Table transactional state storage conflict.",
+                            "Unknown",
+                            key.ETag.ToString(),
+                            ex);
+                    }
                     catch (Exception ex)
                     {
                         if (logger.IsEnabled(LogLevel.Trace))
@@ -353,6 +372,22 @@ namespace Orleans.Transactions.AzureStorage
                         throw;
                     }
                 }
+            }
+
+            private static bool IsStorageConflict(Exception exception)
+            {
+                while (exception is not null)
+                {
+                    if (exception is RequestFailedException requestFailedException
+                        && requestFailedException.Status is (int)HttpStatusCode.Conflict or (int)HttpStatusCode.PreconditionFailed)
+                    {
+                        return true;
+                    }
+
+                    exception = exception.InnerException;
+                }
+
+                return false;
             }
         }
 

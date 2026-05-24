@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.Diagnostics;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
@@ -355,7 +356,7 @@ namespace Orleans.Transactions.State
 
             // setting this field makes this entry ready for batching
 
-            remoteEntry.ConfirmationResponsePromise = remoteEntry.ConfirmationResponsePromise ?? new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            remoteEntry.ConfirmationResponsePromise ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             storageWorker.Notify();
 
@@ -404,10 +405,11 @@ namespace Orleans.Transactions.State
         /// <returns></returns>
         public Task Ready()
         {
-            if (this.readyTask.Status == TaskStatus.RanToCompletion)
+            if (this.readyTask.IsCompletedSuccessfully)
             {
                 return readyTask;
             }
+
             return ReadyAsync();
             async Task ReadyAsync()
             {
@@ -418,7 +420,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await AbortAndRestore(TransactionalStatus.UnknownException, exception);
+                    await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: false);
                 }
             }
         }
@@ -508,6 +510,8 @@ namespace Orleans.Transactions.State
 
             using (this.activationLifetime.BlockDeactivation())
             {
+                var writeAttempted = false;
+
                 try
                 {
                     // count committable entries at the bottom of the commit queue
@@ -542,6 +546,10 @@ namespace Orleans.Transactions.State
                         {
                             if (await batchBeingSentToStorage.CheckStorePreConditions())
                             {
+                                // Once Store is invoked, failures are ambiguous: the write may have failed, or it may
+                                // have succeeded and only the response failed/timed out. Recover from storage to resolve it.
+                                writeAttempted = true;
+
                                 // perform the actual store, and record the e-tag
                                 this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
                                 failCounter = 0;
@@ -549,22 +557,33 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
-                                await AbortAndRestore(TransactionalStatus.CommitFailure, exception: null);
+                                await AbortAndRestore(TransactionalStatus.CommitFailure, exception: null, storageOutcomeInDoubt: false);
                                 return;
                             }
                         }
-                        catch (InconsistentStateException exception)
-                        {
-                            LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
-                            await AbortAndRestore(TransactionalStatus.StorageConflict, exception, true);
-                            return;
-                        }
                         catch (Exception exception)
                         {
-                            LogWarningStorageExceptionInStorageWorker(exception);
-                            await AbortAndRestore(TransactionalStatus.UnknownException, exception);
+                            TransactionalStatus status;
+                            if (exception is InconsistentStateException)
+                            {
+                                status = TransactionalStatus.StorageConflict;
+                                LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
+                            }
+                            else
+                            {
+                                status = TransactionalStatus.UnknownException;
+                                LogWarningStorageExceptionInStorageWorker(exception);
+                            }
+
+                            await AbortAndRestore(status, exception, storageOutcomeInDoubt: writeAttempted);
                             return;
                         }
+
+                        TransactionDiagnosticEvents.EmitStorageWriteCompleted(
+                            this.resource,
+                            this.storageBatch.ETag,
+                            batchBeingSentToStorage.BatchSize,
+                            batchBeingSentToStorage.CommitCount);
                     }
 
                     if (committableEntries > 0)
@@ -589,38 +608,75 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
-                    await AbortAndRestore(TransactionalStatus.UnknownException, exception);
+
+                    // If a write was attempted, the durable outcome is unknown and recovery must resolve it.
+                    await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: writeAttempted);
                 }
             }
         }
 
-        private Task AbortAndRestore(TransactionalStatus status, Exception exception, bool force = false)
+        private async Task AbortAndRestore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
         {
-            this.readyTask = Bail(status, exception, force);
-            return this.readyTask;
+            var task = this.readyTask = AbortAndRestoreCore(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt);
+            await task;
+
+            async Task AbortAndRestoreCore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
+            {
+                List<Task> pending = [RWLock.AbortExecutingTransactions(exception)];
+                this.RWLock.AbortQueuedTransactions();
+
+                foreach (var entry in commitQueue.Elements)
+                {
+                    if (storageOutcomeInDoubt)
+                    {
+                        // The storage write may have committed before the exception surfaced, or a later action may
+                        // have failed after the write completed. Do not send abort/cancel messages from stale
+                        // in-memory state; restore from storage and let recovery confirm or abort.
+                        CompleteInDoubtEntryLocally(entry, status, exception);
+                    }
+                    else
+                    {
+                        pending.Add(NotifyOfAbort(entry, status, exception: exception));
+                    }
+                }
+
+                commitQueue.Clear();
+
+                await Task.WhenAll(pending);
+                if (++failCounter >= 10 || status == TransactionalStatus.StorageConflict)
+                {
+                    LogDebugStorageWorkerTriggeringGrainDeactivation();
+                    this.deactivate();
+                }
+                await this.Restore();
+            }
         }
 
-        private async Task Bail(TransactionalStatus status, Exception exception, bool force = false)
+        private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception exception)
         {
-            List<Task> pending = new List<Task>();
-            pending.Add(RWLock.AbortExecutingTransactions(exception));
-            this.RWLock.AbortQueuedTransactions();
-
-            // abort all entries in the commit queue
-            foreach (var entry in commitQueue.Elements)
+            switch (entry.Role)
             {
-                pending.Add(NotifyOfAbort(entry, status, exception: exception));
-            }
+                case CommitRole.NotYetDetermined:
+                    break;
+                case CommitRole.RemoteCommit:
+                    entry.ConfirmationResponsePromise?.TrySetException(exception ?? new OrleansException($"Confirm failed: Status {status}"));
+                    break;
+                case CommitRole.LocalCommit:
+                case CommitRole.ReadOnly:
+                    if (exception is not null)
+                    {
+                        entry.PromiseForTA.TrySetException(exception);
+                    }
+                    else
+                    {
+                        entry.PromiseForTA.TrySetResult(status);
+                    }
 
-            commitQueue.Clear();
-
-            await Task.WhenAll(pending);
-            if (++failCounter >= 10 || force)
-            {
-                LogDebugStorageWorkerTriggeringGrainDeactivation();
-                this.deactivate();
+                    break;
+                default:
+                    LogErrorImpossibleCase(entry.Role);
+                    throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
             }
-            await this.Restore();
         }
 
         private async Task CheckProgressOfCommitQueue()

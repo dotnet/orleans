@@ -9,6 +9,7 @@ using Orleans.GrainDirectory;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -45,6 +46,7 @@ public sealed class GrainTypeSharedContext
         SerializerSessionPool = serializerSessionPool;
         GrainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
         Logger = loggerFactory.CreateLogger("Orleans.Grain");
+        SchedulerLogger = loggerFactory.CreateLogger<WorkItemGroup>();
         MessagingOptions = messagingOptions.Value;
         GrainReferenceActivator = grainReferenceActivator;
         _serviceProvider = serviceProvider;
@@ -160,6 +162,8 @@ public sealed class GrainTypeSharedContext
     /// Gets the logger.
     /// </summary>
     public ILogger Logger { get; }
+
+    internal ILogger SchedulerLogger { get; }
 
     /// <summary>
     /// Gets the serializer session pool.

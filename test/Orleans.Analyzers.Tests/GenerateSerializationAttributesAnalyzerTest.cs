@@ -64,4 +64,25 @@ public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTes
     [Fact]
     public Task SerializableRecordStruct()
         => VerifyGeneratedDiagnostic(@"[GenerateSerializer] public record struct D { public int f; }");
+
+    [Fact]
+    public Task UserDefinedIdAttribute_ShouldTriggerDiagnostic()
+        => VerifyGeneratedDiagnostic(
+            """
+            namespace Custom
+            {
+                public sealed class IdAttribute : System.Attribute
+                {
+                    public IdAttribute(uint id)
+                    {
+                    }
+                }
+            }
+
+            [GenerateSerializer]
+            public class D
+            {
+                [Custom.Id(0)] public int F;
+            }
+            """);
 }

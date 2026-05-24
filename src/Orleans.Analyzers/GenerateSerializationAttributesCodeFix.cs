@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -5,10 +6,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Simplification;
-using System;
-using System.Collections.Immutable;
-using System.Threading;
-using System.Threading.Tasks;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
@@ -23,7 +20,7 @@ namespace Orleans.Analyzers
 
         public override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
-            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken);
+            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
             var declaration = root.FindNode(context.Span).FirstAncestorOrSelf<TypeDeclarationSyntax>();
             foreach (var diagnostic in context.Diagnostics)
             {
@@ -51,7 +48,7 @@ namespace Orleans.Analyzers
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
 
             // Add the [GenerateSerializer] attribute
-            var attribute = Attribute(ParseName(Constants.GenerateSerializerAttributeFullyQualifiedName))
+            var attribute = Attribute(ParseName(Constants.GenerateSerializerAttributeSourceName))
                 .WithAdditionalAnnotations(Simplifier.Annotation);
             editor.AddAttribute(declaration, attribute);
             return editor.GetChangedDocument();
@@ -60,13 +57,18 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddSerializationAttributes(TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var compilation = semanticModel.Compilation;
+            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration,
+                compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.NonSerializedAttributeFullyQualifiedName));
 
             var nextId = analysis.NextAvailableId;
             foreach (var member in analysis.UnannotatedMembers)
             {
                 // Add the [Id(x)] attribute
-                var attribute = Attribute(ParseName(Constants.IdAttributeFullyQualifiedName))
+                var attribute = Attribute(ParseName(Constants.IdAttributeSourceName))
                     .AddArgumentListArguments(AttributeArgument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal((int)nextId++))))
                     .WithAdditionalAnnotations(Simplifier.Annotation);
                 editor.AddAttribute(member, attribute);
@@ -78,12 +80,17 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddNonSerializedAttributes(SyntaxNode root, TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var compilation = semanticModel.Compilation;
+            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration,
+                compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.NonSerializedAttributeFullyQualifiedName));
 
             foreach (var member in analysis.UnannotatedMembers)
             {
                 // Add the [NonSerialized] attribute
-                var attribute = AttributeList().AddAttributes(Attribute(ParseName(Constants.NonSerializedAttributeFullyQualifiedName)).WithAdditionalAnnotations(Simplifier.Annotation));
+                var attribute = AttributeList().AddAttributes(Attribute(ParseName(Constants.NonSerializedAttributeSourceName)).WithAdditionalAnnotations(Simplifier.Annotation));
 
                 // Since [NonSerialized] is a field-only attribute, add the field target specifier.
                 if (member is PropertyDeclarationSyntax)

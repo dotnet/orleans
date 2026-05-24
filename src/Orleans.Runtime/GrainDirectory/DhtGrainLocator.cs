@@ -79,7 +79,17 @@ namespace Orleans.Runtime.GrainDirectory
         public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => _localGrainDirectory.AddOrUpdateCacheEntry(grainId, siloAddress);
         public void InvalidateCache(GrainId grainId) => _localGrainDirectory.InvalidateCacheEntry(grainId);
         public void InvalidateCache(GrainAddress address) => _localGrainDirectory.InvalidateCacheEntry(address);
-        public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => _localGrainDirectory.TryCachedLookup(grainId, out address);
+        public bool TryLookupInCache(GrainId grainId, out GrainAddress address)
+        {
+            DirectoryInstruments.LookupsLocalIssued.Add(1);
+            if (!_localGrainDirectory.TryCachedLookup(grainId, out address))
+            {
+                return false;
+            }
+
+            DirectoryInstruments.LookupsLocalSuccesses.Add(1);
+            return true;
+        }
 
         private class BatchedDeregistrationWorker
         {

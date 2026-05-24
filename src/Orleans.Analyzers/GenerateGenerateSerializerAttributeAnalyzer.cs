@@ -1,6 +1,6 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Immutable;
 
 namespace Orleans.Analyzers
 {
@@ -23,8 +23,8 @@ namespace Orleans.Analyzers
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterCompilationStartAction(context =>
             {
-                var serializableAttributeSymbol = context.Compilation.GetTypeByMetadataName("System.SerializableAttribute");
-                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+                var serializableAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.SerializableAttributeFullyQualifiedName);
+                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
                 if (serializableAttributeSymbol is not null && generateSerializerAttributeSymbol is not null)
                 {
                     context.RegisterSymbolAction(context => AnalyzeNamedType(context, serializableAttributeSymbol, generateSerializerAttributeSymbol), SymbolKind.NamedType);

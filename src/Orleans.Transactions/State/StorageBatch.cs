@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -57,6 +57,9 @@ namespace Orleans.Transactions
         public string ETag { get; set; }
 
         public int BatchSize => total;
+
+        public int CommitCount => commit;
+
         public override string ToString()
         {
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
@@ -201,7 +204,7 @@ namespace Orleans.Transactions
             this.storeConditions.Add(action);
         }
 
-        public async Task<bool> CheckStorePreConditions()
+        public async ValueTask<bool> CheckStorePreConditions()
         {
             if (this.storeConditions.Count == 0)
                 return true;

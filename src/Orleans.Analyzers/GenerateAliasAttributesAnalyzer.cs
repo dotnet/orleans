@@ -1,11 +1,8 @@
+using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Text;
 
 namespace Orleans.Analyzers;
 
@@ -29,9 +26,9 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterCompilationStartAction(context =>
         {
-            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.AliasAttribute");
-            var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
-            var grainSymbol = context.Compilation.GetTypeByMetadataName("Orleans.Grain");
+            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
+            var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
+            var grainSymbol = context.Compilation.GetTypeByMetadataName(Constants.GrainBaseFullyQualifiedName);
             if (aliasAttributeSymbol is not null && generateSerializerAttributeSymbol is not null)
             {
                 context.RegisterSymbolAction(context => AnalyzeNamedType(context, aliasAttributeSymbol, generateSerializerAttributeSymbol, grainSymbol), SymbolKind.NamedType);
@@ -39,7 +36,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         });
     }
 
-    private void AnalyzeNamedType(
+    private static void AnalyzeNamedType(
         SymbolAnalysisContext context,
         INamedTypeSymbol aliasAttributeSymbol,
         INamedTypeSymbol generateSerializerAttributeSymbol,

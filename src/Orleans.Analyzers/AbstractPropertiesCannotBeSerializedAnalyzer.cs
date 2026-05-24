@@ -1,7 +1,7 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
-using System.Collections.Immutable;
 
 namespace Orleans.Analyzers
 {
@@ -24,8 +24,8 @@ namespace Orleans.Analyzers
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterCompilationStartAction(context =>
             {
-                var idAttribute = context.Compilation.GetTypeByMetadataName("Orleans.IdAttribute");
-                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+                var idAttribute = context.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
+                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
                 if (idAttribute is null || generateSerializerAttributeSymbol is null)
                 {
                     return;

@@ -70,25 +70,5 @@ public interface IJournalStorageProvider
     /// </summary>
     /// <param name="journalId">The journal id.</param>
     /// <returns>The journal storage instance.</returns>
-    IJournalStorage CreateStorage(JournalId journalId)
-    {
-        if (journalId.IsDefault)
-        {
-            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
-        }
-
-        throw new NotSupportedException(
-            $"This journal storage provider does not support grain-independent journals. Implement {nameof(CreateStorage)}({nameof(JournalId)}) to support on-demand journals.");
-    }
-
-    /// <summary>
-    /// Creates journal storage for the provided grain context.
-    /// </summary>
-    /// <param name="grainContext">The grain context.</param>
-    /// <returns>The journal storage instance.</returns>
-    IJournalStorage CreateStorage(IGrainContext grainContext)
-    {
-        ArgumentNullException.ThrowIfNull(grainContext);
-        return CreateStorage(JournalId.FromGrainId(grainContext.GrainId));
-    }
+    IJournalStorage CreateStorage(JournalId journalId);
 }

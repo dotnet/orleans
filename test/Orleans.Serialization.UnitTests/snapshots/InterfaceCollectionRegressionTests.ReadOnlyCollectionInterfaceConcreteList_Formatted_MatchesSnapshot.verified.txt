@@ -1,0 +1,6 @@
+﻿0x002F [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: System.Collections.Generic.List`1[System.Int32] (name: Encoded "TypeName "System.Collections.Generic.List`1[[int]]" (hash 77903B0D)" (System.Collections.Generic.List`1[[System.Int32]]))] Value: {
+0x0030  [#2 VarInt Id: 0 SchemaType: Expected] Value: 3 (0x3)
+0x0032  [#3 VarInt Id: 1 SchemaType: Expected] Value: 4 (0x4)
+0x0034  [#4 VarInt Id: 1 SchemaType: Expected] Value: 8 (0x8)
+0x0036  [#5 VarInt Id: 1 SchemaType: Expected] Value: 12 (0xC)
+0x0038 }

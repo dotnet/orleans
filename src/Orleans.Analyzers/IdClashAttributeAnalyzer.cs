@@ -1,10 +1,7 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
 
 namespace Orleans.Analyzers;
 
@@ -33,8 +30,8 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterCompilationStartAction(context =>
         {
-            var generateSerializerAttribute = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
-            var idAttribute = context.Compilation.GetTypeByMetadataName("Orleans.IdAttribute");
+            var generateSerializerAttribute = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
+            var idAttribute = context.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
             if (generateSerializerAttribute is not null && idAttribute is not null)
             {
                 context.RegisterSymbolAction(context => AnalyzeNamedType(context, generateSerializerAttribute, idAttribute), SymbolKind.NamedType);
