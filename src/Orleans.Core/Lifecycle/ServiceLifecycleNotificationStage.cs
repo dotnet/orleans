@@ -78,7 +78,7 @@ internal sealed partial class ServiceLifecycleNotificationStage(ILogger logger, 
         }
 
         LogStageAlreadyCompleted(logger, name);
-        _ = ExecuteLateCallback(participant);
+        _ = Task.Run(() => ExecuteLateCallback(participant));
 
         return participant;
 
