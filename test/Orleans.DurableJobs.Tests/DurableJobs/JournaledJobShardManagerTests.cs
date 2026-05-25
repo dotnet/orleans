@@ -1,4 +1,7 @@
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics.Metrics;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -131,7 +134,7 @@ public class JournaledJobShardManagerTests
         Assert.NotNull(scheduled);
 
         await shard.MarkAsCompleteAsync(CancellationToken.None);
-        await shard.DisposeAsync();
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
 
         var reopenedManager = CreateManager(services, membership, silo);
         var reopened = await reopenedManager.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
@@ -155,6 +158,121 @@ public class JournaledJobShardManagerTests
 
         Assert.Equal(0, await shard.GetJobCountAsync());
         await reopenedManager.UnregisterShardAsync(shard, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_ArePersistedInStorageBatches()
+    {
+        const int JobCount = 32;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5016), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var end = start.AddHours(1);
+        var shard = await manager.CreateShardAsync(
+            start,
+            end,
+            new Dictionary<string, string> { ["Purpose"] = "ConcurrentBatching" },
+            CancellationToken.None);
+        var observedBatchSizes = new ConcurrentBag<long>();
+        using var listener = CreateStorageBatchSizeListener(observedBatchSizes);
+
+        var scheduleTasks = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"target-{index}"),
+                JobName = $"batched-job-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = null
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        storageProvider.AllowAppends();
+        var scheduledJobs = await Task.WhenAll(scheduleTasks).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.All(scheduledJobs, job => Assert.NotNull(job));
+        Assert.True(
+            storageProvider.AppendCount < JobCount,
+            $"Expected fewer storage appends than scheduled jobs, but saw {storageProvider.AppendCount} appends for {JobCount} jobs.");
+        Assert.Contains(observedBatchSizes, size => size > 1);
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+
+        var reopenedManager = CreateManager(services, membership, silo);
+        var reopened = await reopenedManager.AssignJobShardsAsync(end, int.MaxValue, CancellationToken.None);
+        var reopenedShard = Assert.Single(reopened);
+        var consumed = new List<IJobRunContext>();
+        await foreach (var jobContext in reopenedShard.ConsumeDurableJobsAsync().WithCancellation(CancellationToken.None))
+        {
+            consumed.Add(jobContext);
+            await reopenedShard.RemoveJobAsync(jobContext.Job.Id, CancellationToken.None);
+        }
+
+        Assert.Equal(JobCount, consumed.Count);
+        Assert.Subset(
+            consumed.Select(context => context.Job.Id).ToHashSet(StringComparer.Ordinal),
+            scheduledJobs.Select(job => job!.Id).ToHashSet(StringComparer.Ordinal));
+
+        await reopenedManager.UnregisterShardAsync(reopenedShard, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_WhenOneRequestIsInvalid_PersistsOtherRequests()
+    {
+        const int JobCount = 8;
+        const int InvalidIndex = 3;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5017), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var end = start.AddHours(1);
+        var shard = await manager.CreateShardAsync(
+            start,
+            end,
+            new Dictionary<string, string> { ["Purpose"] = "ConcurrentBatchingInvalidItem" },
+            CancellationToken.None);
+
+        var scheduleTasks = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"target-{index}"),
+                JobName = $"batched-job-{index}",
+                DueTime = index == InvalidIndex ? end.AddSeconds(1) : start.AddSeconds(1),
+                Metadata = null
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        storageProvider.AllowAppends();
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => scheduleTasks[InvalidIndex].WaitAsync(TimeSpan.FromSeconds(5)));
+        var scheduledJobs = await Task.WhenAll(scheduleTasks.Where((_, index) => index != InvalidIndex)).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.All(scheduledJobs, job => Assert.NotNull(job));
+        Assert.True(
+            storageProvider.AppendCount < JobCount,
+            $"Expected fewer storage appends than scheduled jobs, but saw {storageProvider.AppendCount} appends for {JobCount - 1} valid jobs.");
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+
+        var reopenedManager = CreateManager(services, membership, silo);
+        var reopened = await reopenedManager.AssignJobShardsAsync(end, int.MaxValue, CancellationToken.None);
+        var reopenedShard = Assert.Single(reopened);
+        var consumed = new List<IJobRunContext>();
+        await foreach (var jobContext in reopenedShard.ConsumeDurableJobsAsync().WithCancellation(CancellationToken.None))
+        {
+            consumed.Add(jobContext);
+            await reopenedShard.RemoveJobAsync(jobContext.Job.Id, CancellationToken.None);
+        }
+
+        Assert.Equal(JobCount - 1, consumed.Count);
+        await reopenedManager.UnregisterShardAsync(reopenedShard, CancellationToken.None);
     }
 
     [Fact]
@@ -386,7 +504,7 @@ public class JournaledJobShardManagerTests
         }
     }
 
-    private static ServiceProvider CreateServices(VolatileJournalStorageProvider storageProvider)
+    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider)
     {
         var builder = new TestSiloBuilder();
         builder.AddJournalStorage();
@@ -394,8 +512,95 @@ public class JournaledJobShardManagerTests
         builder.Services.AddLogging();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
-        builder.Services.AddSingleton<IJournalStorageCatalog>(storageProvider);
+        builder.Services.AddSingleton((IJournalStorageCatalog)storageProvider);
         return builder.Services.BuildServiceProvider();
+    }
+
+    private static MeterListener CreateStorageBatchSizeListener(ConcurrentBag<long> observedBatchSizes)
+    {
+        var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == "Microsoft.Orleans" && instrument.Name == "orleans-durablejobs-storage-batch-size")
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, measurement, _, _) => observedBatchSizes.Add(measurement));
+        listener.Start();
+        return listener;
+    }
+
+    private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
+    {
+        private readonly VolatileJournalStorageProvider _inner = new();
+        private readonly bool _delayAppends;
+        private readonly TaskCompletionSource _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _appendCount;
+
+        public CountingJournalStorageProvider(bool delayAppends)
+        {
+            _delayAppends = delayAppends;
+            if (!delayAppends)
+            {
+                _allowAppends.SetResult();
+            }
+        }
+
+        public Task AppendStarted => _appendStarted.Task;
+
+        public int AppendCount => Volatile.Read(ref _appendCount);
+
+        public void AllowAppends() => _allowAppends.TrySetResult();
+
+        public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
+
+        public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
+            => _inner.ListAsync(prefix, cancellationToken);
+
+        private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _appendCount);
+            _appendStarted.TrySetResult();
+            if (_delayAppends)
+            {
+                await _allowAppends.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private sealed class CountingJournalStorage(CountingJournalStorageProvider owner, IJournalStorage inner) : IJournalStorage
+        {
+            public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+            public ValueTask<bool> CreateIfNotExistsAsync(IReadOnlyDictionary<string, string> metadata = null, CancellationToken cancellationToken = default)
+                => inner.CreateIfNotExistsAsync(metadata, cancellationToken);
+
+            public ValueTask<IJournalMetadata> GetMetadataAsync(CancellationToken cancellationToken = default)
+                => inner.GetMetadataAsync(cancellationToken);
+
+            public ValueTask<IJournalMetadata> UpdateMetadataAsync(
+                IReadOnlyDictionary<string, string> set = null,
+                IEnumerable<string> remove = null,
+                string expectedETag = null,
+                CancellationToken cancellationToken = default)
+                => inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+
+            public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+                => inner.ReadAsync(consumer, cancellationToken);
+
+            public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            {
+                await owner.OnAppendAsync(cancellationToken).ConfigureAwait(false);
+                await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
+            }
+
+            public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+                => inner.ReplaceAsync(value, cancellationToken);
+
+            public ValueTask DeleteAsync(CancellationToken cancellationToken)
+                => inner.DeleteAsync(cancellationToken);
+        }
     }
 
     private static JournaledJobShardManager CreateManager(

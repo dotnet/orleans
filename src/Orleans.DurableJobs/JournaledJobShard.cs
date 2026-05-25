@@ -15,6 +15,11 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly IJournaledStateManager _stateManager;
     private readonly JournaledJobShardManager _shardManager;
     private readonly SemaphoreSlim _operationLock = new(1, 1);
+    private readonly object _pendingOperationsLock = new();
+    private readonly Queue<PendingOperation> _pendingOperations = new();
+    private readonly SemaphoreSlim _pendingOperationSignal = new(0);
+    private readonly CancellationTokenSource _shutdownCancellation = new();
+    private readonly Task _operationProcessor;
     private int _disposed;
 
     /// <summary>
@@ -54,6 +59,8 @@ internal sealed class JournaledJobShard : IJobShard
         {
             _state.MarkAsComplete();
         }
+
+        _operationProcessor = Task.Run(ProcessOperationsAsync);
     }
 
     /// <inheritdoc/>
@@ -87,22 +94,15 @@ internal sealed class JournaledJobShard : IJobShard
     {
         ThrowIfDisposed();
 
-        await _operationLock.WaitAsync(cancellationToken);
+        var operation = new MarkAsCompleteOperation(cancellationToken);
         try
         {
-            if (_state.IsAddingCompleted)
-            {
-                return;
-            }
-
-            if (await _shardManager.TryMarkShardClosedAsync(Id, cancellationToken))
-            {
-                _state.MarkAsComplete();
-            }
+            EnqueueOperation(operation);
+            await operation.Task.ConfigureAwait(false);
         }
         finally
         {
-            _operationLock.Release();
+            operation.Dispose();
         }
     }
 
@@ -112,21 +112,15 @@ internal sealed class JournaledJobShard : IJobShard
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         ThrowIfDisposed();
 
-        await _operationLock.WaitAsync(cancellationToken);
+        var operation = new RemoveJobOperation(jobId, cancellationToken);
         try
         {
-            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(Id, cancellationToken))
-            {
-                return false;
-            }
-
-            var removed = _state.RemoveJob(jobId);
-            await _stateManager.WriteStateAsync(cancellationToken);
-            return removed;
+            EnqueueOperation(operation);
+            return await operation.Task.ConfigureAwait(false);
         }
         finally
         {
-            _operationLock.Release();
+            operation.Dispose();
         }
     }
 
@@ -136,20 +130,15 @@ internal sealed class JournaledJobShard : IJobShard
         ArgumentNullException.ThrowIfNull(jobContext);
         ThrowIfDisposed();
 
-        await _operationLock.WaitAsync(cancellationToken);
+        var operation = new RetryJobLaterOperation(jobContext, newDueTime, cancellationToken);
         try
         {
-            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(Id, cancellationToken))
-            {
-                return;
-            }
-
-            _state.RetryJobLater(jobContext, newDueTime);
-            await _stateManager.WriteStateAsync(cancellationToken);
+            EnqueueOperation(operation);
+            await operation.Task.ConfigureAwait(false);
         }
         finally
         {
-            _operationLock.Release();
+            operation.Dispose();
         }
     }
 
@@ -158,31 +147,15 @@ internal sealed class JournaledJobShard : IJobShard
     {
         ThrowIfDisposed();
 
-        await _operationLock.WaitAsync(cancellationToken);
+        var operation = new ScheduleJobOperation(request, cancellationToken);
         try
         {
-            if (_state.IsAddingCompleted)
-            {
-                return null;
-            }
-
-            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(Id, cancellationToken))
-            {
-                return null;
-            }
-
-            var job = _state.TryScheduleJob(request);
-            if (job is null)
-            {
-                return null;
-            }
-
-            await _stateManager.WriteStateAsync(cancellationToken);
-            return job;
+            EnqueueOperation(operation);
+            return await operation.Task.ConfigureAwait(false);
         }
         finally
         {
-            _operationLock.Release();
+            operation.Dispose();
         }
     }
 
@@ -195,14 +168,15 @@ internal sealed class JournaledJobShard : IJobShard
     {
         ThrowIfDisposed();
 
-        await _operationLock.WaitAsync(cancellationToken);
+        var operation = new DeleteStateOperation(cancellationToken);
         try
         {
-            await _stateManager.DeleteStateAsync(cancellationToken);
+            EnqueueOperation(operation);
+            await operation.Task.ConfigureAwait(false);
         }
         finally
         {
-            _operationLock.Release();
+            operation.Dispose();
         }
     }
 
@@ -216,14 +190,458 @@ internal sealed class JournaledJobShard : IJobShard
 
         try
         {
+            _shutdownCancellation.Cancel();
+            _pendingOperationSignal.Release();
+            await _operationProcessor.ConfigureAwait(false);
             await _stateManager.DisposeAsync();
         }
         finally
         {
+            _shutdownCancellation.Dispose();
+            _pendingOperationSignal.Dispose();
             _operationLock.Dispose();
             GC.SuppressFinalize(this);
         }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed != 0, this);
+
+    private void EnqueueOperation(PendingOperation operation)
+    {
+        operation.CancellationToken.ThrowIfCancellationRequested();
+
+        lock (_pendingOperationsLock)
+        {
+            ThrowIfDisposed();
+            _pendingOperations.Enqueue(operation);
+            _pendingOperationSignal.Release();
+        }
+    }
+
+    private async Task ProcessOperationsAsync()
+    {
+        var batch = new List<PendingMutationOperation>();
+        try
+        {
+            while (true)
+            {
+                await _pendingOperationSignal.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+
+                if (!TryDequeueOperation(out var operation) || operation is null)
+                {
+                    continue;
+                }
+
+                if (operation is PendingMutationOperation mutation)
+                {
+                    batch.Add(mutation);
+                    DequeueConsecutiveMutations(batch);
+                    await ProcessMutationBatchAsync(batch).ConfigureAwait(false);
+                    batch.Clear();
+                }
+                else
+                {
+                    await ProcessBarrierOperationAsync(operation).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            CancelOperations(batch);
+            CancelQueuedOperations();
+        }
+    }
+
+    private bool TryDequeueOperation(out PendingOperation? operation)
+    {
+        lock (_pendingOperationsLock)
+        {
+            return _pendingOperations.TryDequeue(out operation);
+        }
+    }
+
+    private void DequeueConsecutiveMutations(List<PendingMutationOperation> batch)
+    {
+        lock (_pendingOperationsLock)
+        {
+            while (_pendingOperations.TryPeek(out var operation) && operation is PendingMutationOperation mutation)
+            {
+                _pendingOperations.Dequeue();
+                batch.Add(mutation);
+            }
+        }
+    }
+
+    private void CancelQueuedOperations()
+    {
+        lock (_pendingOperationsLock)
+        {
+            while (_pendingOperations.TryDequeue(out var operation))
+            {
+                operation.TryCancel(_shutdownCancellation.Token);
+            }
+        }
+    }
+
+    private void CancelOperations(List<PendingMutationOperation> operations)
+    {
+        foreach (var operation in operations)
+        {
+            operation.TryCancel(_shutdownCancellation.Token);
+        }
+
+        operations.Clear();
+    }
+
+    private async Task ProcessMutationBatchAsync(List<PendingMutationOperation> operations)
+    {
+        var lockTaken = false;
+        var startedOperations = new List<PendingMutationOperation>(operations.Count);
+        var appliedOperations = new List<PendingMutationOperation>(operations.Count);
+
+        try
+        {
+            await _operationLock.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+            lockTaken = true;
+
+            foreach (var operation in operations)
+            {
+                if (!operation.TryStart())
+                {
+                    continue;
+                }
+
+                if (operation.TryCompleteWithoutOwnership(this))
+                {
+                    continue;
+                }
+
+                startedOperations.Add(operation);
+            }
+
+            if (startedOperations.Count == 0)
+            {
+                return;
+            }
+
+            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false))
+            {
+                foreach (var operation in startedOperations)
+                {
+                    operation.CompleteNotOwned();
+                }
+
+                return;
+            }
+
+            foreach (var operation in startedOperations)
+            {
+                try
+                {
+                    if (operation.Apply(this))
+                    {
+                        appliedOperations.Add(operation);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    operation.TrySetException(exception);
+                }
+            }
+
+            if (appliedOperations.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                await _stateManager.WriteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                DurableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: false);
+                foreach (var operation in appliedOperations)
+                {
+                    operation.CompleteAfterWrite();
+                }
+            }
+            catch (OperationCanceledException exception) when (_shutdownCancellation.IsCancellationRequested)
+            {
+                DurableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: true, error: false);
+                foreach (var operation in appliedOperations)
+                {
+                    operation.TrySetCanceled(exception.CancellationToken);
+                }
+            }
+            catch (Exception exception)
+            {
+                DurableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: true);
+                foreach (var operation in appliedOperations)
+                {
+                    operation.TrySetException(exception);
+                }
+            }
+        }
+        catch (OperationCanceledException exception) when (_shutdownCancellation.IsCancellationRequested)
+        {
+            CompleteIncompleteOperations(operations, exception);
+        }
+        catch (Exception exception)
+        {
+            CompleteIncompleteOperations(operations, exception);
+        }
+        finally
+        {
+            if (lockTaken)
+            {
+                _operationLock.Release();
+            }
+        }
+    }
+
+    private async Task ProcessBarrierOperationAsync(PendingOperation operation)
+    {
+        if (!operation.TryStart())
+        {
+            return;
+        }
+
+        var lockTaken = false;
+        try
+        {
+            await _operationLock.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+            lockTaken = true;
+
+            switch (operation)
+            {
+                case MarkAsCompleteOperation markAsComplete:
+                    if (!_state.IsAddingCompleted && await _shardManager.TryMarkShardClosedAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false))
+                    {
+                        _state.MarkAsComplete();
+                    }
+
+                    markAsComplete.Complete();
+                    break;
+                case DeleteStateOperation deleteState:
+                    await _stateManager.DeleteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                    deleteState.Complete();
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unsupported DurableJobs shard operation '{operation.GetType().Name}'.");
+            }
+        }
+        catch (OperationCanceledException exception) when (_shutdownCancellation.IsCancellationRequested)
+        {
+            operation.TrySetCanceled(exception.CancellationToken);
+        }
+        catch (Exception exception)
+        {
+            operation.TrySetException(exception);
+        }
+        finally
+        {
+            if (lockTaken)
+            {
+                _operationLock.Release();
+            }
+        }
+    }
+
+    private void CompleteIncompleteOperations(List<PendingMutationOperation> operations, Exception exception)
+    {
+        foreach (var operation in operations)
+        {
+            if (exception is OperationCanceledException cancellation && _shutdownCancellation.IsCancellationRequested)
+            {
+                operation.TrySetCanceled(cancellation.CancellationToken);
+            }
+            else
+            {
+                operation.TrySetException(exception);
+            }
+        }
+    }
+
+    private abstract class PendingOperation : IDisposable
+    {
+        private readonly CancellationTokenRegistration _cancellationRegistration;
+        private int _started;
+
+        protected PendingOperation(CancellationToken cancellationToken)
+        {
+            CancellationToken = cancellationToken;
+            if (cancellationToken.CanBeCanceled)
+            {
+                _cancellationRegistration = cancellationToken.Register(static state => ((PendingOperation)state!).TryCancel(), this);
+            }
+        }
+
+        public CancellationToken CancellationToken { get; }
+
+        public abstract Task Completion { get; }
+
+        public bool TryStart()
+        {
+            if (CancellationToken.IsCancellationRequested)
+            {
+                TryCancel();
+                return false;
+            }
+
+            if (Interlocked.CompareExchange(ref _started, 1, 0) != 0)
+            {
+                return false;
+            }
+
+            return !Completion.IsCompleted;
+        }
+
+        public void TryCancel() => TryCancel(CancellationToken);
+
+        public void TryCancel(CancellationToken cancellationToken)
+        {
+            if (Volatile.Read(ref _started) == 0)
+            {
+                TrySetCanceled(cancellationToken);
+            }
+        }
+
+        public abstract void TrySetCanceled(CancellationToken cancellationToken);
+
+        public abstract void TrySetException(Exception exception);
+
+        public void Dispose() => _cancellationRegistration.Dispose();
+    }
+
+    private abstract class PendingOperation<TResult> : PendingOperation
+    {
+        private readonly TaskCompletionSource<TResult> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected PendingOperation(CancellationToken cancellationToken) : base(cancellationToken)
+        {
+        }
+
+        public Task<TResult> Task => _completion.Task;
+
+        public override Task Completion => _completion.Task;
+
+        public override void TrySetCanceled(CancellationToken cancellationToken) => _completion.TrySetCanceled(cancellationToken);
+
+        public override void TrySetException(Exception exception) => _completion.TrySetException(exception);
+
+        protected void TrySetResult(TResult result) => _completion.TrySetResult(result);
+    }
+
+    private abstract class PendingMutationOperation : PendingOperation
+    {
+        protected PendingMutationOperation(CancellationToken cancellationToken) : base(cancellationToken)
+        {
+        }
+
+        public virtual bool TryCompleteWithoutOwnership(JournaledJobShard shard) => false;
+
+        public abstract void CompleteNotOwned();
+
+        public abstract bool Apply(JournaledJobShard shard);
+
+        public abstract void CompleteAfterWrite();
+    }
+
+    private abstract class PendingMutationOperation<TResult> : PendingMutationOperation
+    {
+        private readonly TaskCompletionSource<TResult> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TResult _result = default!;
+
+        protected PendingMutationOperation(CancellationToken cancellationToken) : base(cancellationToken)
+        {
+        }
+
+        public Task<TResult> Task => _completion.Task;
+
+        public override Task Completion => _completion.Task;
+
+        protected abstract TResult NotOwnedResult { get; }
+
+        protected abstract bool Apply(JournaledJobShard shard, out TResult result);
+
+        public override void TrySetCanceled(CancellationToken cancellationToken) => _completion.TrySetCanceled(cancellationToken);
+
+        public override void TrySetException(Exception exception) => _completion.TrySetException(exception);
+
+        public override void CompleteNotOwned() => _completion.TrySetResult(NotOwnedResult);
+
+        public override bool Apply(JournaledJobShard shard)
+        {
+            var writeRequired = Apply(shard, out _result);
+            if (!writeRequired)
+            {
+                _completion.TrySetResult(_result);
+            }
+
+            return writeRequired;
+        }
+
+        public override void CompleteAfterWrite() => _completion.TrySetResult(_result);
+
+        protected void TrySetResult(TResult result) => _completion.TrySetResult(result);
+    }
+
+    private sealed class ScheduleJobOperation(ScheduleJobRequest request, CancellationToken cancellationToken)
+        : PendingMutationOperation<DurableJob?>(cancellationToken)
+    {
+        protected override DurableJob? NotOwnedResult => null;
+
+        public override bool TryCompleteWithoutOwnership(JournaledJobShard shard)
+        {
+            if (!shard._state.IsAddingCompleted)
+            {
+                return false;
+            }
+
+            TrySetResult(null);
+            return true;
+        }
+
+        protected override bool Apply(JournaledJobShard shard, out DurableJob? result)
+        {
+            result = shard._state.TryScheduleJob(request);
+            return result is not null;
+        }
+    }
+
+    private sealed class RemoveJobOperation(string jobId, CancellationToken cancellationToken)
+        : PendingMutationOperation<bool>(cancellationToken)
+    {
+        protected override bool NotOwnedResult => false;
+
+        protected override bool Apply(JournaledJobShard shard, out bool result)
+        {
+            result = shard._state.RemoveJob(jobId);
+            return true;
+        }
+    }
+
+    private sealed class RetryJobLaterOperation(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
+        : PendingMutationOperation<bool>(cancellationToken)
+    {
+        protected override bool NotOwnedResult => true;
+
+        protected override bool Apply(JournaledJobShard shard, out bool result)
+        {
+            shard._state.RetryJobLater(jobContext, newDueTime);
+            result = true;
+            return true;
+        }
+    }
+
+    private sealed class MarkAsCompleteOperation(CancellationToken cancellationToken) : PendingOperation<bool>(cancellationToken)
+    {
+        public void Complete() => TrySetResult(true);
+    }
+
+    private sealed class DeleteStateOperation(CancellationToken cancellationToken) : PendingOperation<bool>(cancellationToken)
+    {
+        public void Complete() => TrySetResult(true);
+    }
 }

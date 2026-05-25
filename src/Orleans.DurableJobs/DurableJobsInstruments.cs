@@ -28,6 +28,7 @@ internal static class DurableJobsInstruments
     private static readonly Counter<long> CancelJobCalls = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-cancel-job-calls");
     private static readonly Counter<long> HandlerExecutionsStarted = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-handler-executions-started");
     private static readonly Counter<long> HandlerExecutions = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-handler-executions");
+    private static readonly Counter<long> StorageBatches = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-storage-batches");
 
     private static readonly Histogram<double> JobScheduleDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-schedule-duration", MillisecondsUnit);
     private static readonly Histogram<double> JobDispatchLag = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-dispatch-lag", MillisecondsUnit);
@@ -36,6 +37,7 @@ internal static class DurableJobsInstruments
     private static readonly Histogram<double> ScheduleJobCallDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-schedule-job-call-duration", MillisecondsUnit);
     private static readonly Histogram<double> CancelJobCallDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-cancel-job-call-duration", MillisecondsUnit);
     private static readonly Histogram<double> HandlerExecutionDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-handler-execution-duration", MillisecondsUnit);
+    private static readonly Histogram<long> StorageBatchSize = Instruments.Meter.CreateHistogram<long>("orleans-durablejobs-storage-batch-size");
 
     internal static void OnJobScheduled(TimeSpan latency)
     {
@@ -100,6 +102,17 @@ internal static class DurableJobsInstruments
         var status = error ? StatusError : canceled ? StatusCanceled : StatusCompleted;
         ShardsProcessed.Add(1, [new KeyValuePair<string, object?>(StatusTagName, status)]);
         Record(ShardProcessingDuration, latency, status);
+    }
+
+    internal static void OnStorageBatchWritten(long operationCount, bool canceled, bool error)
+    {
+        var status = error ? StatusError : canceled ? StatusCanceled : StatusOk;
+        var tags = new KeyValuePair<string, object?>[] { new(StatusTagName, status) };
+        StorageBatches.Add(1, tags);
+        if (StorageBatchSize.Enabled)
+        {
+            StorageBatchSize.Record(Math.Max(0, operationCount), tags);
+        }
     }
 
     private static void OnScheduleJobCall(TimeSpan latency, string status)
