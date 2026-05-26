@@ -346,6 +346,70 @@ public class InMemoryJobQueueTests
         });
     }
 
+    [Fact]
+    public async Task Enqueue_WithSameDueTimeAsDrainingBucket_DoesNotStrandJob()
+    {
+        // Regression: Enqueueing a job with the same DueTime as a bucket currently being
+        // drained by the enumerator previously reused the dequeued bucket via _buckets,
+        // but that bucket was no longer in the priority queue, so the new job was stranded.
+        var queue = new InMemoryJobQueue();
+        var sharedDueTime = DateTimeOffset.UtcNow.AddMilliseconds(-100);
+        var job1 = CreateJob("job1", sharedDueTime);
+        var job2 = CreateJob("job2", sharedDueTime);
+
+        queue.Enqueue(job1, 0);
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+
+        // Drain the first job. After this returns, the enumerator is between yields with
+        // the bucket already dequeued from _queue.
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("job1", enumerator.Current.Job.Name);
+        queue.CancelJob(enumerator.Current.Job.Id);
+
+        // Enqueue a second job at the same DueTime. With the bug, this would target the
+        // already-dequeued bucket and never become visible to the enumerator.
+        queue.Enqueue(job2, 0);
+        queue.MarkAsComplete();
+
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("job2", enumerator.Current.Job.Name);
+        queue.CancelJob(enumerator.Current.Job.Id);
+
+        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task Enqueue_AfterBucketProcessingCompletes_CreatesNewBucket()
+    {
+        // After a bucket is fully drained and removed, a subsequent Enqueue at the same
+        // DueTime must create a fresh bucket and re-enter the priority queue so the new
+        // job is processed.
+        var queue = new InMemoryJobQueue();
+        var sharedDueTime = DateTimeOffset.UtcNow.AddMilliseconds(-100);
+        var job1 = CreateJob("job1", sharedDueTime);
+
+        queue.Enqueue(job1, 0);
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("job1", enumerator.Current.Job.Name);
+        queue.CancelJob(enumerator.Current.Job.Id);
+
+        // job1 has been yielded and removed; a new job at the same DueTime must be visible
+        // to the next MoveNextAsync.
+        var job2 = CreateJob("job2", sharedDueTime);
+        queue.Enqueue(job2, 0);
+        queue.MarkAsComplete();
+
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("job2", enumerator.Current.Job.Name);
+        queue.CancelJob(enumerator.Current.Job.Id);
+
+        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
     private static DurableJob CreateJob(string id, DateTimeOffset dueTime)
     {
         return new DurableJob

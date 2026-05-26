@@ -205,8 +205,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     {
         while (true)
         {
-            JobBucket? bucketToProcess = null;
-            DateTimeOffset bucketKey = default;
+            List<(DurableJob Job, int DequeueCount)>? jobsToYield = null;
             Task? queueChanged = null;
             TimeSpan? delay = null;
 
@@ -229,9 +228,16 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                     var now = _timeProvider.GetUtcNow();
                     if (nextBucket.DueTime <= now)
                     {
-                        // Dequeue the entire bucket to process outside the lock
-                        bucketToProcess = _queue.Dequeue();
-                        bucketKey = bucketToProcess.DueTime;
+                        // Dequeue the bucket and remove it from _buckets atomically so a concurrent
+                        // Enqueue for the same DueTime cannot reuse this bucket. Without this,
+                        // GetJobBucket would find the bucket still in _buckets and add to it,
+                        // but the bucket is no longer in _queue, so the new job would be stranded.
+                        var bucketToProcess = _queue.Dequeue();
+                        _buckets.Remove(bucketToProcess.DueTime);
+
+                        // Snapshot the jobs under the lock so concurrent Cancel/Retry mutations
+                        // do not race the enumeration.
+                        jobsToYield = new List<(DurableJob Job, int DequeueCount)>(bucketToProcess.Jobs);
                     }
                     else
                     {
@@ -245,10 +251,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 }
             }
 
-            if (bucketToProcess is not null)
+            if (jobsToYield is not null)
             {
                 // Process all jobs in the bucket outside the lock for better concurrency
-                foreach (var (job, dequeueCount) in bucketToProcess.Jobs.ToList())
+                foreach (var (job, dequeueCount) in jobsToYield)
                 {
                     // Verify job hasn't been cancelled while we were processing
                     bool shouldYield;
@@ -262,12 +268,6 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                     {
                         yield return new JobRunContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
                     }
-                }
-
-                // Clean up the bucket from dictionary after processing all jobs
-                lock (_syncLock)
-                {
-                    _buckets.Remove(bucketKey);
                 }
             }
             else
