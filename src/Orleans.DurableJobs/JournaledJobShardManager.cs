@@ -34,6 +34,11 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private readonly JournaledStateManagerOptions _journaledStateManagerOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<string, JournaledJobShard> _jobShardCache = new();
+    // Sticky positive cache for IsShardOwnedByLocalSiloAsync. Entries are added once a shard is
+    // confirmed to be owned by this silo, and removed only when ownership is released locally
+    // (via UnregisterShardAsync). Mis-cache from split-brain is bounded by storage-layer ETag
+    // conflicts triggering InconsistentStateException → the journaling layer's recovery path.
+    private readonly ConcurrentDictionary<string, bool> _ownedShards = new(StringComparer.Ordinal);
 
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
@@ -205,6 +210,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         finally
         {
             _jobShardCache.TryRemove(shard.Id, out _);
+            _ownedShards.TryRemove(shard.Id, out _);
             await journaledShard.DisposeAsync();
         }
     }
@@ -234,8 +240,19 @@ internal sealed class JournaledJobShardManager : JobShardManager
 
     internal override async ValueTask<bool> IsShardOwnedByLocalSiloAsync(string shardId, CancellationToken cancellationToken)
     {
+        if (_ownedShards.ContainsKey(shardId))
+        {
+            return true;
+        }
+
         var descriptor = await GetDescriptorAsync(shardId, cancellationToken);
-        return descriptor is { Poisoned: false, Owner: { } owner } && owner.Equals(SiloAddress);
+        var isOwned = descriptor is { Poisoned: false, Owner: { } owner } && owner.Equals(SiloAddress);
+        if (isOwned)
+        {
+            _ownedShards[shardId] = true;
+        }
+
+        return isOwned;
     }
 
     internal async ValueTask<bool> TryMarkShardClosedAsync(string shardId, CancellationToken cancellationToken)
@@ -362,6 +379,13 @@ internal sealed class JournaledJobShardManager : JobShardManager
         {
             await manager.DisposeAsync().ConfigureAwait(false);
             throw;
+        }
+
+        // Pre-populate the ownership cache when the descriptor confirms this silo owns the shard,
+        // so the first batch flush does not pay an Azure metadata round trip.
+        if (descriptor is { Poisoned: false, Owner: { } owner } && owner.Equals(SiloAddress))
+        {
+            _ownedShards[descriptor.ShardId.Value] = true;
         }
 
         return new JournaledJobShard(
