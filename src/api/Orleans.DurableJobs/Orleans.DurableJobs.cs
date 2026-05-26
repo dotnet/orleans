@@ -179,6 +179,8 @@ namespace Orleans.Hosting
     {
         public bool ConcurrencySlowStartEnabled { get { throw null; } set { } }
 
+        public System.TimeSpan JobStatusPollInterval { get { throw null; } set { } }
+
         public int MaxAdoptedCount { get { throw null; } set { } }
 
         public int MaxConcurrentJobsPerSilo { get { throw null; } set { } }
@@ -194,6 +196,8 @@ namespace Orleans.Hosting
         public System.TimeSpan ShardClaimRampUpDuration { get { throw null; } set { } }
 
         public System.TimeSpan ShardDuration { get { throw null; } set { } }
+
+        public int ShardStripeCount { get { throw null; } set { } }
 
         public System.Func<DurableJobs.IJobRunContext, System.Exception, System.DateTimeOffset?> ShouldRetry { get { throw null; } set { } }
 

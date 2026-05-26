@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
+using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
@@ -32,6 +34,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     private readonly IGrainContext _grain;
     private readonly ILogger<DurableJobReceiverExtension> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly DurableJobsOptions _options;
     private readonly ConcurrentDictionary<(string JobId, int DequeueCount), JobAttemptState> _jobAttempts = new();
     private readonly ConcurrentQueue<CompletedJobAttempt> _completedJobAttempts = new();
     private int _completedJobAttemptCount;
@@ -39,11 +42,16 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     private const int MaxCompletedJobAttempts = 65_536;
     private static readonly TimeSpan CompletedJobAttemptRetention = TimeSpan.FromMinutes(1);
 
-    public DurableJobReceiverExtension(IGrainContext grain, ILogger<DurableJobReceiverExtension> logger, TimeProvider timeProvider)
+    public DurableJobReceiverExtension(
+        IGrainContext grain,
+        ILogger<DurableJobReceiverExtension> logger,
+        TimeProvider timeProvider,
+        IOptions<DurableJobsOptions> options)
     {
         _grain = grain;
         _logger = logger;
         _timeProvider = timeProvider;
+        _options = options.Value;
     }
 
     /// <inheritdoc />
@@ -98,7 +106,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         // Cancellation is cooperative: only terminal task state is authoritative for job outcome.
         if (!state.Task.IsCompleted)
         {
-            return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(1)));
+            return Task.FromResult(DurableJobRunResult.PollAfter(_options.JobStatusPollInterval));
         }
 
         RecordCompletedJobAttempt(key, state);

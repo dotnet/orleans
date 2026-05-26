@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -34,7 +35,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     // Shard tracking state
     private readonly ConcurrentDictionary<string, IJobShard> _shardCache = new();
-    private readonly ConcurrentDictionary<DateTimeOffset, IJobShard> _writeableShards = new();
+    private readonly ConcurrentDictionary<WritableShardKey, IJobShard> _writeableShards = new();
+    private readonly ConcurrentDictionary<string, WritableShardKey> _writeableShardKeys = new();
     private readonly ConcurrentDictionary<string, Task> _runningShards = new();
     private readonly SemaphoreSlim _shardCreationLock = new(1, 1);
     private readonly SemaphoreSlim _shardCheckSignal = new(0);
@@ -44,6 +46,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private int _totalClaimedShards;
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
+    private const string ShardStripeMetadataKey = "stripe";
 
     public LocalDurableJobManager(
         JobShardManager shardManager,
@@ -75,7 +78,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         {
             LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
-            var shardKey = GetShardKey(request.DueTime);
+            var shardKey = GetWritableShardKey(request);
 
             while (true)
             {
@@ -89,7 +92,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     }
                     catch (ObjectDisposedException ex) when (TryRemoveWritableShard(shardKey, existingShard) || !IsWritableShard(shardKey, existingShard))
                     {
-                        LogWritableShardDisposedDuringScheduling(_logger, ex, existingShard.Id, shardKey);
+                        LogWritableShardDisposedDuringScheduling(_logger, ex, existingShard.Id, shardKey.StartTime, shardKey.Stripe);
                         continue;
                     }
 
@@ -119,11 +122,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
                     // Create new shard
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-                    var endTime = shardKey.Add(_options.ShardDuration);
-                    var newShard = await _shardManager.CreateShardAsync(shardKey, endTime, EmptyMetadata, linkedCts.Token);
+                    var endTime = shardKey.StartTime.Add(_options.ShardDuration);
+                    var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, CreateShardMetadata(shardKey), linkedCts.Token);
 
-                    LogCreatingNewShard(_logger, shardKey);
+                    LogCreatingNewShard(_logger, shardKey.StartTime, shardKey.Stripe);
                     _writeableShards[shardKey] = newShard;
+                    _writeableShardKeys[newShard.Id] = shardKey;
                     _shardCache.TryAdd(newShard.Id, newShard);
                     TryActivateShard(newShard);
                 }
@@ -343,16 +347,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var now = _timeProvider.GetUtcNow();
         foreach (var key in _writeableShards.Keys.ToArray())
         {
-            var shardEndTime = key.Add(_options.ShardDuration);
+            var shardEndTime = key.StartTime.Add(_options.ShardDuration);
             if (shardEndTime < now && _writeableShards.TryRemove(key, out var expiredShard))
             {
+                _writeableShardKeys.TryRemove(expiredShard.Id, out _);
                 try
                 {
                     await expiredShard.MarkAsCompleteAsync(cancellationToken);
                 }
                 catch (ObjectDisposedException ex)
                 {
-                    LogExpiredWritableShardAlreadyDisposed(_logger, ex, expiredShard.Id, key);
+                    LogExpiredWritableShardAlreadyDisposed(_logger, ex, expiredShard.Id, key.StartTime, key.Stripe);
                 }
             }
         }
@@ -495,7 +500,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         finally
         {
             // Clean up tracking and dispose the shard
-            TryRemoveWritableShard(shard.StartTime, shard);
+            TryRemoveWritableShard(shard);
             _shardCache.TryRemove(shard.Id, out _);
             _runningShards.TryRemove(shard.Id, out _);
 
@@ -516,28 +521,51 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         return _timeProvider.GetUtcNow() >= activationTime;
     }
 
-    private bool IsWritableShard(DateTimeOffset shardKey, IJobShard shard)
+    private bool IsWritableShard(WritableShardKey shardKey, IJobShard shard)
         => _writeableShards.TryGetValue(shardKey, out var existingShard) && ReferenceEquals(existingShard, shard);
 
-    private bool TryRemoveWritableShard(DateTimeOffset shardKey, IJobShard shard)
+    private bool TryRemoveWritableShard(WritableShardKey shardKey, IJobShard shard)
     {
-        var entry = new KeyValuePair<DateTimeOffset, IJobShard>(shardKey, shard);
-        return ((ICollection<KeyValuePair<DateTimeOffset, IJobShard>>)_writeableShards).Remove(entry);
+        var entry = new KeyValuePair<WritableShardKey, IJobShard>(shardKey, shard);
+        var removed = ((ICollection<KeyValuePair<WritableShardKey, IJobShard>>)_writeableShards).Remove(entry);
+        if (removed)
+        {
+            var keyEntry = new KeyValuePair<string, WritableShardKey>(shard.Id, shardKey);
+            ((ICollection<KeyValuePair<string, WritableShardKey>>)_writeableShardKeys).Remove(keyEntry);
+        }
+
+        return removed;
+    }
+
+    private bool TryRemoveWritableShard(IJobShard shard)
+    {
+        if (_writeableShardKeys.TryGetValue(shard.Id, out var shardKey))
+        {
+            return TryRemoveWritableShard(shardKey, shard);
+        }
+
+        return false;
     }
 
     internal sealed class TestAccessor(LocalDurableJobManager manager)
     {
         public Task ProcessShardCheckCycleAsync(CancellationToken cancellationToken) => manager.ProcessShardCheckCycleAsync(cancellationToken);
 
-        public void AddWritableShard(DateTimeOffset shardKey, IJobShard shard)
+        public void AddWritableShard(DateTimeOffset shardKey, IJobShard shard, int stripe = 0)
         {
-            manager._writeableShards[shardKey] = shard;
+            var key = new WritableShardKey(shardKey, stripe);
+            manager._writeableShards[key] = shard;
+            manager._writeableShardKeys[shard.Id] = key;
             manager._shardCache.TryAdd(shard.Id, shard);
         }
 
-        public bool HasWritableShard(DateTimeOffset shardKey) => manager._writeableShards.ContainsKey(shardKey);
+        public bool HasWritableShard(DateTimeOffset shardKey, int stripe = 0) => manager._writeableShards.ContainsKey(new WritableShardKey(shardKey, stripe));
 
-        public bool TryGetWritableShard(DateTimeOffset shardKey, out IJobShard? shard) => manager._writeableShards.TryGetValue(shardKey, out shard);
+        public bool TryGetWritableShard(DateTimeOffset shardKey, out IJobShard? shard, int stripe = 0) => manager._writeableShards.TryGetValue(new WritableShardKey(shardKey, stripe), out shard);
+
+        public int GetWritableShardStripe(ScheduleJobRequest request) => manager.GetWritableShardKey(request).Stripe;
+
+        public int WritableShardCount => manager._writeableShards.Count;
 
         public void TryActivateShard(IJobShard shard) => manager.TryActivateShard(shard);
 
@@ -546,11 +574,89 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         public bool HasCachedShard(string shardId) => manager._shardCache.ContainsKey(shardId);
     }
 
-    private DateTimeOffset GetShardKey(DateTimeOffset scheduledTime)
+    private WritableShardKey GetWritableShardKey(ScheduleJobRequest request)
+        => new(GetShardStartTime(request.DueTime), GetShardStripe(request));
+
+    private DateTimeOffset GetShardStartTime(DateTimeOffset scheduledTime)
     {
         var shardDurationTicks = _options.ShardDuration.Ticks;
         var epochTicks = scheduledTime.UtcTicks;
         var bucketTicks = (epochTicks / shardDurationTicks) * shardDurationTicks;
         return new DateTimeOffset(bucketTicks, TimeSpan.Zero);
     }
+
+    private int GetShardStripe(ScheduleJobRequest request)
+    {
+        if (_options.ShardStripeCount <= 1)
+        {
+            return 0;
+        }
+
+        var hash = AddStableHash(2_166_136_261u, request.Target.GetUniformHashCode());
+        hash = AddStableHash(hash, request.JobName);
+
+        if (request.Metadata is { Count: > 0 } metadata)
+        {
+            foreach (var entry in metadata.OrderBy(static entry => entry.Key, StringComparer.Ordinal))
+            {
+                hash = AddStableHash(hash, entry.Key);
+                hash = AddStableHash(hash, entry.Value);
+            }
+        }
+
+        return (int)(hash % (uint)_options.ShardStripeCount);
+    }
+
+    private IDictionary<string, string> CreateShardMetadata(WritableShardKey shardKey)
+    {
+        if (_options.ShardStripeCount <= 1)
+        {
+            return EmptyMetadata;
+        }
+
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [ShardStripeMetadataKey] = shardKey.Stripe.ToString(CultureInfo.InvariantCulture)
+        };
+    }
+
+    private static uint AddStableHash(uint hash, uint value)
+    {
+        unchecked
+        {
+            hash ^= value & 0xFF;
+            hash *= 16_777_619u;
+            hash ^= (value >> 8) & 0xFF;
+            hash *= 16_777_619u;
+            hash ^= (value >> 16) & 0xFF;
+            hash *= 16_777_619u;
+            hash ^= (value >> 24) & 0xFF;
+            hash *= 16_777_619u;
+            return hash;
+        }
+    }
+
+    private static uint AddStableHash(uint hash, string? value)
+    {
+        unchecked
+        {
+            if (value is null)
+            {
+                return AddStableHash(hash, 0);
+            }
+
+            foreach (var character in value)
+            {
+                var code = (uint)character;
+                hash ^= code & 0xFFu;
+                hash *= 16_777_619u;
+                hash ^= code >> 8;
+                hash *= 16_777_619u;
+            }
+
+            return hash;
+        }
+    }
+
+    private readonly record struct WritableShardKey(DateTimeOffset StartTime, int Stripe);
 }

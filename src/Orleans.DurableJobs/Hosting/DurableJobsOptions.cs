@@ -30,6 +30,20 @@ public sealed class DurableJobsOptions
     public TimeSpan ShardActivationBufferPeriod { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// Gets or sets the number of writable shards to use for each shard time bucket.
+    /// Increasing this value distributes jobs with the same due-time bucket across multiple shard journals.
+    /// Default: 1.
+    /// </summary>
+    public int ShardStripeCount { get; set; } = 1;
+
+    /// <summary>
+    /// Gets or sets the delay before polling an asynchronous durable job handler again.
+    /// The job continues holding its concurrency slot while it is polled.
+    /// Default: 1 second.
+    /// </summary>
+    public TimeSpan JobStatusPollInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// Gets or sets the maximum number of jobs that can be executed concurrently on a single silo.
     /// Default: 10,000 × processor count.
     /// </summary>
@@ -165,6 +179,18 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         if (options.ShardDuration <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
+        }
+        if (options.ShardStripeCount <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be greater than zero.");
+        }
+        if (options.ShardStripeCount > 1024)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be less than or equal to 1024.");
+        }
+        if (options.JobStatusPollInterval <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.JobStatusPollInterval must be greater than zero.");
         }
         if (options.ShouldRetry is null)
         {

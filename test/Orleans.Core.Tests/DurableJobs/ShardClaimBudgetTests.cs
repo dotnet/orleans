@@ -193,6 +193,34 @@ public class ShardClaimBudgetTests
     }
 
     [Fact]
+    public void ValidateConfiguration_NonPositiveShardStripeCount_Throws()
+    {
+        var options = Options.Create(new DurableJobsOptions
+        {
+            ShardStripeCount = 0
+        });
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            options);
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
+    [Fact]
+    public void ValidateConfiguration_NonPositiveJobStatusPollInterval_Throws()
+    {
+        var options = Options.Create(new DurableJobsOptions
+        {
+            JobStatusPollInterval = TimeSpan.Zero
+        });
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            options);
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
+    [Fact]
     public void ValidateConfiguration_ValidShardClaimOptions_DoesNotThrow()
     {
         var options = Options.Create(new DurableJobsOptions

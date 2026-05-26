@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
@@ -46,7 +47,8 @@ public static class DurableJobsExtensions
             return new DurableJobReceiverExtension(
                 grainContextAccessor.GrainContext,
                 sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
-                sp.GetService<TimeProvider>() ?? TimeProvider.System);
+                sp.GetService<TimeProvider>() ?? TimeProvider.System,
+                sp.GetRequiredService<IOptions<DurableJobsOptions>>());
         });
     }
 
