@@ -1536,15 +1536,15 @@ internal sealed partial class ActivationData :
             if (State == ActivationState.Invalid)
             {
                 _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
-
-                // Always process responses
-                _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
-                return;
+                // Note that we always process responses, even if the activation is invalid.
             }
-
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
-            _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
+            else
+            {
+                MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+            }
         }
+
+        _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
     }
 
     private void ReceiveRequest(Message message)
