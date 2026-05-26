@@ -14,6 +14,8 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly JournaledJobShardState _state;
     private readonly IJournaledStateManager _stateManager;
     private readonly JournaledJobShardManager _shardManager;
+    private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan _batchLingerDelay;
     private readonly SemaphoreSlim _operationLock = new(1, 1);
     private readonly object _pendingOperationsLock = new();
     private readonly Queue<PendingOperation> _pendingOperations = new();
@@ -33,6 +35,11 @@ internal sealed class JournaledJobShard : IJobShard
     /// <param name="state">The journaled shard state.</param>
     /// <param name="stateManager">The manager used to persist journaled state.</param>
     /// <param name="shardManager">The shard manager that owns this shard.</param>
+    /// <param name="timeProvider">The time provider used for batch linger delays. Defaults to <see cref="TimeProvider.System"/>.</param>
+    /// <param name="batchLingerDelay">
+    /// Optional duration the operation processor waits for additional mutations to join the batch
+    /// after the first one arrives. Use <see cref="TimeSpan.Zero"/> (the default) to disable linger.
+    /// </param>
     public JournaledJobShard(
         JobShardId shardId,
         DateTimeOffset startTime,
@@ -41,11 +48,17 @@ internal sealed class JournaledJobShard : IJobShard
         bool isClosed,
         JournaledJobShardState state,
         IJournaledStateManager stateManager,
-        JournaledJobShardManager shardManager)
+        JournaledJobShardManager shardManager,
+        TimeProvider? timeProvider = null,
+        TimeSpan batchLingerDelay = default)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(stateManager);
         ArgumentNullException.ThrowIfNull(shardManager);
+        if (batchLingerDelay < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(batchLingerDelay), batchLingerDelay, "Batch linger delay must be non-negative.");
+        }
 
         Id = shardId.Value;
         StartTime = startTime;
@@ -54,6 +67,8 @@ internal sealed class JournaledJobShard : IJobShard
         _state = state;
         _stateManager = stateManager;
         _shardManager = shardManager;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _batchLingerDelay = batchLingerDelay;
 
         if (isClosed)
         {
@@ -236,6 +251,10 @@ internal sealed class JournaledJobShard : IJobShard
                 {
                     batch.Add(mutation);
                     DequeueConsecutiveMutations(batch);
+                    if (_batchLingerDelay > TimeSpan.Zero)
+                    {
+                        await LingerForMoreMutationsAsync(batch).ConfigureAwait(false);
+                    }
                     await ProcessMutationBatchAsync(batch).ConfigureAwait(false);
                     batch.Clear();
                 }
@@ -253,6 +272,20 @@ internal sealed class JournaledJobShard : IJobShard
             CancelOperations(batch);
             CancelQueuedOperations();
         }
+    }
+
+    private async Task LingerForMoreMutationsAsync(List<PendingMutationOperation> batch)
+    {
+        try
+        {
+            await Task.Delay(_batchLingerDelay, _timeProvider, _shutdownCancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        DequeueConsecutiveMutations(batch);
     }
 
     private bool TryDequeueOperation(out PendingOperation? operation)

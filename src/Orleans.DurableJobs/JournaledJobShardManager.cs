@@ -372,7 +372,9 @@ internal sealed class JournaledJobShardManager : JobShardManager
             descriptor.Closed,
             state,
             manager,
-            this);
+            this,
+            _timeProvider,
+            _options.ShardBatchLingerDelay);
     }
 
     private IDurableValueCommandCodec<DurableJobShardJournalRecord> CreateOperationCodec()
