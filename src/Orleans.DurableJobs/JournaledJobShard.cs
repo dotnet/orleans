@@ -16,7 +16,6 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly JournaledJobShardManager _shardManager;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _batchLingerDelay;
-    private readonly SemaphoreSlim _operationLock = new(1, 1);
     private readonly object _pendingOperationsLock = new();
     private readonly Queue<PendingOperation> _pendingOperations = new();
     private readonly SemaphoreSlim _pendingOperationSignal = new(0);
@@ -214,7 +213,6 @@ internal sealed class JournaledJobShard : IJobShard
         {
             _shutdownCancellation.Dispose();
             _pendingOperationSignal.Dispose();
-            _operationLock.Dispose();
             GC.SuppressFinalize(this);
         }
     }
@@ -254,6 +252,7 @@ internal sealed class JournaledJobShard : IJobShard
                     if (_batchLingerDelay > TimeSpan.Zero)
                     {
                         await LingerForMoreMutationsAsync(batch).ConfigureAwait(false);
+                        DequeueConsecutiveMutations(batch);
                     }
                     await ProcessMutationBatchAsync(batch).ConfigureAwait(false);
                     batch.Clear();
@@ -284,8 +283,6 @@ internal sealed class JournaledJobShard : IJobShard
         {
             return;
         }
-
-        DequeueConsecutiveMutations(batch);
     }
 
     private bool TryDequeueOperation(out PendingOperation? operation)
@@ -331,15 +328,11 @@ internal sealed class JournaledJobShard : IJobShard
 
     private async Task ProcessMutationBatchAsync(List<PendingMutationOperation> operations)
     {
-        var lockTaken = false;
         var startedOperations = new List<PendingMutationOperation>(operations.Count);
         var appliedOperations = new List<PendingMutationOperation>(operations.Count);
 
         try
         {
-            await _operationLock.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(false);
-            lockTaken = true;
-
             foreach (var operation in operations)
             {
                 if (!operation.TryStart())
@@ -424,13 +417,6 @@ internal sealed class JournaledJobShard : IJobShard
         {
             CompleteIncompleteOperations(operations, exception);
         }
-        finally
-        {
-            if (lockTaken)
-            {
-                _operationLock.Release();
-            }
-        }
     }
 
     private async Task ProcessBarrierOperationAsync(PendingOperation operation)
@@ -440,12 +426,8 @@ internal sealed class JournaledJobShard : IJobShard
             return;
         }
 
-        var lockTaken = false;
         try
         {
-            await _operationLock.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(false);
-            lockTaken = true;
-
             switch (operation)
             {
                 case MarkAsCompleteOperation markAsComplete:
@@ -471,13 +453,6 @@ internal sealed class JournaledJobShard : IJobShard
         catch (Exception exception)
         {
             operation.TrySetException(exception);
-        }
-        finally
-        {
-            if (lockTaken)
-            {
-                _operationLock.Release();
-            }
         }
     }
 
