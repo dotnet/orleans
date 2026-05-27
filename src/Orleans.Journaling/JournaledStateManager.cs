@@ -190,6 +190,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         workItem = dequeuedWorkItem;
                     }
 
+                    var processingTimestamp = _shared.TimeProvider.GetTimestamp();
+                    var queueOperation = GetStorageQueueOperation(workItem);
+                    var queueDuration = queueOperation is null
+                        ? default
+                        : _shared.TimeProvider.GetElapsedTime(workItem.EnqueuedTimestamp, processingTimestamp);
+                    var recordQueueDuration = workItem is DeleteStateWorkItem;
                     try
                     {
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -302,6 +308,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                                     if (hasCommittedBuffer)
                                     {
+                                        recordQueueDuration = true;
                                         var writeSequence = committedBuffer.AsReadOnlySequence();
 #if DEBUG
                                         // Defensive: copy the sequence into a pooled buffer so we can poison it
@@ -321,7 +328,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         {
                                             if (isSnapshot && hasBufferToConsume)
                                             {
-                                                await _storage.AppendAsync(bufferToConsume.AsReadOnlySequence(), _shutdownCancellation.Token).ConfigureAwait(true);
+                                                await AppendStorageAsync(bufferToConsume.AsReadOnlySequence(), _shutdownCancellation.Token).ConfigureAwait(true);
                                                 lock (_lock)
                                                 {
                                                     _journalWriter.Consume(bufferToConsume);
@@ -337,11 +344,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                                             if (isSnapshot)
                                             {
-                                                await _storage.ReplaceAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
+                                                await ReplaceStorageAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                             }
                                             else
                                             {
-                                                await _storage.AppendAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
+                                                await AppendStorageAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                             }
 
                                             writeCompleted = true;
@@ -395,7 +402,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             case DeleteStateWorkItem:
                                 {
                                     // Clear storage.
-                                    await _storage.DeleteAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
                                     lock (_lock)
                                     {
@@ -448,10 +455,20 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 }
                         }
 
+                        if (recordQueueDuration && queueOperation is not null)
+                        {
+                            JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: true);
+                        }
+
                         workItem.SetResult();
                     }
                     catch (Exception exception)
                     {
+                        if (recordQueueDuration && queueOperation is not null)
+                        {
+                            JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: false);
+                        }
+
                         workItem.SetException(exception);
                         if (IsRecoverySignal(exception))
                         {
@@ -575,17 +592,37 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             _workSignal.Signal();
         }
 
-        await task;
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        try
+        {
+            await task;
+            JournalingInstruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
+        }
+        catch
+        {
+            JournalingInstruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
+            throw;
+        }
     }
 
     private async Task RecoverAsync(CancellationToken cancellationToken)
     {
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
         lock (_lock)
         {
             ResetForRecovery();
         }
 
-        await _storage.ReadAsync(this, cancellationToken).ConfigureAwait(true);
+        try
+        {
+            await ReadStorageAsync(this, cancellationToken).ConfigureAwait(true);
+            JournalingInstruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
+        }
+        catch
+        {
+            JournalingInstruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
+            throw;
+        }
 
         lock (_lock)
         {
@@ -718,9 +755,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         Task pendingWrite;
         bool didEnqueue;
+        string operation;
         lock (_lock)
         {
-            pendingWrite = _migrationSnapshotRequired || _storage.IsCompactionRequested
+            var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
+            operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
+            pendingWrite = isSnapshot
                 ? EnqueueOrGetPendingWorkItem<WriteSnapshotWorkItem>(out didEnqueue)
                 : EnqueueOrGetPendingWorkItem<AppendJournalWorkItem>(out didEnqueue);
         }
@@ -730,7 +770,77 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             _workSignal.Signal();
         }
 
-        await pendingWrite.WaitAsync(cancellationToken);
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        try
+        {
+            await pendingWrite.WaitAsync(cancellationToken);
+            JournalingInstruments.OnStateWriteRequest(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
+        }
+        catch
+        {
+            JournalingInstruments.OnStateWriteRequest(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
+            throw;
+        }
+    }
+
+    private async ValueTask ReadStorageAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+    {
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        try
+        {
+            await _storage.ReadAsync(consumer, cancellationToken).ConfigureAwait(true);
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationRead, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: true);
+        }
+        catch
+        {
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationRead, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: false);
+            throw;
+        }
+    }
+
+    private async ValueTask AppendStorageAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    {
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        try
+        {
+            await _storage.AppendAsync(value, cancellationToken).ConfigureAwait(true);
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
+        }
+        catch
+        {
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
+            throw;
+        }
+    }
+
+    private async ValueTask ReplaceStorageAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    {
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        try
+        {
+            await _storage.ReplaceAsync(value, cancellationToken).ConfigureAwait(true);
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
+        }
+        catch
+        {
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
+            throw;
+        }
+    }
+
+    private async ValueTask DeleteStorageAsync(CancellationToken cancellationToken)
+    {
+        var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        try
+        {
+            await _storage.DeleteAsync(cancellationToken).ConfigureAwait(true);
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationDelete, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: true);
+        }
+        catch
+        {
+            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationDelete, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: false);
+            throw;
+        }
     }
 
     private Task EnqueueOrGetPendingWorkItem<TWorkItem>(out bool didEnqueue)
@@ -748,6 +858,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
 
         var newWorkItem = new TWorkItem();
+        newWorkItem.EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp();
         _workQueue.Enqueue(newWorkItem);
         didEnqueue = true;
         return newWorkItem.Task;
@@ -812,6 +923,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private abstract class WorkItem : TaskCompletionSource
     {
+        public long EnqueuedTimestamp { get; set; }
+
         protected WorkItem() : base(TaskCreationOptions.RunContinuationsAsynchronously)
         {
         }
@@ -821,6 +934,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
 
     }
+
+    private static string? GetStorageQueueOperation(WorkItem workItem) =>
+        workItem switch
+        {
+            AppendJournalWorkItem => JournalingInstruments.OperationAppend,
+            WriteSnapshotWorkItem => JournalingInstruments.OperationSnapshot,
+            DeleteStateWorkItem => JournalingInstruments.OperationDelete,
+            _ => null
+        };
 
     private sealed class InitializeWorkItem : WorkItem;
 

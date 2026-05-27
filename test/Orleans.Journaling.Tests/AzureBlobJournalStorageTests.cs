@@ -58,6 +58,77 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
+    public async Task AppendAsync_WhenWalETagChangesOnlyForMetadata_ReloadsWalAndAppends()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs);
+        var catalogStorage = CreateStorage(appendBlobs);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        Assert.NotNull(await catalogStorage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["catalog"] = "closed" },
+            cancellationToken: CancellationToken.None));
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+
+        Assert.Equal([1, 2], appendBlobs.GetContent("blob/wal"));
+    }
+
+    [Fact]
+    public async Task AppendAsync_AfterSameInstanceMetadataUpdate_UsesUpdatedETag()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        Assert.NotNull(await storage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["catalog"] = "closed" },
+            cancellationToken: CancellationToken.None));
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+
+        Assert.Equal(new ETag("\"metadata-1\""), appendBlobs.AppendCalls.Last().IfMatch);
+        Assert.Equal([1, 2], appendBlobs.GetContent("blob/wal"));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenWalETagChangesOnlyForMetadata_ReloadsWalAndDeletes()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs);
+        var catalogStorage = CreateStorage(appendBlobs);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        Assert.NotNull(await catalogStorage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["catalog"] = "closed" },
+            cancellationToken: CancellationToken.None));
+
+        await storage.DeleteAsync(CancellationToken.None);
+
+        Assert.False(appendBlobs.Exists("blob/wal"));
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenWalETagChangesOnlyForMetadata_ReloadsWalAndPublishesCheckpoint()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        var storage = CreateStorage(appendBlobs, checkpoints);
+        var catalogStorage = CreateStorage(appendBlobs, checkpoints);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        Assert.NotNull(await catalogStorage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["catalog"] = "closed" },
+            cancellationToken: CancellationToken.None));
+
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+
+        Assert.Equal("closed", appendBlobs.CreateCalls.Last().Metadata["catalog"]);
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(appendBlobs, checkpoints).ReadAsync(consumer, CancellationToken.None);
+        Assert.Equal([2], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
     public async Task AppendAsync_WhenMimeTypeConfigured_SetsBlobContentType()
     {
         var appendBlobs = new FakeAppendBlobStore();

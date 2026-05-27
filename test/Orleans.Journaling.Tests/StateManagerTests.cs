@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Serialization.Buffers;
@@ -257,6 +259,63 @@ public class StateManagerTests : JournalingTestBase
         var replacement = Assert.Single(storage.Replaces);
         Assert.Single(storage.Appends);
         AssertContainsRuntimeAndApplicationEntries(ReadBinaryEntries(replacement));
+    }
+
+    [Fact]
+    public async Task StateManager_StorageOperationBytesMetric_RecordsWritePayloadSizes()
+    {
+        var observedBytes = new ConcurrentBag<MetricMeasurement<long>>();
+        using var listener = CreateMetricListener("orleans-journaling-storage-operation-bytes", observedBytes);
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var append = Assert.Single(storage.Appends);
+        var replacement = Assert.Single(storage.Replaces);
+        Assert.Contains(observedBytes, measurement => measurement.Operation == "append" && measurement.Status == "ok" && measurement.Value == append.Length);
+        Assert.Contains(observedBytes, measurement => measurement.Operation == "replace" && measurement.Status == "ok" && measurement.Value == replacement.Length);
+    }
+
+    [Fact]
+    public void JournalingInstruments_StorageOperationBytesMetric_SkipsZeroByteAndFailedOperations()
+    {
+        var observedBytes = new ConcurrentBag<MetricMeasurement<long>>();
+        using var listener = CreateMetricListener("orleans-journaling-storage-operation-bytes", observedBytes);
+        var operation = $"test-{Guid.NewGuid():N}";
+
+        JournalingInstruments.OnStorageOperation(operation, TimeSpan.Zero, bytes: 0, succeeded: true);
+        JournalingInstruments.OnStorageOperation(operation, TimeSpan.Zero, bytes: 1, succeeded: false);
+
+        Assert.DoesNotContain(observedBytes, measurement => measurement.Operation == operation);
+    }
+
+    [Fact]
+    public async Task StateManager_StorageOperationQueueDurationMetric_RecordsWaitBehindPreviousAppend()
+    {
+        var observedDurations = new ConcurrentBag<MetricMeasurement<double>>();
+        using var listener = CreateMetricListener("orleans-journaling-storage-operation-queue-duration", observedDurations);
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var storage = new BlockingAppendStorage();
+        var sut = CreateTestSystem(storage: storage, provider: timeProvider);
+        var state = new AlwaysWritingState();
+        sut.Manager.RegisterState("state", state);
+
+        await sut.Lifecycle.OnStart();
+        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.FirstAppendStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var secondWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+        storage.AllowFirstAppend.SetResult();
+
+        await Task.WhenAll(firstWrite, secondWrite).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(2, storage.Appends.Count);
+        Assert.Contains(observedDurations, measurement => measurement.Operation == "append" && measurement.Status == "ok" && measurement.Value >= 250);
     }
 
     [Fact]
@@ -1370,6 +1429,74 @@ public class StateManagerTests : JournalingTestBase
             BeganEntryIds.Add(streamId.Value);
             base.WritePreservedEntry(streamId, entry);
         }
+    }
+
+    private readonly record struct MetricMeasurement<T>(T Value, string? Operation, string? Status);
+
+    private static MeterListener CreateMetricListener<T>(string instrumentName, ConcurrentBag<MetricMeasurement<T>> measurements)
+        where T : struct
+    {
+        var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == "Microsoft.Orleans" && instrument.Name == instrumentName)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+
+        listener.SetMeasurementEventCallback<T>((_, measurement, tags, _) =>
+            measurements.Add(new(measurement, GetTag(tags, "operation"), GetTag(tags, "status"))));
+        listener.Start();
+        return listener;
+    }
+
+    private static string? GetTag(ReadOnlySpan<KeyValuePair<string, object?>> tags, string name)
+    {
+        foreach (var tag in tags)
+        {
+            if (tag.Key == name)
+            {
+                return tag.Value?.ToString();
+            }
+        }
+
+        return null;
+    }
+
+    private sealed class BlockingAppendStorage : IJournalStorage
+    {
+        private int _appendCount;
+
+        public TaskCompletionSource FirstAppendStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowFirstAppend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public List<byte[]> Appends { get; } = [];
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            consumer.Complete(metadata: null);
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Interlocked.Increment(ref _appendCount) == 1)
+            {
+                FirstAppendStarted.SetResult();
+                await AllowFirstAppend.Task.WaitAsync(cancellationToken);
+            }
+
+            Appends.Add(value.ToArray());
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
     private sealed class CapturingStorage : IJournalStorage
