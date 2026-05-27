@@ -148,8 +148,8 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
     {
         Task? task = null;
 
-        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, _ => Task.CompletedTask);
-        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, _ => Task.CompletedTask, OnStop);
+        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, NoOpStop);
+        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, NoOpStart, OnStop);
 
         Task OnStart(CancellationToken ct)
         {
@@ -165,6 +165,9 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
                 await task.WaitAsync(ct).SuppressThrowing();
             }
         }
+
+        static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
+        static Task NoOpStop(CancellationToken _) => Task.CompletedTask;
     }
 
     [LoggerMessage(

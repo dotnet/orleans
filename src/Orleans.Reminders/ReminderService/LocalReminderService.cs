@@ -65,49 +65,57 @@ namespace Orleans.Runtime.ReminderService
             observer.Subscribe(
                 nameof(LocalReminderService),
                 ServiceLifecycleStage.BecomeActive,
-                async ct =>
-                {
-                    try
-                    {
-                        await this.QueueTask(() => Initialize(ct));
-                    }
-                    catch (Exception exception)
-                    {
-                        LogErrorActivatingReminderService(exception);
-                        throw;
-                    }
-                },
-                async ct =>
-                {
-                    try
-                    {
-                        await this.QueueTask(Stop).WaitAsync(ct);
-                    }
-                    catch (Exception exception)
-                    {
-                        LogErrorStoppingReminderService(exception);
-                        throw;
-                    }
-                });
+                InitializeReminderService,
+                StopReminderService);
             observer.Subscribe(
                 nameof(LocalReminderService),
                 ServiceLifecycleStage.Active,
-                async ct =>
-                {
-                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    cts.CancelAfter(this.reminderOptions.InitializationTimeout);
+                StartReminderService,
+                NoOpStop);
 
-                    try
-                    {
-                        await this.QueueTask(Start).WaitAsync(cts.Token);
-                    }
-                    catch (Exception exception)
-                    {
-                        LogErrorStartingReminderService(exception);
-                        throw;
-                    }
-                },
-                ct => Task.CompletedTask);
+            async Task InitializeReminderService(CancellationToken ct)
+            {
+                try
+                {
+                    await this.QueueTask(() => Initialize(ct));
+                }
+                catch (Exception exception)
+                {
+                    LogErrorActivatingReminderService(exception);
+                    throw;
+                }
+            }
+
+            async Task StopReminderService(CancellationToken ct)
+            {
+                try
+                {
+                    await this.QueueTask(Stop).WaitAsync(ct);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorStoppingReminderService(exception);
+                    throw;
+                }
+            }
+
+            async Task StartReminderService(CancellationToken ct)
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(this.reminderOptions.InitializationTimeout);
+
+                try
+                {
+                    await this.QueueTask(Start).WaitAsync(cts.Token);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorStartingReminderService(exception);
+                    throw;
+                }
+            }
+
+            static Task NoOpStop(CancellationToken _) => Task.CompletedTask;
         }
 
         /// <summary>

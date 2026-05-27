@@ -28,4 +28,7 @@ internal interface ISiloGrainService : IGrainService
 
     [Alias("GetCounters")]
     Task<Immutable<StatCounter[]>> GetCounters();
+
+    [Alias("GetLifecycleStages")]
+    Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages();
 }

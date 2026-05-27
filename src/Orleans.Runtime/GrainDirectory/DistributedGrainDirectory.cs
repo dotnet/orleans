@@ -301,7 +301,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
 
         // Transition into 'ShuttingDown'/'Stopping' stage, removing ourselves from directory membership, but allow some time for hand-off before transitioning to 'Dead'.
-        observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.BecomeActive - 1, _ => Task.CompletedTask, OnShuttingDown);
+        observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.BecomeActive - 1, NoOpStart, OnShuttingDown);
+
+        static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
 
         Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
         {

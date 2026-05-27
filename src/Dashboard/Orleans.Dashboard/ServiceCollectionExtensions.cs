@@ -272,6 +272,19 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        group.MapGet("/LifecycleStages", async ([FromServices] IDashboardClient client) =>
+        {
+            try
+            {
+                var result = await client.GetLifecycleStages();
+                return Results.Json(result.Value, jsonOptions);
+            }
+            catch (SiloUnavailableException)
+            {
+                return CreateUnavailableResult(true);
+            }
+        });
+
         group.MapGet("/GrainTypes", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try

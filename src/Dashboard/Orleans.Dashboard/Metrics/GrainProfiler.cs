@@ -30,7 +30,11 @@ internal sealed partial class GrainProfiler(
 
     public bool IsEnabled => options.Value.TraceAlways || _isEnabled;
 
-    public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe<GrainProfiler>(ServiceLifecycleStage.Last, ct => OnStart(), ct => OnStop());
+    public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe<GrainProfiler>(ServiceLifecycleStage.Last, StartProfiler, StopProfiler);
+
+    private Task StartProfiler(CancellationToken ct) => OnStart();
+
+    private Task StopProfiler(CancellationToken ct) => OnStop();
 
     private Task OnStart()
     {

@@ -223,13 +223,15 @@ namespace Orleans.Runtime.Metadata
                 nameof(ClusterManifestProvider),
                 ServiceLifecycleStage.RuntimeServices,
                 Initialize,
-                _ => Task.CompletedTask);
+                NoOpStop);
 
             lifecycle.Subscribe(
                 nameof(ClusterManifestProvider),
                 ServiceLifecycleStage.RuntimeGrainServices,
                 StartAsync,
                 StopAsync);
+
+            static Task NoOpStop(CancellationToken _) => Task.CompletedTask;
         }
 
         public async ValueTask DisposeAsync()

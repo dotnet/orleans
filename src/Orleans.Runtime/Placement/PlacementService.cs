@@ -102,8 +102,10 @@ namespace Orleans.Runtime.Placement
             lifecycle.Subscribe(
                 nameof(PlacementService),
                 ServiceLifecycleStage.RuntimeInitialize + 1,
-                static _ => Task.CompletedTask,
+                NoOpStart,
                 StopAsync);
+
+            static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
         }
 
         private async Task StopAsync(CancellationToken cancellationToken)

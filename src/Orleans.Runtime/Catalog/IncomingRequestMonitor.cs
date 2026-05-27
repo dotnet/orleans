@@ -72,19 +72,23 @@ namespace Orleans.Runtime
             lifecycle.Subscribe(
                 nameof(IncomingRequestMonitor),
                 ServiceLifecycleStage.BecomeActive,
-                ct =>
+                StartMonitoring,
+                StopMonitoring);
+
+            Task StartMonitoring(CancellationToken ct)
+            {
+                _runTask = Task.Run(this.Run);
+                return Task.CompletedTask;
+            }
+
+            async Task StopMonitoring(CancellationToken ct)
+            {
+                _scanPeriodTimer.Dispose();
+                if (_runTask is Task task)
                 {
-                    _runTask = Task.Run(this.Run);
-                    return Task.CompletedTask;
-                },
-                async ct =>
-                {
-                    _scanPeriodTimer.Dispose();
-                    if (_runTask is Task task)
-                    {
-                        await task.WaitAsync(ct).SuppressThrowing();
-                    }
-                });
+                    await task.WaitAsync(ct).SuppressThrowing();
+                }
+            }
         }
 
         private async Task Run()

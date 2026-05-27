@@ -9,6 +9,7 @@ using Orleans.Runtime;
 using Orleans.Dashboard.Metrics;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Core;
+using Orleans.Dashboard.Implementation;
 
 #nullable disable
 namespace Orleans.Dashboard.Implementation;
@@ -21,6 +22,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
     private readonly DashboardOptions _options;
     private readonly IGrainProfiler _profiler;
     private readonly IGrainFactory _grainFactory;
+    private readonly ISiloLifecycleSubject _siloLifecycle;
     private readonly ILogger<SiloGrainService> _logger;
     private IDisposable _timer;
     private string _versionOrleans;
@@ -32,11 +34,13 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         ILoggerFactory loggerFactory,
         IGrainProfiler profiler,
         IOptions<DashboardOptions> options,
-        IGrainFactory grainFactory) : base(grainId, silo, loggerFactory)
+        IGrainFactory grainFactory,
+        ISiloLifecycleSubject siloLifecycle) : base(grainId, silo, loggerFactory)
     {
         _profiler = profiler;
         _options = options.Value;
         _grainFactory = grainFactory;
+        _siloLifecycle = siloLifecycle;
         _statistics = new Queue<SiloRuntimeStatistics>(_options.HistoryLength + 1);
         _logger = loggerFactory.CreateLogger<SiloGrainService>();
     }
@@ -132,6 +136,11 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
     public Task<Immutable<StatCounter[]>> GetCounters()
     {
         return Task.FromResult(_counters.Values.OrderBy(x => x.Name).ToArray().AsImmutable());
+    }
+
+    public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages()
+    {
+        return Task.FromResult(LifecycleStageInspector.GetStages(_siloLifecycle).AsImmutable());
     }
 
     public Task Enable(bool enabled)
