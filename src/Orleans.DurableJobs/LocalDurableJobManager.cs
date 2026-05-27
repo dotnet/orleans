@@ -70,51 +70,68 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     /// <inheritdoc/>
     public async Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
-        LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
-
-        var shardKey = GetShardKey(request.DueTime);
-
-        while (true)
+        var startTimestamp = _timeProvider.GetTimestamp();
+        try
         {
-            // Fast path: shard already exists
-            if (_writeableShards.TryGetValue(shardKey, out var existingShard))
-            {
-                var job = await existingShard.TryScheduleJobAsync(request, cancellationToken);
-                if (job is not null)
-                {
-                    LogJobScheduled(_logger, request.JobName, job.Id, existingShard.Id, request.Target);
-                    return job;
-                }
+            LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
-                // Shard is full or no longer writable, remove from writable shards and try again
-                _writeableShards.TryRemove(shardKey, out _);
-                continue;
-            }
+            var shardKey = GetShardKey(request.DueTime);
 
-            // Slow path: need to create shard
-            await _shardCreationLock.WaitAsync(cancellationToken);
-            try
+            while (true)
             {
-                // Double-check after acquiring lock
-                if (_writeableShards.TryGetValue(shardKey, out existingShard))
+                // Fast path: shard already exists
+                if (_writeableShards.TryGetValue(shardKey, out var existingShard))
                 {
+                    var job = await existingShard.TryScheduleJobAsync(request, cancellationToken);
+                    if (job is not null)
+                    {
+                        var elapsed = _timeProvider.GetElapsedTime(startTimestamp);
+                        LogJobScheduled(_logger, request.JobName, job.Id, existingShard.Id, request.Target);
+                        DurableJobsInstruments.OnJobScheduled(elapsed);
+                        DurableJobsInstruments.OnScheduleJobCallSucceeded(elapsed);
+                        return job;
+                    }
+
+                    // Shard is full or no longer writable, remove from writable shards and try again
+                    _writeableShards.TryRemove(shardKey, out _);
                     continue;
                 }
 
-                // Create new shard
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-                var endTime = shardKey.Add(_options.ShardDuration);
-                var newShard = await _shardManager.CreateShardAsync(shardKey, endTime, EmptyMetadata, linkedCts.Token);
+                // Slow path: need to create shard
+                await _shardCreationLock.WaitAsync(cancellationToken);
+                try
+                {
+                    // Double-check after acquiring lock
+                    if (_writeableShards.TryGetValue(shardKey, out existingShard))
+                    {
+                        continue;
+                    }
 
-                LogCreatingNewShard(_logger, shardKey);
-                _writeableShards[shardKey] = newShard;
-                _shardCache.TryAdd(newShard.Id, newShard);
-                TryActivateShard(newShard);
+                    // Create new shard
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
+                    var endTime = shardKey.Add(_options.ShardDuration);
+                    var newShard = await _shardManager.CreateShardAsync(shardKey, endTime, EmptyMetadata, linkedCts.Token);
+
+                    LogCreatingNewShard(_logger, shardKey);
+                    _writeableShards[shardKey] = newShard;
+                    _shardCache.TryAdd(newShard.Id, newShard);
+                    TryActivateShard(newShard);
+                }
+                finally
+                {
+                    _shardCreationLock.Release();
+                }
             }
-            finally
-            {
-                _shardCreationLock.Release();
-            }
+        }
+        catch (OperationCanceledException)
+        {
+            DurableJobsInstruments.OnScheduleJobCallCanceled(_timeProvider.GetElapsedTime(startTimestamp));
+            throw;
+        }
+        catch
+        {
+            DurableJobsInstruments.OnScheduleJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
+            throw;
         }
     }
 
@@ -180,37 +197,60 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     /// <inheritdoc/>
     public async Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken)
     {
-        LogCancellingJob(_logger, job.Id, job.Name, job.ShardId);
-
-        if (_shardCache.TryGetValue(job.ShardId, out var shard))
+        var startTimestamp = _timeProvider.GetTimestamp();
+        try
         {
-            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(job.ShardId, cancellationToken))
+            LogCancellingJob(_logger, job.Id, job.Name, job.ShardId);
+
+            if (_shardCache.TryGetValue(job.ShardId, out var shard))
+            {
+                if (!await _shardManager.IsShardOwnedByLocalSiloAsync(job.ShardId, cancellationToken))
+                {
+                    LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
+                    DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), canceledJob: false);
+                    return false;
+                }
+
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
+                var wasRemoved = await shard.RemoveJobAsync(job.Id, linkedCts.Token);
+                LogJobCancelled(_logger, job.Id, job.Name, job.ShardId);
+                if (wasRemoved)
+                {
+                    DurableJobsInstruments.OnJobCanceled();
+                }
+
+                DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), wasRemoved);
+                return wasRemoved;
+            }
+
+            var owner = await _shardManager.GetShardOwnerAsync(job.ShardId, cancellationToken);
+            if (owner is null || owner.Equals(Silo))
             {
                 LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
+                DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), canceledJob: false);
                 return false;
             }
 
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-            var wasRemoved = await shard.RemoveJobAsync(job.Id, linkedCts.Token);
-            LogJobCancelled(_logger, job.Id, job.Name, job.ShardId);
-            return wasRemoved;
-        }
+            var remote = _grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(JobManagerGrainType, owner);
+            var routed = await remote.TryCancelDurableJobAsync(job, cancellationToken);
+            if (!routed)
+            {
+                LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
+            }
 
-        var owner = await _shardManager.GetShardOwnerAsync(job.ShardId, cancellationToken);
-        if (owner is null || owner.Equals(Silo))
+            DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), routed);
+            return routed;
+        }
+        catch (OperationCanceledException)
         {
-            LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
-            return false;
+            DurableJobsInstruments.OnCancelJobCallCanceled(_timeProvider.GetElapsedTime(startTimestamp));
+            throw;
         }
-
-        var remote = _grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(JobManagerGrainType, owner);
-        var routed = await remote.TryCancelDurableJobAsync(job, cancellationToken);
-        if (!routed)
+        catch
         {
-            LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
+            DurableJobsInstruments.OnCancelJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
+            throw;
         }
-
-        return routed;
     }
 
     private async Task ProcessMembershipUpdates()

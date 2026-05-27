@@ -56,7 +56,7 @@ public class DurableJobReceiverExtensionTests
         var grainContext = Substitute.For<IGrainContext>();
         grainContext.GrainInstance.Returns(handler);
         grainContext.GrainId.Returns(GrainId.Create("test", "grain-1"));
-        return new DurableJobReceiverExtension(grainContext, NullLogger<DurableJobReceiverExtension>.Instance);
+        return new DurableJobReceiverExtension(grainContext, NullLogger<DurableJobReceiverExtension>.Instance, TimeProvider.System);
     }
 
     private static IJobRunContext CreateJobContext(string runId)

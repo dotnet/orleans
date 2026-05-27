@@ -12,6 +12,14 @@ namespace Orleans.Hosting
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureBlobDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
 
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureBlobDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Journaling.AzureBlobJournalStorageOptions> configure, System.Action<Journaling.Json.JsonJournalOptions>? configureJson) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureBlobDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Journaling.AzureBlobJournalStorageOptions> configure, System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
+
         public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, System.Action<Journaling.AzureBlobJournalStorageOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, System.Action<Journaling.AzureBlobJournalStorageOptions> configure, System.Action<Journaling.Json.JsonJournalOptions>? configureJson) { throw null; }
+
+        public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, System.Action<Journaling.AzureBlobJournalStorageOptions> configure, System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
     }
 }

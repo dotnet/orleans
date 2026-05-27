@@ -43,7 +43,10 @@ public static class DurableJobsExtensions
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
-            return new DurableJobReceiverExtension(grainContextAccessor.GrainContext, sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>());
+            return new DurableJobReceiverExtension(
+                grainContextAccessor.GrainContext,
+                sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
+                sp.GetService<TimeProvider>() ?? TimeProvider.System);
         });
     }
 

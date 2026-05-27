@@ -30,12 +30,14 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 {
     private readonly IGrainContext _grain;
     private readonly ILogger<DurableJobReceiverExtension> _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<string, Task> _runningJobs = new();
 
-    public DurableJobReceiverExtension(IGrainContext grain, ILogger<DurableJobReceiverExtension> logger)
+    public DurableJobReceiverExtension(IGrainContext grain, ILogger<DurableJobReceiverExtension> logger, TimeProvider timeProvider)
     {
         _grain = grain;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -57,10 +59,31 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IDurableJobHandler");
         }
 
-        var task = handler.ExecuteJobAsync(context, cancellationToken);
+        var task = ExecuteHandlerAsync(handler, context, cancellationToken);
         _runningJobs[context.RunId] = task;
 
         return GetJobStatus(context, task);
+    }
+
+    private async Task ExecuteHandlerAsync(IDurableJobHandler handler, IJobRunContext context, CancellationToken cancellationToken)
+    {
+        var startTimestamp = _timeProvider.GetTimestamp();
+        DurableJobsInstruments.OnHandlerExecutionStarted();
+        try
+        {
+            await handler.ExecuteJobAsync(context, cancellationToken);
+            DurableJobsInstruments.OnHandlerExecutionCompleted(_timeProvider.GetElapsedTime(startTimestamp));
+        }
+        catch (OperationCanceledException)
+        {
+            DurableJobsInstruments.OnHandlerExecutionCanceled(_timeProvider.GetElapsedTime(startTimestamp));
+            throw;
+        }
+        catch
+        {
+            DurableJobsInstruments.OnHandlerExecutionFailed(_timeProvider.GetElapsedTime(startTimestamp));
+            throw;
+        }
     }
 
     private Task<DurableJobRunResult> GetJobStatus(IJobRunContext context, Task task)
@@ -94,4 +117,3 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     [LoggerMessage(Level = LogLevel.Error, Message = "Grain {GrainId} does not implement IDurableJobHandler")]
     private partial void LogGrainDoesNotImplementHandler(GrainId grainId);
 }
-

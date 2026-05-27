@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -27,13 +28,56 @@ public static class AzureStorageDurableJobsExtensions
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
     public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions> configure)
+        => builder.UseAzureBlobDurableJobs(configure, configureJson: null);
+
+    /// <summary>
+    /// Adds durable jobs storage backed by Azure Blob Storage.
+    /// </summary>
+    /// <param name="builder">
+    /// The builder.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the durable jobs storage.
+    /// </param>
+    /// <param name="typeInfoResolver">
+    /// The JSON metadata resolver used for application journal payload types.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="ISiloBuilder"/>, for chaining.
+    /// </returns>
+    public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions> configure, IJsonTypeInfoResolver typeInfoResolver)
+    {
+        ArgumentNullException.ThrowIfNull(typeInfoResolver);
+        return builder.UseAzureBlobDurableJobs(configure, options => options.AddTypeInfoResolver(typeInfoResolver));
+    }
+
+    /// <summary>
+    /// Adds durable jobs storage backed by Azure Blob Storage.
+    /// </summary>
+    /// <param name="builder">
+    /// The builder.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the durable jobs storage.
+    /// </param>
+    /// <param name="configureJson">
+    /// The delegate used to configure JSON journaling for application payload types.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="ISiloBuilder"/>, for chaining.
+    /// </returns>
+    public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions> configure, Action<JsonJournalOptions>? configureJson)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
 
         builder.AddDurableJobs();
         builder.AddAzureBlobJournalStorage(configure);
-        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        builder.UseJsonJournalFormat(options =>
+        {
+            options.AddTypeInfoResolver(DurableJobsJsonContext.Default);
+            configureJson?.Invoke(options);
+        });
         builder.Services.UseJournaledDurableJobs();
         return builder;
     }
@@ -51,6 +95,45 @@ public static class AzureStorageDurableJobsExtensions
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
     public static IServiceCollection UseAzureBlobDurableJobs(this IServiceCollection services, Action<AzureBlobJournalStorageOptions> configure)
+        => services.UseAzureBlobDurableJobs(configure, configureJson: null);
+
+    /// <summary>
+    /// Adds durable jobs storage backed by Azure Blob Storage.
+    /// </summary>
+    /// <param name="services">
+    /// The service collection.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the durable jobs storage.
+    /// </param>
+    /// <param name="typeInfoResolver">
+    /// The JSON metadata resolver used for application journal payload types.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="IServiceCollection"/>, for chaining.
+    /// </returns>
+    public static IServiceCollection UseAzureBlobDurableJobs(this IServiceCollection services, Action<AzureBlobJournalStorageOptions> configure, IJsonTypeInfoResolver typeInfoResolver)
+    {
+        ArgumentNullException.ThrowIfNull(typeInfoResolver);
+        return services.UseAzureBlobDurableJobs(configure, options => options.AddTypeInfoResolver(typeInfoResolver));
+    }
+
+    /// <summary>
+    /// Adds durable jobs storage backed by Azure Blob Storage.
+    /// </summary>
+    /// <param name="services">
+    /// The service collection.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the durable jobs storage.
+    /// </param>
+    /// <param name="configureJson">
+    /// The delegate used to configure JSON journaling for application payload types.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="IServiceCollection"/>, for chaining.
+    /// </returns>
+    public static IServiceCollection UseAzureBlobDurableJobs(this IServiceCollection services, Action<AzureBlobJournalStorageOptions> configure, Action<JsonJournalOptions>? configureJson)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
@@ -59,7 +142,11 @@ public static class AzureStorageDurableJobsExtensions
 
         var builder = new ServiceCollectionSiloBuilder(services);
         builder.AddAzureBlobJournalStorage(configure);
-        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        builder.UseJsonJournalFormat(options =>
+        {
+            options.AddTypeInfoResolver(DurableJobsJsonContext.Default);
+            configureJson?.Invoke(options);
+        });
 
         services.UseJournaledDurableJobs();
         return services;

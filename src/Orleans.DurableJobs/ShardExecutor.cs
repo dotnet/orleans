@@ -69,6 +69,10 @@ internal sealed partial class ShardExecutor
         }
 
         var tasks = new ConcurrentDictionary<string, Task>();
+        var processingStarted = false;
+        var processingStartTimestamp = 0L;
+        var canceled = false;
+        var error = false;
         try
         {
             var now = _timeProvider.GetUtcNow();
@@ -81,6 +85,8 @@ internal sealed partial class ShardExecutor
             }
 
             LogBeginProcessingShard(_logger, shard.Id);
+            processingStarted = true;
+            processingStartTimestamp = _timeProvider.GetTimestamp();
 
             // Process all jobs in the shard
             await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
@@ -106,13 +112,34 @@ internal sealed partial class ShardExecutor
         }
         catch (OperationCanceledException)
         {
+            canceled = true;
             LogShardCancelled(_logger, shard.Id);
+            throw;
+        }
+        catch
+        {
+            error = true;
             throw;
         }
         finally
         {
             // Wait for all jobs to complete
-            await Task.WhenAll(tasks.Values);
+            try
+            {
+                await Task.WhenAll(tasks.Values);
+            }
+            catch
+            {
+                error = true;
+                throw;
+            }
+            finally
+            {
+                if (processingStarted)
+                {
+                    DurableJobsInstruments.OnShardProcessed(_timeProvider.GetElapsedTime(processingStartTimestamp), canceled, error);
+                }
+            }
         }
     }
 
@@ -178,6 +205,8 @@ internal sealed partial class ShardExecutor
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
         Exception? failureException = null;
+        var attemptStartTimestamp = _timeProvider.GetTimestamp();
+        DurableJobsInstruments.OnJobAttemptStarted(_timeProvider.GetUtcNow() - jobContext.Job.DueTime);
 
         try
         {
@@ -204,6 +233,7 @@ internal sealed partial class ShardExecutor
                 {
                     await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
                     LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                    DurableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                 }
                 else if (result.IsFailed)
                 {
@@ -226,10 +256,12 @@ internal sealed partial class ShardExecutor
                 {
                     LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
                     await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
+                    DurableJobsInstruments.OnJobRetried(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                 }
                 else
                 {
                     LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
+                    DurableJobsInstruments.OnJobFailed(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                 }
             }
         }
