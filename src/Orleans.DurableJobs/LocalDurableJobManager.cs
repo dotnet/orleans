@@ -13,6 +13,7 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.DurableJobs;
 
@@ -476,7 +477,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         if (_runningShards.TryAdd(shard.Id, Task.CompletedTask))
         {
             LogStartingShard(_logger, shard.Id, shard.StartTime, shard.EndTime);
-            _runningShards[shard.Id] = RunShardWithCleanupAsync(shard);
+            using var _ = new ExecutionContextSuppressor();
+            _runningShards[shard.Id] = this.RunOrQueueTask(() => RunShardWithCleanupAsync(shard));
         }
     }
 
