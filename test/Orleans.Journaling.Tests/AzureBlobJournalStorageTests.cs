@@ -75,6 +75,22 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
+    public async Task AppendAsync_WhenWalRecreatedWithSameShape_RequiresRecovery()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        appendBlobs.Add("blob/wal", [9], WalMetadata(generation: "recreated"), isSealed: false);
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
+
+        Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal([9], appendBlobs.GetContent("blob/wal"));
+    }
+
+    [Fact]
     public async Task AppendAsync_AfterSameInstanceMetadataUpdate_UsesUpdatedETag()
     {
         var appendBlobs = new FakeAppendBlobStore();
@@ -634,12 +650,17 @@ public sealed class AzureBlobJournalStorageTests
             JournalId.FromGrainId(GrainId.Create("test-grain", "0")));
     }
 
-    private static Dictionary<string, string> WalMetadata(string? format = null)
+    private static Dictionary<string, string> WalMetadata(string? format = null, string? generation = null)
     {
         var result = new Dictionary<string, string>();
         if (format is not null)
         {
             result[AzureBlobJournalStorage.FormatMetadataKey] = format;
+        }
+
+        if (generation is not null)
+        {
+            result[AzureBlobJournalStorage.WalGenerationMetadataKey] = generation;
         }
 
         return result;

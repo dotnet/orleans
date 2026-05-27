@@ -36,8 +36,6 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     // IsCompactionRequested trips at this block count so callers compact before the hard append-blob limit.
     private const int RequestCompactionBlockCount = 49_000;
 
-    private const int MaxMetadataOnlyConflictRetries = 5;
-
     private readonly AzureBlobJournalStorageShared _shared;
     private readonly JournalId _journalId;
     private readonly AppendBlobClient _walClient;
@@ -255,8 +253,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 }
                 catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
                 {
-                    var refreshed = attempt < MaxMetadataOnlyConflictRetries
-                        ? await TryRefreshWalStateAfterMetadataOnlyConflictAsync(expectedProviderState, cancellationToken).ConfigureAwait(false)
+                    var refreshed = attempt < _shared.Options.MaxMetadataOnlyConflictRetries
+                        ? await RetryAfterMetadataOnlyConflictAsync(attempt, expectedProviderState, cancellationToken).ConfigureAwait(false)
                         : null;
                     if (refreshed is not null)
                     {
@@ -339,8 +337,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 }
                 catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
                 {
-                    var refreshed = attempt < MaxMetadataOnlyConflictRetries
-                        ? await TryRefreshWalStateAfterMetadataOnlyConflictAsync(deleteWalState.ProviderState, cancellationToken).ConfigureAwait(false)
+                    var refreshed = attempt < _shared.Options.MaxMetadataOnlyConflictRetries
+                        ? await RetryAfterMetadataOnlyConflictAsync(attempt, deleteWalState.ProviderState, cancellationToken).ConfigureAwait(false)
                         : null;
                     if (refreshed is { } refreshedState)
                     {
@@ -543,8 +541,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     }
                     catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
                     {
-                        var refreshed = attempt < MaxMetadataOnlyConflictRetries
-                            ? await TryRefreshWalStateAfterMetadataOnlyConflictAsync(publishWalState.ProviderState, cancellationToken).ConfigureAwait(false)
+                        var refreshed = attempt < _shared.Options.MaxMetadataOnlyConflictRetries
+                            ? await RetryAfterMetadataOnlyConflictAsync(attempt, publishWalState.ProviderState, cancellationToken).ConfigureAwait(false)
                             : null;
                         if (refreshed is { } refreshedState)
                         {
@@ -663,6 +661,29 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
 
         return walState;
+    }
+
+    private async ValueTask<WalState?> RetryAfterMetadataOnlyConflictAsync(
+        int attempt,
+        WalProviderState expectedProviderState,
+        CancellationToken cancellationToken)
+    {
+        var initial = _shared.Options.MetadataOnlyConflictInitialBackoff;
+        if (initial > TimeSpan.Zero)
+        {
+            var max = _shared.Options.MetadataOnlyConflictMaxBackoff;
+            if (max < initial)
+            {
+                max = initial;
+            }
+
+            var multiplier = 1L << Math.Min(attempt, 16);
+            var scaledTicks = initial.Ticks * multiplier;
+            var cappedTicks = Math.Min(scaledTicks, max.Ticks);
+            await Task.Delay(TimeSpan.FromTicks(cappedTicks), cancellationToken).ConfigureAwait(false);
+        }
+
+        return await TryRefreshWalStateAfterMetadataOnlyConflictAsync(expectedProviderState, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<WalState?> TryRefreshWalStateAfterMetadataOnlyConflictAsync(
@@ -1017,6 +1038,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         return new ETag(eTag);
     }
 
+    /// <summary>
+    /// Returns true when an Azure response indicates an append blob was sealed (HTTP 409 / BlobIsSealed).
+    /// A sealed WAL is permanently closed for new appends; the journaling layer must recover before
+    /// any further writes can proceed.
+    /// </summary>
     private static bool IsBlobSealed(RequestFailedException exception)
         => exception.Status == 409
             && (string.Equals(exception.ErrorCode, "BlobIsSealed", StringComparison.Ordinal)
@@ -1027,6 +1053,17 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             && (string.Equals(exception.ErrorCode, "BlobAlreadyExists", StringComparison.Ordinal)
                 || exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// Returns true when an Azure response indicates the WAL has been mutated since our cached ETag
+    /// was captured: HTTP 404 (WAL deleted/recreated), HTTP 412 (precondition failed / IfMatch
+    /// rejected), or HTTP 409 with <c>ConditionNotMet</c> (matched-write conflict). When this
+    /// returns true, callers should attempt
+    /// <see cref="RetryAfterMetadataOnlyConflictAsync"/> to refresh the cached ETag in place when
+    /// the change was metadata-only, and otherwise propagate
+    /// <see cref="Orleans.Storage.InconsistentStateException"/> to trigger journaling-layer recovery.
+    /// Transient transport failures (HTTP 5xx, network errors, timeouts) are handled by the Azure
+    /// SDK's built-in retry policy and never reach this classifier.
+    /// </summary>
     private static bool IsWalMutationConflict(RequestFailedException exception)
     {
         // These failures mean our cached WAL view is stale or gone, so the caller must recover before retrying.
@@ -1093,6 +1130,22 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
             Logger = logger;
             Options = options.Value;
+            ArgumentNullException.ThrowIfNull(Options);
+            if (Options.MaxMetadataOnlyConflictRetries < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(options), $"{nameof(AzureBlobJournalStorageOptions.MaxMetadataOnlyConflictRetries)} must be non-negative.");
+            }
+
+            if (Options.MetadataOnlyConflictInitialBackoff < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(options), $"{nameof(AzureBlobJournalStorageOptions.MetadataOnlyConflictInitialBackoff)} must be non-negative.");
+            }
+
+            if (Options.MetadataOnlyConflictMaxBackoff < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(options), $"{nameof(AzureBlobJournalStorageOptions.MetadataOnlyConflictMaxBackoff)} must be non-negative.");
+            }
+
             MimeType = mimeType;
             JournalFormatKey = journalFormatKey;
             BlobClientProvider = blobClientProvider;

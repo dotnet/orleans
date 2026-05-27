@@ -11,6 +11,10 @@ namespace Orleans.Journaling
     public sealed partial class AzureBlobJournalStorageOptions
     {
         public const string DEFAULT_CONTAINER_NAME = "state";
+        public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
+        public static readonly System.TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
+        public static readonly System.TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
+
         public Azure.Storage.Blobs.BlobServiceClient? BlobServiceClient { get { throw null; } set { } }
 
         public System.Func<System.IServiceProvider, AzureBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }
@@ -22,6 +26,12 @@ namespace Orleans.Journaling
         public bool DeleteOldCheckpoints { get { throw null; } set { } }
 
         public System.Func<JournalId, string> GetBlobName { get { throw null; } set { } }
+
+        public int MaxMetadataOnlyConflictRetries { get { throw null; } set { } }
+
+        public System.TimeSpan MetadataOnlyConflictInitialBackoff { get { throw null; } set { } }
+
+        public System.TimeSpan MetadataOnlyConflictMaxBackoff { get { throw null; } set { } }
 
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 

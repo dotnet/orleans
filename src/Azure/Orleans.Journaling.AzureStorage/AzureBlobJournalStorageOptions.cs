@@ -48,6 +48,33 @@ public sealed class AzureBlobJournalStorageOptions
     public bool DeleteOldCheckpoints { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets the maximum number of times a journaling Append, Replace, or Delete operation
+    /// will refresh its cached WAL ETag and retry in place after observing a metadata-only ETag
+    /// conflict (for example, a concurrent caller-owned metadata update or generation bump).
+    /// When the cap is exceeded the storage layer falls back to throwing
+    /// <see cref="Orleans.Storage.InconsistentStateException"/> and the journaling layer recovers
+    /// before retrying. Defaults to 5.
+    /// </summary>
+    public int MaxMetadataOnlyConflictRetries { get; set; } = DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES;
+    public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
+
+    /// <summary>
+    /// Gets or sets the initial delay applied before re-trying after a metadata-only ETag conflict.
+    /// Subsequent attempts double the delay (capped at <see cref="MetadataOnlyConflictMaxBackoff"/>).
+    /// Set to <see cref="TimeSpan.Zero"/> to retry immediately without backoff. Defaults to 10 ms.
+    /// </summary>
+    public TimeSpan MetadataOnlyConflictInitialBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
+    public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF = TimeSpan.FromMilliseconds(10);
+
+    /// <summary>
+    /// Gets or sets the upper bound on the per-attempt backoff used by metadata-only conflict
+    /// retries. The exponential schedule starts at <see cref="MetadataOnlyConflictInitialBackoff"/>
+    /// and never exceeds this value. Defaults to 200 ms.
+    /// </summary>
+    public TimeSpan MetadataOnlyConflictMaxBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
+    public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>
     /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
     /// </summary>
     internal Func<CancellationToken, Task<BlobServiceClient>>? CreateClient { get; private set; }
