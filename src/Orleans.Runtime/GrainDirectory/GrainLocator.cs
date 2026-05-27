@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
@@ -19,7 +20,37 @@ namespace Orleans.Runtime.GrainDirectory
 
         public ValueTask<GrainAddress?> Lookup(GrainId grainId) => GetGrainLocator(grainId.Type).Lookup(grainId);
 
-        public Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousRegistration) => GetGrainLocator(address.GrainId.Type).Register(address, previousRegistration);
+        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousRegistration)
+        {
+            var grainLocator = GetGrainLocator(address.GrainId.Type);
+            var locator = GetLocatorTag(grainLocator);
+            var startTimestamp = Stopwatch.GetTimestamp();
+            try
+            {
+                var result = await grainLocator.Register(address, previousRegistration);
+                DirectoryInstruments.OnRegistrationCompleted(
+                    Stopwatch.GetElapsedTime(startTimestamp),
+                    locator,
+                    DirectoryInstruments.RegistrationStatusSuccess);
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                DirectoryInstruments.OnRegistrationCompleted(
+                    Stopwatch.GetElapsedTime(startTimestamp),
+                    locator,
+                    DirectoryInstruments.RegistrationStatusCanceled);
+                throw;
+            }
+            catch
+            {
+                DirectoryInstruments.OnRegistrationCompleted(
+                    Stopwatch.GetElapsedTime(startTimestamp),
+                    locator,
+                    DirectoryInstruments.RegistrationStatusError);
+                throw;
+            }
+        }
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause) => GetGrainLocator(address.GrainId.Type).Unregister(address, cause);
 
@@ -30,6 +61,14 @@ namespace Orleans.Runtime.GrainDirectory
         public void InvalidateCache(GrainAddress address) => GetGrainLocator(address.GrainId.Type).InvalidateCache(address);
 
         private IGrainLocator GetGrainLocator(GrainType grainType) => _grainLocatorResolver.GetGrainLocator(grainType);
+
+        private static string GetLocatorTag(IGrainLocator grainLocator) => grainLocator switch
+        {
+            CachedGrainLocator => "cached",
+            ClientGrainLocator => "client",
+            DhtGrainLocator => "dht",
+            _ => "custom"
+        };
 
         public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => GetGrainLocator(grainId.Type).UpdateCache(grainId, siloAddress);
 

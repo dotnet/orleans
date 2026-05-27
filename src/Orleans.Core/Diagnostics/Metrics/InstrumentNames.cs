@@ -43,13 +43,13 @@ internal static class InstrumentNames
     public const string CATALOG_ACTIVATION_WORKING_SET = "orleans-catalog-activation-working-set";
     public const string CATALOG_ACTIVATION_CREATED = "orleans-catalog-activation-created";
     public const string CATALOG_ACTIVATION_DESTROYED = "orleans-catalog-activation-destroyed";
-    public const string CATALOG_ACTIVATION_LATENCY = "orleans-catalog-activation-latency";
     public const string CATALOG_DEACTIVATION_LATENCY = "orleans-catalog-deactivation-latency";
     public const string CATALOG_ACTIVATION_FAILED_TO_ACTIVATE = "orleans-catalog-activation-failed-to-activate";
     public const string CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS = "orleans-catalog-activation-collections";
     public const string CATALOG_ACTIVATION_SHUTDOWN = "orleans-catalog-activation-shutdown";
     public const string CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS = "orleans-catalog-activation-non-existent";
     public const string CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS = "orleans-catalog-activation-concurrent-registration-attempts";
+    public const string CATALOG_ACTIVATION_DURATION = "orleans-catalog-activation-duration";
 
     // Directory
     public const string DIRECTORY_LOOKUPS_LOCAL_ISSUED = "orleans-directory-lookups-local-issued";
@@ -72,6 +72,8 @@ internal static class InstrumentNames
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL = "orleans-directory-registrations-single-act-local";
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_SENT = "orleans-directory-registrations-single-act-remote-sent";
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_RECEIVED = "orleans-directory-registrations-single-act-remote-received";
+    public const string DIRECTORY_REGISTRATIONS = "orleans-directory-registrations";
+    public const string DIRECTORY_REGISTRATION_DURATION = "orleans-directory-registration-duration";
     public const string DIRECTORY_UNREGISTRATIONS_ISSUED = "orleans-directory-unregistrations-issued";
     public const string DIRECTORY_UNREGISTRATIONS_LOCAL = "orleans-directory-unregistrations-local";
     public const string DIRECTORY_UNREGISTRATIONS_REMOTE_SENT = "orleans-directory-unregistrations-remote-sent";
