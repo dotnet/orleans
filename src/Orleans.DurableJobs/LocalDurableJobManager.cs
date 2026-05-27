@@ -45,6 +45,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     // Slow-start state
     private long _startTimestamp;
     private int _totalClaimedShards;
+    private int _stripeCounter;
 
     public LocalDurableJobManager(
         JobShardManager shardManager,
@@ -574,7 +575,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     }
 
     private WritableShardKey GetWritableShardKey(ScheduleJobRequest request)
-        => new(GetShardStartTime(request.DueTime), GetShardStripe(request));
+        => new(GetShardStartTime(request.DueTime), GetShardStripe());
 
     private DateTimeOffset GetShardStartTime(DateTimeOffset scheduledTime)
     {
@@ -584,64 +585,18 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         return new DateTimeOffset(bucketTicks, TimeSpan.Zero);
     }
 
-    private int GetShardStripe(ScheduleJobRequest request)
+    private int GetShardStripe()
     {
         if (_options.ShardStripeCount <= 1)
         {
             return 0;
         }
 
-        var hash = AddStableHash(2_166_136_261u, request.Target.GetUniformHashCode());
-        hash = AddStableHash(hash, request.JobName);
-
-        if (request.Metadata is { Count: > 0 } metadata)
-        {
-            foreach (var entry in metadata.OrderBy(static entry => entry.Key, StringComparer.Ordinal))
-            {
-                hash = AddStableHash(hash, entry.Key);
-                hash = AddStableHash(hash, entry.Value);
-            }
-        }
-
-        return (int)(hash % (uint)_options.ShardStripeCount);
-    }
-
-    private static uint AddStableHash(uint hash, uint value)
-    {
-        unchecked
-        {
-            hash ^= value & 0xFF;
-            hash *= 16_777_619u;
-            hash ^= (value >> 8) & 0xFF;
-            hash *= 16_777_619u;
-            hash ^= (value >> 16) & 0xFF;
-            hash *= 16_777_619u;
-            hash ^= (value >> 24) & 0xFF;
-            hash *= 16_777_619u;
-            return hash;
-        }
-    }
-
-    private static uint AddStableHash(uint hash, string? value)
-    {
-        unchecked
-        {
-            if (value is null)
-            {
-                return AddStableHash(hash, 0);
-            }
-
-            foreach (var character in value)
-            {
-                var code = (uint)character;
-                hash ^= code & 0xFFu;
-                hash *= 16_777_619u;
-                hash ^= code >> 8;
-                hash *= 16_777_619u;
-            }
-
-            return hash;
-        }
+        // Round-robin assignment. Stripe selection is a write-side fan-out knob only:
+        // the persisted job location is the shard id, not (StartTime, Stripe), so consistency
+        // across calls/silos is not required and round-robin distributes evenly under any input skew.
+        var next = (uint)Interlocked.Increment(ref _stripeCounter);
+        return (int)(next % (uint)_options.ShardStripeCount);
     }
 
     private readonly record struct WritableShardKey(DateTimeOffset StartTime, int Stripe);
