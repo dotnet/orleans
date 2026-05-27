@@ -82,7 +82,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 // Fast path: shard already exists
                 if (_writeableShards.TryGetValue(shardKey, out var existingShard))
                 {
-                    var job = await existingShard.TryScheduleJobAsync(request, cancellationToken);
+                    DurableJob? job;
+                    try
+                    {
+                        job = await existingShard.TryScheduleJobAsync(request, cancellationToken);
+                    }
+                    catch (ObjectDisposedException ex) when (TryRemoveWritableShard(shardKey, existingShard) || !IsWritableShard(shardKey, existingShard))
+                    {
+                        LogWritableShardDisposedDuringScheduling(_logger, ex, existingShard.Id, shardKey);
+                        continue;
+                    }
+
                     if (job is not null)
                     {
                         var elapsed = _timeProvider.GetElapsedTime(startTimestamp);
@@ -93,7 +103,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     }
 
                     // Shard is full or no longer writable, remove from writable shards and try again
-                    _writeableShards.TryRemove(shardKey, out _);
+                    TryRemoveWritableShard(shardKey, existingShard);
                     continue;
                 }
 
@@ -336,7 +346,14 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             var shardEndTime = key.Add(_options.ShardDuration);
             if (shardEndTime < now && _writeableShards.TryRemove(key, out var expiredShard))
             {
-                await expiredShard.MarkAsCompleteAsync(cancellationToken);
+                try
+                {
+                    await expiredShard.MarkAsCompleteAsync(cancellationToken);
+                }
+                catch (ObjectDisposedException ex)
+                {
+                    LogExpiredWritableShardAlreadyDisposed(_logger, ex, expiredShard.Id, key);
+                }
             }
         }
 
@@ -478,6 +495,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         finally
         {
             // Clean up tracking and dispose the shard
+            TryRemoveWritableShard(shard.StartTime, shard);
             _shardCache.TryRemove(shard.Id, out _);
             _runningShards.TryRemove(shard.Id, out _);
 
@@ -498,6 +516,15 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         return _timeProvider.GetUtcNow() >= activationTime;
     }
 
+    private bool IsWritableShard(DateTimeOffset shardKey, IJobShard shard)
+        => _writeableShards.TryGetValue(shardKey, out var existingShard) && ReferenceEquals(existingShard, shard);
+
+    private bool TryRemoveWritableShard(DateTimeOffset shardKey, IJobShard shard)
+    {
+        var entry = new KeyValuePair<DateTimeOffset, IJobShard>(shardKey, shard);
+        return ((ICollection<KeyValuePair<DateTimeOffset, IJobShard>>)_writeableShards).Remove(entry);
+    }
+
     internal sealed class TestAccessor(LocalDurableJobManager manager)
     {
         public Task ProcessShardCheckCycleAsync(CancellationToken cancellationToken) => manager.ProcessShardCheckCycleAsync(cancellationToken);
@@ -509,6 +536,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
 
         public bool HasWritableShard(DateTimeOffset shardKey) => manager._writeableShards.ContainsKey(shardKey);
+
+        public bool TryGetWritableShard(DateTimeOffset shardKey, out IJobShard? shard) => manager._writeableShards.TryGetValue(shardKey, out shard);
 
         public void TryActivateShard(IJobShard shard) => manager.TryActivateShard(shard);
 

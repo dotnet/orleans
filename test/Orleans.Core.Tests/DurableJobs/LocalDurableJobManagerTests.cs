@@ -120,6 +120,114 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task CompletedWritableShardCleanup_RemovesWritableShard()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = new CompletingShard("completed-writable-shard", shardKey, shardKey.Add(options.ShardDuration));
+
+        accessor.AddWritableShard(shardKey, shard);
+        accessor.TryActivateShard(shard);
+
+        Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
+
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.MarkAsCompleteAsync(CancellationToken.None);
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(accessor.HasWritableShard(shardKey));
+        Assert.False(accessor.HasCachedShard(shard.Id));
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        Assert.Same(shard, Assert.Single(shardManager.UnregisteredShards));
+        Assert.Equal(1, shard.DisposeCallCount);
+    }
+
+    [Fact]
+    public async Task CompletedWritableShardCleanup_DoesNotRemoveReplacementWritableShard()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var completedShard = new CompletingShard("completed-writable-shard", shardKey, shardKey.Add(options.ShardDuration));
+        var replacementShard = CreateSubstituteShard("replacement-writable-shard", shardKey, shardKey.Add(options.ShardDuration));
+
+        accessor.AddWritableShard(shardKey, completedShard);
+        accessor.TryActivateShard(completedShard);
+
+        Assert.True(accessor.TryGetRunningShardTask(completedShard.Id, out var runTask));
+
+        await completedShard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        accessor.AddWritableShard(shardKey, replacementShard);
+        await completedShard.MarkAsCompleteAsync(CancellationToken.None);
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(accessor.TryGetWritableShard(shardKey, out var currentShard));
+        Assert.Same(replacementShard, currentShard);
+    }
+
+    [Fact]
+    public async Task ProcessShardCheckCycleAsync_WhenExpiredWritableShardIsDisposed_RemovesWritableShard()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow().Subtract(options.ShardDuration * 2);
+        var shard = new DisposedSchedulingShard("disposed-expired-shard", shardKey, shardKey.Add(options.ShardDuration));
+
+        accessor.AddWritableShard(shardKey, shard);
+
+        await accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
+
+        Assert.False(accessor.HasWritableShard(shardKey));
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_WhenWritableShardIsDisposed_RemovesStaleShardAndRetries()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var dueTime = timeProvider.GetUtcNow().AddMinutes(5);
+        var shardKey = new DateTimeOffset(
+            (dueTime.UtcTicks / options.ShardDuration.Ticks) * options.ShardDuration.Ticks,
+            TimeSpan.Zero);
+        var staleShard = new DisposedSchedulingShard("disposed-writable-shard", shardKey, shardKey.Add(options.ShardDuration));
+        var replacementShard = new SchedulingShard("replacement-writable-shard", shardKey, shardKey.Add(options.ShardDuration));
+        shardManager.CreateShard = (minDueTime, maxDueTime, _, _) =>
+        {
+            Assert.Equal(shardKey, minDueTime);
+            Assert.Equal(shardKey.Add(options.ShardDuration), maxDueTime);
+            return Task.FromResult<IJobShard>(replacementShard);
+        };
+
+        accessor.AddWritableShard(shardKey, staleShard);
+
+        var job = await manager.ScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("test", "target"),
+            JobName = "retried-job",
+            DueTime = dueTime
+        }, CancellationToken.None);
+
+        Assert.Equal("retried-job", job.Name);
+        Assert.Equal(replacementShard.Id, job.ShardId);
+        Assert.Equal(1, shardManager.CreateShardCallCount);
+        Assert.True(accessor.TryGetWritableShard(shardKey, out var currentShard));
+        Assert.Same(replacementShard, currentShard);
+    }
+
+    [Fact]
     public async Task ScheduleJobAsync_WhenExpiryWaitsBehindScheduling_CompletesShardAfterJobIsAccepted()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -597,6 +705,83 @@ public class LocalDurableJobManagerTests
         }
     }
 
+    private sealed class DisposedSchedulingShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
+    {
+        public string Id { get; } = id;
+
+        public DateTimeOffset StartTime { get; } = start;
+
+        public DateTimeOffset EndTime { get; } = end;
+
+        public IDictionary<string, string>? Metadata => null;
+
+        public bool IsAddingCompleted => true;
+
+        public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => ConsumeAsync();
+
+        public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
+
+        public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
+
+        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
+
+        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
+
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        private static async IAsyncEnumerable<IJobRunContext> ConsumeAsync()
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private sealed class SchedulingShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
+    {
+        public string Id { get; } = id;
+
+        public DateTimeOffset StartTime { get; } = start;
+
+        public DateTimeOffset EndTime { get; } = end;
+
+        public IDictionary<string, string>? Metadata => null;
+
+        public bool IsAddingCompleted => false;
+
+        public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => ConsumeAsync();
+
+        public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
+
+        public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<DurableJob?>(new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                TargetGrainId = request.Target,
+                ShardId = Id,
+                Metadata = request.Metadata
+            });
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        private static async IAsyncEnumerable<IJobRunContext> ConsumeAsync()
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
     private sealed class GateableSchedulingShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
     {
         private readonly SemaphoreSlim _lock = new(1, 1);
@@ -687,6 +872,10 @@ public class LocalDurableJobManagerTests
 
         public List<IJobShard> UnregisteredShards { get; } = [];
 
+        public Func<DateTimeOffset, DateTimeOffset, IDictionary<string, string>, CancellationToken, Task<IJobShard>>? CreateShard { get; set; }
+
+        public int CreateShardCallCount { get; private set; }
+
         public DateTimeOffset LastMaxDueTime { get; private set; }
 
         public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
@@ -696,7 +885,12 @@ public class LocalDurableJobManagerTests
         }
 
         public override Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
-            => throw new NotSupportedException();
+        {
+            CreateShardCallCount++;
+            return CreateShard is null
+                ? throw new NotSupportedException()
+                : CreateShard(minDueTime, maxDueTime, metadata, cancellationToken);
+        }
 
         public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
         {
