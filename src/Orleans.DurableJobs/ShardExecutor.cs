@@ -62,11 +62,7 @@ internal sealed partial class ShardExecutor
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        if (Volatile.Read(ref _currentCapacity) < _options.MaxConcurrentJobsPerSilo
-            && Interlocked.CompareExchange(ref _slowStartRampUpStarted, 1, 0) == 0)
-        {
-            _ = Task.Run(SlowStartRampUpAsync);
-        }
+        EnsureSlowStartRampUpStarted();
 
         var tasks = new ConcurrentDictionary<string, Task>();
         var processingStarted = false;
@@ -91,21 +87,12 @@ internal sealed partial class ShardExecutor
             // Process all jobs in the shard
             await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
             {
-                // Check for overload and pause batch processing if needed
-                if (_overloadDetector.IsOverloaded)
-                {
-                    LogOverloadDetected(_logger, shard.Id);
-                    while (_overloadDetector.IsOverloaded)
-                    {
-                        await Task.Delay(_options.OverloadBackoffDelay, _timeProvider, cancellationToken);
-                    }
-                    LogOverloadCleared(_logger, shard.Id);
-                }
+                await WaitForOverloadToClearAsync(shard.Id, cancellationToken);
 
                 // Wait for concurrency slot
                 await _jobConcurrencyLimiter.WaitAsync(cancellationToken);
-                // Start processing the job. RunJobAsync will release the semaphore when done and remove itself from the tasks dictionary
-                tasks[jobContext.Job.Id] = RunJobAsync(jobContext, shard, tasks, cancellationToken);
+                // Start processing the job. ExecuteJobAsync will release the semaphore when done and remove itself from the tasks dictionary
+                tasks[jobContext.Job.Id] = ExecuteJobAsync(jobContext, shard, tasks, cancellationToken);
             }
 
             LogCompletedProcessingShard(_logger, shard.Id);
@@ -140,6 +127,30 @@ internal sealed partial class ShardExecutor
                     DurableJobsInstruments.OnShardProcessed(_timeProvider.GetElapsedTime(processingStartTimestamp), canceled, error);
                 }
             }
+        }
+    }
+
+    private void EnsureSlowStartRampUpStarted()
+    {
+        if (Volatile.Read(ref _currentCapacity) < _options.MaxConcurrentJobsPerSilo
+            && Interlocked.CompareExchange(ref _slowStartRampUpStarted, 1, 0) == 0)
+        {
+            _ = Task.Run(SlowStartRampUpAsync);
+        }
+    }
+
+    private async Task WaitForOverloadToClearAsync(string shardId, CancellationToken cancellationToken)
+    {
+        // Check for overload and pause batch processing if needed
+        if (_overloadDetector.IsOverloaded)
+        {
+            LogOverloadDetected(_logger, shardId);
+            while (_overloadDetector.IsOverloaded)
+            {
+                await Task.Delay(_options.OverloadBackoffDelay, _timeProvider, cancellationToken);
+            }
+
+            LogOverloadCleared(_logger, shardId);
         }
     }
 
@@ -196,10 +207,10 @@ internal sealed partial class ShardExecutor
         LogSlowStartComplete(_logger, Volatile.Read(ref _currentCapacity));
     }
 
-    private async Task RunJobAsync(
+    private async Task ExecuteJobAsync(
         IJobRunContext jobContext,
         IJobShard shard,
-        ConcurrentDictionary<string, Task> runningTasks,
+        ConcurrentDictionary<string, Task>? runningTasks,
         CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
@@ -269,7 +280,7 @@ internal sealed partial class ShardExecutor
         {
             // Cleanup must happen even when retry persistence throws, otherwise slots leak and shard processing can stall.
             _jobConcurrencyLimiter.Release();
-            runningTasks.TryRemove(jobContext.Job.Id, out _);
+            runningTasks?.TryRemove(jobContext.Job.Id, out _);
         }
     }
 }

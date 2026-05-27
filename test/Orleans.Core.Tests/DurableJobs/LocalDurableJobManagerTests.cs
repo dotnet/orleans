@@ -217,6 +217,155 @@ public class LocalDurableJobManagerTests
         Assert.Null(await storageProvider.CreateStorage(JobShardId.Parse(job.ShardId).ToJournalId()).GetMetadataAsync());
     }
 
+    [Fact]
+    public async Task ScheduleJobAsync_WhenJobIsDueNow_DispatchesWithoutAdvancingTime()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardDuration = TimeSpan.FromSeconds(1);
+        var storageProvider = new VolatileJournalStorageProvider();
+        await using var services = CreateJournaledServices(storageProvider, timeProvider);
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5010), 0);
+        var localSiloDetails = new TestLocalSiloDetails(siloAddress);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(siloAddress, SiloStatus.Active);
+        var optionsWrapper = Options.Create(options);
+        var journaledShardManager = new JournaledJobShardManager(
+            localSiloDetails,
+            services.GetRequiredService<IJournaledStateManagerFactory>(),
+            services.GetRequiredService<IJournalStorageProvider>(),
+            services.GetRequiredService<IJournalStorageCatalog>(),
+            membership,
+            services,
+            optionsWrapper,
+            services.GetRequiredService<IOptions<JournaledStateManagerOptions>>());
+        var (grainFactory, handledJob, getHandleCount) = CreateCountingGrainFactory(timeProvider);
+        var overloadDetector = Substitute.For<IOverloadDetector>();
+        overloadDetector.IsOverloaded.Returns(false);
+        var shardExecutor = new ShardExecutor(
+            grainFactory,
+            optionsWrapper,
+            overloadDetector,
+            NullLogger<ShardExecutor>.Instance,
+            timeProvider);
+        var manager = new LocalDurableJobManager(
+            journaledShardManager,
+            shardExecutor,
+            grainFactory,
+            membership,
+            overloadDetector,
+            timeProvider,
+            optionsWrapper,
+            CreateSystemTargetShared(localSiloDetails),
+            NullLogger<LocalDurableJobManager>.Instance);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+
+        var job = await manager.ScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("test", "target"),
+            JobName = "due-now-job",
+            DueTime = timeProvider.GetUtcNow()
+        }, CancellationToken.None);
+
+        Assert.True(accessor.TryGetRunningShardTask(job.ShardId, out var runTask));
+        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(job.Id, jobContext.Job.Id);
+        Assert.Equal(1, getHandleCount());
+
+        timeProvider.Advance(TimeSpan.FromSeconds(3));
+        await accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
+        await AdvanceUntilCompletedAsync(timeProvider, runTask!, TimeSpan.FromSeconds(1));
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, getHandleCount());
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_WhenJobIsDueNow_WaitsForShardConsumer()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var (grainFactory, handledJob, _) = CreateCountingGrainFactory(timeProvider);
+        var manager = CreateManager(shardManager, timeProvider, options, grainFactory);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = new ControlledConsumingShard("controlled-shard", shardKey, shardKey.Add(options.ShardDuration));
+
+        accessor.AddWritableShard(shardKey, shard);
+        accessor.TryActivateShard(shard);
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var job = await manager.ScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("test", "target"),
+            JobName = "due-now-job",
+            DueTime = shardKey
+        }, CancellationToken.None);
+
+        var unexpectedDispatch = await Task.WhenAny(handledJob.Task, Task.Delay(TimeSpan.FromMilliseconds(100)));
+        Assert.NotSame(handledJob.Task, unexpectedDispatch);
+
+        shard.AllowConsume.SetResult();
+
+        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(job.Id, jobContext.Job.Id);
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_WhenJobIsDueInFuture_DoesNotDispatchImmediately()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardDuration = TimeSpan.FromSeconds(1);
+        var storageProvider = new VolatileJournalStorageProvider();
+        await using var services = CreateJournaledServices(storageProvider, timeProvider);
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5010), 0);
+        var localSiloDetails = new TestLocalSiloDetails(siloAddress);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(siloAddress, SiloStatus.Active);
+        var optionsWrapper = Options.Create(options);
+        var journaledShardManager = new JournaledJobShardManager(
+            localSiloDetails,
+            services.GetRequiredService<IJournaledStateManagerFactory>(),
+            services.GetRequiredService<IJournalStorageProvider>(),
+            services.GetRequiredService<IJournalStorageCatalog>(),
+            membership,
+            services,
+            optionsWrapper,
+            services.GetRequiredService<IOptions<JournaledStateManagerOptions>>());
+        var (grainFactory, handledJob, getHandleCount) = CreateCountingGrainFactory(timeProvider);
+        var overloadDetector = Substitute.For<IOverloadDetector>();
+        overloadDetector.IsOverloaded.Returns(false);
+        var shardExecutor = new ShardExecutor(
+            grainFactory,
+            optionsWrapper,
+            overloadDetector,
+            NullLogger<ShardExecutor>.Instance,
+            timeProvider);
+        var manager = new LocalDurableJobManager(
+            journaledShardManager,
+            shardExecutor,
+            grainFactory,
+            membership,
+            overloadDetector,
+            timeProvider,
+            optionsWrapper,
+            CreateSystemTargetShared(localSiloDetails),
+            NullLogger<LocalDurableJobManager>.Instance);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+
+        var job = await manager.ScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("test", "target"),
+            JobName = "future-job",
+            DueTime = timeProvider.GetUtcNow().AddSeconds(5)
+        }, CancellationToken.None);
+
+        Assert.False(handledJob.Task.IsCompleted);
+        Assert.Equal(0, getHandleCount());
+        Assert.False(accessor.TryGetRunningShardTask(job.ShardId, out _));
+    }
+
     private static DurableJobsOptions CreateOptions() => new()
     {
         ShardDuration = TimeSpan.FromMinutes(1),
@@ -229,11 +378,12 @@ public class LocalDurableJobManagerTests
     private static LocalDurableJobManager CreateManager(
         JobShardManager shardManager,
         FakeTimeProvider timeProvider,
-        DurableJobsOptions options)
+        DurableJobsOptions options,
+        IInternalGrainFactory? grainFactory = null)
     {
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var localSiloDetails = new TestLocalSiloDetails(siloAddress);
-        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory ??= Substitute.For<IInternalGrainFactory>();
         var overloadDetector = Substitute.For<IOverloadDetector>();
         overloadDetector.IsOverloaded.Returns(false);
         var optionsWrapper = Options.Create(options);
@@ -312,6 +462,28 @@ public class LocalDurableJobManagerTests
         return (grainFactory, handledJob);
     }
 
+    private static (IInternalGrainFactory GrainFactory, TaskCompletionSource<IJobRunContext> HandledJob, Func<int> GetHandleCount) CreateCountingGrainFactory(TimeProvider timeProvider)
+    {
+        var handledJob = new TaskCompletionSource<IJobRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handleCount = 0;
+        var handler = Substitute.For<IDurableJobHandler>();
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                Interlocked.Increment(ref handleCount);
+                handledJob.TrySetResult(callInfo.ArgAt<IJobRunContext>(0));
+                return Task.CompletedTask;
+            });
+
+        var grainContext = Substitute.For<IGrainContext>();
+        grainContext.GrainInstance.Returns(handler);
+        grainContext.GrainId.Returns(GrainId.Create("test", "target"));
+        var extension = new DurableJobReceiverExtension(grainContext, NullLogger<DurableJobReceiverExtension>.Instance, timeProvider);
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+        return (grainFactory, handledJob, () => Volatile.Read(ref handleCount));
+    }
+
     private static async Task AdvanceUntilCompletedAsync(FakeTimeProvider timeProvider, Task task, TimeSpan advanceBy)
     {
         for (var i = 0; i < 10 && !task.IsCompleted; i++)
@@ -367,6 +539,61 @@ public class LocalDurableJobManagerTests
             ConsumeStarted.TrySetResult();
             await _completed.Task.WaitAsync(cancellationToken);
             yield break;
+        }
+    }
+
+    private sealed class ControlledConsumingShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
+    {
+        private readonly TaskCompletionSource<DurableJob> _scheduledJob = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ConsumeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowConsume { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string Id { get; } = id;
+
+        public DateTimeOffset StartTime { get; } = start;
+
+        public DateTimeOffset EndTime { get; } = end;
+
+        public IDictionary<string, string>? Metadata => null;
+
+        public bool IsAddingCompleted => false;
+
+        public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => ConsumeAsync();
+
+        public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(_scheduledJob.Task.IsCompleted ? 1 : 0);
+
+        public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(true);
+
+        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
+        {
+            var job = new DurableJob
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                TargetGrainId = request.Target,
+                ShardId = Id,
+                Metadata = request.Metadata
+            };
+
+            _scheduledJob.SetResult(job);
+            return Task.FromResult<DurableJob?>(job);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        private async IAsyncEnumerable<IJobRunContext> ConsumeAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            ConsumeStarted.TrySetResult();
+            var job = await _scheduledJob.Task.WaitAsync(cancellationToken);
+            await AllowConsume.Task.WaitAsync(cancellationToken);
+            yield return new JobRunContext(job, Guid.NewGuid().ToString(), retryCount: 1);
         }
     }
 

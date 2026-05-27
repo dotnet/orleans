@@ -16,6 +16,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
+    private TaskCompletionSource _queueChanged = CreateQueueChangedSource();
     private bool _isComplete;
 #if NET9_0_OR_GREATER
     private readonly Lock _syncLock = new();
@@ -56,6 +57,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             var bucket = GetJobBucket(job.DueTime);
             bucket.AddJob(job, dequeueCount);
             _jobsIdToBucket[job.Id] = bucket;
+            SignalQueueChanged();
         }
     }
 
@@ -68,6 +70,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         lock (_syncLock)
         {
             _isComplete = true;
+            SignalQueueChanged();
         }
     }
 
@@ -89,6 +92,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 bucket.RemoveJob(jobId);
                 _jobsIdToBucket.Remove(jobId);
                 // Note: The bucket remains in the priority queue until processed
+                SignalQueueChanged();
                 return true;
             }
 
@@ -148,6 +152,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             var newBucket = GetJobBucket(newDueTime);
             newBucket.AddJob(newJob, dequeueCount);
             _jobsIdToBucket[jobId] = newBucket;
+            SignalQueueChanged();
             return true;
         }
     }
@@ -184,6 +189,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             _jobsIdToBucket.Clear();
             _buckets.Clear();
             _isComplete = false;
+            SignalQueueChanged();
         }
     }
 
@@ -193,34 +199,49 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>
     /// An async enumerator that returns <see cref="IJobRunContext"/> instances for jobs that are due.
-    /// The enumerator checks for due jobs every second and terminates when the queue is marked complete and empty.
+    /// The enumerator wakes when the queue changes or the next job becomes due, and terminates when the queue is marked complete and empty.
     /// </returns>
     public async IAsyncEnumerator<IJobRunContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1), _timeProvider);
         while (true)
         {
             JobBucket? bucketToProcess = null;
             DateTimeOffset bucketKey = default;
+            Task? queueChanged = null;
+            TimeSpan? delay = null;
 
             lock (_syncLock)
             {
+                RemoveEmptyBuckets();
+
                 if (Count == 0)
                 {
                     if (_isComplete)
                     {
                         yield break; // Exit if the queue is frozen and empty
                     }
+
+                    queueChanged = _queueChanged.Task;
                 }
                 else if (_queue.Count > 0)
                 {
                     var nextBucket = _queue.Peek();
-                    if (nextBucket.DueTime < _timeProvider.GetUtcNow())
+                    var now = _timeProvider.GetUtcNow();
+                    if (nextBucket.DueTime <= now)
                     {
                         // Dequeue the entire bucket to process outside the lock
                         bucketToProcess = _queue.Dequeue();
                         bucketKey = bucketToProcess.DueTime;
                     }
+                    else
+                    {
+                        queueChanged = _queueChanged.Task;
+                        delay = nextBucket.DueTime - now;
+                    }
+                }
+                else
+                {
+                    queueChanged = _queueChanged.Task;
                 }
             }
 
@@ -251,25 +272,61 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             }
             else
             {
-                await timer.WaitForNextTickAsync(cancellationToken);
+                await WaitForQueueChangeOrDelayAsync(queueChanged!, delay, cancellationToken);
             }
         }
     }
 
     private JobBucket GetJobBucket(DateTimeOffset dueTime)
     {
-        // Truncate to second precision and add 1 second to normalize bucket key
-        // This ensures all jobs within the same second (e.g., 12:00:00.000-12:00:00.999) share the same bucket (12:00:01)
-        var key = new DateTimeOffset(dueTime.Year, dueTime.Month, dueTime.Day, dueTime.Hour, dueTime.Minute, dueTime.Second, dueTime.Offset);
-        key = key.AddSeconds(1);
-        if (!_buckets.TryGetValue(key, out var bucket))
+        if (!_buckets.TryGetValue(dueTime, out var bucket))
         {
-            bucket = new JobBucket(key);
-            _buckets[key] = bucket;
-            _queue.Enqueue(bucket, key);
+            bucket = new JobBucket(dueTime);
+            _buckets[dueTime] = bucket;
+            _queue.Enqueue(bucket, dueTime);
         }
+
         return bucket;
-    }   
+    }
+
+    private void RemoveEmptyBuckets()
+    {
+        while (_queue.Count > 0 && _queue.Peek().Count == 0)
+        {
+            var bucket = _queue.Dequeue();
+            _buckets.Remove(bucket.DueTime);
+        }
+    }
+
+    private void SignalQueueChanged()
+    {
+        var previous = _queueChanged;
+        _queueChanged = CreateQueueChangedSource();
+        previous.TrySetResult();
+    }
+
+    private async Task WaitForQueueChangeOrDelayAsync(Task queueChanged, TimeSpan? delay, CancellationToken cancellationToken)
+    {
+        if (delay is null)
+        {
+            await queueChanged.WaitAsync(cancellationToken);
+            return;
+        }
+
+        if (delay <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var queueChangedTask = queueChanged.WaitAsync(waitCancellation.Token);
+        var delayTask = Task.Delay(delay.Value, _timeProvider, waitCancellation.Token);
+        var completedTask = await Task.WhenAny(queueChangedTask, delayTask);
+        waitCancellation.Cancel();
+        await completedTask;
+    }
+
+    private static TaskCompletionSource CreateQueueChangedSource() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
 internal sealed class JobBucket

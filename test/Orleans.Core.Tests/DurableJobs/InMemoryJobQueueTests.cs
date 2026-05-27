@@ -130,6 +130,23 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
+    public async Task GetAsyncEnumerator_WhenDueJobIsEnqueued_WakesWithoutAdvancingTime()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        var moveNextTask = enumerator.MoveNextAsync().AsTask();
+        await Task.Yield();
+
+        var job = CreateJob("job1", timeProvider.GetUtcNow());
+        queue.Enqueue(job, 0);
+
+        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(job.Id, enumerator.Current.Job.Id);
+    }
+
+    [Fact]
     public async Task GetAsyncEnumerator_CompletesWhenQueueIsMarkedComplete()
     {
         var queue = new InMemoryJobQueue();
