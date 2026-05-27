@@ -46,9 +46,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private long _startTimestamp;
     private int _totalClaimedShards;
 
-    private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
-    private const string ShardStripeMetadataKey = "stripe";
-
     public LocalDurableJobManager(
         JobShardManager shardManager,
         ShardExecutor shardExecutor,
@@ -124,7 +121,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     // Create new shard
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
                     var endTime = shardKey.StartTime.Add(_options.ShardDuration);
-                    var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, CreateShardMetadata(shardKey), linkedCts.Token);
+                    var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, new Dictionary<string, string>(), linkedCts.Token);
 
                     LogCreatingNewShard(_logger, shardKey.StartTime, shardKey.Stripe);
                     _writeableShards[shardKey] = newShard;
@@ -607,19 +604,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
 
         return (int)(hash % (uint)_options.ShardStripeCount);
-    }
-
-    private IDictionary<string, string> CreateShardMetadata(WritableShardKey shardKey)
-    {
-        if (_options.ShardStripeCount <= 1)
-        {
-            return EmptyMetadata;
-        }
-
-        return new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [ShardStripeMetadataKey] = shardKey.Stripe.ToString(CultureInfo.InvariantCulture)
-        };
     }
 
     private static uint AddStableHash(uint hash, uint value)
