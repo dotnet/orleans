@@ -19,6 +19,7 @@ internal sealed partial class ShardExecutor
     private readonly IInternalGrainFactory _grainFactory;
     private readonly ILogger<ShardExecutor> _logger;
     private readonly DurableJobsOptions _options;
+    private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
     private readonly IOverloadDetector _overloadDetector;
     private int _currentCapacity;
@@ -35,12 +36,14 @@ internal sealed partial class ShardExecutor
         IInternalGrainFactory grainFactory,
         IOptions<DurableJobsOptions> options,
         IOverloadDetector overloadDetector,
-        ILogger<ShardExecutor> logger)
+        ILogger<ShardExecutor> logger,
+        TimeProvider? timeProvider = null)
     {
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
         _overloadDetector = overloadDetector;
+        _timeProvider = timeProvider ?? TimeProvider.System;
 
         _currentCapacity = _options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo
             ? _options.SlowStartInitialConcurrency
@@ -68,12 +71,13 @@ internal sealed partial class ShardExecutor
         var tasks = new ConcurrentDictionary<string, Task>();
         try
         {
-            if (shard.StartTime > DateTime.UtcNow)
+            var now = _timeProvider.GetUtcNow();
+            if (shard.StartTime > now)
             {
                 // Wait until the shard's start time
-                var delay = shard.StartTime - DateTimeOffset.UtcNow;
+                var delay = shard.StartTime - now;
                 LogWaitingForShardStartTime(_logger, shard.Id, delay, shard.StartTime);
-                await Task.Delay(delay, cancellationToken);
+                await Task.Delay(delay, _timeProvider, cancellationToken);
             }
 
             LogBeginProcessingShard(_logger, shard.Id);
@@ -87,7 +91,7 @@ internal sealed partial class ShardExecutor
                     LogOverloadDetected(_logger, shard.Id);
                     while (_overloadDetector.IsOverloaded)
                     {
-                        await Task.Delay(_options.OverloadBackoffDelay, cancellationToken);
+                        await Task.Delay(_options.OverloadBackoffDelay, _timeProvider, cancellationToken);
                     }
                     LogOverloadCleared(_logger, shard.Id);
                 }
@@ -121,7 +125,7 @@ internal sealed partial class ShardExecutor
         {
             while (Volatile.Read(ref _currentCapacity) < targetCapacity)
             {
-                await Task.Delay(_options.SlowStartInterval);
+                await Task.Delay(_options.SlowStartInterval, _timeProvider, CancellationToken.None);
 
                 while (true)
                 {
@@ -191,7 +195,7 @@ internal sealed partial class ShardExecutor
                     // Enter polling loop
                     LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
 
-                    await Task.Delay(result.PollAfterDelay.Value, cancellationToken);
+                    await Task.Delay(result.PollAfterDelay.Value, _timeProvider, cancellationToken);
 
                     result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
                 }

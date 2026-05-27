@@ -665,7 +665,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         return JournalFormatServices.GetRequiredJournalFormat(_shared.ServiceProvider, journalFormatKey);
     }
 
-    private void ProcessRecoveryBuffer(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+    private void ProcessRecoveryBuffer(JournalBufferReader buffer, IJournalMetadata? metadata)
     {
         if (buffer.Length == 0)
         {
@@ -697,7 +697,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
-    void IJournalStorageConsumer.Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) => ProcessRecoveryBuffer(buffer, metadata);
+    void IJournalStorageConsumer.Read(JournalBufferReader buffer, IJournalMetadata? metadata) => ProcessRecoveryBuffer(buffer, metadata);
 
     private static bool ShouldWrapRecoveryFormatException(Exception exception) =>
         exception is not OperationCanceledException && !IsRecoveryFormatException(exception);

@@ -1,10 +1,11 @@
 using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration.Internal;
 using Orleans.DurableJobs;
-using Orleans.DurableJobs.AzureStorage;
+using Orleans.Journaling;
+using Orleans.Journaling.Json;
 
 namespace Orleans.Hosting;
 
@@ -25,27 +26,15 @@ public static class AzureStorageDurableJobsExtensions
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
-    public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, Action<AzureStorageJobShardOptions> configure)
+    public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions> configure)
     {
-        builder.ConfigureServices(services => services.UseAzureBlobDurableJobs(configure));
-        return builder;
-    }
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configure);
 
-    /// <summary>
-    /// Adds durable jobs storage backed by Azure Blob Storage.
-    /// </summary>
-    /// <param name="builder">
-    /// The builder.
-    /// </param>
-    /// <param name="configureOptions">
-    /// The configuration delegate.
-    /// </param>
-    /// <returns>
-    /// The provided <see cref="ISiloBuilder"/>, for chaining.
-    /// </returns>
-    public static ISiloBuilder UseAzureBlobDurableJobs(this ISiloBuilder builder, Action<OptionsBuilder<AzureStorageJobShardOptions>> configureOptions)
-    {
-        builder.ConfigureServices(services => services.UseAzureBlobDurableJobs(configureOptions));
+        builder.AddDurableJobs();
+        builder.AddAzureBlobJournalStorage(configure);
+        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        builder.Services.UseJournaledDurableJobs();
         return builder;
     }
 
@@ -61,36 +50,38 @@ public static class AzureStorageDurableJobsExtensions
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
-    public static IServiceCollection UseAzureBlobDurableJobs(this IServiceCollection services, Action<AzureStorageJobShardOptions> configure)
+    public static IServiceCollection UseAzureBlobDurableJobs(this IServiceCollection services, Action<AzureBlobJournalStorageOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
         services.AddDurableJobs();
-        services.AddSingleton<AzureStorageJobShardManager>();
-        services.AddFromExisting<Orleans.DurableJobs.JobShardManager, AzureStorageJobShardManager>();
-        services.Configure<AzureStorageJobShardOptions>(configure);
-        services.ConfigureFormatter<AzureStorageJobShardOptions>();
+
+        var builder = new ServiceCollectionSiloBuilder(services);
+        builder.AddAzureBlobJournalStorage(configure);
+        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+
+        services.UseJournaledDurableJobs();
         return services;
     }
 
-    /// <summary>
-    /// Adds durable jobs storage backed by Azure Blob Storage.
-    /// </summary>
-    /// <param name="services">
-    /// The service collection.
-    /// </param>
-    /// <param name="configureOptions">
-    /// The configuration delegate.
-    /// </param>
-    /// <returns>
-    /// The provided <see cref="IServiceCollection"/>, for chaining.
-    /// </returns>
-    public static IServiceCollection UseAzureBlobDurableJobs(this IServiceCollection services, Action<OptionsBuilder<AzureStorageJobShardOptions>> configureOptions)
+    private static IServiceCollection UseJournaledDurableJobs(this IServiceCollection services)
     {
-        services.AddDurableJobs();
-        services.AddSingleton<AzureStorageJobShardManager>();
-        services.AddFromExisting<Orleans.DurableJobs.JobShardManager, AzureStorageJobShardManager>();
-        configureOptions?.Invoke(services.AddOptions<AzureStorageJobShardOptions>());
-        services.ConfigureFormatter<AzureStorageJobShardOptions>();
-        services.AddTransient<IConfigurationValidator>(sp => new AzureStorageJobShardOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureStorageJobShardOptions>>().Get(Options.DefaultName), Options.DefaultName));
+        services.TryAddSingleton<JournaledJobShardManager>();
+        services.AddFromExisting<JobShardManager, JournaledJobShardManager>();
         return services;
+    }
+
+    private sealed class ServiceCollectionSiloBuilder : ISiloBuilder
+    {
+        public ServiceCollectionSiloBuilder(IServiceCollection services)
+        {
+            Services = services;
+            Configuration = new ConfigurationBuilder().Build();
+        }
+
+        public IServiceCollection Services { get; }
+
+        public IConfiguration Configuration { get; }
     }
 }

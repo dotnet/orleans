@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Time.Testing;
+using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.Runtime;
-using NSubstitute;
 using Xunit;
 
 namespace NonSilo.Tests.DurableJobs;
@@ -109,20 +110,23 @@ public class InMemoryJobQueueTests
     [Fact]
     public async Task GetAsyncEnumerator_WaitsForDueTime()
     {
-        var queue = new InMemoryJobQueue();
-        var futureTime = DateTimeOffset.UtcNow.AddSeconds(2);
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var futureTime = timeProvider.GetUtcNow().AddSeconds(1);
         var job = CreateJob("job1", futureTime);
 
         queue.Enqueue(job, 0);
         queue.MarkAsComplete();
 
-        var startTime = DateTimeOffset.UtcNow;
-        await foreach (var context in queue.WithCancellation(CancellationToken.None))
-        {
-            var elapsed = DateTimeOffset.UtcNow - startTime;
-            Assert.True(elapsed.TotalSeconds >= 1.5, $"Job was dequeued too early. Elapsed: {elapsed.TotalSeconds}s");
-            break;
-        }
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        var moveNextTask = enumerator.MoveNextAsync().AsTask();
+
+        Assert.False(moveNextTask.IsCompleted);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(3));
+
+        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(job.Id, enumerator.Current.Job.Id);
     }
 
     [Fact]

@@ -475,8 +475,8 @@ public class CodecRecoveryTests : JournalingTestBase
             ArgumentNullException.ThrowIfNull(consumer);
 
             var metadata = storedJournalFormatKey is null
-                ? JournalFileMetadata.Empty
-                : new JournalFileMetadata(storedJournalFormatKey);
+                ? JournalMetadata.Empty
+                : new JournalMetadata(storedJournalFormatKey);
             if (inner.Segments.Count == 0)
             {
                 consumer.Complete(metadata);

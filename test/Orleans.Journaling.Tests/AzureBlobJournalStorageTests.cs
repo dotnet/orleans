@@ -316,7 +316,7 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
-    public async Task ReplaceAsync_WhenOldCheckpointCleanupDisabled_DoesNotReadWalManifestOrDeletePreviousCheckpoint()
+    public async Task ReplaceAsync_WhenOldCheckpointCleanupDisabled_DoesNotDeletePreviousCheckpoint()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var checkpoints = new FakeBlockBlobStore();
@@ -329,7 +329,7 @@ public sealed class AzureBlobJournalStorageTests
 
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
 
-        Assert.Empty(appendBlobs.PropertiesCalls);
+        Assert.Single(appendBlobs.PropertiesCalls);
         Assert.True(checkpoints.Exists(previousCheckpoint));
         Assert.Empty(checkpoints.DeleteCalls);
     }
@@ -632,7 +632,7 @@ public sealed class AzureBlobJournalStorageTests
     {
         public static DiscardingJournalStorageConsumer Instance { get; } = new();
 
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) => buffer.Skip(buffer.Length);
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata) => buffer.Skip(buffer.Length);
     }
 
     private sealed class CapturingJournalStorageConsumer : IJournalStorageConsumer
@@ -641,7 +641,7 @@ public sealed class AzureBlobJournalStorageTests
 
         public MemoryStream Bytes { get; } = new();
 
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
             JournalFormatKey = metadata?.Format;
             while (buffer.Length > 0)

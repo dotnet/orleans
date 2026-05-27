@@ -57,6 +57,91 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         _walClient = GetWalClient();
     }
 
+    public async ValueTask<bool> CreateIfNotExistsAsync(
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        var callerMetadata = CopyAndValidateCallerMetadata(metadata);
+        try
+        {
+            var response = await CreateWalAsync(
+                checkpointName: null,
+                new AppendBlobRequestConditions { IfNoneMatch = ETag.All },
+                cancellationToken,
+                callerMetadata).ConfigureAwait(false);
+            SetWal(response.Value.ETag, blockCount: 0);
+            return true;
+        }
+        catch (RequestFailedException exception) when (exception.Status is 409 or 412)
+        {
+            return false;
+        }
+    }
+
+    public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
+    {
+        var properties = await GetPropertiesCoreAsync(_walClient, conditions: null, cancellationToken).ConfigureAwait(false);
+        return properties is null || properties.BlobType != BlobType.Append
+            ? null
+            : CreateJournalMetadata(properties.ETag, properties.Metadata);
+    }
+
+    public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+        IReadOnlyDictionary<string, string>? set = null,
+        IEnumerable<string>? remove = null,
+        string? expectedETag = null,
+        CancellationToken cancellationToken = default)
+    {
+        var setValues = CopyAndValidateCallerMetadata(set);
+        var removeValues = CopyRemove(remove, setValues);
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            BlobProperties? properties;
+            try
+            {
+                properties = await GetPropertiesCoreAsync(
+                    _walClient,
+                    expectedETag is null ? null : new BlobRequestConditions { IfMatch = ToAzureETag(expectedETag) },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (RequestFailedException exception) when (exception.Status is 412)
+            {
+                return null;
+            }
+
+            if (properties is null || properties.BlobType != BlobType.Append)
+            {
+                return null;
+            }
+
+            var metadata = CopyMetadata(properties.Metadata);
+            if (!ApplyCallerMetadataUpdate(metadata, setValues, removeValues))
+            {
+                return CreateJournalMetadata(properties.ETag, metadata);
+            }
+
+            var conditions = new BlobRequestConditions
+            {
+                IfMatch = expectedETag is null ? properties.ETag : ToAzureETag(expectedETag),
+            };
+
+            try
+            {
+                var response = await _walClient.SetMetadataAsync(metadata, conditions, cancellationToken).ConfigureAwait(false);
+                return CreateJournalMetadata(response.Value.ETag, metadata);
+            }
+            catch (RequestFailedException exception) when (exception.Status is 412)
+            {
+                if (expectedETag is not null)
+                {
+                    return null;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         // Appends are written as one Azure append block, so validate blob limits before touching storage.
@@ -220,8 +305,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         var walMetadata = manifest.Metadata.Format is { Length: > 0 }
             ? manifest.Metadata
             : expectedFormat is { Length: > 0 }
-                ? new JournalFileMetadata(expectedFormat)
-                : JournalFileMetadata.Empty;
+                ? new JournalMetadata(expectedFormat)
+                : JournalMetadata.Empty;
         var totalWalBytes = await consumer.ReadAsync(
             walStream,
             walMetadata,
@@ -239,33 +324,29 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
 
         var expectedWalETag = _walETag;
-        string? previousCheckpointName = null;
-        if (_shared.Options.DeleteOldCheckpoints)
+        WalState? walState;
+        try
         {
-            // Read the WAL manifest only when cleanup needs the previous checkpoint name, and require the cached ETag to still match.
-            WalState? walState;
-            try
-            {
-                walState = await TryLoadWalStateAsync(new BlobRequestConditions { IfMatch = expectedWalETag }, cancellationToken).ConfigureAwait(false);
-
-                if (walState is null)
-                {
-                    throw CreateInconsistentWalStateException(
-                        "Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.",
-                        expectedWalETag);
-                }
-            }
-            catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
+            // Read the WAL manifest so compaction preserves caller-owned metadata while replacing provider-owned checkpoint metadata.
+            walState = await TryLoadWalStateAsync(new BlobRequestConditions { IfMatch = expectedWalETag }, cancellationToken).ConfigureAwait(false);
+            if (walState is null)
             {
                 throw CreateInconsistentWalStateException(
                     "Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.",
-                    expectedWalETag,
-                    exception);
+                    expectedWalETag);
             }
-
-            expectedWalETag = walState.Value.ETag;
-            previousCheckpointName = walState.Value.Manifest.Checkpoint?.Name;
         }
+        catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
+        {
+            throw CreateInconsistentWalStateException(
+                "Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.",
+                expectedWalETag,
+                exception);
+        }
+
+        expectedWalETag = walState.Value.ETag;
+        var previousCheckpointName = _shared.Options.DeleteOldCheckpoints ? walState.Value.Manifest.Checkpoint?.Name : null;
+        var callerMetadata = walState.Value.Manifest.Metadata.Properties;
 
         using var checkpointStream = new ReadOnlySequenceStream(value);
         while (true)
@@ -299,7 +380,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 var result = await CreateWalAsync(
                     checkpointName,
                     new AppendBlobRequestConditions { IfMatch = expectedWalETag },
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    callerMetadata).ConfigureAwait(false);
                 SetWal(result.Value.ETag, blockCount: 0);
             }
             catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
@@ -412,7 +494,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private async ValueTask<Response<BlobContentInfo>> CreateWalAsync(
         string? checkpointName,
         AppendBlobRequestConditions conditions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? callerMetadata = null)
     {
         // Creating an append blob is also how compaction publishes a fresh WAL manifest.
         return await _walClient.CreateAsync(
@@ -420,7 +503,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             {
                 Conditions = conditions,
                 HttpHeaders = CreateHttpHeaders(_shared.MimeType),
-                Metadata = CreateWalMetadata(checkpointName, checkpointOffset: 0),
+                Metadata = CreateWalMetadata(checkpointName, checkpointOffset: 0, callerMetadata),
             },
             cancellationToken).ConfigureAwait(false);
     }
@@ -478,10 +561,22 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private Dictionary<string, string> CreateCheckpointBlobMetadata() => CreateMetadataDictionary();
 
-    private Dictionary<string, string> CreateWalMetadata(string? checkpointName, long checkpointOffset)
+    private Dictionary<string, string> CreateWalMetadata(
+        string? checkpointName,
+        long checkpointOffset,
+        IReadOnlyDictionary<string, string>? callerMetadata = null)
     {
         // WAL metadata is the recovery manifest: common format plus optional checkpoint pointer and WAL offset.
         var metadata = CreateMetadataDictionary();
+        if (callerMetadata is not null)
+        {
+            foreach (var (key, value) in callerMetadata)
+            {
+                ValidateCallerMetadataProperty(key, value);
+                metadata[key] = value;
+            }
+        }
+
         if (checkpointName is not null)
         {
             metadata[CheckpointMetadataKey] = checkpointName;
@@ -501,9 +596,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private static WalManifest CreateWalManifest(IDictionary<string, string>? metadata)
     {
         // Decode the WAL manifest, accepting non-compacted WALs that have no checkpoint pointer.
-        var fileMetadata = GetFormatKeyMetadata(metadata) is { } format
-            ? new JournalFileMetadata(format)
-            : JournalFileMetadata.Empty;
+        var fileMetadata = CreateJournalMetadata(eTag: default, metadata);
         if (metadata is null || !metadata.TryGetValue(CheckpointMetadataKey, out var checkpointName) || checkpointName is not { Length: > 0 })
         {
             return new WalManifest(fileMetadata, Checkpoint: null);
@@ -521,7 +614,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         return new WalManifest(fileMetadata, new CheckpointReference(checkpointName, checkpointOffset));
     }
 
-    private static IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
+    private static IJournalMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
     {
         // Refuse to stitch checkpoint and WAL data together if their declared journal formats differ.
         var checkpointBlobFormat = GetFormatKeyMetadata(checkpointDetails.Metadata);
@@ -540,9 +633,152 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             }
         }
 
-        return checkpointBlobFormat is { } format
-            ? new JournalFileMetadata(format)
-            : JournalFileMetadata.Empty;
+        return CreateJournalMetadata(eTag: default, checkpointDetails.Metadata);
+    }
+
+    private static async ValueTask<BlobProperties?> GetPropertiesCoreAsync(
+        AppendBlobClient blobClient,
+        BlobRequestConditions? conditions,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await blobClient.GetPropertiesAsync(conditions, cancellationToken).ConfigureAwait(false);
+            return response.Value;
+        }
+        catch (RequestFailedException exception) when (exception.Status is 404)
+        {
+            return null;
+        }
+    }
+
+    private static IJournalMetadata CreateJournalMetadata(ETag eTag, IDictionary<string, string>? metadata)
+        => new JournalMetadata(
+            GetFormatKeyMetadata(metadata),
+            eTag == default ? null : eTag.ToString(),
+            CopyCallerMetadata(metadata));
+
+    private static Dictionary<string, string> CopyCallerMetadata(IDictionary<string, string>? metadata)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (metadata is null)
+        {
+            return result;
+        }
+
+        foreach (var (key, value) in metadata)
+        {
+            if (IsProviderMetadataKey(key))
+            {
+                continue;
+            }
+
+            result[key] = value;
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, string> CopyAndValidateCallerMetadata(IReadOnlyDictionary<string, string>? metadata)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (metadata is null)
+        {
+            return result;
+        }
+
+        foreach (var (key, value) in metadata)
+        {
+            ValidateCallerMetadataProperty(key, value);
+            result.Add(key, value);
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, string> CopyMetadata(IDictionary<string, string>? metadata)
+        => metadata is null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(metadata, StringComparer.OrdinalIgnoreCase);
+
+    private static IReadOnlySet<string> CopyRemove(IEnumerable<string>? remove, IReadOnlyDictionary<string, string> set)
+    {
+        if (remove is null)
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var propertyName in remove)
+        {
+            ValidateCallerMetadataPropertyName(propertyName);
+            if (set.ContainsKey(propertyName))
+            {
+                throw new ArgumentException($"Journal metadata property '{propertyName}' cannot be both set and removed.", nameof(remove));
+            }
+
+            result.Add(propertyName);
+        }
+
+        return result;
+    }
+
+    private static bool ApplyCallerMetadataUpdate(
+        Dictionary<string, string> metadata,
+        IReadOnlyDictionary<string, string> set,
+        IReadOnlySet<string> remove)
+    {
+        var changed = false;
+        foreach (var propertyName in remove)
+        {
+            ValidateCallerMetadataPropertyName(propertyName);
+            changed |= metadata.Remove(propertyName);
+        }
+
+        foreach (var (propertyName, value) in set)
+        {
+            ValidateCallerMetadataProperty(propertyName, value);
+            if (!metadata.TryGetValue(propertyName, out var currentValue)
+                || !string.Equals(currentValue, value, StringComparison.Ordinal))
+            {
+                metadata[propertyName] = value;
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private static void ValidateCallerMetadataProperty(string key, string value)
+    {
+        ValidateCallerMetadataPropertyName(key);
+        ArgumentNullException.ThrowIfNull(value);
+    }
+
+    private static void ValidateCallerMetadataPropertyName(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (key.IndexOf('\0') >= 0)
+        {
+            throw new ArgumentException("Journal metadata property names must not contain null characters.", nameof(key));
+        }
+
+        if (IsProviderMetadataKey(key))
+        {
+            throw new ArgumentException($"Journal metadata property '{key}' is provider-owned.", nameof(key));
+        }
+    }
+
+    private static bool IsProviderMetadataKey(string key)
+        => string.Equals(key, FormatMetadataKey, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, CheckpointMetadataKey, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, CheckpointOffsetMetadataKey, StringComparison.OrdinalIgnoreCase)
+            || key.StartsWith("$", StringComparison.Ordinal);
+
+    private static ETag ToAzureETag(string eTag)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eTag);
+        return new ETag(eTag);
     }
 
     private static bool IsBlobSealed(RequestFailedException exception)
@@ -590,7 +826,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         Message = "Failed to delete obsolete Azure Blob journal checkpoint \"{ContainerName}/{BlobName}\"")]
     private static partial void LogCheckpointCleanupFailure(ILogger logger, string containerName, string blobName, Exception exception);
 
-    private sealed record WalManifest(IJournalFileMetadata Metadata, CheckpointReference? Checkpoint);
+    private sealed record WalManifest(IJournalMetadata Metadata, CheckpointReference? Checkpoint);
 
     private readonly record struct WalState(ETag ETag, WalManifest Manifest);
 

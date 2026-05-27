@@ -2,7 +2,10 @@ using Azure.Core.Diagnostics;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using Orleans.Journaling;
 using TestExtensions;
+
+#pragma warning disable ORLEANSEXP005 // Tests configure the experimental journaling-backed DurableJobs provider.
 
 namespace Tester.AzureUtils
 {
@@ -59,7 +62,7 @@ namespace Tester.AzureUtils
             return options;
         }
 
-        public static AzureStorageJobShardOptions ConfigureTestDefaults(this AzureStorageJobShardOptions options)
+        public static AzureBlobJournalStorageOptions ConfigureTestDefaults(this AzureBlobJournalStorageOptions options)
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
