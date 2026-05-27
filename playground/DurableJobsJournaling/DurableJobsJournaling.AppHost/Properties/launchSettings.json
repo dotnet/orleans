@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17321;http://localhost:15321",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "Playground__Storage__Provider": "Azurite",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21321",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22321"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15321",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "Playground__Storage__Provider": "Azurite",
+        "ASPIRE_ALLOW_UNSECURED_TRANSPORT": "true",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19321",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20321"
+      }
+    },
+    "https-azure": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17321;http://localhost:15321",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "Playground__Storage__Provider": "Azure",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21321",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22321"
+      }
+    },
+    "http-azure": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15321",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "Playground__Storage__Provider": "Azure",
+        "ASPIRE_ALLOW_UNSECURED_TRANSPORT": "true",
+        "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19321",
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20321"
+      }
+    }
+  }
+}

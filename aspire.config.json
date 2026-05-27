@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "playground/DurableJobsJournaling/DurableJobsJournaling.AppHost/DurableJobsJournaling.AppHost.csproj"
+  }
+}

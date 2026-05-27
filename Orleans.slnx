@@ -16,6 +16,13 @@
     <Project Path="playground/ChaoticCluster/ChaoticCluster.ServiceDefaults/ChaoticCluster.ServiceDefaults.csproj" />
     <Project Path="playground/ChaoticCluster/ChaoticCluster.Silo/ChaoticCluster.Silo.csproj" />
   </Folder>
+  <Folder Name="/playground/DurableJobsJournaling/">
+    <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.Abstractions/DurableJobsJournaling.Abstractions.csproj" />
+    <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.AppHost/DurableJobsJournaling.AppHost.csproj" />
+    <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.ServiceDefaults/DurableJobsJournaling.ServiceDefaults.csproj" />
+    <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.Silo/DurableJobsJournaling.Silo.csproj" />
+    <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.Web/DurableJobsJournaling.Web.csproj" />
+  </Folder>
   <Folder Name="/playground/Dashboard/">
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
