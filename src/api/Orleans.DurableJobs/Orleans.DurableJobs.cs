@@ -29,6 +29,12 @@ namespace Orleans.DurableJobs
 
         [Id(3)]
         public Runtime.GrainId TargetGrainId { get { throw null; } init { } }
+
+        [Id(6)]
+        public string? TraceParent { get { throw null; } init { } }
+
+        [Id(7)]
+        public string? TraceState { get { throw null; } init { } }
     }
 
     [GenerateSerializer]
@@ -161,6 +167,10 @@ namespace Orleans.DurableJobs
         public System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get { throw null; } init { } }
 
         public required Runtime.GrainId Target { get { throw null; } init { } }
+
+        public string? TraceParent { get { throw null; } init { } }
+
+        public string? TraceState { get { throw null; } init { } }
     }
 }
 

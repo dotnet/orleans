@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -74,11 +75,14 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     public async Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
         var startTimestamp = _timeProvider.GetTimestamp();
+        using var activity = DurableJobsDiagnostics.StartScheduleActivity(in request);
+        request = EnsureScheduleRequestHasTraceContext(request, activity);
         try
         {
             LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
             var shardKey = GetWritableShardKey(request);
+            DurableJobsInstruments.OnStripeAssigned(shardKey.Stripe);
 
             while (true)
             {
@@ -102,6 +106,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                         LogJobScheduled(_logger, request.JobName, job.Id, existingShard.Id, request.Target);
                         DurableJobsInstruments.OnJobScheduled(elapsed);
                         DurableJobsInstruments.OnScheduleJobCallSucceeded(elapsed);
+                        DurableJobsDiagnostics.SetScheduledJobTags(activity, job);
                         return job;
                     }
 
@@ -142,11 +147,37 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             DurableJobsInstruments.OnScheduleJobCallCanceled(_timeProvider.GetElapsedTime(startTimestamp));
             throw;
         }
-        catch
+        catch (Exception ex)
         {
             DurableJobsInstruments.OnScheduleJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
+            DurableJobsDiagnostics.SetError(activity, ex);
             throw;
         }
+    }
+
+    private static ScheduleJobRequest EnsureScheduleRequestHasTraceContext(ScheduleJobRequest request, Activity? scheduleActivity)
+    {
+        if (!string.IsNullOrEmpty(request.TraceParent))
+        {
+            return request;
+        }
+
+        var source = scheduleActivity ?? Activity.Current;
+        var (traceParent, traceState) = DurableJobsDiagnostics.CaptureTraceContext(source);
+        if (traceParent is null)
+        {
+            return request;
+        }
+
+        return new ScheduleJobRequest
+        {
+            Target = request.Target,
+            JobName = request.JobName,
+            DueTime = request.DueTime,
+            Metadata = request.Metadata,
+            TraceParent = traceParent,
+            TraceState = traceState,
+        };
     }
 
     public void Participate(ISiloLifecycle lifecycle)

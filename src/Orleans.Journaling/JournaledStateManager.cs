@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
+using Orleans.Diagnostics;
 using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
 using Orleans.Storage;
@@ -196,6 +197,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         ? default
                         : _shared.TimeProvider.GetElapsedTime(workItem.EnqueuedTimestamp, processingTimestamp);
                     var recordQueueDuration = workItem is DeleteStateWorkItem;
+                    Activity? storageActivity = queueOperation is null
+                        ? null
+                        : ActivitySources.StorageGrainSource.StartActivity(
+                            $"journal {queueOperation}",
+                            ActivityKind.Internal,
+                            workItem.TraceParent,
+                            tags: null,
+                            links: workItem.TraceLinks);
+                    if (storageActivity is not null)
+                    {
+                        storageActivity.SetTag(ActivityTagKeys.JournalStorageOperation, queueOperation);
+                    }
+
                     try
                     {
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -210,6 +224,21 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     var isSnapshot = workItem is WriteSnapshotWorkItem
                                         || _migrationSnapshotRequired
                                         || _storage.IsCompactionRequested;
+                                    var operationLabel = isSnapshot
+                                        ? JournalingInstruments.OperationSnapshot
+                                        : JournalingInstruments.OperationAppend;
+                                    if (isSnapshot)
+                                    {
+                                        var compactionReason = workItem is WriteSnapshotWorkItem
+                                            ? JournalingInstruments.CompactionReasonUserSnapshot
+                                            : _migrationSnapshotRequired
+                                                ? JournalingInstruments.CompactionReasonMigration
+                                                : JournalingInstruments.CompactionReasonStorageRequested;
+                                        JournalingInstruments.OnCompactionTriggered(compactionReason);
+                                    }
+                                    JournalingInstruments.OnWriteCoalesced(operationLabel, workItem.CallerCount);
+                                    var gatherStartTimestamp = _shared.TimeProvider.GetTimestamp();
+                                    var statesScanned = 0L;
                                     ArcBuffer committedBuffer = default;
                                     ArcBuffer bufferToConsume = default;
                                     var hasCommittedBuffer = false;
@@ -235,6 +264,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                             // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
                                             // If we removed retired states, this snapshot will persist that change.
                                             AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, StateDirectory.Id, _journalStreamDirectory);
+                                            statesScanned++;
 
                                             foreach (var (id, state) in _statesMap)
                                             {
@@ -244,6 +274,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                                 }
 
                                                 AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, id, state);
+                                                statesScanned++;
                                             }
 
                                             bufferToConsume = _journalWriter.GetCommittedBuffer();
@@ -266,6 +297,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                                 // The map of state ids is itself stored as a durable state with the id 0.
                                                 // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
                                                 AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, StateDirectory.Id, _journalStreamDirectory);
+                                                statesScanned++;
 
                                                 foreach (var (id, state) in _statesMap)
                                                 {
@@ -275,6 +307,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                                     }
 
                                                     AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, id, state);
+                                                    statesScanned++;
                                                 }
                                             }
 
@@ -300,6 +333,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                             }
                                         }
                                     }
+
+                                    JournalingInstruments.OnGather(
+                                        operationLabel,
+                                        _shared.TimeProvider.GetElapsedTime(gatherStartTimestamp),
+                                        statesScanned);
 
                                     if (!hasCommittedBuffer && hasBufferToConsume && !bufferToConsumeIsCommittedBuffer)
                                     {
@@ -460,6 +498,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: true);
                         }
 
+                        storageActivity?.SetStatus(ActivityStatusCode.Ok);
                         workItem.SetResult();
                     }
                     catch (Exception exception)
@@ -469,11 +508,27 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: false);
                         }
 
+                        if (storageActivity is not null)
+                        {
+                            storageActivity.SetStatus(ActivityStatusCode.Error, exception.Message);
+                            if (storageActivity.IsAllDataRequested)
+                            {
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionType, exception.GetType().FullName);
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionMessage, exception.Message);
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionStacktrace, exception.ToString());
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionEscaped, true);
+                            }
+                        }
+
                         workItem.SetException(exception);
                         if (IsRecoverySignal(exception))
                         {
                             needsRecovery = true;
                         }
+                    }
+                    finally
+                    {
+                        storageActivity?.Dispose();
                     }
                 }
             }
@@ -853,12 +908,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 continue;
             }
 
+            workItem.RecordTraceContext();
+            workItem.AddCaller();
             didEnqueue = false;
             return workItem.Task;
         }
 
         var newWorkItem = new TWorkItem();
         newWorkItem.EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp();
+        newWorkItem.RecordTraceContext();
         _workQueue.Enqueue(newWorkItem);
         didEnqueue = true;
         return newWorkItem.Task;
@@ -887,6 +945,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     }
 
     public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
+
+    public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
@@ -923,7 +983,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private abstract class WorkItem : TaskCompletionSource
     {
+        private List<ActivityLink>? _links;
+
         public long EnqueuedTimestamp { get; set; }
+
+        public ActivityContext TraceParent { get; private set; }
+
+        public IReadOnlyList<ActivityLink>? TraceLinks => _links;
+
+        /// <summary>
+        /// Gets the number of callers that have folded into this work item, including the
+        /// caller that originally enqueued it. Mutated under the manager lock.
+        /// </summary>
+        public int CallerCount { get; private set; } = 1;
 
         protected WorkItem() : base(TaskCreationOptions.RunContinuationsAsynchronously)
         {
@@ -933,6 +1005,56 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         {
         }
 
+        /// <summary>
+        /// Increments the coalesced caller count when a new caller folds into this pending work item.
+        /// </summary>
+        public void AddCaller()
+        {
+            CallerCount++;
+        }
+
+        public void RecordTraceContext()
+        {
+            var current = Activity.Current;
+            if (current is null || current.IdFormat != ActivityIdFormat.W3C)
+            {
+                return;
+            }
+
+            var context = current.Context;
+            if (TraceParent == default)
+            {
+                TraceParent = context;
+                return;
+            }
+
+            if (context == TraceParent)
+            {
+                return;
+            }
+
+            const int MaxLinks = 64;
+            if (_links is null)
+            {
+                _links = new List<ActivityLink>();
+            }
+            else if (_links.Count >= MaxLinks)
+            {
+                return;
+            }
+            else
+            {
+                for (var i = 0; i < _links.Count; i++)
+                {
+                    if (_links[i].Context == context)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            _links.Add(new ActivityLink(context));
+        }
     }
 
     private static string? GetStorageQueueOperation(WorkItem workItem) =>

@@ -48,7 +48,11 @@
     <InternalsVisibleTo Include="Orleans.Core" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
     <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
     <InternalsVisibleTo Include="Orleans.Placement.Tests" />
     <InternalsVisibleTo Include="Orleans.Reminders" />
     <InternalsVisibleTo Include="Orleans.Runtime" />

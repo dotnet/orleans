@@ -144,5 +144,65 @@ internal static class ActivityTagKeys
     /// The target silo address for migration.
     /// </summary>
     public const string MigrationTargetSilo = "orleans.migration.target.silo";
+
+    /// <summary>
+    /// The durable job id tag key.
+    /// </summary>
+    public const string DurableJobId = "orleans.durable_job.id";
+
+    /// <summary>
+    /// The durable job name tag key.
+    /// </summary>
+    public const string DurableJobName = "orleans.durable_job.name";
+
+    /// <summary>
+    /// The durable job shard id tag key.
+    /// </summary>
+    public const string DurableJobShardId = "orleans.durable_job.shard_id";
+
+    /// <summary>
+    /// The durable job target grain id tag key.
+    /// </summary>
+    public const string DurableJobTargetGrainId = "orleans.durable_job.target_grain_id";
+
+    /// <summary>
+    /// The durable job dequeue count tag key.
+    /// </summary>
+    public const string DurableJobDequeueCount = "orleans.durable_job.dequeue_count";
+
+    /// <summary>
+    /// The durable job run id tag key.
+    /// </summary>
+    public const string DurableJobRunId = "orleans.durable_job.run_id";
+
+    /// <summary>
+    /// The durable job due time tag key.
+    /// </summary>
+    public const string DurableJobDueTime = "orleans.durable_job.due_time";
+
+    /// <summary>
+    /// The durable job status tag key.
+    /// </summary>
+    public const string DurableJobStatus = "orleans.durable_job.status";
+
+    /// <summary>
+    /// The journal id tag key.
+    /// </summary>
+    public const string JournalId = "orleans.journal.id";
+
+    /// <summary>
+    /// The journal storage operation tag key (append, snapshot, replace, delete, read).
+    /// </summary>
+    public const string JournalStorageOperation = "orleans.journal.operation";
+
+    /// <summary>
+    /// The number of bytes involved in a journal storage operation.
+    /// </summary>
+    public const string JournalStorageBytes = "orleans.journal.bytes";
+
+    /// <summary>
+    /// The number of pending operations coalesced into a single journal storage write.
+    /// </summary>
+    public const string JournalStorageBatchSize = "orleans.journal.batch_size";
 }
 

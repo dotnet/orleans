@@ -24,4 +24,6 @@ public interface IDurableJobGrain : IGrainWithStringKey
     Task<IJobRunContext> GetJobRun(string jobId);
 
     Task<bool> WasCancellationTokenCancelled(string jobId);
+
+    Task<string> GetJobTraceId(string jobId);
 }

@@ -159,7 +159,9 @@ public abstract class JobShard : IJobShard
             Name = request.JobName,
             DueTime = request.DueTime,
             ShardId = Id,
-            Metadata = request.Metadata
+            Metadata = request.Metadata,
+            TraceParent = request.TraceParent,
+            TraceState = request.TraceState,
         };
 
         await PersistAddJobAsync(jobId, request.JobName, request.DueTime, request.Target, request.Metadata, cancellationToken);

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Diagnostics;
 using Orleans.Journaling;
 
 namespace Orleans.DurableJobs;
@@ -254,6 +256,7 @@ internal sealed class JournaledJobShard : IJobShard
                         await LingerForMoreMutationsAsync(batch).ConfigureAwait(false);
                         DequeueConsecutiveMutations(batch);
                     }
+                    DurableJobsInstruments.OnShardPendingDepth(batch.Count);
                     await ProcessMutationBatchAsync(batch).ConfigureAwait(false);
                     batch.Clear();
                 }
@@ -353,7 +356,18 @@ internal sealed class JournaledJobShard : IJobShard
                 return;
             }
 
-            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false))
+            var ownershipStartTimestamp = Stopwatch.GetTimestamp();
+            bool isOwned;
+            try
+            {
+                isOwned = await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                DurableJobsInstruments.OnOwnershipCheck(Stopwatch.GetElapsedTime(ownershipStartTimestamp));
+            }
+
+            if (!isOwned)
             {
                 foreach (var operation in startedOperations)
                 {
@@ -362,6 +376,8 @@ internal sealed class JournaledJobShard : IJobShard
 
                 return;
             }
+
+            var pendingBytesBeforeApply = _stateManager.PendingWriteByteCount;
 
             foreach (var operation in startedOperations)
             {
@@ -383,10 +399,19 @@ internal sealed class JournaledJobShard : IJobShard
                 return;
             }
 
+            var pendingBytesAfterApply = _stateManager.PendingWriteByteCount;
+            DurableJobsInstruments.OnShardBatch(appliedOperations.Count);
+            if (pendingBytesBeforeApply >= 0 && pendingBytesAfterApply >= pendingBytesBeforeApply)
+            {
+                DurableJobsInstruments.OnShardBatchBytes(pendingBytesAfterApply - pendingBytesBeforeApply);
+            }
+
             try
             {
+                using var batchActivity = DurableJobsDiagnostics.StartPersistBatchActivity(appliedOperations, Id);
                 await _stateManager.WriteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
                 DurableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: false);
+                batchActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
                 foreach (var operation in appliedOperations)
                 {
                     operation.CompleteAfterWrite();
@@ -439,7 +464,12 @@ internal sealed class JournaledJobShard : IJobShard
                     markAsComplete.Complete();
                     break;
                 case DeleteStateOperation deleteState:
-                    await _stateManager.DeleteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                    using (var deleteActivity = DurableJobsDiagnostics.StartDeleteShardActivity(deleteState.CapturedContext, Id))
+                    {
+                        await _stateManager.DeleteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                        deleteActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
+                    }
+
                     deleteState.Complete();
                     break;
                 default:
@@ -471,7 +501,7 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
-    private abstract class PendingOperation : IDisposable
+    private abstract class PendingOperation : IDisposable, DurableJobsDiagnostics.IHasCapturedContext
     {
         private readonly CancellationTokenRegistration _cancellationRegistration;
         private int _started;
@@ -479,6 +509,9 @@ internal sealed class JournaledJobShard : IJobShard
         protected PendingOperation(CancellationToken cancellationToken)
         {
             CancellationToken = cancellationToken;
+            CapturedContext = Activity.Current is { IdFormat: ActivityIdFormat.W3C } current
+                ? current.Context
+                : default;
             if (cancellationToken.CanBeCanceled)
             {
                 _cancellationRegistration = cancellationToken.Register(static state => ((PendingOperation)state!).TryCancel(), this);
@@ -486,6 +519,8 @@ internal sealed class JournaledJobShard : IJobShard
         }
 
         public CancellationToken CancellationToken { get; }
+
+        public ActivityContext CapturedContext { get; }
 
         public abstract Task Completion { get; }
 

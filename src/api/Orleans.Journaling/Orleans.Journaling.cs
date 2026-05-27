@@ -221,6 +221,8 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
+        long PendingWriteByteCount { get; }
+
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
         void RegisterState(string name, IJournaledState state);

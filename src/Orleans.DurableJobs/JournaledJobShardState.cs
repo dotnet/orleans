@@ -83,7 +83,9 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
             Name = request.JobName,
             DueTime = request.DueTime,
             ShardId = Id,
-            Metadata = request.Metadata
+            Metadata = request.Metadata,
+            TraceParent = request.TraceParent,
+            TraceState = request.TraceState,
         };
 
         Write(DurableJobShardJournalRecord.ForSchedule(job));

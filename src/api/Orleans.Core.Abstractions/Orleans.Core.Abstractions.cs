@@ -1514,6 +1514,7 @@ namespace Orleans.Diagnostics
     {
         public const string AllActivitySourceName = "Microsoft.Orleans.*";
         public const string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
+        public const string DurableJobsActivitySourceName = "Microsoft.Orleans.DurableJobs";
         public const string LifecycleActivitySourceName = "Microsoft.Orleans.Lifecycle";
         public const string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
         public const string StorageActivitySourceName = "Microsoft.Orleans.Storage";

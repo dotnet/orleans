@@ -44,4 +44,15 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask DeleteStateAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets an approximate count of bytes accumulated in the in-memory journal buffer that have
+    /// not yet been flushed to storage. Returns a negative value when the implementation does not
+    /// support sampling pending bytes.
+    /// </summary>
+    /// <remarks>
+    /// This is intended for diagnostics and instrumentation; the returned value may race with
+    /// concurrent writers and should not be used for correctness decisions.
+    /// </remarks>
+    long PendingWriteByteCount => -1;
 }

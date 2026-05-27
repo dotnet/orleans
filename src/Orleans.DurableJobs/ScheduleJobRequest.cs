@@ -28,4 +28,16 @@ public readonly struct ScheduleJobRequest
     /// Gets optional metadata associated with the job.
     /// </summary>
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+
+    /// <summary>
+    /// Gets the W3C <c>traceparent</c> value to associate with the scheduled job, used to continue the distributed trace when the job is later executed.
+    /// If <see langword="null"/>, the value of <see cref="System.Diagnostics.Activity.Current"/> at the time <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> is invoked will be used.
+    /// </summary>
+    public string? TraceParent { get; init; }
+
+    /// <summary>
+    /// Gets the W3C <c>tracestate</c> value to associate with the scheduled job, used to continue the distributed trace when the job is later executed.
+    /// If <see langword="null"/>, the value of <see cref="System.Diagnostics.Activity.Current"/> at the time <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> is invoked will be used.
+    /// </summary>
+    public string? TraceState { get; init; }
 }

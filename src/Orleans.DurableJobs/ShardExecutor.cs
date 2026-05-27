@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Diagnostics;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
@@ -220,6 +222,7 @@ internal sealed partial class ShardExecutor
         var attemptStartTimestamp = _timeProvider.GetTimestamp();
         DurableJobsInstruments.OnJobAttemptStarted(_timeProvider.GetUtcNow() - jobContext.Job.DueTime);
 
+        using var activity = DurableJobsDiagnostics.StartExecuteActivity(jobContext.Job, jobContext.DequeueCount, jobContext.RunId);
         try
         {
             try
@@ -246,6 +249,8 @@ internal sealed partial class ShardExecutor
                     await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
                     LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
                     DurableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
+                    activity?.SetStatus(ActivityStatusCode.Ok);
                 }
                 else if (result.IsFailed)
                 {
@@ -269,13 +274,22 @@ internal sealed partial class ShardExecutor
                     LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
                     await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
                     DurableJobsInstruments.OnJobRetried(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, "retried");
+                    DurableJobsDiagnostics.SetError(activity, failureException);
                 }
                 else
                 {
                     LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
                     DurableJobsInstruments.OnJobFailed(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, "failed");
+                    DurableJobsDiagnostics.SetError(activity, failureException);
                 }
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            activity?.SetTag(ActivityTagKeys.DurableJobStatus, "canceled");
+            throw;
         }
         finally
         {
