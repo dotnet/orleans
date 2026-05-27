@@ -5,18 +5,18 @@ using Orleans.Messaging;
 #nullable disable
 namespace Orleans.Runtime;
 
-internal static class NetworkingInstruments
+internal class NetworkingInstruments(OrleansInstruments instruments)
 {
-    internal static Counter<int> ClosedSocketsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.NETWORKING_SOCKETS_CLOSED);
-    internal static Counter<int> OpenedSocketsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.NETWORKING_SOCKETS_OPENED);
+    private readonly Counter<int> _closedSocketsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.NETWORKING_SOCKETS_CLOSED);
+    private readonly Counter<int> _openedSocketsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.NETWORKING_SOCKETS_OPENED);
 
-    internal static void OnOpenedSocket(ConnectionDirection direction)
+    internal void OnOpenedSocket(ConnectionDirection direction)
     {
-        OpenedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
+        _openedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
     }
 
-    internal static void OnClosedSocket(ConnectionDirection direction)
+    internal void OnClosedSocket(ConnectionDirection direction)
     {
-        ClosedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
+        _closedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
     }
 }

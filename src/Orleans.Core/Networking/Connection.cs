@@ -103,7 +103,7 @@ namespace Orleans.Runtime.Messaging
             var connection = context.Features.Get<Connection>();
             context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
 
-            NetworkingInstruments.OnOpenedSocket(connection.ConnectionDirection);
+            connection.shared.NetworkingInstruments.OnOpenedSocket(connection.ConnectionDirection);
             return connection.RunInternal();
         }
 
@@ -163,7 +163,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private async Task CloseAsync()
         {
-            NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
+            this.shared.NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
 
             // Signal the outgoing message processor to exit gracefully.
             this.outgoingMessageWriter.TryComplete();
