@@ -17,7 +17,7 @@ using static System.FormattableString;
 #nullable disable
 namespace Orleans.Reminders.Redis
 {
-    internal partial class RedisReminderTable : IReminderTable, IDisposable
+    internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncDisposable
     {
         private readonly RedisKey _hashSetKey;
         private readonly RedisReminderTableOptions _redisOptions;
@@ -182,14 +182,40 @@ namespace Orleans.Reminders.Redis
 
         public void Dispose()
         {
-            if (!_muxerIsShared)
+            var muxer = _muxer;
+            if (muxer is null)
             {
-                _muxer?.Dispose();
+                return;
             }
 
+            var muxerIsShared = _muxerIsShared;
             _muxer = null;
             _db = null;
             _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                muxer.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            var muxer = _muxer;
+            if (muxer is null)
+            {
+                return;
+            }
+
+            var muxerIsShared = _muxerIsShared;
+            _muxer = null;
+            _db = null;
+            _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                await muxer.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         private static ReminderEntry ConvertToEntry(string reminderValue)

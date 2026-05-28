@@ -37,11 +37,15 @@ namespace Orleans.Hosting
 
 namespace Orleans.Persistence
 {
-    public partial class RedisGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>
+    public partial class RedisGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>, System.IDisposable, System.IAsyncDisposable
     {
         public RedisGrainStorage(string name, RedisStorageOptions options, Storage.IGrainStorageSerializer grainStorageSerializer, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<RedisGrainStorage> logger) { }
 
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public void Dispose() { }
+
+        public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 

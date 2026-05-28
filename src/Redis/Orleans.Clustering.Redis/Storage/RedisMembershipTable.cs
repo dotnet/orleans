@@ -11,7 +11,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Clustering.Redis
 {
-    internal class RedisMembershipTable : IMembershipTable, IDisposable
+    internal class RedisMembershipTable : IMembershipTable, IDisposable, IAsyncDisposable
     {
         private const string TableVersionKey = "Version";
         private static readonly TableVersion DefaultTableVersion = new TableVersion(0, "0");
@@ -216,14 +216,40 @@ namespace Orleans.Clustering.Redis
 
         public void Dispose()
         {
-            if (!_muxerIsShared)
+            var muxer = _muxer;
+            if (muxer is null)
             {
-                _muxer?.Dispose();
+                return;
             }
 
+            var muxerIsShared = _muxerIsShared;
             _muxer = null!;
             _db = null!;
             _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                muxer.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            var muxer = _muxer;
+            if (muxer is null)
+            {
+                return;
+            }
+
+            var muxerIsShared = _muxerIsShared;
+            _muxer = null!;
+            _db = null!;
+            _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                await muxer.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         private enum UpsertResult

@@ -29,9 +29,13 @@ namespace Orleans.Configuration
 
 namespace Orleans.GrainDirectory.Redis
 {
-    public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<Runtime.ISiloLifecycle>
+    public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<Runtime.ISiloLifecycle>, System.IDisposable, System.IAsyncDisposable
     {
         public RedisGrainDirectory(Configuration.RedisGrainDirectoryOptions directoryOptions, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILogger<RedisGrainDirectory> logger) { }
+
+        public void Dispose() { }
+
+        public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
         public System.Threading.Tasks.Task Initialize(System.Threading.CancellationToken ct = default) { throw null; }
 

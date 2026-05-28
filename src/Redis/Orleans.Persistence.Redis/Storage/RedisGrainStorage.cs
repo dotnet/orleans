@@ -21,7 +21,7 @@ namespace Orleans.Persistence
     /// <summary>
     /// Redis-based grain storage provider
     /// </summary>
-    public partial class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public partial class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>, IDisposable, IAsyncDisposable
     {
         private readonly string _serviceId;
         private readonly RedisValue _ttl;
@@ -62,7 +62,7 @@ namespace Orleans.Persistence
         public void Participate(ISiloLifecycle lifecycle)
         {
             var name = OptionFormattingUtilities.Name<RedisGrainStorage>(_name);
-            lifecycle.Subscribe(name, _options.InitStage, Init, Close);
+            lifecycle.Subscribe(name, _options.InitStage, Init);
         }
 
         private async Task Init(CancellationToken cancellationToken)
@@ -253,23 +253,41 @@ namespace Orleans.Persistence
             }
         }
 
-        private async Task Close(CancellationToken cancellationToken)
+        public void Dispose()
         {
-            if (_connection is null) return;
-
-            try
+            var connection = _connection;
+            if (connection is null)
             {
-                 if (!_connectionIsShared)
-                {
-                    await _connection.CloseAsync().ConfigureAwait(false);
-                    _connection.Dispose();
-                }
+                return;
             }
-            finally
+
+            var connectionIsShared = _connectionIsShared;
+            _connection = null;
+            _db = null;
+            _connectionIsShared = false;
+
+            if (!connectionIsShared)
             {
-                _connection = null;
-                _db = null;
-                _connectionIsShared = false;
+                connection.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            var connection = _connection;
+            if (connection is null)
+            {
+                return;
+            }
+
+            var connectionIsShared = _connectionIsShared;
+            _connection = null;
+            _db = null;
+            _connectionIsShared = false;
+
+            if (!connectionIsShared)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
         }
 
