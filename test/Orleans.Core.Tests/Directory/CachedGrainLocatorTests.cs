@@ -156,7 +156,8 @@ namespace UnitTests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory());
+                activations: new ActivationDirectory(),
+                schedulerInstruments: CreateSchedulerInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -207,7 +208,8 @@ namespace UnitTests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory());
+                activations: new ActivationDirectory(),
+                schedulerInstruments: CreateSchedulerInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -270,7 +272,8 @@ namespace UnitTests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory());
+                activations: new ActivationDirectory(),
+                schedulerInstruments: CreateSchedulerInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -813,6 +816,15 @@ namespace UnitTests.Directory
             }
 
             return silos[^1];
+        }
+
+        private static SchedulerInstruments CreateSchedulerInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<SchedulerInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
         }
 
         private int generation = 0;

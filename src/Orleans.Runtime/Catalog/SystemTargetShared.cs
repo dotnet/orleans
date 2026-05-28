@@ -15,7 +15,8 @@ internal sealed class SystemTargetShared(
     IOptions<SchedulingOptions> schedulingOptions,
     GrainReferenceActivator grainReferenceActivator,
     ITimerRegistry timerRegistry,
-    ActivationDirectory activations)
+    ActivationDirectory activations,
+    SchedulerInstruments schedulerInstruments)
 {
     public SiloAddress SiloAddress => localSiloDetails.SiloAddress;
 
@@ -32,6 +33,7 @@ internal sealed class SystemTargetShared(
         ArgumentNullException.ThrowIfNull(systemTarget);
         return new WorkItemGroup(
             systemTarget,
-            schedulingOptions);
+            schedulingOptions,
+            schedulerInstruments);
     }
 }

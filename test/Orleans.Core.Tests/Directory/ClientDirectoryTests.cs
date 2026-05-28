@@ -80,7 +80,8 @@ namespace NonSilo.Tests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory());
+                activations: new ActivationDirectory(),
+                schedulerInstruments: CreateSchedulerInstruments());
 
             _directory = new ClientDirectory(
                 grainFactory: _grainFactory,
@@ -95,6 +96,15 @@ namespace NonSilo.Tests.Directory
 
             // Disable automatic publishing to simplify testing.
             _testAccessor.SchedulePublishUpdate = () => { };
+        }
+
+        private static SchedulerInstruments CreateSchedulerInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<SchedulerInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
         }
 
         /// <summary>

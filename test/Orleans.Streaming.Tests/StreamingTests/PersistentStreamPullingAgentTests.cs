@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -165,8 +166,9 @@ namespace UnitTests.StreamingTests
                 NullLoggerFactory.Instance,
                 Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null!,
-                timerRegistry,
-                activations: new ActivationDirectory());
+                timerRegistry: timerRegistry,
+                activations: new ActivationDirectory(),
+                schedulerInstruments: CreateSchedulerInstruments());
 
             receiver ??= Substitute.For<IQueueAdapterReceiver>();
             receiver.Initialize(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
@@ -192,6 +194,15 @@ namespace UnitTests.StreamingTests
         }
 
         private static Task InitializeAgent(PersistentStreamPullingAgent agent) => agent.RunOrQueueTask(() => agent.Initialize());
+
+        private static SchedulerInstruments CreateSchedulerInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<SchedulerInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
+        }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_KeepsCacheEntryWhenSubscriberHandshakeFails()
