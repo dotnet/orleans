@@ -79,6 +79,7 @@ public sealed class WorkflowCoordinatorGrain(ILocalDurableJobManager jobManager)
 
     public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
+        await Task.Delay(10);
         var currentState = _state ?? CreateDefaultState(DateTimeOffset.UtcNow);
         if (currentState.Status is WorkflowStatus.Completed or WorkflowStatus.Failed or WorkflowStatus.Canceled)
         {

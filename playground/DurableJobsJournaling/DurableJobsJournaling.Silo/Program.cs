@@ -1,11 +1,6 @@
 using Azure.Storage.Blobs;
-using DurableJobsJournaling.Abstractions;
 using DurableJobsJournaling.Silo;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using Orleans.Dashboard;
-using Orleans.Hosting;
 using Orleans.Journaling;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +15,7 @@ var storagePrefix = builder.Configuration.GetValue("Playground:Storage:Prefix", 
 builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
+        .AddDashboard()
         .AddActivityPropagation()
         .AddIncomingGrainCallFilter<GrainRequestMetricsFilter>()
         .AddAzureBlobJournalStorage()
@@ -34,7 +30,7 @@ builder.UseOrleans(siloBuilder =>
         {
             options.ShardDuration = TimeSpan.FromMinutes(5);
             options.ShardActivationBufferPeriod = TimeSpan.FromSeconds(30);
-            options.ShardStripeCount = 1;
+            options.ShardStripeCount = 2;
             options.JobStatusPollInterval = TimeSpan.FromMilliseconds(100);
             options.MaxConcurrentJobsPerSilo = 512;
             options.ConcurrencySlowStartEnabled = true;
