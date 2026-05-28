@@ -1531,17 +1531,15 @@ internal sealed partial class ActivationData :
 
     private void ReceiveResponse(Message message)
     {
-        lock (this)
+        var state = State;
+        if (state == ActivationState.Invalid)
         {
-            if (State == ActivationState.Invalid)
-            {
-                _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
-                // Note that we always process responses, even if the activation is invalid.
-            }
-            else
-            {
-                MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
-            }
+            _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, state);
+            // Note that we always process responses, even if the activation is invalid.
+        }
+        else
+        {
+            MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
         }
 
         _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
