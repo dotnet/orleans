@@ -25,6 +25,7 @@ namespace Orleans.GrainDirectory.Redis
         // Both are initialized in the Initialize method.
         private IConnectionMultiplexer _redis = null!;
         private IDatabase _database = null!;
+        private bool _redisIsShared;
 
         private bool _disposed;
 
@@ -177,7 +178,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Initialize(CancellationToken ct = default)
         {
-            _redis = await _directoryOptions.CreateMultiplexer(_directoryOptions);
+            (_redis, _redisIsShared) = await _directoryOptions.CreateMultiplexer(_directoryOptions);
 
             // Configure logging
             _redis.ConnectionRestored += LogConnectionRestored;
@@ -190,14 +191,28 @@ namespace Orleans.GrainDirectory.Redis
 
         private async Task Uninitialize(CancellationToken arg)
         {
-            if (_redis != null && _redis.IsConnected)
+            if (_redis != null)
             {
                 _disposed = true;
 
-                await _redis.CloseAsync();
-                _redis.Dispose();
-                _redis = null!;
-                _database = null!;
+                try
+                {
+                    _redis.ConnectionRestored -= LogConnectionRestored;
+                    _redis.ConnectionFailed -= LogConnectionFailed;
+                    _redis.ErrorMessage -= LogErrorMessage;
+                    _redis.InternalError -= LogInternalError;
+
+                    if (!_redisIsShared)
+                    {
+                        await _redis.DisposeAsync();
+                    }
+                }
+                finally
+                {
+                    _redis = null!;
+                    _database = null!;
+                    _redisIsShared = false;
+                }
             }
         }
 

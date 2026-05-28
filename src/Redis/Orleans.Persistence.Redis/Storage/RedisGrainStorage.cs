@@ -34,6 +34,7 @@ namespace Orleans.Persistence
         private readonly Func<string, GrainId, RedisKey> _getKeyFunc;
         private IConnectionMultiplexer _connection;
         private IDatabase _db;
+        private bool _connectionIsShared;
 
         /// <summary>
         /// Creates a new instance of the <see cref="RedisGrainStorage"/> type.
@@ -72,7 +73,7 @@ namespace Orleans.Persistence
             {
                 LogDebugInitializing(_name, _serviceId, _options.DeleteStateOnClear);
 
-                _connection = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
+                (_connection, _connectionIsShared) = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
                 _db = _connection.GetDatabase();
 
                 var elapsed = Stopwatch.GetElapsedTime(startTime);
@@ -256,8 +257,20 @@ namespace Orleans.Persistence
         {
             if (_connection is null) return;
 
-            await _connection.CloseAsync().ConfigureAwait(false);
-            _connection.Dispose();
+            try
+            {
+                 if (!_connectionIsShared)
+                {
+                    await _connection.CloseAsync().ConfigureAwait(false);
+                    _connection.Dispose();
+                }
+            }
+            finally
+            {
+                _connection = null;
+                _db = null;
+                _connectionIsShared = false;
+            }
         }
 
         private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();

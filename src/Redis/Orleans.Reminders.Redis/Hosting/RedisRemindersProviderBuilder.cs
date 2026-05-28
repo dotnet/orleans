@@ -27,7 +27,7 @@ internal sealed class RedisRemindersProviderBuilder : IProviderBuilder<ISiloBuil
                 {
                     // Get a connection multiplexer instance by name.
                     var multiplexer = services.GetRequiredKeyedService<IConnectionMultiplexer>(serviceKey);
-                    options.CreateMultiplexer = _ => Task.FromResult(multiplexer);
+                    options.CreateMultiplexer = _ => Task.FromResult((Multiplexer: multiplexer, IsShared: true));
                     options.ConfigurationOptions = new ConfigurationOptions();
                 }
                 else
