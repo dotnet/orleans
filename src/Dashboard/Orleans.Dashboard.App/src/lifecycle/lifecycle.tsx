@@ -106,13 +106,14 @@ function buildShutdownGraph(stages: LifecycleStageInfo[]): string {
 }
 
 /**
- * Mermaid emits an SVG with fixed `width`/`height` attributes plus a
- * `max-width: NNNpx` style that, when the host container is narrower
- * than the diagram's natural width, leaves the rendered SVG element
- * at its full natural height while the content scales down — so the
- * bottom of the diagram gets clipped by the card. Replace those with
- * an explicit `aspect-ratio` derived from the viewBox so the browser
- * sizes the SVG element to match the scaled content.
+ * Mermaid emits an SVG whose `viewBox` is computed before the browser
+ * has laid out the HTML-based labels inside `foreignObject` elements,
+ * so the calculation routinely under-estimates the diagram height — the
+ * bottom row of nodes ends up below the viewBox's lower edge and gets
+ * clipped, while spurious whitespace appears at the top. Strip
+ * Mermaid's fixed width/height/max-width styling so the subsequent
+ * `fixSvgViewBox` pass (which runs after layout) can install its own
+ * intrinsic dimensions derived from the actual rendered bounds.
  */
 function normaliseSvg(svg: string): string {
   if (typeof DOMParser === 'undefined' || !svg) return svg;
@@ -121,24 +122,54 @@ function normaliseSvg(svg: string): string {
     const svgEl = doc.documentElement as unknown as SVGSVGElement;
     if (!svgEl || svgEl.tagName.toLowerCase() !== 'svg') return svg;
 
-    const viewBox = svgEl.getAttribute('viewBox');
     svgEl.removeAttribute('width');
     svgEl.removeAttribute('height');
     svgEl.removeAttribute('style');
     svgEl.style.display = 'block';
-    svgEl.style.width = '100%';
-    svgEl.style.maxWidth = '100%';
-    svgEl.style.height = 'auto';
-    if (viewBox) {
-      const parts = viewBox.split(/\s+/).map(Number);
-      if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-        svgEl.style.aspectRatio = `${parts[2]} / ${parts[3]}`;
-      }
-    }
     return svgEl.outerHTML;
   } catch {
     return svg;
   }
+}
+
+/**
+ * Once the SVG is mounted in the DOM, `getBBox()` returns the union of
+ * the actual rendered bounds of every node — including any HTML labels
+ * that wrapped past Mermaid's internal estimate. Rewrite the viewBox
+ * to that bounding box (with a small padding) and install explicit
+ * `width`/`height` attributes so the SVG renders at natural pixel
+ * size: text stays at 16px and nodes stay at their natural width. The
+ * surrounding wrapper provides scrollbars when the diagram is larger
+ * than the host card.
+ */
+function fixSvgViewBox(container: HTMLElement | null): void {
+  if (!container) return;
+  const svg = container.querySelector('svg') as SVGSVGElement | null;
+  if (!svg) return;
+
+  // getBBox throws on detached/unrendered SVGs; ignore failures.
+  let bbox: { x: number; y: number; width: number; height: number };
+  try {
+    const raw = svg.getBBox();
+    bbox = { x: raw.x, y: raw.y, width: raw.width, height: raw.height };
+  } catch {
+    return;
+  }
+
+  if (bbox.width <= 0 || bbox.height <= 0) return;
+
+  const padding = 16;
+  const x = bbox.x - padding;
+  const y = bbox.y - padding;
+  const w = Math.ceil(bbox.width + padding * 2);
+  const h = Math.ceil(bbox.height + padding * 2);
+
+  svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  svg.setAttribute('width', String(w));
+  svg.setAttribute('height', String(h));
+  svg.style.aspectRatio = '';
+  svg.style.maxWidth = '';
+  svg.style.height = '';
 }
 
 export default class Lifecycle extends React.Component<LifecycleProps, LifecycleState> {
@@ -150,13 +181,26 @@ export default class Lifecycle extends React.Component<LifecycleProps, Lifecycle
     activeTab: 'startup'
   };
 
+  private diagramRef = React.createRef<HTMLDivElement>();
+
   componentDidMount() {
     this.renderDiagrams();
   }
 
-  componentDidUpdate(prevProps: LifecycleProps) {
+  componentDidUpdate(prevProps: LifecycleProps, prevState: LifecycleState) {
     if (prevProps.stages !== this.props.stages) {
       this.renderDiagrams();
+    }
+
+    const svgChanged =
+      prevState.startupSvg !== this.state.startupSvg ||
+      prevState.shutdownSvg !== this.state.shutdownSvg ||
+      prevState.activeTab !== this.state.activeTab;
+
+    if (svgChanged) {
+      // Wait one frame so the browser has flushed layout for the freshly
+      // inserted SVG before we measure it with getBBox().
+      requestAnimationFrame(() => fixSvgViewBox(this.diagramRef.current));
     }
   }
 
@@ -238,7 +282,8 @@ export default class Lifecycle extends React.Component<LifecycleProps, Lifecycle
             {errorMessage ? <pre className="text-danger">{errorMessage}</pre> : null}
             {rendering && !svg ? <p>Rendering…</p> : null}
             <div
-              style={{ overflowX: 'auto', width: '100%' }}
+              ref={this.diagramRef}
+              style={{ overflow: 'auto', width: '100%', maxHeight: '80vh' }}
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           </div>
