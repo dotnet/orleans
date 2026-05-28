@@ -141,6 +141,11 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
         switch (record.Kind)
         {
+            case DurableJobShardJournalRecordKind.None:
+                throw new InvalidOperationException(
+                    "DurableJobs shard journal record has an uninitialized Kind (None). This usually " +
+                    "indicates a malformed or default-constructed journal payload — for example, a JSON " +
+                    "record whose 'kind' property was missing.");
             case DurableJobShardJournalRecordKind.Schedule:
                 ApplySchedule(GetRequired(record.Schedule, nameof(record.Schedule)).Job);
                 break;
@@ -226,10 +231,19 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 [Alias("Orleans.DurableJobs.DurableJobShardJournalRecordKind")]
 internal enum DurableJobShardJournalRecordKind : byte
 {
-    Schedule = 0,
-    Remove = 1,
-    Retry = 2,
-    Snapshot = 3
+    /// <summary>
+    /// Reserved sentinel. A record whose <see cref="DurableJobShardJournalRecord.Kind"/>
+    /// is <see cref="None"/> is invalid — it indicates a default-constructed instance or a
+    /// malformed journal payload (for example, a JSON record where <c>kind</c> was omitted
+    /// because the serializer drops default-valued properties). Apply paths must reject it.
+    /// Keep this at value 0 so that the default surfaces as an explicit failure rather than
+    /// silently aliasing to another kind.
+    /// </summary>
+    None = 0,
+    Schedule = 1,
+    Remove = 2,
+    Retry = 3,
+    Snapshot = 4,
 }
 
 [GenerateSerializer]

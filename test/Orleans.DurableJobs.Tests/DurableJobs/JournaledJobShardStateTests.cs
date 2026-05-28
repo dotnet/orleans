@@ -120,6 +120,22 @@ public class JournaledJobShardStateTests
         Assert.Equal(shardId, JobShardId.FromJournalId(storageId));
     }
 
+    [Fact]
+    public void Apply_DefaultKind_Throws()
+    {
+        var shardId = new JobShardId("shard-default-kind");
+        var start = DateTimeOffset.UtcNow;
+        var state = new JournaledJobShardState(shardId, start, start.AddHours(1));
+
+        // A default-constructed record has Kind == DurableJobShardJournalRecordKind.None.
+        // This simulates an uninitialized record or a JSON payload where 'kind' was omitted
+        // because the serializer is configured to skip default-valued properties.
+        var record = new DurableJobShardJournalRecord();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => state.Apply(record));
+        Assert.Contains("uninitialized Kind", exception.Message, StringComparison.Ordinal);
+    }
+
     private static DurableJob CreateJob(JobShardId shardId, string id, string name, DateTimeOffset dueTime) => new()
     {
         Id = id,
