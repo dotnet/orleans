@@ -40,8 +40,8 @@ function ensureMermaidInit() {
   mermaid.initialize({
     startOnLoad: false,
     theme,
-    securityLevel: 'loose',
-    flowchart: { htmlLabels: true, curve: 'basis' }
+    securityLevel: 'strict',
+    flowchart: { htmlLabels: false, curve: 'basis' }
   });
   initialized = true;
 }
@@ -51,7 +51,20 @@ function escape(value: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/[\r\n]+/g, ' ');
+}
+
+function formatStageLabel(stage: LifecycleStageInfo, direction: Direction): string {
+  const title = `${escape(stage.stageName)} (${direction === 'startup' ? 'start' : 'stop'})`;
+  const observerLines = stage.observers.map(observer => {
+    const method = direction === 'startup' ? observer.onStartMethod : observer.onStopMethod;
+    return method
+      ? `- ${escape(observer.name)} - ${escape(method)}`
+      : `- ${escape(observer.name)}`;
+  });
+
+  return [title, ...(observerLines.length ? observerLines : ['(no participants)'])].join('\\n');
 }
 
 function buildStartupGraph(stages: LifecycleStageInfo[]): string {
@@ -65,11 +78,7 @@ function buildStartupGraph(stages: LifecycleStageInfo[]): string {
 
   stages.forEach((s, idx) => {
     const id = `s${idx}`;
-    const header = escape(`${s.stageName} (start)`);
-    const body = s.observers
-      .map(o => `&bull; ${escape(o.name)}${o.onStartMethod ? ` &mdash; ${escape(o.onStartMethod)}` : ''}`)
-      .join('<br/>');
-    lines.push(`  ${id}["<b>${header}</b><br/>${body || '<i>(no participants)</i>'}"]`);
+    lines.push(`  ${id}["${formatStageLabel(s, 'startup')}"]`);
     lines.push(`  class ${id} ${s.isNamedStage ? 'named' : 'stage'};`);
     if (idx > 0) {
       lines.push(`  s${idx - 1} --> ${id}`);
@@ -91,11 +100,7 @@ function buildShutdownGraph(stages: LifecycleStageInfo[]): string {
 
   reversed.forEach((s, idx) => {
     const id = `t${idx}`;
-    const header = escape(`${s.stageName} (stop)`);
-    const body = s.observers
-      .map(o => `&bull; ${escape(o.name)}${o.onStopMethod ? ` &mdash; ${escape(o.onStopMethod)}` : ''}`)
-      .join('<br/>');
-    lines.push(`  ${id}["<b>${header}</b><br/>${body || '<i>(no participants)</i>'}"]`);
+    lines.push(`  ${id}["${formatStageLabel(s, 'shutdown')}"]`);
     lines.push(`  class ${id} ${s.isNamedStage ? 'named' : 'stage'};`);
     if (idx > 0) {
       lines.push(`  t${idx - 1} --> ${id}`);
@@ -106,12 +111,7 @@ function buildShutdownGraph(stages: LifecycleStageInfo[]): string {
 }
 
 /**
- * Mermaid emits an SVG whose `viewBox` is computed before the browser
- * has laid out the HTML-based labels inside `foreignObject` elements,
- * so the calculation routinely under-estimates the diagram height — the
- * bottom row of nodes ends up below the viewBox's lower edge and gets
- * clipped, while spurious whitespace appears at the top. Strip
- * Mermaid's fixed width/height/max-width styling so the subsequent
+ * Strip Mermaid's fixed width/height/max-width styling so the subsequent
  * `fixSvgViewBox` pass (which runs after layout) can install its own
  * intrinsic dimensions derived from the actual rendered bounds.
  */
@@ -134,13 +134,10 @@ function normaliseSvg(svg: string): string {
 
 /**
  * Once the SVG is mounted in the DOM, `getBBox()` returns the union of
- * the actual rendered bounds of every node — including any HTML labels
- * that wrapped past Mermaid's internal estimate. Rewrite the viewBox
- * to that bounding box (with a small padding) and install explicit
- * `width`/`height` attributes so the SVG renders at natural pixel
- * size: text stays at 16px and nodes stay at their natural width. The
- * surrounding wrapper provides scrollbars when the diagram is larger
- * than the host card.
+ * the actual rendered bounds of every node. Rewrite the viewBox to that
+ * bounding box (with a small padding) and install explicit `width`/`height`
+ * attributes so the SVG renders at natural pixel size. The surrounding
+ * wrapper provides scrollbars when the diagram is larger than the host card.
  */
 function fixSvgViewBox(container: HTMLElement | null): void {
   if (!container) return;
