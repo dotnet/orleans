@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
+        private readonly GatewayInstruments gatewayInstruments;
         private readonly OverloadDetector overloadDetector;
         private readonly SiloAddress myAddress;
         private readonly string myClusterId;
@@ -28,11 +29,13 @@ namespace Orleans.Runtime.Messaging
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
             ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper)
+            ConnectionPreambleHelper connectionPreambleHelper,
+            GatewayInstruments gatewayInstruments)
             : base(connection, middleware, connectionShared)
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
+            this.gatewayInstruments = gatewayInstruments;
             this.overloadDetector = overloadDetector;
             this.messageCenter = messageCenter;
             this.connectionPreambleHelper = connectionPreambleHelper;
@@ -47,13 +50,13 @@ namespace Orleans.Runtime.Messaging
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
             MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            GatewayInstruments.GatewayReceived.Add(1);
+            this.gatewayInstruments.OnGatewayReceived();
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
             MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            GatewayInstruments.GatewaySent.Add(1);
+            this.gatewayInstruments.OnGatewaySent();
         }
 
         protected override void OnReceivedMessage(Message msg)
@@ -72,7 +75,7 @@ namespace Orleans.Runtime.Messaging
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 this.messageCenter.TryDeliverToProxy(rejection, targetCache: null);
                 LogRejectingRequestDueToOverloading(this.Log, msg);
-                GatewayInstruments.GatewayLoadShedding.Add(1);
+                this.gatewayInstruments.OnGatewayLoadShedding();
                 return;
             }
 

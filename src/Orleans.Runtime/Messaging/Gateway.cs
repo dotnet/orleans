@@ -41,7 +41,8 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options,
-            IAsyncTimerFactory timerFactory)
+            IAsyncTimerFactory timerFactory,
+            OrleansInstruments orleansInstruments)
         {
             this.messageCenter = messageCenter;
             this.messagingOptions = options.Value;
@@ -50,9 +51,12 @@ namespace Orleans.Runtime.Messaging
             this.clientDropTimeout = messagingOptions.ClientDropTimeout;
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
             this.gatewayAddress = siloDetails.GatewayAddress;
+            this.GatewayInstruments = new(orleansInstruments);
             this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance));
             this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
         }
+
+        internal GatewayInstruments GatewayInstruments { get; }
 
         public static GrainAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
         {
@@ -449,7 +453,7 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     connection.Send(message);
-                    GatewayInstruments.GatewaySent.Add(1);
+                    _gateway.GatewayInstruments.OnGatewaySent();
                     return true;
                 }
                 catch (Exception exception)

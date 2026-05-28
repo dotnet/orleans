@@ -62,7 +62,8 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions,
                 this.messageCenter,
                 this.connectionShared,
-                this.connectionPreambleHelper);
+                this.connectionPreambleHelper,
+                this.gateway.GatewayInstruments);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
