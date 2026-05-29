@@ -85,59 +85,6 @@ internal sealed partial class ActivationData :
         public const string DehydrateError = "dehydrate-error";
     }
 
-    private struct ActivationMetricTracker
-    {
-        private readonly ValueStopwatch _stopwatch;
-        private readonly bool _usesDirectory;
-        private string? _status;
-
-        private ActivationMetricTracker(ValueStopwatch stopwatch, bool usesDirectory, string status)
-        {
-            _stopwatch = stopwatch;
-            _usesDirectory = usesDirectory;
-            _status = status;
-        }
-
-        public static ActivationMetricTracker Start(bool usesDirectory)
-        {
-            return CatalogInstruments.ActivationLatencyEnabled
-                ? new(ValueStopwatch.StartNew(), usesDirectory, CatalogInstruments.ActivationStatusError)
-                : default;
-        }
-
-        public void Succeeded() => SetStatus(CatalogInstruments.ActivationStatusSuccess);
-
-        public void Failed(bool cancellationRequested) => SetStatus(cancellationRequested
-            ? CatalogInstruments.ActivationStatusCanceled
-            : CatalogInstruments.ActivationStatusError);
-
-        public void DirectoryRegistrationFailed(Exception? exception, bool cancellationRequested) => SetStatus(exception is null
-            ? CatalogInstruments.ActivationStatusDuplicate
-            : cancellationRequested
-                ? CatalogInstruments.ActivationStatusCanceled
-                : CatalogInstruments.ActivationStatusDirectoryError);
-
-        public void Canceled() => SetStatus(CatalogInstruments.ActivationStatusCanceled);
-
-        public void Record()
-        {
-            if (_status is null)
-            {
-                return;
-            }
-
-            CatalogInstruments.OnActivationCompleted(_stopwatch.Elapsed, _status, _usesDirectory);
-        }
-
-        private void SetStatus(string status)
-        {
-            if (_status is not null)
-            {
-                _status = status;
-            }
-        }
-    }
-
     private readonly struct DeactivationMetricTracker
     {
         private readonly ValueStopwatch _stopwatch;
@@ -1725,14 +1672,14 @@ internal sealed partial class ActivationData :
 
     public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
     {
-        var metrics = ActivationMetricTracker.Start(IsUsingGrainDirectory);
+        var metrics = CatalogInstruments.ActivationMetricTracker.Start(IsUsingGrainDirectory);
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
         ScheduleOperation(new Command.Activate(requestContext, cts, metrics));
     }
 
-    private async Task ActivateAsync(Dictionary<string, object>? requestContextData, ActivationMetricTracker activationMetrics, CancellationToken cancellationToken)
+    private async Task ActivateAsync(Dictionary<string, object>? requestContextData, CatalogInstruments.ActivationMetricTracker activationMetrics, CancellationToken cancellationToken)
     {
         if (State != ActivationState.Creating)
         {
@@ -2550,10 +2497,10 @@ internal sealed partial class ActivationData :
             public Activity? Activity { get; } = activity;
         }
 
-        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts, ActivationMetricTracker metrics) : Command(cts)
+        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts, CatalogInstruments.ActivationMetricTracker metrics) : Command(cts)
         {
             public Dictionary<string, object>? RequestContext { get; } = requestContext;
-            public ActivationMetricTracker Metrics { get; } = metrics;
+            public CatalogInstruments.ActivationMetricTracker Metrics { get; } = metrics;
         }
 
         public sealed class Rehydrate(IRehydrationContext context) : Command(new())

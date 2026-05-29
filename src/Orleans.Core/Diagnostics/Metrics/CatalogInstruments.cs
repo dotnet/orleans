@@ -25,6 +25,59 @@ internal static class CatalogInstruments
     internal const string DeactivationViaMigration = "migration";
     internal const string DeactivationViaUnknown = "unknown";
 
+    internal struct ActivationMetricTracker
+    {
+        private readonly ValueStopwatch _stopwatch;
+        private readonly bool _usesDirectory;
+        private string? _status;
+
+        private ActivationMetricTracker(ValueStopwatch stopwatch, bool usesDirectory, string status)
+        {
+            _stopwatch = stopwatch;
+            _usesDirectory = usesDirectory;
+            _status = status;
+        }
+
+        public static ActivationMetricTracker Start(bool usesDirectory)
+        {
+            return ActivationLatencyEnabled
+                ? new(ValueStopwatch.StartNew(), usesDirectory, ActivationStatusError)
+                : default;
+        }
+
+        public void Succeeded() => SetStatus(ActivationStatusSuccess);
+
+        public void Failed(bool cancellationRequested) => SetStatus(cancellationRequested
+            ? ActivationStatusCanceled
+            : ActivationStatusError);
+
+        public void DirectoryRegistrationFailed(Exception? exception, bool cancellationRequested) => SetStatus(exception is null
+            ? ActivationStatusDuplicate
+            : cancellationRequested
+                ? ActivationStatusCanceled
+                : ActivationStatusDirectoryError);
+
+        public void Canceled() => SetStatus(ActivationStatusCanceled);
+
+        public void Record()
+        {
+            if (_status is null)
+            {
+                return;
+            }
+
+            OnActivationCompleted(_stopwatch.Elapsed, _status, _usesDirectory);
+        }
+
+        private void SetStatus(string status)
+        {
+            if (_status is not null)
+            {
+                _status = status;
+            }
+        }
+    }
+
     internal static Counter<int> ActivationFailedToActivate = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
 
     internal static Counter<int> ActivationCollections = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
