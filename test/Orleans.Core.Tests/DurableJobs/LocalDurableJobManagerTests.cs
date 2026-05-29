@@ -652,7 +652,7 @@ public class LocalDurableJobManagerTests
             .Returns(callInfo =>
             {
                 handledJob.TrySetResult(callInfo.ArgAt<IJobRunContext>(0));
-                return Task.FromResult(DurableJobRunResult.Completed);
+                return DurableJobRunResult.Completed;
             });
         grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
         return (grainFactory, handledJob);

@@ -21,7 +21,7 @@ public class DurableJobReceiverExtensionTests
         var extension = CreateExtension(handler);
         var context = CreateJobContext("run-1");
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => extension.HandleDurableJobAsync(context, CancellationToken.None));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => extension.HandleDurableJobAsync(context, CancellationToken.None).AsTask());
     }
 
     [Fact]

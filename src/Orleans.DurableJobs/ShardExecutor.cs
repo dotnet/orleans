@@ -91,6 +91,7 @@ internal sealed partial class ShardExecutor
 
                 // Wait for concurrency slot
                 await _jobConcurrencyLimiter.WaitAsync(cancellationToken);
+
                 // Start processing the job. ExecuteJobAsync will release the semaphore when done and remove itself from the tasks dictionary
                 tasks[jobContext.Job.Id] = ExecuteJobAsync(jobContext, shard, tasks, cancellationToken);
             }

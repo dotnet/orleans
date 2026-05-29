@@ -310,11 +310,11 @@ public class ShardExecutorTests
                 if (currentCall == 1)
                 {
                     firstCall.SetResult();
-                    return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(5)));
+                    return DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(5));
                 }
 
                 secondCall.SetResult();
-                return Task.FromResult(DurableJobRunResult.Completed);
+                return DurableJobRunResult.Completed;
             });
         grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
         var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance, timeProvider);
@@ -729,7 +729,7 @@ public class ShardExecutorTests
                 {
                     completedJobs.Add(context.Job.Id);
                 }
-                return Task.FromResult(DurableJobRunResult.Completed);
+                return DurableJobRunResult.Completed;
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
@@ -741,11 +741,11 @@ public class ShardExecutorTests
     {
         var extension = Substitute.For<IDurableJobReceiverExtension>();
         extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
-            .Returns(async callInfo =>
+            .Returns((Func<NSubstitute.Core.CallInfo, ValueTask<DurableJobRunResult>>)(async callInfo =>
             {
                 await executionAction();
                 return DurableJobRunResult.Completed;
-            });
+            }));
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
     }
@@ -773,7 +773,7 @@ public class ShardExecutorTests
                         failedJobs.Add(context.Job.Id);
                     }
                     var exception = new InvalidOperationException("Simulated job failure");
-                    return Task.FromResult(DurableJobRunResult.Failed(exception));
+                    return DurableJobRunResult.Failed(exception);
                 }
                 
                 // Other jobs succeed
@@ -781,7 +781,7 @@ public class ShardExecutorTests
                 {
                     completedJobs.Add(context.Job.Id);
                 }
-                return Task.FromResult(DurableJobRunResult.Completed);
+                return DurableJobRunResult.Completed;
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
@@ -795,7 +795,7 @@ public class ShardExecutorTests
 
         var extension = Substitute.For<IDurableJobReceiverExtension>();
         extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true)));
+            .Returns(ValueTask.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true)));
 
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
 
@@ -816,9 +816,9 @@ public class ShardExecutorTests
                 var currentCall = Interlocked.Increment(ref callBox.Value);
                 if (currentCall < 4)
                 {
-                    return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10)));
+                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
                 }
-                return Task.FromResult(DurableJobRunResult.Completed);
+                return DurableJobRunResult.Completed;
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
@@ -840,10 +840,10 @@ public class ShardExecutorTests
                 var currentCall = Interlocked.Increment(ref callBox.Value);
                 if (currentCall < 4)
                 {
-                    return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10)));
+                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
                 }
                 var exception = new InvalidOperationException("Job failed after polling");
-                return Task.FromResult(DurableJobRunResult.Failed(exception));
+                return DurableJobRunResult.Failed(exception);
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
@@ -875,9 +875,9 @@ public class ShardExecutorTests
                 
                 if (currentCall < 4)
                 {
-                    return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(pollDelayMs)));
+                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(pollDelayMs));
                 }
-                return Task.FromResult(DurableJobRunResult.Completed);
+                return DurableJobRunResult.Completed;
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
