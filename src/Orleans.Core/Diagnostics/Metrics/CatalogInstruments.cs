@@ -53,8 +53,8 @@ internal static class CatalogInstruments
 
     internal static readonly Counter<int> ActivationsCreated = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CREATED);
     internal static readonly Counter<int> ActivationsDestroyed = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
-    private static readonly Histogram<double> ActivationDuration = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_ACTIVATION_DURATION, MillisecondsUnit);
-    internal static bool ActivationDurationEnabled => ActivationDuration.Enabled;
+    private static readonly Histogram<double> ActivationLatency = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_ACTIVATION_LATENCY, MillisecondsUnit);
+    internal static bool ActivationLatencyEnabled => ActivationLatency.Enabled;
 
     internal static ObservableGauge<int>? ActivationCount;
 
@@ -71,9 +71,9 @@ internal static class CatalogInstruments
 
     internal static void OnActivationCompleted(TimeSpan latency, string status, bool usesDirectory)
     {
-        if (ActivationDuration.Enabled)
+        if (ActivationLatency.Enabled)
         {
-            ActivationDuration.Record(
+            ActivationLatency.Record(
                 Math.Max(0, latency.TotalMilliseconds),
                 [
                     new KeyValuePair<string, object?>(StatusTagName, status),

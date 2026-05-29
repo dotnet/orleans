@@ -10,20 +10,20 @@ public class CatalogInstrumentsTests
     [Fact, TestCategory("BVT"), TestCategory("Runtime")]
     public void ActivationLifecycleLatencyMetrics_AreHistograms()
     {
-        Instrument activationDurationInstrument = null!;
+        Instrument activationLatencyInstrument = null!;
         Instrument deactivationLatencyInstrument = null!;
-        var activationDurationMeasurement = 0d;
+        var activationLatencyMeasurement = 0d;
         var deactivationLatencyMeasurement = 0d;
 
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, meterListener) =>
         {
-            if (instrument.Name is InstrumentNames.CATALOG_ACTIVATION_DURATION or InstrumentNames.CATALOG_DEACTIVATION_LATENCY)
+            if (instrument.Name is InstrumentNames.CATALOG_ACTIVATION_LATENCY or InstrumentNames.CATALOG_DEACTIVATION_LATENCY)
             {
                 meterListener.EnableMeasurementEvents(instrument);
-                if (instrument.Name == InstrumentNames.CATALOG_ACTIVATION_DURATION)
+                if (instrument.Name == InstrumentNames.CATALOG_ACTIVATION_LATENCY)
                 {
-                    activationDurationInstrument = instrument;
+                    activationLatencyInstrument = instrument;
                 }
                 else
                 {
@@ -34,9 +34,9 @@ public class CatalogInstrumentsTests
 
         listener.SetMeasurementEventCallback<double>((instrument, measurement, tags, state) =>
         {
-            if (instrument.Name == InstrumentNames.CATALOG_ACTIVATION_DURATION)
+            if (instrument.Name == InstrumentNames.CATALOG_ACTIVATION_LATENCY)
             {
-                activationDurationMeasurement = measurement;
+                activationLatencyMeasurement = measurement;
             }
             else if (instrument.Name == InstrumentNames.CATALOG_DEACTIVATION_LATENCY)
             {
@@ -49,11 +49,11 @@ public class CatalogInstrumentsTests
         CatalogInstruments.OnActivationCompleted(TimeSpan.FromMilliseconds(12), CatalogInstruments.ActivationStatusSuccess, usesDirectory: true);
         CatalogInstruments.OnDeactivationCompleted(TimeSpan.FromMilliseconds(34), CatalogInstruments.DeactivationViaCollection);
 
-        Assert.IsType<Histogram<double>>(activationDurationInstrument);
+        Assert.IsType<Histogram<double>>(activationLatencyInstrument);
         Assert.IsType<Histogram<double>>(deactivationLatencyInstrument);
-        Assert.Equal("ms", activationDurationInstrument.Unit);
+        Assert.Equal("ms", activationLatencyInstrument.Unit);
         Assert.Equal("ms", deactivationLatencyInstrument.Unit);
-        Assert.Equal(12, activationDurationMeasurement);
+        Assert.Equal(12, activationLatencyMeasurement);
         Assert.Equal(34, deactivationLatencyMeasurement);
     }
 }

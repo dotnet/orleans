@@ -27,17 +27,17 @@ namespace Orleans.Runtime.GrainDirectory
             try
             {
                 var result = await grainLocator.Register(address, previousRegistration);
-                metrics.Succeeded();
+                metrics.RecordSucceeded();
                 return result;
             }
             catch (OperationCanceledException)
             {
-                metrics.Canceled();
+                metrics.RecordCanceled();
                 throw;
             }
             catch
             {
-                metrics.Failed();
+                metrics.RecordFailed();
                 throw;
             }
         }
@@ -78,11 +78,11 @@ namespace Orleans.Runtime.GrainDirectory
                     : default;
             }
 
-            public void Succeeded() => Record(DirectoryInstruments.RegistrationStatusSuccess);
+            public void RecordSucceeded() => Record(DirectoryInstruments.RegistrationStatusSuccess);
 
-            public void Canceled() => Record(DirectoryInstruments.RegistrationStatusCanceled);
+            public void RecordCanceled() => Record(DirectoryInstruments.RegistrationStatusCanceled);
 
-            public void Failed() => Record(DirectoryInstruments.RegistrationStatusError);
+            public void RecordFailed() => Record(DirectoryInstruments.RegistrationStatusError);
 
             private void Record(string status)
             {
@@ -91,8 +91,7 @@ namespace Orleans.Runtime.GrainDirectory
                     return;
                 }
 
-                var stopwatch = _stopwatch;
-                DirectoryInstruments.OnRegistrationCompleted(stopwatch.Elapsed, _locator, status);
+                DirectoryInstruments.OnRegistrationCompleted(_stopwatch.Elapsed, _locator, status);
             }
         }
 

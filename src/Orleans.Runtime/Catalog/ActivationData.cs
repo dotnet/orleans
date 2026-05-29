@@ -85,11 +85,11 @@ internal sealed partial class ActivationData :
         public const string DehydrateError = "dehydrate-error";
     }
 
-    private readonly struct ActivationMetricTracker
+    private struct ActivationMetricTracker
     {
         private readonly ValueStopwatch _stopwatch;
         private readonly bool _usesDirectory;
-        private readonly string? _status;
+        private string? _status;
 
         private ActivationMetricTracker(ValueStopwatch stopwatch, bool usesDirectory, string status)
         {
@@ -100,24 +100,24 @@ internal sealed partial class ActivationData :
 
         public static ActivationMetricTracker Start(bool usesDirectory)
         {
-            return CatalogInstruments.ActivationDurationEnabled
+            return CatalogInstruments.ActivationLatencyEnabled
                 ? new(ValueStopwatch.StartNew(), usesDirectory, CatalogInstruments.ActivationStatusError)
                 : default;
         }
 
-        public ActivationMetricTracker Succeeded() => WithStatus(CatalogInstruments.ActivationStatusSuccess);
+        public void Succeeded() => SetStatus(CatalogInstruments.ActivationStatusSuccess);
 
-        public ActivationMetricTracker Failed(bool cancellationRequested) => WithStatus(cancellationRequested
+        public void Failed(bool cancellationRequested) => SetStatus(cancellationRequested
             ? CatalogInstruments.ActivationStatusCanceled
             : CatalogInstruments.ActivationStatusError);
 
-        public ActivationMetricTracker DirectoryRegistrationFailed(Exception? exception, bool cancellationRequested) => WithStatus(exception is null
+        public void DirectoryRegistrationFailed(Exception? exception, bool cancellationRequested) => SetStatus(exception is null
             ? CatalogInstruments.ActivationStatusDuplicate
             : cancellationRequested
                 ? CatalogInstruments.ActivationStatusCanceled
                 : CatalogInstruments.ActivationStatusDirectoryError);
 
-        public ActivationMetricTracker Canceled() => WithStatus(CatalogInstruments.ActivationStatusCanceled);
+        public void Canceled() => SetStatus(CatalogInstruments.ActivationStatusCanceled);
 
         public void Record()
         {
@@ -126,11 +126,16 @@ internal sealed partial class ActivationData :
                 return;
             }
 
-            var stopwatch = _stopwatch;
-            CatalogInstruments.OnActivationCompleted(stopwatch.Elapsed, _status, _usesDirectory);
+            CatalogInstruments.OnActivationCompleted(_stopwatch.Elapsed, _status, _usesDirectory);
         }
 
-        private ActivationMetricTracker WithStatus(string status) => _status is null ? this : new(_stopwatch, _usesDirectory, status);
+        private void SetStatus(string status)
+        {
+            if (_status is not null)
+            {
+                _status = status;
+            }
+        }
     }
 
     private readonly struct DeactivationMetricTracker
@@ -1735,7 +1740,6 @@ internal sealed partial class ActivationData :
             return;
         }
 
-        var metrics = activationMetrics;
         _activationActivity?.AddEvent(new ActivityEvent("activation-start"));
         try
         {
@@ -1847,7 +1851,7 @@ internal sealed partial class ActivationData :
                 if (!success)
                 {
                     Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
-                    metrics = metrics.DirectoryRegistrationFailed(registrationException, cancellationToken.IsCancellationRequested);
+                    activationMetrics.DirectoryRegistrationFailed(registrationException, cancellationToken.IsCancellationRequested);
 
                     // Activation failed.
                     if (registrationException is not null)
@@ -1936,7 +1940,7 @@ internal sealed partial class ActivationData :
                                 DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
                             _activationActivity?.Dispose();
                             _activationActivity = null;
-                            metrics = metrics.Canceled();
+                            activationMetrics.Canceled();
                             return;
                         }
 
@@ -1961,12 +1965,12 @@ internal sealed partial class ActivationData :
                 GrainLifecycleEvents.EmitActivated(this);
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
-                metrics = metrics.Succeeded();
+                activationMetrics.Succeeded();
             }
             catch (Exception exception)
             {
                 CatalogInstruments.OnActivationFailedToActivate();
-                metrics = metrics.Failed(cancellationToken.IsCancellationRequested);
+                activationMetrics.Failed(cancellationToken.IsCancellationRequested);
                 var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                 LogErrorActivatingGrain(_shared.Logger, sourceException, this);
                 if (!cancellationToken.IsCancellationRequested)
@@ -1983,7 +1987,7 @@ internal sealed partial class ActivationData :
         catch (Exception exception)
         {
             LogActivationFailed(_shared.Logger, exception, this);
-            metrics = metrics.Failed(cancellationToken.IsCancellationRequested);
+            activationMetrics.Failed(cancellationToken.IsCancellationRequested);
             Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."), CancellationToken.None);
             SetActivityError(_activationActivity, ActivityErrorEvents.ActivationError);
             _activationActivity?.Dispose();
@@ -1991,7 +1995,7 @@ internal sealed partial class ActivationData :
         }
         finally
         {
-            metrics.Record();
+            activationMetrics.Record();
             _workSignal.Signal();
         }
     }
