@@ -162,8 +162,18 @@ namespace Orleans.Runtime.MembershipService
                     await Task.Delay(retryDelay, ct);
                     await this.membershipManager.Refresh(null, ct);
                 }
-                catch (Exception exception) when (canContinue && exception is not OperationCanceledException)
+                catch (Exception exception)
                 {
+                    if (!canContinue)
+                    {
+                        throw;
+                    }
+
+                    if (exception is OperationCanceledException && ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+
                     LogErrorFailedToValidateInitialClusterConnectivity(exception);
                     await Task.Delay(TimeSpan.FromSeconds(1), ct);
                 }
