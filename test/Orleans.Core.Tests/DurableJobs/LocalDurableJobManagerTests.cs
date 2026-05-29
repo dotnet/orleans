@@ -263,7 +263,17 @@ public class LocalDurableJobManagerTests
         Options.Create(new SchedulingOptions()),
         grainReferenceActivator: null!,
         timerRegistry: null!,
-        activations: new ActivationDirectory());
+        activations: new ActivationDirectory(),
+        schedulerInstruments: CreateSchedulerInstruments());
+
+    private static SchedulerInstruments CreateSchedulerInstruments()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<SchedulerInstruments>();
+        return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
+    }
 
     private static IJobShard CreateSubstituteShard(string id, DateTimeOffset start, DateTimeOffset end)
     {
