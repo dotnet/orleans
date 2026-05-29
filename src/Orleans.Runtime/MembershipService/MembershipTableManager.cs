@@ -582,14 +582,14 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entry = item.Value;
                 if (entry.SiloAddress.IsSameLogicalSilo(this.myAddress)) continue;
-                if (!IsFunctionalForMembership(entry.Status)) continue;
+                if (!CanReceiveMembershipGossip(entry.Status)) continue;
                 if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now)) continue;
 
                 gossipPartners.Add(entry.SiloAddress);
 
-                bool IsFunctionalForMembership(SiloStatus status)
+                static bool CanReceiveMembershipGossip(SiloStatus status)
                 {
-                    return status == SiloStatus.Active || status == SiloStatus.ShuttingDown || status == SiloStatus.Stopping;
+                    return status is SiloStatus.Joining or SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
                 }
             }
 

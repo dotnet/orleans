@@ -50,6 +50,11 @@ namespace Orleans
         public const int BecomeActive = Active-1;
 
         /// <summary>
+        /// Validate connectivity to active cluster members before becoming active.
+        /// </summary>
+        public const int ValidateInitialConnectivity = Active - 100;
+
+        /// <summary>
         /// Service is active.
         /// </summary>
         public const int Active = 20000;

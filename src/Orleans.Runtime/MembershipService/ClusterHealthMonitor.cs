@@ -158,8 +158,9 @@ namespace Orleans.Runtime.MembershipService
             ImmutableDictionary<SiloAddress, SiloHealthMonitor> monitoredSilos,
             DateTime now)
         {
-            // If I am still not fully functional, I should not be probing others.
-            if (!membership.Entries.TryGetValue(this.localSiloDetails.SiloAddress, out var self) || !IsFunctionalForMembership(self.Status))
+            // If this silo cannot evict peers, it should not be probing others.
+            if (!membership.Entries.TryGetValue(this.localSiloDetails.SiloAddress, out var self)
+                || !CanEvictPeers(self.Status))
             {
                 return ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
             }
@@ -177,7 +178,7 @@ namespace Orleans.Runtime.MembershipService
             foreach (var (candidate, entry) in membership.Entries)
             {
                 // Watch shutting-down silos as well, so we can properly ensure they become dead.
-                if (!IsFunctionalForMembership(entry.Status))
+                if (!CanBeEvictedByPeers(entry.Status))
                 {
                     continue;
                 }
@@ -211,35 +212,38 @@ namespace Orleans.Runtime.MembershipService
             // silo must be evicted before another failed silo can be detected).
             // The idea to use an expander graph is taken from "Stable and Consistent Membership at Scale with Rapid" by Lalith Suresh et al:
             // https://www.usenix.org/conference/atc18/presentation/suresh
-            for (var ringNum = 0; ringNum < numProbedSilos; ++ringNum)
+            if (self.Status != SiloStatus.Joining)
             {
-                // Update hash values with the current ring number.
-                for (var i = 0; i < tmpList.Count; i++)
+                for (var ringNum = 0; ringNum < numProbedSilos; ++ringNum)
                 {
-                    var siloAddress = tmpList[i].SiloAddress;
-                    tmpList[i] = (siloAddress, siloAddress.GetConsistentHashCode(ringNum));
-                }
-
-                // Sort the candidates based on their updated hash values.
-                tmpList.Sort((x, y) => x.HashCode.CompareTo(y.HashCode));
-
-                var myIndex = tmpList.FindIndex(el => el.SiloAddress.Equals(self.SiloAddress));
-                if (myIndex < 0)
-                {
-                    LogErrorSiloNotInLocalList(log, self.SiloAddress, self.Status);
-                    throw new OrleansMissingMembershipEntryException(
-                        $"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
-                }
-
-                // Starting at the local silo's index, find the first non-monitored silo and add it to the list.
-                for (var i = 0; i < tmpList.Count - 1; i++)
-                {
-                    var candidate = tmpList[(myIndex + i + 1) % tmpList.Count].SiloAddress;
-                    if (!silosToWatch.Contains(candidate))
+                    // Update hash values with the current ring number.
+                    for (var i = 0; i < tmpList.Count; i++)
                     {
-                        Debug.Assert(!candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress));
-                        silosToWatch.Add(candidate);
-                        break;
+                        var siloAddress = tmpList[i].SiloAddress;
+                        tmpList[i] = (siloAddress, siloAddress.GetConsistentHashCode(ringNum));
+                    }
+
+                    // Sort the candidates based on their updated hash values.
+                    tmpList.Sort((x, y) => x.HashCode.CompareTo(y.HashCode));
+
+                    var myIndex = tmpList.FindIndex(el => el.SiloAddress.Equals(self.SiloAddress));
+                    if (myIndex < 0)
+                    {
+                        LogErrorSiloNotInLocalList(log, self.SiloAddress, self.Status);
+                        throw new OrleansMissingMembershipEntryException(
+                            $"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
+                    }
+
+                    // Starting at the local silo's index, find the first non-monitored silo and add it to the list.
+                    for (var i = 0; i < tmpList.Count - 1; i++)
+                    {
+                        var candidate = tmpList[(myIndex + i + 1) % tmpList.Count].SiloAddress;
+                        if (!silosToWatch.Contains(candidate))
+                        {
+                            Debug.Assert(!candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress));
+                            silosToWatch.Add(candidate);
+                            break;
+                        }
                     }
                 }
             }
@@ -269,23 +273,27 @@ namespace Orleans.Runtime.MembershipService
             static bool AreTheSame<T>(ImmutableDictionary<SiloAddress, T> first, ImmutableDictionary<SiloAddress, T> second)
                 => first.Count == second.Count && first.Count == first.Keys.Intersect(second.Keys).Count();
 
-            static bool IsFunctionalForMembership(SiloStatus status)
-                => status is SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
+            static bool CanEvictPeers(SiloStatus status)
+                => status is SiloStatus.Joining or SiloStatus.Active;
+
+            static bool CanBeEvictedByPeers(SiloStatus status)
+                => status is SiloStatus.Joining or SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             var tasks = new List<Task>();
 
-            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.Active, OnActiveStart, OnActiveStop);
+            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.ValidateInitialConnectivity, OnValidateInitialConnectivityStart, OnStop);
 
-            Task OnActiveStart(CancellationToken ct)
+            Task OnValidateInitialConnectivityStart(CancellationToken ct)
             {
+                this.monitoredSilos = this.UpdateMonitoredSilos(this.membershipManager.CurrentSnapshot, this.monitoredSilos, DateTime.UtcNow);
                 tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
                 return Task.CompletedTask;
             }
 
-            async Task OnActiveStop(CancellationToken ct)
+            async Task OnStop(CancellationToken ct)
             {
                 this.shutdownCancellation.Cancel(throwOnFirstException: false);
 

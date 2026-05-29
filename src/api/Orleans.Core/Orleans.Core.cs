@@ -366,6 +366,7 @@ namespace Orleans
         public const int RuntimeInitialize = 2000;
         public const int RuntimeServices = 4000;
         public const int RuntimeStorageServices = 6000;
+        public const int ValidateInitialConnectivity = 19900;
     }
 
     [GenerateSerializer]

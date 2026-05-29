@@ -88,6 +88,57 @@ namespace NonSilo.Tests.Membership
             await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 2, otherSilosAreStale: true);
         }
 
+        [Fact]
+        public async Task ClusterHealthMonitor_JoiningSiloMonitorsStaleAndSuspectedEvictableSilos()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var clusterMembershipOptions = new ClusterMembershipOptions
+            {
+                NumProbedSilos = 3,
+            };
+
+            var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions);
+            await this.lifecycle.OnStart();
+
+            var staleSilo = Silo("127.0.0.200:100@100");
+            var freshSilo = Silo("127.0.0.200:200@100");
+            var suspectedSilo = Silo("127.0.0.200:300@100");
+            var shuttingDownSilo = Silo("127.0.0.200:500@100");
+            var suspectedEntry = Entry(suspectedSilo, SiloStatus.Active, now);
+            suspectedEntry.AddSuspector(Silo("127.0.0.200:400@100"), now.UtcDateTime);
+
+            var otherSilos = new[]
+            {
+                Entry(staleSilo, SiloStatus.Active, now.Subtract(TimeSpan.FromHours(1))),
+                Entry(freshSilo, SiloStatus.Active, now),
+                suspectedEntry,
+                Entry(shuttingDownSilo, SiloStatus.ShuttingDown, now.Subtract(TimeSpan.FromHours(1)))
+            };
+
+            var lastVersion = testRig.TestAccessor.ObservedVersion;
+            foreach (var entry in otherSilos)
+            {
+                var table = await this.membershipTable.ReadAll();
+                Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
+            }
+
+            await testRig.Manager.Refresh();
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
+            Assert.Empty(testRig.TestAccessor.MonitoredSilos);
+
+            lastVersion = testRig.TestAccessor.ObservedVersion;
+            await testRig.Manager.UpdateStatus(SiloStatus.Joining);
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
+            await Until(() => testRig.TestAccessor.MonitoredSilos.Count == 3);
+
+            Assert.Contains(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(staleSilo));
+            Assert.Contains(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(suspectedSilo));
+            Assert.Contains(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(shuttingDownSilo));
+            Assert.DoesNotContain(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(freshSilo));
+
+            await StopLifecycle();
+        }
+
         /// <summary>
         /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
         /// </summary>
