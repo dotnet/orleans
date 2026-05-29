@@ -446,6 +446,47 @@ namespace UnitTests.Directory
             await this.lifecycle.OnStop();
         }
 
+        [Theory]
+        [InlineData(SiloStatus.Created)]
+        [InlineData(SiloStatus.Joining)]
+        [InlineData(SiloStatus.ShuttingDown)]
+        [InlineData(SiloStatus.Stopping)]
+        public async Task RegisterWhenOtherEntryExistsButSiloIsNonActiveButNotDead(SiloStatus status)
+        {
+            var expectedSilo = GenerateSiloAddress();
+            var outdatedSilo = GenerateSiloAddress();
+
+            this.mockMembershipService.UpdateSiloStatus(expectedSilo, SiloStatus.Active, "exp");
+            this.mockMembershipService.UpdateSiloStatus(outdatedSilo, status, "old");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var expectedAddr = GenerateGrainAddress(expectedSilo);
+            var outdatedAddr = new GrainAddress
+            {
+                ActivationId = ActivationId.NewId(),
+                SiloAddress = outdatedSilo,
+                GrainId = expectedAddr.GrainId,
+                MembershipVersion = expectedAddr.MembershipVersion
+            };
+
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(outdatedAddr);
+            this.grainDirectory.Register(expectedAddr, previousAddress: outdatedAddr).Returns(expectedAddr);
+
+            var actual = await this.grainLocator.Register(expectedAddr, previousAddress: null);
+
+            Assert.Equal(expectedAddr, actual);
+            await this.grainDirectory.Received(1).Register(expectedAddr, previousAddress: null);
+            await this.grainDirectory.Received(1).Register(expectedAddr, previousAddress: outdatedAddr);
+            await this.grainDirectory.DidNotReceive().Unregister(outdatedAddr);
+
+            Assert.True(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out var result));
+            Assert.NotNull(result);
+            Assert.Equal(expectedAddr, result);
+
+            await this.lifecycle.OnStop();
+        }
+
         [Fact]
         public async Task LookupPopulateTheCache()
         {
@@ -521,9 +562,11 @@ namespace UnitTests.Directory
         }
 
         [Theory]
+        [InlineData(SiloStatus.Created)]
+        [InlineData(SiloStatus.Joining)]
         [InlineData(SiloStatus.ShuttingDown)]
         [InlineData(SiloStatus.Stopping)]
-        public async Task LocalLookupWhenCachedEntrySiloIsTerminatingButNotDead(SiloStatus status)
+        public async Task LocalLookupWhenCachedEntrySiloIsNonActiveButNotDead(SiloStatus status)
         {
             var silo = GenerateSiloAddress();
 
@@ -542,9 +585,35 @@ namespace UnitTests.Directory
             this.mockMembershipService.UpdateSiloStatus(silo, status, "silo");
             await WaitUntilClusterChangePropagated();
 
-            Assert.True(this.grainLocator.TryLookupInCache(address.GrainId, out cached));
-            Assert.Equal(address, cached);
+            Assert.False(this.grainLocator.TryLookupInCache(address.GrainId, out cached));
             await this.grainDirectory.DidNotReceive().UnregisterSilos(Arg.Any<List<SiloAddress>>());
+
+            await this.lifecycle.OnStop();
+        }
+
+        [Theory]
+        [InlineData(SiloStatus.Created)]
+        [InlineData(SiloStatus.Joining)]
+        [InlineData(SiloStatus.ShuttingDown)]
+        [InlineData(SiloStatus.Stopping)]
+        public async Task LookupWhenEntryExistsButSiloIsNonActiveButNotDead(SiloStatus status)
+        {
+            var silo = GenerateSiloAddress();
+
+            this.mockMembershipService.UpdateSiloStatus(silo, status, "silo");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var address = GenerateGrainAddress(silo);
+
+            this.grainDirectory.Lookup(address.GrainId).Returns(address);
+
+            var actual = await this.grainLocator.Lookup(address.GrainId);
+            Assert.Null(actual);
+
+            await this.grainDirectory.Received(1).Lookup(address.GrainId);
+            await this.grainDirectory.DidNotReceive().Unregister(address);
+            Assert.False(this.grainLocator.TryLookupInCache(address.GrainId, out _));
 
             await this.lifecycle.OnStop();
         }

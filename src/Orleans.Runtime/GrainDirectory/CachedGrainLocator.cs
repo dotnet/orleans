@@ -72,6 +72,10 @@ namespace Orleans.Runtime.GrainDirectory
                 await GetGrainDirectory(grainId.Type).Unregister(entry);
                 entry = null;
             }
+            else if (IsKnownNonActiveSilo(entry))
+            {
+                entry = null;
+            }
             else
             {
                 // Add to the local cache and return it
@@ -112,9 +116,21 @@ namespace Orleans.Runtime.GrainDirectory
                 await GetGrainDirectory(grainType).Unregister(result);
                 result = await GetGrainDirectory(grainType).Register(address, previousAddress);
             }
+            else if (IsKnownNonActiveSilo(result))
+            {
+                result = await GetGrainDirectory(grainType).Register(address, result);
+            }
 
             // Cache update
-            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
+            if (result is not null && IsKnownNonActiveSilo(result))
+            {
+                return null;
+            }
+
+            if (result is not null)
+            {
+                this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
+            }
 
             return result;
 
@@ -200,11 +216,27 @@ namespace Orleans.Runtime.GrainDirectory
             return siloAddress is null || current.GetSiloStatus(siloAddress, membershipVersion) == SiloStatus.Dead;
         }
 
+        private bool IsKnownNonActiveSilo(GrainAddress grainAddress)
+            => IsKnownNonActiveSilo(grainAddress.SiloAddress, grainAddress.MembershipVersion);
+
+        private bool IsKnownNonActiveSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
+        {
+            var current = this.clusterMembershipService.CurrentSnapshot;
+            var status = current.GetSiloStatus(siloAddress, membershipVersion);
+            return siloAddress is null || (status != SiloStatus.None && status != SiloStatus.Active);
+        }
+
         private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
 
         public void UpdateCache(GrainId grainId, SiloAddress siloAddress)
         {
             var membershipVersion = this.clusterMembershipService.CurrentSnapshot.Version;
+            if (IsKnownNonActiveSilo(siloAddress, membershipVersion))
+            {
+                cache.Remove(grainId);
+                return;
+            }
+
             cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress, MembershipVersion = membershipVersion }, (int)membershipVersion.Value);
         }
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
@@ -220,8 +252,8 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryInstruments.LookupsCacheIssued.Add(1);
             if (this.cache.LookUp(grainId, out address, out _))
             {
-                // If the silo is dead, remove the entry
-                if (IsKnownDeadSilo(address))
+                // If the silo cannot currently host activations, remove the entry.
+                if (IsKnownNonActiveSilo(address))
                 {
                     address = default;
                     this.cache.Remove(grainId);

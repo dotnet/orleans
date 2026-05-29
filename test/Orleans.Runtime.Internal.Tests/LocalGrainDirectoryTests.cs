@@ -65,6 +65,42 @@ public class LocalGrainDirectoryTests
         Assert.True(LocalGrainDirectory.IsDefunctActivation(address, snapshot));
     }
 
+    [Theory]
+    [InlineData(SiloStatus.Created)]
+    [InlineData(SiloStatus.Joining)]
+    [InlineData(SiloStatus.ShuttingDown)]
+    [InlineData(SiloStatus.Stopping)]
+    [InlineData(SiloStatus.Dead)]
+    public void IsNonRoutableActivation_RejectsKnownNonActiveSilos(SiloStatus status)
+    {
+        var silo = CreateSiloAddress(1);
+        var address = CreateGrainAddress(silo, membershipVersion: 2);
+        var snapshot = CreateSnapshot(new ClusterMember(silo, status, "silo"), version: 2);
+
+        Assert.True(LocalGrainDirectory.IsNonRoutableActivation(address, snapshot));
+    }
+
+    [Fact]
+    public void IsNonRoutableActivation_AllowsActiveSilos()
+    {
+        var silo = CreateSiloAddress(1);
+        var address = CreateGrainAddress(silo, membershipVersion: 2);
+        var snapshot = CreateSnapshot(new ClusterMember(silo, SiloStatus.Active, "silo"), version: 2);
+
+        Assert.False(LocalGrainDirectory.IsNonRoutableActivation(address, snapshot));
+    }
+
+    [Fact]
+    public void IsNonRoutableActivation_AllowsUnknownSiloWithoutNewerMembershipVersion()
+    {
+        var silo = CreateSiloAddress(1);
+        var unrelatedSilo = CreateSiloAddress(1, port: 11112);
+        var address = CreateGrainAddress(silo, membershipVersion: 2);
+        var snapshot = CreateSnapshot(new ClusterMember(unrelatedSilo, SiloStatus.Active, "other"), version: 2);
+
+        Assert.False(LocalGrainDirectory.IsNonRoutableActivation(address, snapshot));
+    }
+
     private static ClusterMembershipSnapshot CreateSnapshot(ClusterMember member, long version)
         => new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(member.SiloAddress, member), new MembershipVersion(version));
 

@@ -83,6 +83,17 @@ namespace Orleans.Runtime.ReminderService
                     LogErrorActivatingReminderService(exception);
                     throw;
                 }
+
+                async Task StartReminderTableCoreAsync(CancellationToken cancellationToken)
+                {
+                    CheckRuntimeContext();
+
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    cts.CancelAfter(this.reminderOptions.InitializationTimeout);
+
+                    // Confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
+                    await reminderTable.StartAsync(cts.Token);
+                }
             }
 
             async Task StopReminderTable(CancellationToken ct)
@@ -97,21 +108,6 @@ namespace Orleans.Runtime.ReminderService
                     throw;
                 }
             }
-        }
-
-        /// <summary>
-        /// Initializes the reminder table.
-        /// </summary>
-        /// <returns></returns>
-        async Task StartReminderTableCoreAsync(CancellationToken cancellationToken)
-        {
-            CheckRuntimeContext();
-
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(this.reminderOptions.InitializationTimeout);
-
-            // Confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.StartAsync(cts.Token);
         }
 
         public override async Task Start()
@@ -1080,6 +1076,12 @@ namespace Orleans.Runtime.ReminderService
             Message = "Error activating reminder service."
         )]
         private partial void LogErrorActivatingReminderService(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error stopping reminder service."
+        )]
+        private partial void LogErrorStoppingReminderService(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Error,
