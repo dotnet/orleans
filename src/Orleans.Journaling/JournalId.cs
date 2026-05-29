@@ -48,14 +48,16 @@ public readonly struct JournalId : IEquatable<JournalId>
     /// <param name="firstSegment">The first id segment.</param>
     /// <param name="additionalSegments">Additional id segments.</param>
     /// <returns>The normalized journal id.</returns>
-    public static JournalId Create(string firstSegment, params string[] additionalSegments)
+    public static JournalId Create(string firstSegment, params ReadOnlySpan<string> additionalSegments)
     {
-        ArgumentNullException.ThrowIfNull(additionalSegments);
+        var encodedSegments = new string[additionalSegments.Length + 1];
+        encodedSegments[0] = EncodeSegment(firstSegment, nameof(firstSegment));
+        for (var i = 0; i < additionalSegments.Length; i++)
+        {
+            encodedSegments[i + 1] = EncodeSegment(additionalSegments[i], nameof(additionalSegments));
+        }
 
-        var segments = new string[additionalSegments.Length + 1];
-        segments[0] = firstSegment;
-        Array.Copy(additionalSegments, 0, segments, 1, additionalSegments.Length);
-        return Create(segments);
+        return new(string.Join(Separator, encodedSegments));
     }
 
     /// <summary>
@@ -67,16 +69,25 @@ public readonly struct JournalId : IEquatable<JournalId>
     {
         ArgumentNullException.ThrowIfNull(segments);
 
-        var decodedSegments = segments.ToArray();
-        if (decodedSegments.Length == 0)
+        return Create(segments.ToArray().AsSpan());
+    }
+
+    /// <summary>
+    /// Creates a journal id from decoded hierarchical segments.
+    /// </summary>
+    /// <param name="segments">The id segments.</param>
+    /// <returns>The normalized journal id.</returns>
+    public static JournalId Create(ReadOnlySpan<string> segments)
+    {
+        if (segments.Length == 0)
         {
             throw new ArgumentException("A journal id must contain at least one segment.", nameof(segments));
         }
 
-        var encodedSegments = new string[decodedSegments.Length];
-        for (var i = 0; i < decodedSegments.Length; i++)
+        var encodedSegments = new string[segments.Length];
+        for (var i = 0; i < segments.Length; i++)
         {
-            encodedSegments[i] = EncodeSegment(decodedSegments[i], nameof(segments));
+            encodedSegments[i] = EncodeSegment(segments[i], nameof(segments));
         }
 
         return new(string.Join(Separator, encodedSegments));

@@ -246,6 +246,146 @@ public class JournaledJobShardManagerTests
         await shard.DisposeAsync();
     }
 
+    [Fact]
+    public async Task LiveLocalShard_IsReturnedAndRemainsWritable()
+    {
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5040), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        var shard = await manager.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string> { ["Purpose"] = "LiveShard" },
+            CancellationToken.None);
+
+        await ScheduleJobAsync(shard, "first-live-job");
+
+        var assigned = await manager.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+        var assignedShard = Assert.Single(assigned);
+        Assert.Equal(shard.Id, assignedShard.Id);
+        Assert.False(assignedShard.IsAddingCompleted);
+        Assert.Equal("LiveShard", assignedShard.Metadata!["Purpose"]);
+
+        await ScheduleJobAsync(assignedShard, "second-live-job");
+        Assert.Equal(2, await assignedShard.GetJobCountAsync());
+
+        await DrainAndUnregisterAsync(manager, assignedShard, expectedJobs: 2);
+    }
+
+    [Fact]
+    public async Task ActiveRemoteOwnerShard_IsNotClaimedUntilOwnerDies()
+    {
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5050), 0);
+        var silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5051), 0);
+        membership.SetSiloStatus(silo1, SiloStatus.Active);
+        membership.SetSiloStatus(silo2, SiloStatus.Active);
+
+        var manager1 = CreateManager(services, membership, silo1);
+        var manager2 = CreateManager(services, membership, silo2);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        var shard = await manager1.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string> { ["Purpose"] = "ActiveOwner" },
+            CancellationToken.None);
+        await ScheduleJobAsync(shard, "active-owner-job");
+
+        Assert.Empty(await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None));
+        Assert.Equal(silo1, await manager2.GetShardOwnerAsync(shard.Id, CancellationToken.None));
+
+        membership.SetSiloStatus(silo1, SiloStatus.Dead);
+
+        var adopted = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+        var adoptedShard = Assert.Single(adopted);
+        Assert.True(adoptedShard.IsAddingCompleted);
+        Assert.Equal("ActiveOwner", adoptedShard.Metadata!["Purpose"]);
+        Assert.Equal(silo2, await manager2.GetShardOwnerAsync(adoptedShard.Id, CancellationToken.None));
+
+        await DrainAndUnregisterAsync(manager2, adoptedShard);
+        await shard.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ShardMetadata_RoundTripsKeysRequiringEncoding()
+    {
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5060), 0);
+        var silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5061), 0);
+        membership.SetSiloStatus(silo1, SiloStatus.Active);
+        membership.SetSiloStatus(silo2, SiloStatus.Active);
+
+        var manager1 = CreateManager(services, membership, silo1);
+        var manager2 = CreateManager(services, membership, silo2);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        var shard = await manager1.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string>
+            {
+                ["key/with/slashes"] = "slash-value",
+                ["key+with=base64"] = "base64-value"
+            },
+            CancellationToken.None);
+        await ScheduleJobAsync(shard, "metadata-job");
+        await manager1.UnregisterShardAsync(shard, CancellationToken.None);
+
+        var assigned = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+        var assignedShard = Assert.Single(assigned);
+        Assert.Equal("slash-value", assignedShard.Metadata!["key/with/slashes"]);
+        Assert.Equal("base64-value", assignedShard.Metadata["key+with=base64"]);
+
+        await DrainAndUnregisterAsync(manager2, assignedShard);
+    }
+
+    [Fact]
+    public async Task SlowStart_LimitsOrphanedShardClaims()
+    {
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5070), 0);
+        var silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5071), 0);
+        membership.SetSiloStatus(silo1, SiloStatus.Active);
+        membership.SetSiloStatus(silo2, SiloStatus.Active);
+
+        var manager1 = CreateManager(services, membership, silo1);
+        var manager2 = CreateManager(services, membership, silo2);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        for (var i = 0; i < 3; i++)
+        {
+            var shard = await manager1.CreateShardAsync(
+                start,
+                start.AddHours(1),
+                new Dictionary<string, string> { ["Index"] = i.ToString() },
+                CancellationToken.None);
+            await ScheduleJobAsync(shard, $"orphaned-job-{i}");
+            await manager1.UnregisterShardAsync(shard, CancellationToken.None);
+        }
+
+        Assert.Empty(await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), maxNewClaims: 0, CancellationToken.None));
+
+        var firstClaim = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), maxNewClaims: 1, CancellationToken.None);
+        var firstShard = Assert.Single(firstClaim);
+        await DrainAndUnregisterAsync(manager2, firstShard);
+
+        var remainingClaims = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+        Assert.Equal(2, remainingClaims.Count);
+        foreach (var shard in remainingClaims)
+        {
+            await DrainAndUnregisterAsync(manager2, shard);
+        }
+    }
+
     private static ServiceProvider CreateServices(VolatileJournalStorageProvider storageProvider)
     {
         var builder = new TestSiloBuilder();
@@ -272,6 +412,38 @@ public class JournaledJobShardManagerTests
             services,
             Options.Create(options ?? new DurableJobsOptions()),
             services.GetRequiredService<IOptions<JournaledStateManagerOptions>>());
+
+    private static async Task<DurableJob> ScheduleJobAsync(IJobShard shard, string jobName)
+    {
+        var scheduled = await shard.TryScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("type", jobName),
+            JobName = jobName,
+            DueTime = DateTimeOffset.UtcNow.AddSeconds(-1),
+            Metadata = null
+        }, CancellationToken.None);
+        Assert.NotNull(scheduled);
+        return scheduled;
+    }
+
+    private static async Task DrainAndUnregisterAsync(JournaledJobShardManager manager, IJobShard shard, int expectedJobs = 1)
+    {
+        var consumed = 0;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        {
+            consumed++;
+            Assert.True(await shard.RemoveJobAsync(jobContext.Job.Id, cts.Token));
+            if (consumed == expectedJobs)
+            {
+                break;
+            }
+        }
+
+        Assert.Equal(expectedJobs, consumed);
+        Assert.Equal(0, await shard.GetJobCountAsync());
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+    }
 
     private static async Task<List<T>> ToListAsync<T>(IAsyncEnumerable<T> source)
     {

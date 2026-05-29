@@ -1,8 +1,7 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Journaling;
 using Orleans.TestingHost;
 using Tester;
 using Tester.DurableJobs;
@@ -127,5 +126,22 @@ public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.JobRetry(cts.Token);
+    }
+}
+
+internal static class AzureBlobDurableJobsTestConfiguration
+{
+    public static AzureBlobJournalStorageOptions ConfigureTestDefaults(this AzureBlobJournalStorageOptions options)
+    {
+        if (TestDefaultConfiguration.UseAadAuthentication)
+        {
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
+        }
+        else
+        {
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
+        }
+
+        return options;
     }
 }

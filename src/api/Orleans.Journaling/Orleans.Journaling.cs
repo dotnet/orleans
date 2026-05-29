@@ -403,7 +403,9 @@ namespace Orleans.Journaling
 
         public static JournalId Create(System.Collections.Generic.IEnumerable<string> segments) { throw null; }
 
-        public static JournalId Create(string firstSegment, params string[] additionalSegments) { throw null; }
+        public static JournalId Create(System.ReadOnlySpan<string> segments) { throw null; }
+
+        public static JournalId Create(string firstSegment, params System.ReadOnlySpan<string> additionalSegments) { throw null; }
 
         public readonly bool Equals(JournalId other) { throw null; }
 
