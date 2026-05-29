@@ -3,6 +3,7 @@ using Orleans.Runtime;
 using Orleans.Configuration.Internal;
 using System.Linq;
 using Orleans.Runtime.ReminderService;
+using Orleans.Services;
 using Orleans.Timers;
 
 namespace Orleans.Hosting;
@@ -28,6 +29,7 @@ public static class SiloBuilderReminderExtensions
         }
 
         services.AddSingleton<LocalReminderService>();
+        services.AddFromExisting<IGrainService, LocalReminderService>();
         services.AddFromExisting<IReminderService, LocalReminderService>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalReminderService>();
         services.AddSingleton<IReminderRegistry, ReminderRegistry>();

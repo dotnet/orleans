@@ -68,20 +68,15 @@ namespace Orleans.Runtime.ReminderService
         {
             observer.Subscribe(
                 nameof(LocalReminderService),
-                ServiceLifecycleStage.BecomeActive,
-                InitializeReminderService,
-                StopReminderService);
-            observer.Subscribe(
-                nameof(LocalReminderService),
-                ServiceLifecycleStage.Active,
-                StartReminderService,
-                StopDeliveringReminders);
+                ServiceLifecycleStage.RuntimeGrainServices,
+                StartReminderTable,
+                StopReminderTable);
 
-            async Task InitializeReminderService(CancellationToken ct)
+            async Task StartReminderTable(CancellationToken ct)
             {
                 try
                 {
-                    await this.QueueTask(() => Initialize(ct));
+                    await this.QueueTask(() => StartReminderTableCoreAsync(ct));
                 }
                 catch (Exception exception)
                 {
@@ -90,43 +85,17 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            async Task StopReminderService(CancellationToken ct)
+            async Task StopReminderTable(CancellationToken ct)
             {
                 try
                 {
-                    await this.QueueTask(Stop).WaitAsync(ct);
+                    await this.QueueTask(() => reminderTable.StopAsync()).WaitAsync(ct);
                 }
                 catch (Exception exception)
                 {
-                    LogErrorStoppingReminderService(exception);
+                    LogErrorActivatingReminderService(exception);
                     throw;
                 }
-            }
-
-            async Task StartReminderService(CancellationToken ct)
-            {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(this.reminderOptions.InitializationTimeout);
-
-                try
-                {
-                    await this.QueueTask(async () =>
-                    {
-                        StartDeliveringReminders();
-                        await Start();
-                    }).WaitAsync(cts.Token);
-                }
-                catch (Exception exception)
-                {
-                    await StopDeliveringReminders(cts.Token);
-                    LogErrorStartingReminderService(exception);
-                    throw;
-                }
-            }
-
-            Task StopDeliveringReminders(CancellationToken ct)
-            {
-                return this.QueueTask(() => StopDeliveringRemindersAsync()).WaitAsync(ct);
             }
         }
 
@@ -134,7 +103,7 @@ namespace Orleans.Runtime.ReminderService
         /// Initializes the reminder table.
         /// </summary>
         /// <returns></returns>
-        private async Task Initialize(CancellationToken cancellationToken)
+        async Task StartReminderTableCoreAsync(CancellationToken cancellationToken)
         {
             CheckRuntimeContext();
 
@@ -145,28 +114,75 @@ namespace Orleans.Runtime.ReminderService
             await reminderTable.StartAsync(cts.Token);
         }
 
-        public async override Task Stop()
+        public override async Task Start()
         {
-            await this.QueueTask(() => StopCoreAsync());
+            CheckRuntimeContext();
 
-            async Task StopCoreAsync()
+            try
             {
-                CheckRuntimeContext();
-
-                await StopDeliveringRemindersAsync();
-                await base.Stop();
-
-                listRefreshTimer.Dispose();
-                if (this.runTask is { } task)
+                lock (_deliveryLock)
                 {
-                    await task;
+                    if (_isDeliveringReminders)
+                    {
+                        return;
+                    }
+
+                    _isDeliveringReminders = true;
                 }
 
-                await reminderTable.StopAsync();
+                foreach (var reminderData in localReminders.Values)
+                {
+                    reminderData.TryStart();
+                }
 
-                // For a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
-                // currently, this is taken care of by periodically reading the reminder table
+                await base.Start();
             }
+            catch (Exception exception)
+            {
+                await Stop();
+                LogErrorStartingReminderService(exception);
+                throw;
+            }
+        }
+
+        public override async Task Stop()
+        {
+            CheckRuntimeContext();
+
+            Task? deliveryQuiescedTask = null;
+            lock (_deliveryLock)
+            {
+                _isDeliveringReminders = false;
+                if (_activeReminderDeliveries > 0)
+                {
+                    _deliveryQuiesced ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    deliveryQuiescedTask = _deliveryQuiesced.Task;
+                }
+            }
+
+            // Stop all reminders.
+            var tasks = new List<Task>(localReminders.Count + (deliveryQuiescedTask is null ? 0 : 1));
+            if (deliveryQuiescedTask is not null)
+            {
+                tasks.Add(deliveryQuiescedTask);
+            }
+
+            foreach (var reminderData in localReminders.Values)
+            {
+                tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
+            }
+
+            await Task.WhenAll(tasks);
+            await base.Stop();
+
+            listRefreshTimer.Dispose();
+            if (this.runTask is { } task)
+            {
+                await task;
+            }
+
+            // For a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
+            // currently, this is taken care of by periodically reading the reminder table
         }
 
         public async Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
@@ -569,56 +585,6 @@ namespace Orleans.Runtime.ReminderService
             }
 
             reminderData.TryStart();
-        }
-
-        private void StartDeliveringReminders()
-        {
-            CheckRuntimeContext();
-
-            lock (_deliveryLock)
-            {
-                if (_isDeliveringReminders)
-                {
-                    return;
-                }
-
-                _isDeliveringReminders = true;
-            }
-
-            foreach (var reminderData in localReminders.Values)
-            {
-                reminderData.TryStart();
-            }
-        }
-
-        private async Task StopDeliveringRemindersAsync()
-        {
-            CheckRuntimeContext();
-
-            Task? deliveryQuiescedTask = null;
-            lock (_deliveryLock)
-            {
-                _isDeliveringReminders = false;
-                if (_activeReminderDeliveries > 0)
-                {
-                    _deliveryQuiesced ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
-                    deliveryQuiescedTask = _deliveryQuiesced.Task;
-                }
-            }
-
-            // Stop all reminders.
-            var tasks = new List<Task>(localReminders.Count + (deliveryQuiescedTask is null ? 0 : 1));
-            if (deliveryQuiescedTask is not null)
-            {
-                tasks.Add(deliveryQuiescedTask);
-            }
-
-            foreach (var reminderData in localReminders.Values)
-            {
-                tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
-            }
-
-            await Task.WhenAll(tasks);
         }
 
         private bool TryBeginSingleReminderDelivery()
@@ -1114,12 +1080,6 @@ namespace Orleans.Runtime.ReminderService
             Message = "Error activating reminder service."
         )]
         private partial void LogErrorActivatingReminderService(Exception exception);
-
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            Message = "Error stopping reminder service."
-        )]
-        private partial void LogErrorStoppingReminderService(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Error,
