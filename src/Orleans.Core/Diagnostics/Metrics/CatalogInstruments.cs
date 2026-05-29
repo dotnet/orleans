@@ -9,6 +9,7 @@ internal static class CatalogInstruments
     private const string MillisecondsUnit = "ms";
     private const string StatusTagName = "status";
     private const string DirectoryTagName = "directory";
+    private const string ViaTagName = "via";
     private const string DirectoryEnabled = "enabled";
     private const string DirectoryDisabled = "disabled";
 
@@ -30,18 +31,19 @@ internal static class CatalogInstruments
 
     internal static Counter<int> ActivationShutdown = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN);
 
-    internal static void ActivationShutdownViaCollection() => ActivationShutdown.Add(1, new KeyValuePair<string, object?>("via", DeactivationViaCollection));
-    internal static void ActivationShutdownViaDeactivateOnIdle() => ActivationShutdown.Add(1, new KeyValuePair<string, object?>("via", DeactivationViaDeactivateOnIdle));
-    internal static void ActivationShutdownViaMigration() => ActivationShutdown.Add(1, new KeyValuePair<string, object?>("via", DeactivationViaMigration));
-    internal static void ActivationShutdownViaDeactivateStuckActivation() => ActivationShutdown.Add(1, new KeyValuePair<string, object?>("via", DeactivationViaDeactivateStuckActivation));
+    internal static void ActivationShutdownViaCollection() => OnActivationShutdown(DeactivationViaCollection);
+    internal static void ActivationShutdownViaDeactivateOnIdle() => OnActivationShutdown(DeactivationViaDeactivateOnIdle);
+    internal static void ActivationShutdownViaMigration() => OnActivationShutdown(DeactivationViaMigration);
+    internal static void ActivationShutdownViaDeactivateStuckActivation() => OnActivationShutdown(DeactivationViaDeactivateStuckActivation);
 
     internal static Histogram<double> DeactivationLatency = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_DEACTIVATION_LATENCY, MillisecondsUnit);
+    internal static bool DeactivationLatencyEnabled => DeactivationLatency.Enabled;
 
     internal static void OnDeactivationCompleted(TimeSpan latency, string via)
     {
         if (DeactivationLatency.Enabled)
         {
-            DeactivationLatency.Record(latency.TotalMilliseconds, new KeyValuePair<string, object?>("via", via));
+            DeactivationLatency.Record(latency.TotalMilliseconds, new KeyValuePair<string, object?>(ViaTagName, via));
         }
     }
 
@@ -52,6 +54,7 @@ internal static class CatalogInstruments
     internal static readonly Counter<int> ActivationsCreated = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CREATED);
     internal static readonly Counter<int> ActivationsDestroyed = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
     private static readonly Histogram<double> ActivationDuration = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_ACTIVATION_DURATION, MillisecondsUnit);
+    internal static bool ActivationDurationEnabled => ActivationDuration.Enabled;
 
     internal static ObservableGauge<int>? ActivationCount;
 
@@ -76,6 +79,30 @@ internal static class CatalogInstruments
                     new KeyValuePair<string, object?>(StatusTagName, status),
                     new KeyValuePair<string, object?>(DirectoryTagName, usesDirectory ? DirectoryEnabled : DirectoryDisabled)
                 ]);
+        }
+    }
+
+    internal static void OnActivationFailedToActivate()
+    {
+        if (ActivationFailedToActivate.Enabled)
+        {
+            ActivationFailedToActivate.Add(1);
+        }
+    }
+
+    internal static void OnActivationConcurrentRegistrationAttempt()
+    {
+        if (ActivationConcurrentRegistrationAttempts.Enabled)
+        {
+            ActivationConcurrentRegistrationAttempts.Add(1);
+        }
+    }
+
+    private static void OnActivationShutdown(string via)
+    {
+        if (ActivationShutdown.Enabled)
+        {
+            ActivationShutdown.Add(1, new KeyValuePair<string, object?>(ViaTagName, via));
         }
     }
 }

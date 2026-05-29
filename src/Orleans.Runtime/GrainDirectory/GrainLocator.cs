@@ -23,31 +23,21 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousRegistration)
         {
             var grainLocator = GetGrainLocator(address.GrainId.Type);
-            var locator = GetLocatorTag(grainLocator);
-            var startTimestamp = Stopwatch.GetTimestamp();
+            var metrics = RegistrationMetricTracker.Start(grainLocator);
             try
             {
                 var result = await grainLocator.Register(address, previousRegistration);
-                DirectoryInstruments.OnRegistrationCompleted(
-                    Stopwatch.GetElapsedTime(startTimestamp),
-                    locator,
-                    DirectoryInstruments.RegistrationStatusSuccess);
+                metrics.Succeeded();
                 return result;
             }
             catch (OperationCanceledException)
             {
-                DirectoryInstruments.OnRegistrationCompleted(
-                    Stopwatch.GetElapsedTime(startTimestamp),
-                    locator,
-                    DirectoryInstruments.RegistrationStatusCanceled);
+                metrics.Canceled();
                 throw;
             }
             catch
             {
-                DirectoryInstruments.OnRegistrationCompleted(
-                    Stopwatch.GetElapsedTime(startTimestamp),
-                    locator,
-                    DirectoryInstruments.RegistrationStatusError);
+                metrics.Failed();
                 throw;
             }
         }
@@ -69,6 +59,42 @@ namespace Orleans.Runtime.GrainDirectory
             DhtGrainLocator => "dht",
             _ => "custom"
         };
+
+        private readonly struct RegistrationMetricTracker
+        {
+            private readonly ValueStopwatch _stopwatch;
+            private readonly string? _locator;
+
+            private RegistrationMetricTracker(ValueStopwatch stopwatch, string locator)
+            {
+                _stopwatch = stopwatch;
+                _locator = locator;
+            }
+
+            public static RegistrationMetricTracker Start(IGrainLocator grainLocator)
+            {
+                return DirectoryInstruments.RegistrationMetricsEnabled
+                    ? new(ValueStopwatch.StartNew(), GetLocatorTag(grainLocator))
+                    : default;
+            }
+
+            public void Succeeded() => Record(DirectoryInstruments.RegistrationStatusSuccess);
+
+            public void Canceled() => Record(DirectoryInstruments.RegistrationStatusCanceled);
+
+            public void Failed() => Record(DirectoryInstruments.RegistrationStatusError);
+
+            private void Record(string status)
+            {
+                if (_locator is null)
+                {
+                    return;
+                }
+
+                var stopwatch = _stopwatch;
+                DirectoryInstruments.OnRegistrationCompleted(stopwatch.Elapsed, _locator, status);
+            }
+        }
 
         public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => GetGrainLocator(grainId.Type).UpdateCache(grainId, siloAddress);
 

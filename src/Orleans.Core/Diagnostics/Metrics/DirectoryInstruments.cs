@@ -85,6 +85,7 @@ internal static class DirectoryInstruments
     internal static readonly Counter<int> RegistrationsSingleActRemoteReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_RECEIVED);
     internal static readonly Counter<int> Registrations = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS);
     internal static readonly Histogram<double> RegistrationDuration = Instruments.Meter.CreateHistogram<double>(InstrumentNames.DIRECTORY_REGISTRATION_DURATION, MillisecondsUnit);
+    internal static bool RegistrationMetricsEnabled => Registrations.Enabled || RegistrationDuration.Enabled;
     internal static readonly Counter<int> UnregistrationsIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_ISSUED);
     internal static readonly Counter<int> UnregistrationsLocal = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_LOCAL);
     internal static readonly Counter<int> UnregistrationsRemoteSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_REMOTE_SENT);
@@ -130,6 +131,11 @@ internal static class DirectoryInstruments
 
     internal static void OnRegistrationCompleted(TimeSpan latency, string locator, string status)
     {
+        if (!RegistrationMetricsEnabled)
+        {
+            return;
+        }
+
         var tags = CreateRegistrationTags(locator, status);
         if (Registrations.Enabled)
         {

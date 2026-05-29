@@ -68,7 +68,6 @@ internal sealed partial class ActivationData :
 #pragma warning restore IDE0052 // Remove unread private members
 
     private Activity? _activationActivity;
-    private long _activationStartTimestamp;
 
     /// <summary>
     /// Constants for activity error event names used during activation lifecycle.
@@ -84,6 +83,108 @@ internal sealed partial class ActivationData :
         public const string OnDeactivateFailed = "on-deactivate-failed";
         public const string RehydrateError = "rehydrate-error";
         public const string DehydrateError = "dehydrate-error";
+    }
+
+    private readonly struct ActivationMetricTracker
+    {
+        private readonly ValueStopwatch _stopwatch;
+        private readonly bool _usesDirectory;
+        private readonly string? _status;
+
+        private ActivationMetricTracker(ValueStopwatch stopwatch, bool usesDirectory, string status)
+        {
+            _stopwatch = stopwatch;
+            _usesDirectory = usesDirectory;
+            _status = status;
+        }
+
+        public static ActivationMetricTracker Start(bool usesDirectory)
+        {
+            return CatalogInstruments.ActivationDurationEnabled
+                ? new(ValueStopwatch.StartNew(), usesDirectory, CatalogInstruments.ActivationStatusError)
+                : default;
+        }
+
+        public ActivationMetricTracker Succeeded() => WithStatus(CatalogInstruments.ActivationStatusSuccess);
+
+        public ActivationMetricTracker Failed(bool cancellationRequested) => WithStatus(cancellationRequested
+            ? CatalogInstruments.ActivationStatusCanceled
+            : CatalogInstruments.ActivationStatusError);
+
+        public ActivationMetricTracker DirectoryRegistrationFailed(Exception? exception, bool cancellationRequested) => WithStatus(exception is null
+            ? CatalogInstruments.ActivationStatusDuplicate
+            : cancellationRequested
+                ? CatalogInstruments.ActivationStatusCanceled
+                : CatalogInstruments.ActivationStatusDirectoryError);
+
+        public ActivationMetricTracker Canceled() => WithStatus(CatalogInstruments.ActivationStatusCanceled);
+
+        public void Record()
+        {
+            if (_status is null)
+            {
+                return;
+            }
+
+            var stopwatch = _stopwatch;
+            CatalogInstruments.OnActivationCompleted(stopwatch.Elapsed, _status, _usesDirectory);
+        }
+
+        private ActivationMetricTracker WithStatus(string status) => _status is null ? this : new(_stopwatch, _usesDirectory, status);
+    }
+
+    private readonly struct DeactivationMetricTracker
+    {
+        private readonly ValueStopwatch _stopwatch;
+        private readonly string? _via;
+        private readonly bool _recorded;
+
+        private DeactivationMetricTracker(ValueStopwatch stopwatch, string via, bool recorded)
+        {
+            _stopwatch = stopwatch;
+            _via = via;
+            _recorded = recorded;
+        }
+
+        public static DeactivationMetricTracker Start()
+        {
+            return CatalogInstruments.DeactivationLatencyEnabled
+                ? new(ValueStopwatch.StartNew(), CatalogInstruments.DeactivationViaUnknown, recorded: false)
+                : default;
+        }
+
+        public DeactivationMetricTracker Collection() => WithVia(CatalogInstruments.DeactivationViaCollection);
+
+        public DeactivationMetricTracker DeactivateOnIdle() => WithVia(CatalogInstruments.DeactivationViaDeactivateOnIdle);
+
+        public DeactivationMetricTracker DeactivateStuckActivation() => WithVia(CatalogInstruments.DeactivationViaDeactivateStuckActivation);
+
+        public DeactivationMetricTracker Migration() => WithVia(CatalogInstruments.DeactivationViaMigration);
+
+        public DeactivationMetricTracker Record()
+        {
+            if (_via is null || _recorded)
+            {
+                return this;
+            }
+
+            var stopwatch = _stopwatch;
+            CatalogInstruments.OnDeactivationCompleted(stopwatch.Elapsed, _via);
+            return new(_stopwatch, _via, recorded: true);
+        }
+
+        public void RecordIfNeeded()
+        {
+            if (_via is null || _recorded)
+            {
+                return;
+            }
+
+            var stopwatch = _stopwatch;
+            CatalogInstruments.OnDeactivationCompleted(stopwatch.Elapsed, _via);
+        }
+
+        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_stopwatch, via, _recorded);
     }
 
     public ActivationData(
@@ -1266,7 +1367,7 @@ internal sealed partial class ActivationData :
                             RehydrateInternal(command.Context);
                             break;
                         case Command.Activate command:
-                            await ActivateAsync(command.RequestContext, command.CancellationToken).SuppressThrowing();
+                            await ActivateAsync(command.RequestContext, command.Metrics, command.CancellationToken).SuppressThrowing();
                             break;
                         case Command.Deactivate command:
                             await FinishDeactivating(command, command.CancellationToken).SuppressThrowing();
@@ -1621,18 +1722,14 @@ internal sealed partial class ActivationData :
 
     public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
     {
-        if (_activationStartTimestamp == 0)
-        {
-            _activationStartTimestamp = GrainRuntime.TimeProvider.GetTimestamp();
-        }
-
+        var metrics = ActivationMetricTracker.Start(IsUsingGrainDirectory);
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
-        ScheduleOperation(new Command.Activate(requestContext, cts));
+        ScheduleOperation(new Command.Activate(requestContext, cts, metrics));
     }
 
-    private async Task ActivateAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
+    private async Task ActivateAsync(Dictionary<string, object>? requestContextData, ActivationMetricTracker activationMetrics, CancellationToken cancellationToken)
     {
         if (State != ActivationState.Creating)
         {
@@ -1640,13 +1737,7 @@ internal sealed partial class ActivationData :
             return;
         }
 
-        var activationStartTimestamp = _activationStartTimestamp;
-        if (activationStartTimestamp == 0)
-        {
-            activationStartTimestamp = GrainRuntime.TimeProvider.GetTimestamp();
-        }
-
-        var activationStatus = CatalogInstruments.ActivationStatusError;
+        var metrics = activationMetrics;
         _activationActivity?.AddEvent(new ActivityEvent("activation-start"));
         try
         {
@@ -1720,7 +1811,7 @@ internal sealed partial class ActivationData :
                                 }
 
                                 success = false;
-                                CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
+                                CatalogInstruments.OnActivationConcurrentRegistrationAttempt();
                                 LogDuplicateActivation(
                                     _shared.Logger,
                                     Address,
@@ -1758,11 +1849,7 @@ internal sealed partial class ActivationData :
                 if (!success)
                 {
                     Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
-                    activationStatus = registrationException is null
-                        ? CatalogInstruments.ActivationStatusDuplicate
-                        : cancellationToken.IsCancellationRequested
-                            ? CatalogInstruments.ActivationStatusCanceled
-                            : CatalogInstruments.ActivationStatusDirectoryError;
+                    metrics = metrics.DirectoryRegistrationFailed(registrationException, cancellationToken.IsCancellationRequested);
 
                     // Activation failed.
                     if (registrationException is not null)
@@ -1826,7 +1913,7 @@ internal sealed partial class ActivationData :
                     {
                         if (cancellationToken.IsCancellationRequested && exception is ObjectDisposedException or OperationCanceledException)
                         {
-                            CatalogInstruments.ActivationFailedToActivate.Add(1);
+                            CatalogInstruments.OnActivationFailedToActivate();
 
                             // This captures the case where user code in OnActivateAsync doesn't use the passed cancellation token
                             // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation,
@@ -1851,7 +1938,7 @@ internal sealed partial class ActivationData :
                                 DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
                             _activationActivity?.Dispose();
                             _activationActivity = null;
-                            activationStatus = CatalogInstruments.ActivationStatusCanceled;
+                            metrics = metrics.Canceled();
                             return;
                         }
 
@@ -1876,14 +1963,12 @@ internal sealed partial class ActivationData :
                 GrainLifecycleEvents.EmitActivated(this);
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
-                activationStatus = CatalogInstruments.ActivationStatusSuccess;
+                metrics = metrics.Succeeded();
             }
             catch (Exception exception)
             {
-                CatalogInstruments.ActivationFailedToActivate.Add(1);
-                activationStatus = cancellationToken.IsCancellationRequested
-                    ? CatalogInstruments.ActivationStatusCanceled
-                    : CatalogInstruments.ActivationStatusError;
+                CatalogInstruments.OnActivationFailedToActivate();
+                metrics = metrics.Failed(cancellationToken.IsCancellationRequested);
                 var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                 LogErrorActivatingGrain(_shared.Logger, sourceException, this);
                 if (!cancellationToken.IsCancellationRequested)
@@ -1900,9 +1985,7 @@ internal sealed partial class ActivationData :
         catch (Exception exception)
         {
             LogActivationFailed(_shared.Logger, exception, this);
-            activationStatus = cancellationToken.IsCancellationRequested
-                ? CatalogInstruments.ActivationStatusCanceled
-                : CatalogInstruments.ActivationStatusError;
+            metrics = metrics.Failed(cancellationToken.IsCancellationRequested);
             Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."), CancellationToken.None);
             SetActivityError(_activationActivity, ActivityErrorEvents.ActivationError);
             _activationActivity?.Dispose();
@@ -1910,10 +1993,7 @@ internal sealed partial class ActivationData :
         }
         finally
         {
-            CatalogInstruments.OnActivationCompleted(
-                GrainRuntime.TimeProvider.GetElapsedTime(activationStartTimestamp),
-                activationStatus,
-                IsUsingGrainDirectory);
+            metrics.Record();
             _workSignal.Signal();
         }
     }
@@ -1947,9 +2027,7 @@ internal sealed partial class ActivationData :
     {
         using var _ = deactivateCommand.Activity;
 
-        var deactivationStopwatch = ValueStopwatch.StartNew();
-        var deactivationVia = CatalogInstruments.DeactivationViaUnknown;
-        var deactivationLatencyRecorded = false;
+        var deactivationMetrics = DeactivationMetricTracker.Start();
         var migrating = false;
         var encounteredError = false;
         try
@@ -2053,22 +2131,22 @@ internal sealed partial class ActivationData :
 
             if (IsStuckDeactivating)
             {
-                deactivationVia = CatalogInstruments.DeactivationViaDeactivateStuckActivation;
+                deactivationMetrics = deactivationMetrics.DeactivateStuckActivation();
                 CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation();
             }
             else if (migrating)
             {
-                deactivationVia = CatalogInstruments.DeactivationViaMigration;
+                deactivationMetrics = deactivationMetrics.Migration();
                 CatalogInstruments.ActivationShutdownViaMigration();
             }
             else if (_isInWorkingSet)
             {
-                deactivationVia = CatalogInstruments.DeactivationViaDeactivateOnIdle;
+                deactivationMetrics = deactivationMetrics.DeactivateOnIdle();
                 CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
             }
             else
             {
-                deactivationVia = CatalogInstruments.DeactivationViaCollection;
+                deactivationMetrics = deactivationMetrics.Collection();
                 CatalogInstruments.ActivationShutdownViaCollection();
             }
 
@@ -2089,8 +2167,7 @@ internal sealed partial class ActivationData :
                 GrainLifecycleEvents.EmitDeactivated(this, DeactivationReason);
             }
 
-            CatalogInstruments.OnDeactivationCompleted(deactivationStopwatch.Elapsed, deactivationVia);
-            deactivationLatencyRecorded = true;
+            deactivationMetrics = deactivationMetrics.Record();
 
             // Signal deactivation
             GetDeactivationCompletionSource().TrySetResult(true);
@@ -2098,10 +2175,7 @@ internal sealed partial class ActivationData :
         }
         finally
         {
-            if (!deactivationLatencyRecorded)
-            {
-                CatalogInstruments.OnDeactivationCompleted(deactivationStopwatch.Elapsed, deactivationVia);
-            }
+            deactivationMetrics.RecordIfNeeded();
         }
 
         async ValueTask<bool> StartMigrationAsync(DehydrationContextHolder context, IActivationMigrationManager migrationManager, CancellationToken cancellationToken)
@@ -2474,9 +2548,10 @@ internal sealed partial class ActivationData :
             public Activity? Activity { get; } = activity;
         }
 
-        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command(cts)
+        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts, ActivationMetricTracker metrics) : Command(cts)
         {
             public Dictionary<string, object>? RequestContext { get; } = requestContext;
+            public ActivationMetricTracker Metrics { get; } = metrics;
         }
 
         public sealed class Rehydrate(IRehydrationContext context) : Command(new())
