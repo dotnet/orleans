@@ -14,10 +14,12 @@ var storagePrefix = builder.Configuration.GetValue("Playground:Storage:Prefix", 
 
 builder.UseOrleans(siloBuilder =>
 {
+#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     siloBuilder
         .AddDashboard()
         .AddActivityPropagation()
         .AddIncomingGrainCallFilter<GrainRequestMetricsFilter>()
+        .AddDistributedGrainDirectory()
         .AddAzureBlobJournalStorage()
         .UseAzureBlobDurableJobs(
             options =>
@@ -28,20 +30,19 @@ builder.UseOrleans(siloBuilder =>
             DurableJobsJournalingJsonContext.Default)
         .Configure<DurableJobsOptions>(options =>
         {
-            options.ShardDuration = TimeSpan.FromMinutes(5);
+            options.ShardDuration = TimeSpan.FromMinutes(2);
             options.ShardActivationBufferPeriod = TimeSpan.FromSeconds(30);
             options.ShardStripeCount = 2;
             options.JobStatusPollInterval = TimeSpan.FromMilliseconds(100);
-            options.MaxConcurrentJobsPerSilo = 512;
+            options.MaxConcurrentJobsPerSilo = 8196;
             options.ConcurrencySlowStartEnabled = true;
-            options.SlowStartInitialConcurrency = 16;
-            options.SlowStartInterval = TimeSpan.FromSeconds(5);
+            options.SlowStartInterval = TimeSpan.FromSeconds(2);
             builder.Configuration.GetSection("Playground:DurableJobs").Bind(options);
             options.ShouldRetry = (context, _) => context.DequeueCount < 3
                 ? DateTimeOffset.UtcNow.AddMilliseconds(250 * Math.Pow(2, context.DequeueCount))
                 : null;
-        })
-        .AddDashboard();
+        });
+#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 });
 
 builder.Services.AddOptions<AzureBlobJournalStorageOptions>()
