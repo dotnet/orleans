@@ -435,7 +435,7 @@ namespace Orleans.Runtime.GrainDirectory
                     continue;
                 }
 
-                if (IsNonRoutableActivation(activationAddress, snapshot))
+                if (IsDefunctActivation(activationAddress, snapshot))
                 {
                     DirectoryCache.Remove(activationAddress.GrainId);
                 }
@@ -450,17 +450,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             return snapshot.GetSiloStatus(silo, address.MembershipVersion) == SiloStatus.Dead;
-        }
-
-        internal static bool IsNonRoutableActivation(GrainAddress address, ClusterMembershipSnapshot snapshot)
-        {
-            if (address.SiloAddress is not { } silo)
-            {
-                return true;
-            }
-
-            var status = snapshot.GetSiloStatus(silo, address.MembershipVersion);
-            return status != SiloStatus.None && status != SiloStatus.Active;
         }
 
         internal SiloAddress? FindPredecessor(SiloAddress silo)
@@ -634,22 +623,9 @@ namespace Orleans.Runtime.GrainDirectory
                 DirectoryInstruments.RegistrationsSingleActLocal.Add(1);
 
                 var result = DirectoryPartition.AddSingleActivation(address, previousAddress);
-                if (!address.Equals(result.Address) && result.Address is not null && IsNonRoutableActivation(result.Address, clusterMembershipService.CurrentSnapshot))
-                {
-                    result = DirectoryPartition.AddSingleActivation(address, result.Address);
-                }
 
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
-                if (result.Address is not null && IsNonRoutableActivation(result.Address, clusterMembershipService.CurrentSnapshot))
-                {
-                    return new(default, result.VersionTag);
-                }
-
-                if (result.Address is not null)
-                {
-                    DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
-                }
-
+                DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
                 return result;
             }
             else
@@ -664,12 +640,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
                 if (result.Address == null) return result;
 
-                if (IsNonRoutableActivation(result.Address, clusterMembershipService.CurrentSnapshot))
-                {
-                    return new(default, result.VersionTag);
-                }
-
-                if (!address.Equals(result.Address)) return result;
+                if (!address.Equals(result.Address) || IsDefunctActivation(address, clusterMembershipService.CurrentSnapshot)) return result;
 
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
                 DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
@@ -843,12 +814,6 @@ namespace Orleans.Runtime.GrainDirectory
                 return false;
             }
 
-            if (IsNonRoutableActivation(localResult.Address, clusterMembershipService.CurrentSnapshot))
-            {
-                address = null;
-                return false;
-            }
-
             address = localResult.Address;
             DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
             DirectoryInstruments.LookupsLocalSuccesses.Add(1);
@@ -862,14 +827,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return null;
             }
 
-            var snapshot = clusterMembershipService.CurrentSnapshot;
-            if (IsNonRoutableActivation(cache, snapshot))
-            {
-                DirectoryCache.Remove(grain);
-                return null;
-            }
-
-            return cache;
+            return IsDefunctActivation(cache, clusterMembershipService.CurrentSnapshot) ? null : cache;
         }
 
         public async Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
@@ -916,11 +874,6 @@ namespace Orleans.Runtime.GrainDirectory
                     return new(default, GrainInfo.NO_ETAG);
                 }
 
-                if (IsNonRoutableActivation(localResult.Address, clusterMembershipService.CurrentSnapshot))
-                {
-                    return new(default, GrainInfo.NO_ETAG);
-                }
-
                 LogTraceFullLookupMine(grainId, localResult.Address);
                 DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
                 return localResult;
@@ -937,13 +890,8 @@ namespace Orleans.Runtime.GrainDirectory
                 var result = await GetDirectoryReference(forwardAddress).LookupAsync(grainId, hopCount + 1);
 
                 // update the cache
-                if (result.Address is { } address)
+                if (result.Address is { } address && !IsDefunctActivation(address, clusterMembershipService.CurrentSnapshot))
                 {
-                    if (IsNonRoutableActivation(address, clusterMembershipService.CurrentSnapshot))
-                    {
-                        return new(default, result.VersionTag);
-                    }
-
                     DirectoryCache.AddOrUpdate(address, result.VersionTag);
                 }
 
@@ -1032,24 +980,7 @@ namespace Orleans.Runtime.GrainDirectory
             return hashComparison != 0 ? hashComparison : left.CompareTo(right);
         }
 
-        public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress)
-        {
-            var snapshot = clusterMembershipService.CurrentSnapshot;
-            var address = new GrainAddress
-            {
-                GrainId = grainId,
-                SiloAddress = siloAddress,
-                MembershipVersion = snapshot.Version
-            };
-
-            if (IsNonRoutableActivation(address, snapshot))
-            {
-                DirectoryCache.Remove(grainId);
-                return;
-            }
-
-            DirectoryCache.AddOrUpdate(address, (int)snapshot.Version.Value);
-        }
+        public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
         {
             DirectoryInstruments.LookupsCacheIssued.Add(1);
