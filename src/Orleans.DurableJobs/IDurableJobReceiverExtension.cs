@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -64,19 +63,14 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         var key = GetExecutionKey(context);
         JobAttemptState state;
         ref var stateRef = ref CollectionsMarshal.GetValueRefOrAddDefault(_jobAttempts, key, out var exists);
-        if (Unsafe.IsNullRef(ref stateRef))
+        if (!exists)
         {
-            Debug.Assert(!exists);
             Debug.Assert(stateRef is null);
-            state = stateRef = new JobAttemptState(StartJob(context, cancellationToken));
-        }
-        else
-        {
-            Debug.Assert(exists);
-            Debug.Assert(stateRef is not null);
-            state = stateRef;
+            stateRef = new JobAttemptState(StartJob(context, cancellationToken));
         }
 
+        Debug.Assert(stateRef is not null);
+        state = stateRef;
         return GetJobStatus(key, context, state);
     }
 
