@@ -168,8 +168,7 @@ internal sealed partial class ActivationData :
                 return this;
             }
 
-            var stopwatch = _stopwatch;
-            CatalogInstruments.OnDeactivationCompleted(stopwatch.Elapsed, _via);
+            CatalogInstruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
             return new(_stopwatch, _via, recorded: true);
         }
 
@@ -180,8 +179,7 @@ internal sealed partial class ActivationData :
                 return;
             }
 
-            var stopwatch = _stopwatch;
-            CatalogInstruments.OnDeactivationCompleted(stopwatch.Elapsed, _via);
+            CatalogInstruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
         }
 
         private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_stopwatch, via, _recorded);
