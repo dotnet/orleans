@@ -32,6 +32,10 @@ namespace Orleans.Runtime.ReminderService
         private long localTableSequence;
         private uint initialReadCallCount = 0;
         private Task? runTask;
+        private readonly object _deliveryLock = new();
+        private bool _isDeliveringReminders;
+        private int _activeReminderDeliveries;
+        private TaskCompletionSource? _deliveryQuiesced;
 
         public LocalReminderService(
             GrainReferenceActivator referenceActivator,
@@ -71,7 +75,7 @@ namespace Orleans.Runtime.ReminderService
                 nameof(LocalReminderService),
                 ServiceLifecycleStage.Active,
                 StartReminderService,
-                NoOpStop);
+                StopDeliveringReminders);
 
             async Task InitializeReminderService(CancellationToken ct)
             {
@@ -106,16 +110,24 @@ namespace Orleans.Runtime.ReminderService
 
                 try
                 {
-                    await this.QueueTask(Start).WaitAsync(cts.Token);
+                    await this.QueueTask(async () =>
+                    {
+                        StartDeliveringReminders();
+                        await Start();
+                    }).WaitAsync(cts.Token);
                 }
                 catch (Exception exception)
                 {
+                    await StopDeliveringReminders(cts.Token);
                     LogErrorStartingReminderService(exception);
                     throw;
                 }
             }
 
-            static Task NoOpStop(CancellationToken _) => Task.CompletedTask;
+            Task StopDeliveringReminders(CancellationToken ct)
+            {
+                return this.QueueTask(() => StopDeliveringRemindersAsync()).WaitAsync(ct);
+            }
         }
 
         /// <summary>
@@ -124,6 +136,8 @@ namespace Orleans.Runtime.ReminderService
         /// <returns></returns>
         private async Task Initialize(CancellationToken cancellationToken)
         {
+            CheckRuntimeContext();
+
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(this.reminderOptions.InitializationTimeout);
 
@@ -133,29 +147,32 @@ namespace Orleans.Runtime.ReminderService
 
         public async override Task Stop()
         {
-            await base.Stop();
+            await this.QueueTask(() => StopCoreAsync());
 
-            listRefreshTimer.Dispose();
-            if (this.runTask is { } task)
+            async Task StopCoreAsync()
             {
-                await task;
+                CheckRuntimeContext();
+
+                await StopDeliveringRemindersAsync();
+                await base.Stop();
+
+                listRefreshTimer.Dispose();
+                if (this.runTask is { } task)
+                {
+                    await task;
+                }
+
+                await reminderTable.StopAsync();
+
+                // For a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
+                // currently, this is taken care of by periodically reading the reminder table
             }
-
-            var disposeTasks = new List<Task>(localReminders.Count);
-            foreach (LocalReminderData r in localReminders.Values)
-            {
-                disposeTasks.Add(r.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
-            }
-
-            await Task.WhenAll(disposeTasks);
-            await reminderTable.StopAsync();
-
-            // For a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
-            // currently, this is taken care of by periodically reading the reminder table
         }
 
         public async Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
+            CheckRuntimeContext();
+
             var entry = new ReminderEntry
             {
                 GrainId = grainId,
@@ -192,6 +209,8 @@ namespace Orleans.Runtime.ReminderService
         /// <returns></returns>
         public async Task UnregisterReminder(IGrainReminder reminder)
         {
+            CheckRuntimeContext();
+
             var remData = (ReminderData)reminder;
             LogDebugUnregisterReminder(reminder, localTableSequence);
 
@@ -283,6 +302,8 @@ namespace Orleans.Runtime.ReminderService
         /// </summary>
         private Task ReadAndUpdateReminders()
         {
+            CheckRuntimeContext();
+
             if (StoppedCancellationTokenSource.IsCancellationRequested) return Task.CompletedTask;
 
             var tasks = new List<Task>();
@@ -302,6 +323,8 @@ namespace Orleans.Runtime.ReminderService
 
         private void RemoveOutOfRangeReminders(List<Task> removedReminderTasks)
         {
+            CheckRuntimeContext();
+
             var remindersOutOfRange = 0;
 
             foreach (var r in localReminders)
@@ -324,6 +347,8 @@ namespace Orleans.Runtime.ReminderService
 
         public override Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
+            CheckRuntimeContext();
+
             _ = base.OnRangeChange(oldRange, newRange, increased);
             if (Status == GrainServiceStatus.Started)
                 return ReadAndUpdateReminders();
@@ -339,6 +364,8 @@ namespace Orleans.Runtime.ReminderService
             {
                 try
                 {
+                    CheckRuntimeContext();
+
                     overrideDelay = null;
                     switch (Status)
                     {
@@ -363,18 +390,23 @@ namespace Orleans.Runtime.ReminderService
 
         protected override async Task StartInBackground()
         {
+            CheckRuntimeContext();
+
             await DoInitialReadAndUpdateReminders();
             this.runTask = RunAsync();
         }
 
         private async Task DoInitialReadAndUpdateReminders()
         {
+            CheckRuntimeContext();
+
             try
             {
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
                 initialReadCallCount++;
                 await this.ReadAndUpdateReminders();
+
                 Status = GrainServiceStatus.Started;
                 startedTask.TrySetResult(true);
             }
@@ -396,6 +428,8 @@ namespace Orleans.Runtime.ReminderService
 
         private async Task ReadTableAndStartTimers(ISingleRange range, int rangeSerialNumberCopy)
         {
+            CheckRuntimeContext();
+
             LogDebugReadingRows(range);
             localTableSequence++;
             long cachedSequence = localTableSequence;
@@ -505,28 +539,122 @@ namespace Orleans.Runtime.ReminderService
 
         private void AddOrUpdateLocalReminder(ReminderEntry entry)
         {
+            CheckRuntimeContext();
+
             localTableSequence++;
             var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
             ref var reminderData = ref CollectionsMarshal.GetValueRefOrAddDefault(localReminders, key, out var exists);
-            if (exists && reminderData is { } existingReminder)
+            if (exists && reminderData is not null)
             {
-                existingReminder.LocalSequenceNumber = localTableSequence;
-                existingReminder.Update(entry);
+                reminderData.LocalSequenceNumber = localTableSequence;
+                reminderData.Update(entry);
                 LogDebugUpdatedReminder(entry);
-                return;
+            }
+            else
+            {
+                reminderData = new LocalReminderData(entry, this)
+                {
+                    LocalSequenceNumber = localTableSequence,
+                };
+
+                LogDebugStartedReminder(entry);
             }
 
-            var newReminder = new LocalReminderData(entry, this)
+            lock (_deliveryLock)
             {
-                LocalSequenceNumber = localTableSequence,
-            };
-            newReminder.Start();
-            reminderData = newReminder;
-            LogDebugStartedReminder(entry);
+                if (!_isDeliveringReminders)
+                {
+                    return;
+                }
+            }
+
+            reminderData.TryStart();
+        }
+
+        private void StartDeliveringReminders()
+        {
+            CheckRuntimeContext();
+
+            lock (_deliveryLock)
+            {
+                if (_isDeliveringReminders)
+                {
+                    return;
+                }
+
+                _isDeliveringReminders = true;
+            }
+
+            foreach (var reminderData in localReminders.Values)
+            {
+                reminderData.TryStart();
+            }
+        }
+
+        private async Task StopDeliveringRemindersAsync()
+        {
+            CheckRuntimeContext();
+
+            Task? deliveryQuiescedTask = null;
+            lock (_deliveryLock)
+            {
+                _isDeliveringReminders = false;
+                if (_activeReminderDeliveries > 0)
+                {
+                    _deliveryQuiesced ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    deliveryQuiescedTask = _deliveryQuiesced.Task;
+                }
+            }
+
+            // Stop all reminders.
+            var tasks = new List<Task>(localReminders.Count + (deliveryQuiescedTask is null ? 0 : 1));
+            if (deliveryQuiescedTask is not null)
+            {
+                tasks.Add(deliveryQuiescedTask);
+            }
+
+            foreach (var reminderData in localReminders.Values)
+            {
+                tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        private bool TryBeginSingleReminderDelivery()
+        {
+            lock (_deliveryLock)
+            {
+                if (!_isDeliveringReminders)
+                {
+                    return false;
+                }
+
+                ++_activeReminderDeliveries;
+                return true;
+            }
+        }
+
+        private void CompleteSingleReminderDelivery()
+        {
+            TaskCompletionSource? quiesced = null;
+            lock (_deliveryLock)
+            {
+                --_activeReminderDeliveries;
+                if (_activeReminderDeliveries == 0)
+                {
+                    quiesced = _deliveryQuiesced;
+                    _deliveryQuiesced = null;
+                }
+            }
+
+            quiesced?.SetResult();
         }
 
         private Task DoResponsibilitySanityCheck(GrainId grainId, string debugInfo)
         {
+            CheckRuntimeContext();
+
             switch (Status)
             {
                 case GrainServiceStatus.Booting:
@@ -568,6 +696,8 @@ namespace Orleans.Runtime.ReminderService
 
             void CheckRange()
             {
+                CheckRuntimeContext();
+
                 if (!RingRange.InRange(grainId))
                 {
                     LogWarningNotResponsible(debugInfo, grainId, RingRange);
@@ -698,15 +828,15 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            public void Start()
+            public bool TryStart()
             {
                 GrainId grainId;
                 string reminderName;
                 lock (_lock)
                 {
-                    if (_runTask is not null)
+                    if (_runTask is not null || _stopReason is not (int)ReminderEvents.LocalReminderStopReason.Unknown)
                     {
-                        throw new InvalidOperationException($"{nameof(Start)} may only be called once per instance and has already been called on this instance.");
+                        return false;
                     }
 
                     grainId = _entry.GrainId;
@@ -716,6 +846,7 @@ namespace Orleans.Runtime.ReminderService
                 }
 
                 ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, this, _shared.Silo);
+                return true;
             }
 
             public void Update(ReminderEntry entry)
@@ -778,7 +909,7 @@ namespace Orleans.Runtime.ReminderService
                     while (await WaitForNextTick())
                     {
                         var entry = PrepareTick();
-                        if (entry is null)
+                        if (entry is null || !_shared.TryBeginSingleReminderDelivery())
                         {
                             continue;
                         }
@@ -823,6 +954,10 @@ namespace Orleans.Runtime.ReminderService
                         catch (Exception exception)
                         {
                             LogWarningFiringReminder(_shared.logger, entry.ReminderName, entry.GrainId, exception);
+                        }
+                        finally
+                        {
+                            _shared.CompleteSingleReminderDelivery();
                         }
                     }
                 }
