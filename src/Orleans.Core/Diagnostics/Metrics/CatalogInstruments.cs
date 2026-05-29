@@ -78,6 +78,58 @@ internal static class CatalogInstruments
         }
     }
 
+    internal readonly struct DeactivationMetricTracker
+    {
+        private readonly ValueStopwatch _stopwatch;
+        private readonly string? _via;
+        private readonly bool _recorded;
+
+        private DeactivationMetricTracker(ValueStopwatch stopwatch, string via, bool recorded)
+        {
+            _stopwatch = stopwatch;
+            _via = via;
+            _recorded = recorded;
+        }
+
+        public static DeactivationMetricTracker Start()
+        {
+            return DeactivationLatencyEnabled
+                ? new(ValueStopwatch.StartNew(), DeactivationViaUnknown, recorded: false)
+                : default;
+        }
+
+        public DeactivationMetricTracker Collection() => WithVia(DeactivationViaCollection);
+
+        public DeactivationMetricTracker DeactivateOnIdle() => WithVia(DeactivationViaDeactivateOnIdle);
+
+        public DeactivationMetricTracker DeactivateStuckActivation() => WithVia(DeactivationViaDeactivateStuckActivation);
+
+        public DeactivationMetricTracker Migration() => WithVia(DeactivationViaMigration);
+
+        public DeactivationMetricTracker Record()
+        {
+            if (_via is null || _recorded)
+            {
+                return this;
+            }
+
+            OnDeactivationCompleted(_stopwatch.Elapsed, _via);
+            return new(_stopwatch, _via, recorded: true);
+        }
+
+        public void RecordIfNeeded()
+        {
+            if (_via is null || _recorded)
+            {
+                return;
+            }
+
+            OnDeactivationCompleted(_stopwatch.Elapsed, _via);
+        }
+
+        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_stopwatch, via, _recorded);
+    }
+
     internal static Counter<int> ActivationFailedToActivate = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
 
     internal static Counter<int> ActivationCollections = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);

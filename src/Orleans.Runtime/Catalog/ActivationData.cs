@@ -85,58 +85,6 @@ internal sealed partial class ActivationData :
         public const string DehydrateError = "dehydrate-error";
     }
 
-    private readonly struct DeactivationMetricTracker
-    {
-        private readonly ValueStopwatch _stopwatch;
-        private readonly string? _via;
-        private readonly bool _recorded;
-
-        private DeactivationMetricTracker(ValueStopwatch stopwatch, string via, bool recorded)
-        {
-            _stopwatch = stopwatch;
-            _via = via;
-            _recorded = recorded;
-        }
-
-        public static DeactivationMetricTracker Start()
-        {
-            return CatalogInstruments.DeactivationLatencyEnabled
-                ? new(ValueStopwatch.StartNew(), CatalogInstruments.DeactivationViaUnknown, recorded: false)
-                : default;
-        }
-
-        public DeactivationMetricTracker Collection() => WithVia(CatalogInstruments.DeactivationViaCollection);
-
-        public DeactivationMetricTracker DeactivateOnIdle() => WithVia(CatalogInstruments.DeactivationViaDeactivateOnIdle);
-
-        public DeactivationMetricTracker DeactivateStuckActivation() => WithVia(CatalogInstruments.DeactivationViaDeactivateStuckActivation);
-
-        public DeactivationMetricTracker Migration() => WithVia(CatalogInstruments.DeactivationViaMigration);
-
-        public DeactivationMetricTracker Record()
-        {
-            if (_via is null || _recorded)
-            {
-                return this;
-            }
-
-            CatalogInstruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
-            return new(_stopwatch, _via, recorded: true);
-        }
-
-        public void RecordIfNeeded()
-        {
-            if (_via is null || _recorded)
-            {
-                return;
-            }
-
-            CatalogInstruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
-        }
-
-        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_stopwatch, via, _recorded);
-    }
-
     public ActivationData(
         GrainAddress grainAddress,
         Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
@@ -1976,7 +1924,7 @@ internal sealed partial class ActivationData :
     {
         using var _ = deactivateCommand.Activity;
 
-        var deactivationMetrics = DeactivationMetricTracker.Start();
+        var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start();
         var migrating = false;
         var encounteredError = false;
         try
