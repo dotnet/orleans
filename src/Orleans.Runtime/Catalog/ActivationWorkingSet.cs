@@ -17,7 +17,12 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly ConcurrentDictionary<IActivationWorkingSetMember, bool> _members = new();
+        private class MemberState
+        {
+            public bool IsIdle { get; set; }
+        }
+
+        private readonly ConcurrentDictionary<IActivationWorkingSetMember, MemberState> _members = new();
         private readonly ILogger _logger;
         private readonly IAsyncTimer _scanPeriodTimer;
         private readonly List<IActivationWorkingSetObserver> _observers;
@@ -38,12 +43,23 @@ namespace Orleans.Runtime
 
         public int Count => _activeCount;
 
-        internal IEnumerable<KeyValuePair<IActivationWorkingSetMember, bool>> Members => _members;
+        internal IEnumerable<IActivationWorkingSetMember> Members => EnumerateActiveMembers();
+
+        private IEnumerable<IActivationWorkingSetMember> EnumerateActiveMembers()
+        {
+            foreach (var pair in _members)
+            {
+                if (!pair.Value.IsIdle)
+                {
+                    yield return pair.Key;
+                }
+            }
+        }
 
         public void OnActivated(IActivationWorkingSetMember member)
         {
             Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
-            if (_members.TryAdd(member, false))
+            if (_members.TryAdd(member, new MemberState()))
             {
                 Interlocked.Increment(ref _activeCount);
                 foreach (var observer in _observers)
@@ -59,20 +75,13 @@ namespace Orleans.Runtime
 
         public void OnActive(IActivationWorkingSetMember member)
         {
-            while (true)
+            if (_members.TryGetValue(member, out var state))
             {
-                if (_members.TryGetValue(member, out var isIdle))
-                {
-                    if (_members.TryUpdate(member, false, comparisonValue: isIdle))
-                    {
-                        break;
-                    }
-                }
-                else if (_members.TryAdd(member, false))
-                {
-                    Interlocked.Increment(ref _activeCount);
-                    break;
-                }
+                state.IsIdle = false;
+            }
+            else if (_members.TryAdd(member, new()))
+            {
+                Interlocked.Increment(ref _activeCount);
             }
 
             foreach (var observer in _observers)
@@ -129,9 +138,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private void VisitMember(IActivationWorkingSetMember member, bool isIdle)
+        private void VisitMember(IActivationWorkingSetMember member, MemberState state)
         {
-            var wouldRemove = isIdle;
+            var wouldRemove = state.IsIdle;
             if (member.IsCandidateForRemoval(wouldRemove))
             {
                 if (wouldRemove)
@@ -140,22 +149,16 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    if (_members.TryUpdate(member, true, comparisonValue: isIdle))
+                    state.IsIdle = true;
+                    foreach (var observer in _observers)
                     {
-                        foreach (var observer in _observers)
-                        {
-                            observer.OnIdle(member);
-                        }
+                        observer.OnIdle(member);
                     }
                 }
             }
             else
             {
-                if (isIdle)
-                {
-                    _members.TryUpdate(member, false, comparisonValue: true);
-                }
-
+                state.IsIdle = false;
                 foreach (var observer in _observers)
                 {
                     observer.OnActive(member);

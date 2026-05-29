@@ -89,10 +89,9 @@ namespace Orleans.Runtime
 
                 var now = DateTime.UtcNow;
                 var iteration = 0;
-                foreach (var pair in _activationWorkingSet.Members)
+                foreach (var member in _activationWorkingSet.Members)
                 {
-                    var member = pair.Key;
-                    if (!pair.Value && member is ActivationData activation)
+                    if (member is ActivationData activation)
                     {
                         lock (activation)
                         {
