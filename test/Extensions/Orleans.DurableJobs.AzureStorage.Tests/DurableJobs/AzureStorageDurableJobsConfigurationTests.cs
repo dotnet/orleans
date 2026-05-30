@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
@@ -13,26 +12,22 @@ namespace Tester.AzureUtils.DurableJobs;
 public class AzureStorageDurableJobsConfigurationTests
 {
     [Fact]
-    public void UseAzureBlobDurableJobs_ComposesDurableJobsAndApplicationJsonMetadata()
+    public void UseAzureBlobDurableJobs_ConfiguresDurableJobsJsonMetadata()
     {
         var builder = new TestSiloBuilder();
 
-        builder.UseAzureBlobDurableJobs(
-            options =>
-            {
-                options.ConfigureBlobServiceClient("UseDevelopmentStorage=true");
-                options.ContainerName = "durable-jobs-test";
-            },
-            AzureStorageDurableJobsConfigurationTestJsonContext.Default);
+        builder.UseAzureBlobDurableJobs(options =>
+        {
+            options.ConfigureBlobServiceClient("UseDevelopmentStorage=true");
+            options.ContainerName = "durable-jobs-test";
+        });
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<JsonJournalOptions>();
 
-        Assert.NotNull(options.SerializerOptions.GetTypeInfo(typeof(DurableJob)));
-        Assert.NotNull(options.SerializerOptions.GetTypeInfo(typeof(TestPayload)));
+        var durableJobsJsonContextType = typeof(DurableJob).Assembly.GetType("Orleans.DurableJobs.DurableJobsJsonContext", throwOnError: true);
+        Assert.Contains(options.SerializerOptions.TypeInfoResolverChain, resolver => durableJobsJsonContextType.IsInstanceOfType(resolver));
     }
-
-    public sealed record TestPayload(string Value);
 
     private sealed class TestSiloBuilder : ISiloBuilder
     {
@@ -43,6 +38,3 @@ public class AzureStorageDurableJobsConfigurationTests
 }
 
 #pragma warning restore ORLEANSEXP005
-
-[JsonSerializable(typeof(AzureStorageDurableJobsConfigurationTests.TestPayload))]
-internal sealed partial class AzureStorageDurableJobsConfigurationTestJsonContext : JsonSerializerContext;

@@ -64,7 +64,7 @@ public static class DurableJobsExtensions
     {
         builder.AddDurableJobs();
         builder.AddJournalStorage();
-        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
 
         builder.ConfigureServices(services => services.UseVolatileJournaledDurableJobs());
         return builder;
@@ -82,7 +82,7 @@ public static class DurableJobsExtensions
     {
         var builder = new ServiceCollectionSiloBuilder(services);
         builder.AddJournalStorage();
-        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         return services.UseVolatileJournaledDurableJobs();
     }
 

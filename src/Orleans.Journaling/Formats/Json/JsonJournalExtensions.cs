@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Journaling.Json;
 
@@ -79,14 +80,11 @@ public static class JsonJournalExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        var options = new JsonJournalOptions();
-        configure?.Invoke(options);
-
-        // Capture the serializer options directly — avoid registering a bare
-        // JsonSerializerOptions singleton that could collide with other components.
-        var jsonOptions = options.SerializerOptions;
-
-        builder.Services.AddJsonJournalFormat(jsonOptions, tryAdd: false);
+        builder.Services.AddJsonJournalFormat(tryAdd: false);
+        if (configure is not null)
+        {
+            builder.Configure(configure);
+        }
 
         return builder;
     }
@@ -113,16 +111,15 @@ public static class JsonJournalExtensions
         return builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(typeInfoResolver));
     }
 
-    internal static IServiceCollection AddJsonJournalFormat(this IServiceCollection services, JsonSerializerOptions jsonOptions, bool tryAdd)
+    internal static IServiceCollection AddJsonJournalFormat(this IServiceCollection services, bool tryAdd)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(jsonOptions);
 
         var key = JournalFormatServices.ValidateJournalFormatKey(JournalFormatKey);
-        var options = new JsonJournalOptions { SerializerOptions = jsonOptions };
+        services.AddOptions<JsonJournalOptions>();
         if (tryAdd)
         {
-            services.TryAddSingleton(options);
+            services.TryAddSingleton<JsonJournalOptions>(static sp => sp.GetRequiredService<IOptions<JsonJournalOptions>>().Value);
             services.TryAddSingleton<JsonLinesJournalFormat>();
             services.TryAddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<JsonLinesJournalFormat>());
             services.TryAddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<JsonLinesJournalFormat>());
@@ -137,7 +134,7 @@ public static class JsonJournalExtensions
         }
         else
         {
-            services.Replace(ServiceDescriptor.Singleton(options));
+            services.Replace(ServiceDescriptor.Singleton<JsonJournalOptions>(static sp => sp.GetRequiredService<IOptions<JsonJournalOptions>>().Value));
             services.AddSingleton<JsonLinesJournalFormat>();
             services.AddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<JsonLinesJournalFormat>());
             services.AddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<JsonLinesJournalFormat>());

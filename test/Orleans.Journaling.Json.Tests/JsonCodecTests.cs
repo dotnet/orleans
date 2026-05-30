@@ -65,6 +65,22 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void ConfigureJsonJournalOptions_AfterAddJournalStorage_RegistersPayloadMetadata()
+    {
+        var builder = new TestSiloBuilder();
+        builder.AddJournalStorage();
+        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(JsonCodecTestJsonContext.Default));
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
+
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
+        var consumer = new ValueConsumer<JsonCodecTestValue>();
+        codec.Apply(CodecTestHelpers.ReadBuffer(input), consumer);
+
+        Assert.Equal(new("test", 1), consumer.Value);
+    }
+
+    [Fact]
     public void JsonDictionaryCodec_Snapshot_RoundTrips()
     {
         var codec = new JsonDurableDictionaryCommandCodec<string, int>(Options);
