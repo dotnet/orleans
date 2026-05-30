@@ -46,6 +46,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private long _startTimestamp;
     private int _totalClaimedShards;
     private int _stripeCounter;
+    private const string ShardStripeMetadataKey = "stripe";
 
     public LocalDurableJobManager(
         JobShardManager shardManager,
@@ -122,7 +123,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     // Create new shard
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
                     var endTime = shardKey.StartTime.Add(_options.ShardDuration);
-                    var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, new Dictionary<string, string>(), linkedCts.Token);
+                    var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, CreateShardMetadata(shardKey), linkedCts.Token);
 
                     LogCreatingNewShard(_logger, shardKey.StartTime, shardKey.Stripe);
                     _writeableShards[shardKey] = newShard;
@@ -576,6 +577,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private WritableShardKey GetWritableShardKey(ScheduleJobRequest request)
         => new(GetShardStartTime(request.DueTime), GetShardStripe());
+
+    private IDictionary<string, string> CreateShardMetadata(WritableShardKey shardKey)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (_options.ShardStripeCount > 1)
+        {
+            result[ShardStripeMetadataKey] = shardKey.Stripe.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return result;
+    }
 
     private DateTimeOffset GetShardStartTime(DateTimeOffset scheduledTime)
     {
