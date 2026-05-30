@@ -147,10 +147,10 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public override Task Stop()
+        public override async Task Stop()
         {
             CheckRuntimeContext();
-            return StopDeliveringReminders();
+            await StopDeliveringReminders();
         }
 
         private async Task StopDeliveringReminders()
@@ -170,11 +170,6 @@ namespace Orleans.Runtime.ReminderService
             {
                 await deliveryQuiescedTask;
             }
-        }
-
-        private async Task StopReminderService()
-        {
-            await StopDeliveringReminders();
 
             // Stop all reminders.
             var tasks = new List<Task>(localReminders.Count);
@@ -184,6 +179,11 @@ namespace Orleans.Runtime.ReminderService
             }
 
             await Task.WhenAll(tasks);
+        }
+
+        private async Task StopReminderService()
+        {
+            await StopDeliveringReminders();
             await base.Stop();
 
             listRefreshTimer.Dispose();
