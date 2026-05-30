@@ -247,7 +247,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 // Its directory owner is not the Gateway silo. This way Gateway will use its directory cache.
                 // Its activation is located on the non Gateway silo as well.
                 ICollectionTestGrain grain = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(i);
-                GrainId grainId = ((GrainReference)await grain.GetGrainReference()).GrainId;
+                GrainId grainId = grain.GetGrainId();
                 SiloAddress primaryForGrain = (await TestUtils.GetDetailedGrainReport(this.testCluster.InternalGrainFactory, grainId, this.testCluster.Primary)).PrimaryForGrain;
                 if (primaryForGrain.Equals(this.testCluster.Primary.SiloAddress))
                 {
