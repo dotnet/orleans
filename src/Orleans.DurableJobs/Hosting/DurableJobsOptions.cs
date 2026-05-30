@@ -197,9 +197,9 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be greater than zero.");
         }
-        if (options.ShardStripeCount > 1024)
+        if (options.ShardStripeCount > 32 * 1024)
         {
-            throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be less than or equal to 1024.");
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be less than or equal to 32768.");
         }
         if (options.JobStatusPollInterval <= TimeSpan.Zero)
         {
