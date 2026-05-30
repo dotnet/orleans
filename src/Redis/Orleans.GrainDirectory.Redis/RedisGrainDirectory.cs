@@ -198,6 +198,10 @@ namespace Orleans.GrainDirectory.Redis
             }
 
             var redisIsShared = _redisIsShared;
+            redis.ConnectionRestored -= LogConnectionRestored;
+            redis.ConnectionFailed -= LogConnectionFailed;
+            redis.ErrorMessage -= LogErrorMessage;
+            redis.InternalError -= LogInternalError;
             _disposed = true;
             _redis = null!;
             _database = null!;
