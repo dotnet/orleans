@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Serialization.Buffers;
@@ -70,7 +71,9 @@ public class JsonCodecTests
         var builder = new TestSiloBuilder();
         builder.AddJournalStorage();
         builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(JsonCodecTestJsonContext.Default));
+        Assert.DoesNotContain(builder.Services, service => service.ServiceType == typeof(JsonJournalOptions));
         using var serviceProvider = builder.Services.BuildServiceProvider();
+        Assert.Contains(JsonCodecTestJsonContext.Default, serviceProvider.GetRequiredService<IOptions<JsonJournalOptions>>().Value.SerializerOptions.TypeInfoResolverChain);
         var codec = serviceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));

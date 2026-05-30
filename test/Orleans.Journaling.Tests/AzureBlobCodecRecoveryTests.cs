@@ -218,7 +218,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
 
         var jsonOptions = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = JournalingTestsJsonContext.Default };
-        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
+        services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),

@@ -364,7 +364,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var services = new ServiceCollection();
         services.AddSerializer();
         services.AddLogging();
-        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
+        services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),
@@ -389,7 +389,7 @@ public class CodecRecoveryTests : JournalingTestBase
             typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
 
         var jsonOptions = CreateJsonOptions();
-        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
+        services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),

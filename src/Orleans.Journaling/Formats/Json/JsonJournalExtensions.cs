@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Journaling.Json;
 
@@ -119,7 +118,6 @@ public static class JsonJournalExtensions
         services.AddOptions<JsonJournalOptions>();
         if (tryAdd)
         {
-            services.TryAddSingleton<JsonJournalOptions>(static sp => sp.GetRequiredService<IOptions<JsonJournalOptions>>().Value);
             services.TryAddSingleton<JsonLinesJournalFormat>();
             services.TryAddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<JsonLinesJournalFormat>());
             services.TryAddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<JsonLinesJournalFormat>());
@@ -134,7 +132,6 @@ public static class JsonJournalExtensions
         }
         else
         {
-            services.Replace(ServiceDescriptor.Singleton<JsonJournalOptions>(static sp => sp.GetRequiredService<IOptions<JsonJournalOptions>>().Value));
             services.AddSingleton<JsonLinesJournalFormat>();
             services.AddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<JsonLinesJournalFormat>());
             services.AddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<JsonLinesJournalFormat>());

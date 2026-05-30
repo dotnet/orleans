@@ -34,8 +34,8 @@ internal static class JsonTypeInfoHelpers
         return new(
             $"JSON journaling requires System.Text.Json metadata for journaled payload type '{valueType.FullName}'. "
             + "Add the type to a source-generated JsonSerializerContext using [JsonSerializable(typeof(...))] and register the context "
-            + $"with UseJsonJournalFormat(MyJournalJsonContext.Default), {nameof(JsonJournalOptions)}.{nameof(JsonJournalOptions.AddTypeInfoResolver)}, "
-            + $"or {nameof(JsonJournalOptions)}.{nameof(JsonJournalOptions.SerializerOptions)}.{nameof(JsonSerializerOptions.TypeInfoResolver)}.",
+            + $"with UseJsonJournalFormat(MyJournalJsonContext.Default) or Configure<{nameof(JsonJournalOptions)}>(options => "
+            + $"options.{nameof(JsonJournalOptions.AddTypeInfoResolver)}(MyJournalJsonContext.Default)).",
             innerException);
     }
 }
