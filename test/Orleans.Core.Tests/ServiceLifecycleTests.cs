@@ -232,7 +232,7 @@ public class ServiceLifecycleTests
         // Registering after stage completes should run immediately
         var (task, _) = RegisterCallback(_lifecycle.Stopping);
 
-        await task.WaitAsync(TimeSpan.FromSeconds(1));
+        await task.WaitAsync(Timeout);
     }
 
     [Fact]
@@ -364,4 +364,3 @@ public class ServiceLifecycleTests
         }
     }
 }
-

@@ -70,17 +70,15 @@ internal sealed partial class ServiceLifecycleNotificationStage(ILogger logger, 
 
         lock (_lock)
         {
-            if (_isNotifyingOrHasCompleted)
+            if (!_isNotifyingOrHasCompleted)
             {
-                LogStageAlreadyCompleted(logger, name);
-
-                _ = Task.Run(() => ExecuteLateCallback(participant));
-
+                _participants.Add(participant);
                 return participant;
             }
-
-            _participants.Add(participant);
         }
+
+        LogStageAlreadyCompleted(logger, name);
+        _ = Task.Run(() => ExecuteLateCallback(participant));
 
         return participant;
 

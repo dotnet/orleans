@@ -749,6 +749,7 @@ namespace Orleans.Runtime.ReminderService
             private ReminderEntry _entry;
             private CancellationTokenSource _scheduleChangedCancellation = new();
             private bool _isFirstTickPending;
+            private long _scheduleVersion;
 
             private int _stopReason;
             private long _localSequenceNumber;
@@ -833,6 +834,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 ArgumentNullException.ThrowIfNull(entry);
 
+                long scheduleVersion;
                 CancellationTokenSource scheduleChangedCancellation;
                 PeriodicTimer? timerToDispose;
                 lock (_lock)
@@ -846,10 +848,12 @@ namespace Orleans.Runtime.ReminderService
                     _isFirstTickPending = true;
                     timerToDispose = _timer;
                     _timer = null;
+                    scheduleVersion = ++_scheduleVersion;
                     scheduleChangedCancellation = _scheduleChangedCancellation;
                     _scheduleChangedCancellation = new();
                 }
 
+                ReminderEvents.EmitLocalReminderScheduleChanged(entry.GrainId, entry.ReminderName, this, scheduleVersion, _shared.Silo);
                 scheduleChangedCancellation.Cancel();
                 timerToDispose?.Dispose();
             }
@@ -959,6 +963,9 @@ namespace Orleans.Runtime.ReminderService
                     TimeSpan? initialDueTime;
                     PeriodicTimer? periodicTimer;
                     CancellationToken scheduleChangedToken;
+                    GrainId grainId;
+                    string reminderName;
+                    long scheduleVersion;
                     lock (_lock)
                     {
                         if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
@@ -979,6 +986,9 @@ namespace Orleans.Runtime.ReminderService
 
                         periodicTimer = _timer;
                         scheduleChangedToken = _scheduleChangedCancellation.Token;
+                        grainId = _entry.GrainId;
+                        reminderName = _entry.ReminderName;
+                        scheduleVersion = _scheduleVersion;
                     }
 
                     using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopCancellation.Token, scheduleChangedToken);
@@ -986,7 +996,13 @@ namespace Orleans.Runtime.ReminderService
                     {
                         if (initialDueTime is { } delay)
                         {
-                            await Task.Delay(delay, _shared._timeProvider, waitCancellation.Token);
+                            var delayTask = Task.Delay(delay, _shared._timeProvider, waitCancellation.Token);
+                            if (!scheduleChangedToken.IsCancellationRequested && !_stopCancellation.IsCancellationRequested)
+                            {
+                                ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);
+                            }
+
+                            await delayTask;
                             if (!TryStartPeriodicTimer(scheduleChangedToken))
                             {
                                 if (_stopCancellation.IsCancellationRequested)
@@ -1000,7 +1016,13 @@ namespace Orleans.Runtime.ReminderService
                             return true;
                         }
 
-                        var result = await periodicTimer!.WaitForNextTickAsync(waitCancellation.Token);
+                        var nextTick = periodicTimer!.WaitForNextTickAsync(waitCancellation.Token);
+                        if (!scheduleChangedToken.IsCancellationRequested && !_stopCancellation.IsCancellationRequested)
+                        {
+                            ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);
+                        }
+
+                        var result = await nextTick;
                         if (!result && scheduleChangedToken.IsCancellationRequested)
                         {
                             continue;
