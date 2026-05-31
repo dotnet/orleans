@@ -97,14 +97,14 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan period = await grain.GetReminderPeriod(DR);
             // start up the 'DR' reminder and wait for two ticks to pass.
             await grain.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2);
             // retrieve the value of the counter-- it should match the sequence number which is the number of periods
             // we've waited.
             long last = await grain.GetCounter(DR);
             Assert.Equal(2, last);
             // stop the timer and wait for a whole period.
-            await grain.StopReminder(DR);
-            Thread.Sleep(period.Multiply(1) + LEEWAY); // giving some leeway
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder);
+            await AdvanceReminderTimeAsync(period);
             // the counter should not have changed.
             long curr = await grain.GetCounter(DR);
             Assert.Equal(last, curr);
@@ -116,13 +116,13 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             TimeSpan period = await grain.GetReminderPeriod(DR);
             await grain.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2);
             long last = await grain.GetCounter(DR);
             Assert.Equal(2, last);
 
-            await grain.StopReminder(DR);
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder);
             TimeSpan sleepFor = period.Multiply(1) + LEEWAY;
-            Thread.Sleep(sleepFor); // giving some leeway
+            await AdvanceReminderTimeAsync(sleepFor);
             long curr = await grain.GetCounter(DR);
             Assert.Equal(last, curr);
             AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
@@ -130,10 +130,9 @@ namespace Tester.AzureUtils.TimerTests
             // start the same reminder again
             await grain.StartReminder(DR);
             sleepFor = period.Multiply(2) + LEEWAY;
-            Thread.Sleep(sleepFor); // giving some leeway
-            curr = await grain.GetCounter(DR);
+            curr = await WaitForAdditionalReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 1);
             AssertIsInRange(curr, 2, 3, grain, DR, sleepFor);
-            await grain.StopReminder(DR); // cleanup
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder); // cleanup
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -314,20 +313,20 @@ namespace Tester.AzureUtils.TimerTests
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestCopyGrain g2 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
-            TimeSpan period = await g1.GetReminderPeriod(DR); // using same period
 
             await g1.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), 2);
             await g2.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), 4);
+            await WaitForReminderCounterAsync(g2, DR, () => g2.GetCounter(DR), 2);
             long last1 = await g1.GetCounter(DR);
             Assert.Equal(4, last1);
             long last2 = await g2.GetCounter(DR);
             Assert.Equal(2, last2); // CopyGrain fault
 
-            await g1.StopReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
-            await g2.StopReminder(DR);
+            await StopReminderAndWaitForQuiescenceAsync(g1, DR, g1.StopReminder);
+            await WaitForReminderCounterAsync(g2, DR, () => g2.GetCounter(DR), 4);
+            await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder);
             long curr1 = await g1.GetCounter(DR);
             Assert.Equal(last1, curr1);
             long curr2 = await g2.GetCounter(DR);
@@ -346,8 +345,6 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestCopyGrain g4 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
             using var cts = new CancellationTokenSource(ENDWAIT);
 
-            TimeSpan period = await g1.GetReminderPeriod(DR);
-
             Task[] tasks =
             {
                 Task.Run(() => PerGrainFailureTest(g1, cts.Token), cts.Token),
@@ -356,14 +353,17 @@ namespace Tester.AzureUtils.TimerTests
                 Task.Run(() => PerCopyGrainFailureTest(g4, cts.Token), cts.Token),
             };
 
-            Thread.Sleep(period.Multiply(failAfter));
+            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), failAfter, cts.Token);
 
             var siloToKill = silos[Random.Shared.Next(silos.Count)];
             // stop a silo and join a new one in parallel
-            log.LogInformation("Stopping a silo and joining a silo");
-            Task t1 = this.StopSiloAsync(siloToKill);
-            Task t2 = this.StartAdditionalSilosAsync(1);
-            await Task.WhenAll(new[] { t1, t2 }).WaitAsync(cts.Token);
+            await using (await PauseReminderTimeAsync(cts.Token))
+            {
+                log.LogInformation("Stopping a silo and joining a silo");
+                Task t1 = this.StopSiloAsync(siloToKill);
+                Task t2 = this.StartAdditionalSilosAsync(1);
+                await Task.WhenAll(new[] { t1, t2 }).WaitAsync(cts.Token);
+            }
 
             await Task.WhenAll(tasks).WaitAsync(cts.Token); // Block until all tasks complete.
         }

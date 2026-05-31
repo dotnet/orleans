@@ -135,6 +135,58 @@ public static class ReminderEvents
     }
 
     /// <summary>
+    /// Event payload for when a local reminder schedule is invalidated and must be re-armed.
+    /// </summary>
+    /// <param name="grainId">The grain associated with the reminder.</param>
+    /// <param name="reminderName">The reminder name.</param>
+    /// <param name="identity">The object reference used to correlate this local reminder instance across lifecycle events.</param>
+    /// <param name="scheduleVersion">The local schedule version associated with the change.</param>
+    /// <param name="siloAddress">The address of the silo handling this reminder.</param>
+    public sealed class LocalReminderScheduleChanged(
+        GrainId grainId,
+        string reminderName,
+        object identity,
+        long scheduleVersion,
+        SiloAddress? siloAddress) : ReminderEvent(grainId, reminderName, siloAddress)
+    {
+        /// <summary>
+        /// The object reference used to correlate this local reminder instance across lifecycle events.
+        /// </summary>
+        public readonly object Identity = identity;
+
+        /// <summary>
+        /// The local schedule version associated with the change.
+        /// </summary>
+        public readonly long ScheduleVersion = scheduleVersion;
+    }
+
+    /// <summary>
+    /// Event payload for when a local reminder has armed its next tick wait.
+    /// </summary>
+    /// <param name="grainId">The grain associated with the reminder.</param>
+    /// <param name="reminderName">The reminder name.</param>
+    /// <param name="identity">The object reference used to correlate this local reminder instance across lifecycle events.</param>
+    /// <param name="scheduleVersion">The local schedule version associated with the armed wait.</param>
+    /// <param name="siloAddress">The address of the silo handling this reminder.</param>
+    public sealed class LocalReminderScheduled(
+        GrainId grainId,
+        string reminderName,
+        object identity,
+        long scheduleVersion,
+        SiloAddress? siloAddress) : ReminderEvent(grainId, reminderName, siloAddress)
+    {
+        /// <summary>
+        /// The object reference used to correlate this local reminder instance across lifecycle events.
+        /// </summary>
+        public readonly object Identity = identity;
+
+        /// <summary>
+        /// The local schedule version associated with the armed wait.
+        /// </summary>
+        public readonly long ScheduleVersion = scheduleVersion;
+    }
+
+    /// <summary>
     /// Event payload for when a reminder tick is about to fire.
     /// </summary>
     /// <param name="grainId">The grain associated with the reminder.</param>
@@ -277,6 +329,52 @@ public static class ReminderEvents
                 reminderName,
                 identity,
                 reason,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitLocalReminderScheduleChanged(GrainId grainId, string reminderName, object identity, long scheduleVersion, SiloAddress? siloAddress)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+
+        if (!Listener.IsEnabled(nameof(LocalReminderScheduleChanged)))
+        {
+            return;
+        }
+
+        Emit(grainId, reminderName, identity, scheduleVersion, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(GrainId grainId, string reminderName, object identity, long scheduleVersion, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(LocalReminderScheduleChanged), new LocalReminderScheduleChanged(
+                grainId,
+                reminderName,
+                identity,
+                scheduleVersion,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitLocalReminderScheduled(GrainId grainId, string reminderName, object identity, long scheduleVersion, SiloAddress? siloAddress)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+
+        if (!Listener.IsEnabled(nameof(LocalReminderScheduled)))
+        {
+            return;
+        }
+
+        Emit(grainId, reminderName, identity, scheduleVersion, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(GrainId grainId, string reminderName, object identity, long scheduleVersion, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(LocalReminderScheduled), new LocalReminderScheduled(
+                grainId,
+                reminderName,
+                identity,
+                scheduleVersion,
                 siloAddress));
         }
     }
