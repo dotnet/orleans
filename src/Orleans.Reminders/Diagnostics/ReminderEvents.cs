@@ -161,14 +161,14 @@ public static class ReminderEvents
     }
 
     /// <summary>
-    /// Event payload for when a local reminder has armed its next tick wait.
+    /// Event payload for when a local reminder has armed the wait for its next tick.
     /// </summary>
     /// <param name="grainId">The grain associated with the reminder.</param>
     /// <param name="reminderName">The reminder name.</param>
     /// <param name="identity">The object reference used to correlate this local reminder instance across lifecycle events.</param>
     /// <param name="scheduleVersion">The local schedule version associated with the armed wait.</param>
     /// <param name="siloAddress">The address of the silo handling this reminder.</param>
-    public sealed class LocalReminderScheduled(
+    public sealed class LocalReminderTickWaitArmed(
         GrainId grainId,
         string reminderName,
         object identity,
@@ -356,11 +356,11 @@ public static class ReminderEvents
         }
     }
 
-    internal static void EmitLocalReminderScheduled(GrainId grainId, string reminderName, object identity, long scheduleVersion, SiloAddress? siloAddress)
+    internal static void EmitLocalReminderTickWaitArmed(GrainId grainId, string reminderName, object identity, long scheduleVersion, SiloAddress? siloAddress)
     {
         ArgumentNullException.ThrowIfNull(identity);
 
-        if (!Listener.IsEnabled(nameof(LocalReminderScheduled)))
+        if (!Listener.IsEnabled(nameof(LocalReminderTickWaitArmed)))
         {
             return;
         }
@@ -370,7 +370,7 @@ public static class ReminderEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(GrainId grainId, string reminderName, object identity, long scheduleVersion, SiloAddress? siloAddress)
         {
-            Listener.Write(nameof(LocalReminderScheduled), new LocalReminderScheduled(
+            Listener.Write(nameof(LocalReminderTickWaitArmed), new LocalReminderTickWaitArmed(
                 grainId,
                 reminderName,
                 identity,

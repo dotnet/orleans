@@ -216,7 +216,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
             Assert.Contains(recorder.Events, evt => evt is ReminderEvents.Registered registered && registered.GrainId == grainId && registered.ReminderName == DR);
             Assert.Contains(recorder.Events, evt => evt is ReminderEvents.LocalReminderScheduleChanged { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
-            Assert.Contains(recorder.Events, evt => evt is ReminderEvents.LocalReminderScheduled { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
+            Assert.Contains(recorder.Events, evt => evt is ReminderEvents.LocalReminderTickWaitArmed { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
             Assert.DoesNotContain(recorder.Events, evt => evt is ReminderEvents.LocalReminderStarted { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
             Assert.DoesNotContain(recorder.Events, evt => evt is ReminderEvents.LocalReminderStopped { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
         }

@@ -28,9 +28,9 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     private readonly Dictionary<ReminderTickKey, int> _tickCountsByReminder = [];
     private readonly Dictionary<ReminderTickKey, int> _tickAttemptsByReminder = [];
     private readonly Dictionary<ReminderTickKey, HashSet<LocalReminderInstanceKey>> _activeLocalReminders = [];
-    private readonly Dictionary<ReminderTickKey, int> _localReminderScheduleCounts = [];
+    private readonly Dictionary<ReminderTickKey, int> _localReminderTickWaitArmedCounts = [];
     private readonly Dictionary<ReminderTickKey, long> _localReminderScheduleVersions = [];
-    private readonly Dictionary<ReminderTickKey, long> _localReminderScheduledVersions = [];
+    private readonly Dictionary<ReminderTickKey, long> _localReminderTickWaitArmedVersions = [];
     private readonly List<TickCountWaiter> _tickCountWaiters = [];
     private readonly List<ActiveReminderCountWaiter> _activeReminderCountWaiters = [];
     private readonly List<LocalReminderScheduleWaiter> _localReminderScheduleWaiters = [];
@@ -109,15 +109,15 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                     }
 
                     break;
-                case ReminderEvents.LocalReminderScheduled localReminderScheduled:
-                    var scheduledKey = new ReminderTickKey(localReminderScheduled.GrainId, localReminderScheduled.ReminderName);
-                    if (IsActiveLocalReminder(scheduledKey, localReminderScheduled.Identity)
-                        && localReminderScheduled.ScheduleVersion >= _localReminderScheduleVersions.GetValueOrDefault(scheduledKey))
+                case ReminderEvents.LocalReminderTickWaitArmed localReminderTickWaitArmed:
+                    var tickWaitArmedKey = new ReminderTickKey(localReminderTickWaitArmed.GrainId, localReminderTickWaitArmed.ReminderName);
+                    if (IsActiveLocalReminder(tickWaitArmedKey, localReminderTickWaitArmed.Identity)
+                        && localReminderTickWaitArmed.ScheduleVersion >= _localReminderScheduleVersions.GetValueOrDefault(tickWaitArmedKey))
                     {
-                        _localReminderScheduledVersions[scheduledKey] = Math.Max(
-                            _localReminderScheduledVersions.GetValueOrDefault(scheduledKey, -1),
-                            localReminderScheduled.ScheduleVersion);
-                        _localReminderScheduleCounts[scheduledKey] = _localReminderScheduleCounts.GetValueOrDefault(scheduledKey) + 1;
+                        _localReminderTickWaitArmedVersions[tickWaitArmedKey] = Math.Max(
+                            _localReminderTickWaitArmedVersions.GetValueOrDefault(tickWaitArmedKey, -1),
+                            localReminderTickWaitArmed.ScheduleVersion);
+                        _localReminderTickWaitArmedCounts[tickWaitArmedKey] = _localReminderTickWaitArmedCounts.GetValueOrDefault(tickWaitArmedKey) + 1;
                         ReleaseReadyLocalReminderScheduleWaiters(ready);
                     }
 
@@ -422,8 +422,8 @@ public sealed class ReminderDiagnosticObserver : IDisposable
             return false;
         }
 
-        return _localReminderScheduleCounts.GetValueOrDefault(key) > _tickAttemptsByReminder.GetValueOrDefault(key)
-            && _localReminderScheduledVersions.GetValueOrDefault(key, -1) >= _localReminderScheduleVersions.GetValueOrDefault(key);
+        return _localReminderTickWaitArmedCounts.GetValueOrDefault(key) > _tickAttemptsByReminder.GetValueOrDefault(key)
+            && _localReminderTickWaitArmedVersions.GetValueOrDefault(key, -1) >= _localReminderScheduleVersions.GetValueOrDefault(key);
     }
 
     private bool IsActiveLocalReminder(ReminderTickKey key, object identity)
@@ -435,9 +435,9 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     private void ResetLocalReminderScheduleState(ReminderTickKey key)
     {
         _tickAttemptsByReminder.Remove(key);
-        _localReminderScheduleCounts.Remove(key);
+        _localReminderTickWaitArmedCounts.Remove(key);
         _localReminderScheduleVersions.Remove(key);
-        _localReminderScheduledVersions.Remove(key);
+        _localReminderTickWaitArmedVersions.Remove(key);
     }
 
     private void ReleaseReadyTickWaiters(List<TaskCompletionSource<bool>> ready)

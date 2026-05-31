@@ -186,11 +186,11 @@ namespace Orleans.Reminders.Diagnostics
             public LocalReminderScheduleChanged(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
         }
 
-        public sealed partial class LocalReminderScheduled : ReminderEvent
+        public sealed partial class LocalReminderTickWaitArmed : ReminderEvent
         {
             public readonly object Identity;
             public readonly long ScheduleVersion;
-            public LocalReminderScheduled(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
+            public LocalReminderTickWaitArmed(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
         }
 
         public enum LocalReminderStopReason

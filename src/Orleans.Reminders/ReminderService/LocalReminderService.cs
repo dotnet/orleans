@@ -999,7 +999,7 @@ namespace Orleans.Runtime.ReminderService
                             var delayTask = Task.Delay(delay, _shared._timeProvider, waitCancellation.Token);
                             if (!scheduleChangedToken.IsCancellationRequested && !_stopCancellation.IsCancellationRequested)
                             {
-                                ReminderEvents.EmitLocalReminderScheduled(grainId, reminderName, this, scheduleVersion, _shared.Silo);
+                                ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);
                             }
 
                             await delayTask;
@@ -1019,7 +1019,7 @@ namespace Orleans.Runtime.ReminderService
                         var nextTick = periodicTimer!.WaitForNextTickAsync(waitCancellation.Token);
                         if (!scheduleChangedToken.IsCancellationRequested && !_stopCancellation.IsCancellationRequested)
                         {
-                            ReminderEvents.EmitLocalReminderScheduled(grainId, reminderName, this, scheduleVersion, _shared.Silo);
+                            ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);
                         }
 
                         var result = await nextTick;
