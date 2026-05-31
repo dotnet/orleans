@@ -34,8 +34,6 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
     protected const string R2 = "REMINDER_2";
 
     protected const long retries = 3;
-    private static readonly TimeSpan RetryableReminderOperationDelay = TimeSpan.FromMilliseconds(250);
-    private static readonly TimeSpan SiloChurnOperationAttemptTimeout = TimeSpan.FromSeconds(5);
 
     protected const long failAfter = 2; // NOTE: match this sleep with 'failCheckAfter' used in PerGrainFailureTest() so you dont try to get counter immediately after failure as new activation may not have the reminder statistics
     protected const long failCheckAfter = 6; // safe value: 9
@@ -274,35 +272,35 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
         // Start Default Reminder and wait for 2 persisted counter increments.
         await ExecuteWithRetries(g.StartReminder, DR);
-        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 2, cancellationToken, tolerateSiloChurnFailures: true);
+        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 2, cancellationToken);
 
         // Start R1 and wait for 2 persisted counter increments.
         await ExecuteWithRetries(g.StartReminder, R1);
-        await WaitForAdditionalReminderCounterAsync(g, R1, () => g.GetCounter(R1), 2, cancellationToken, tolerateSiloChurnFailures: true);
+        await WaitForAdditionalReminderCounterAsync(g, R1, () => g.GetCounter(R1), 2, cancellationToken);
 
         // Start R2 and wait for 2 persisted counter increments.
         await ExecuteWithRetries(g.StartReminder, R2);
-        await WaitForAdditionalReminderCounterAsync(g, R2, () => g.GetCounter(R2), 2, cancellationToken, tolerateSiloChurnFailures: true);
+        await WaitForAdditionalReminderCounterAsync(g, R2, () => g.GetCounter(R2), 2, cancellationToken);
 
         // Wait for 1 more DR counter increment to verify all reminders are still running.
-        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken, tolerateSiloChurnFailures: true);
+        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken);
 
         // If this test asserts that R1 reached 4 ticks, wait on R1 itself rather than
         // inferring progress from DR. This turns the old flaky floor into an explicit contract.
-        await WaitForReminderCounterAsync(g, R1, () => g.GetCounter(R1), 4, cancellationToken, tolerateSiloChurnFailures: true);
+        await WaitForReminderCounterAsync(g, R1, () => g.GetCounter(R1), 4, cancellationToken);
 
         // Stop R1
-        await StopReminderAndWaitForQuiescenceAsync(g, R1, g.StopReminder, cancellationToken, tolerateSiloChurnFailures: true);
+        await StopReminderAndWaitForQuiescenceAsync(g, R1, g.StopReminder, cancellationToken);
         // Wait for 2 more DR counter increments to let things settle after R1 stop.
-        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 2, cancellationToken, tolerateSiloChurnFailures: true);
+        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 2, cancellationToken);
 
         // Stop R2
-        await StopReminderAndWaitForQuiescenceAsync(g, R2, g.StopReminder, cancellationToken, tolerateSiloChurnFailures: true);
+        await StopReminderAndWaitForQuiescenceAsync(g, R2, g.StopReminder, cancellationToken);
         // Wait for 1 more DR counter increment.
-        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken, tolerateSiloChurnFailures: true);
+        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken);
 
         // Stop Default reminder
-        await StopReminderAndWaitForQuiescenceAsync(g, DR, g.StopReminder, cancellationToken, tolerateSiloChurnFailures: true);
+        await StopReminderAndWaitForQuiescenceAsync(g, DR, g.StopReminder, cancellationToken);
 
         long lastR1 = await g.GetCounter(R1);
         const long minimumReminder1Ticks = 4;
@@ -328,21 +326,10 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         this.log.LogInformation("PerGrainFailureTest Grain={Grain}", grain);
 
         await grain.StartReminder(DR);
-        long last = await WaitForReminderCounterAsync(
-            grain,
-            DR,
-            () => grain.GetCounter(DR),
-            failCheckAfter,
-            cancellationToken,
-            tolerateSiloChurnFailures: true);
+        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), failCheckAfter, cancellationToken);
         Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
-        await StopReminderAndWaitForQuiescenceAsync(
-            grain,
-            DR,
-            grain.StopReminder,
-            cancellationToken,
-            tolerateSiloChurnFailures: true);
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cancellationToken);
         var stoppedCount = await grain.GetCounter(DR);
         await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grain, DR), cancellationToken);
 
@@ -352,13 +339,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         return true;
     }
 
-    protected async Task<long> WaitForReminderCounterAsync(
-        IAddressable grain,
-        string reminderName,
-        Func<Task<long>> getCounter,
-        long minimumCount,
-        CancellationToken cancellationToken = default,
-        bool tolerateSiloChurnFailures = false)
+    protected async Task<long> WaitForReminderCounterAsync(IAddressable grain, string reminderName, Func<Task<long>> getCounter, long minimumCount, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(getCounter);
@@ -369,27 +350,11 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         {
             try
             {
-                result = await WaitForReminderOperationAsync(
-                    getCounter(),
-                    tolerateSiloChurnFailures ? SiloChurnOperationAttemptTimeout : null,
-                    ct);
+                result = await getCounter();
                 return result >= minimumCount;
             }
             catch (FileNotFoundException) when (!ct.IsCancellationRequested)
             {
-                return false;
-            }
-            catch (Exception exception) when (
-                tolerateSiloChurnFailures &&
-                !ct.IsCancellationRequested &&
-                IsRetryableReminderOperationException(exception, tolerateSiloChurnFailures: true, includeTimeout: true))
-            {
-                log.LogWarning(
-                    "Caught retryable exception {Exception} while waiting for reminder {ReminderName} to reach {MinimumCount} ticks. Retrying.",
-                    exception,
-                    reminderName,
-                    minimumCount);
-                await Task.Delay(RetryableReminderOperationDelay, ct);
                 return false;
             }
         }
@@ -402,41 +367,14 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                 return result;
             }
 
-            TimeSpan period;
-            try
-            {
-                period = await WaitForReminderOperationAsync(
-                    GetReminderPeriodAsync(grain, reminderName),
-                    tolerateSiloChurnFailures ? SiloChurnOperationAttemptTimeout : null,
-                    cancellationToken);
-            }
-            catch (Exception exception) when (
-                tolerateSiloChurnFailures &&
-                !cancellationToken.IsCancellationRequested &&
-                IsRetryableReminderOperationException(exception, tolerateSiloChurnFailures: true, includeTimeout: true))
-            {
-                log.LogWarning(
-                    "Caught retryable exception {Exception} while reading the period for reminder {ReminderName}. Retrying.",
-                    exception,
-                    reminderName);
-                await Task.Delay(RetryableReminderOperationDelay, cancellationToken);
-                continue;
-            }
-
             var nextTickTarget = observer.GetTickCount(grain.GetGrainId(), reminderName) + 1;
             var waitTask = observer.WaitForTickCountAsync(grain, nextTickTarget, cancellationToken, reminderName);
-            await AdvanceReminderTimeAsync(period, cancellationToken);
+            await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grain, reminderName), cancellationToken);
             await waitTask;
         }
     }
 
-    protected async Task<long> WaitForAdditionalReminderCounterAsync(
-        IAddressable grain,
-        string reminderName,
-        Func<Task<long>> getCounter,
-        long additionalCount,
-        CancellationToken cancellationToken = default,
-        bool tolerateSiloChurnFailures = false)
+    protected async Task<long> WaitForAdditionalReminderCounterAsync(IAddressable grain, string reminderName, Func<Task<long>> getCounter, long additionalCount, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(getCounter);
@@ -445,32 +383,13 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         long currentCount = 0;
         try
         {
-            currentCount = await WaitForReminderOperationAsync(
-                getCounter(),
-                tolerateSiloChurnFailures ? SiloChurnOperationAttemptTimeout : null,
-                cancellationToken);
+            currentCount = await getCounter();
         }
         catch (FileNotFoundException) when (!cancellationToken.IsCancellationRequested)
         {
         }
-        catch (Exception exception) when (
-            tolerateSiloChurnFailures &&
-            !cancellationToken.IsCancellationRequested &&
-            IsRetryableReminderOperationException(exception, tolerateSiloChurnFailures: true, includeTimeout: true))
-        {
-            log.LogWarning(
-                "Caught retryable exception {Exception} while reading the current counter for reminder {ReminderName}. Retrying.",
-                exception,
-                reminderName);
-        }
 
-        return await WaitForReminderCounterAsync(
-            grain,
-            reminderName,
-            getCounter,
-            currentCount + additionalCount,
-            cancellationToken,
-            tolerateSiloChurnFailures);
+        return await WaitForReminderCounterAsync(grain, reminderName, getCounter, currentCount + additionalCount, cancellationToken);
     }
 
     protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g, CancellationToken cancellationToken = default)
@@ -538,21 +457,10 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         this.log.LogInformation("PerCopyGrainFailureTest Grain={Grain}", grain);
 
         await grain.StartReminder(DR);
-        long last = await WaitForReminderCounterAsync(
-            grain,
-            DR,
-            () => grain.GetCounter(DR),
-            failCheckAfter,
-            cancellationToken,
-            tolerateSiloChurnFailures: true);
+        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), failCheckAfter, cancellationToken);
         Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
-        await StopReminderAndWaitForQuiescenceAsync(
-            grain,
-            DR,
-            grain.StopReminder,
-            cancellationToken,
-            tolerateSiloChurnFailures: true);
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cancellationToken);
         var stoppedCount = await grain.GetCounter(DR);
         await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grain, DR), cancellationToken);
 
@@ -622,65 +530,32 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
     }
 
     // Func<> doesnt take optional parameters, thats why we need a separate method
-    protected async Task ExecuteWithRetriesStop(
-        Func<string, Task> function,
-        string reminderName,
-        CancellationToken cancellationToken = default,
-        Task? operationCompletedTask = null,
-        bool tolerateSiloChurnFailures = false)
+    protected async Task ExecuteWithRetriesStop(Func<string, Task> function, string reminderName)
     {
-        for (long i = 0; ; i++)
+        for (long i = 1; i <= retries; i++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             try
             {
-                await WaitForReminderOperationAsync(
-                    function(reminderName),
-                    tolerateSiloChurnFailures ? SiloChurnOperationAttemptTimeout : TestConstants.InitTimeout,
-                    cancellationToken);
+                await function(reminderName).WaitAsync(TestConstants.InitTimeout);
                 return; // success ... no need to retry
             }
-            catch (Exception exception) when (
-                !tolerateSiloChurnFailures &&
-                !cancellationToken.IsCancellationRequested &&
-                CanRetryReminderOperation(i))
+            catch (Exception exception)
             {
                 await HandleError(exception, i);
             }
-            catch (Exception exception) when (
-                tolerateSiloChurnFailures &&
-                !cancellationToken.IsCancellationRequested &&
-                IsRetryableReminderOperationException(exception, tolerateSiloChurnFailures: true, includeTimeout: true))
-            {
-                if (operationCompletedTask is { IsCompleted: true })
-                {
-                    await operationCompletedTask.WaitAsync(cancellationToken);
-                    return;
-                }
-
-                log.LogWarning(
-                    "Caught retryable exception {Exception} while stopping reminder {ReminderName} on retry count {RetryCount}",
-                    exception,
-                    reminderName,
-                    i);
-                await Task.Delay(RetryableReminderOperationDelay, cancellationToken);
-            }
         }
+
+        // execute one last time and bubble up errors if any
+        await function(reminderName).WaitAsync(TestConstants.InitTimeout);
     }
 
-    protected async Task StopReminderAndWaitForQuiescenceAsync(
-        IAddressable grain,
-        string reminderName,
-        Func<string, Task> stopReminder,
-        CancellationToken cancellationToken = default,
-        bool tolerateSiloChurnFailures = false)
+    protected async Task StopReminderAndWaitForQuiescenceAsync(IAddressable grain, string reminderName, Func<string, Task> stopReminder, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(stopReminder);
 
         var unregisteredTask = observer.WaitForReminderUnregisteredAsync(grain, reminderName, cancellationToken);
-        await ExecuteWithRetriesStop(stopReminder, reminderName, cancellationToken, unregisteredTask, tolerateSiloChurnFailures);
+        await ExecuteWithRetriesStop(stopReminder, reminderName);
         await unregisteredTask;
         await WaitForReminderQuiescenceAsync(grain, reminderName, cancellationToken);
     }
@@ -716,101 +591,11 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             ex = aggregateException.Flatten().InnerException!;
         }
 
-        if (IsRetryableReminderOperationException(ex, tolerateSiloChurnFailures: false, includeTimeout: false))
+        if (ex is ReminderException)
         {
             this.log.LogInformation(ex, "Retryable operation failed on attempt {Attempt}", i);
             await Task.Delay(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
             return true;
-        }
-
-        return false;
-    }
-
-    private static bool CanRetryReminderOperation(long retryCount) => retryCount < retries;
-
-    private static async Task WaitForReminderOperationAsync(Task task, TimeSpan? timeout, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (timeout is { } value)
-            {
-                await task.WaitAsync(value, cancellationToken);
-            }
-            else
-            {
-                await task;
-            }
-        }
-        catch (TimeoutException)
-        {
-            ObserveFault(task);
-            throw;
-        }
-    }
-
-    private static async Task<T> WaitForReminderOperationAsync<T>(Task<T> task, TimeSpan? timeout, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (timeout is { } value)
-            {
-                return await task.WaitAsync(value, cancellationToken);
-            }
-
-            return await task;
-        }
-        catch (TimeoutException)
-        {
-            ObserveFault(task);
-            throw;
-        }
-    }
-
-    private static void ObserveFault(Task task)
-    {
-        _ = task.ContinueWith(
-            static task => _ = task.Exception,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
-            TaskScheduler.Default);
-    }
-
-    private static bool IsRetryableReminderOperationException(
-        Exception exception,
-        bool tolerateSiloChurnFailures,
-        bool includeTimeout)
-    {
-        if (exception is AggregateException aggregateException)
-        {
-            exception = aggregateException.Flatten().InnerException!;
-        }
-
-        if (exception is ReminderException)
-        {
-            return true;
-        }
-
-        if (!tolerateSiloChurnFailures)
-        {
-            return false;
-        }
-
-        if (includeTimeout && exception is TimeoutException)
-        {
-            return true;
-        }
-
-        if (exception is SiloUnavailableException)
-        {
-            return true;
-        }
-
-        if (exception is OrleansMessageRejectionException rejection)
-        {
-            var message = rejection.Message;
-            return message.Contains("Forwarding failed", StringComparison.Ordinal)
-                || message.Contains("Unable to create local activation", StringComparison.Ordinal)
-                || message.Contains("Target silo is known to be dead", StringComparison.Ordinal);
         }
 
         return false;
