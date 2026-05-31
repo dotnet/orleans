@@ -80,6 +80,7 @@
   </Folder>
   <Folder Name="/src/Extensions/AWS/">
     <Project Path="src/AWS/Orleans.Clustering.DynamoDB/Orleans.Clustering.DynamoDB.csproj" />
+    <Project Path="src/AWS/Orleans.Journaling.S3/Orleans.Journaling.S3.csproj" />
     <Project Path="src/AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Streaming.SQS/Orleans.Streaming.SQS.csproj" />
