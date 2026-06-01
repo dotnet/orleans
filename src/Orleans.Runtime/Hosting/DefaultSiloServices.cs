@@ -68,6 +68,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<SchedulerInstruments>();
             services.TryAddSingleton<ConsistentRingInstruments>();
+            services.TryAddSingleton<StorageInstruments>();
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
