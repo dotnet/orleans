@@ -242,8 +242,14 @@ namespace UnitTests.ActivationsLifeCycleTests
             var grainType = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(0).GetGrainId().Type;
 
             const int maxCandidateGrainKeys = 1_000_000;
+            const int candidateYieldInterval = 4096;
             for (int i = 0; i < maxCandidateGrainKeys; i++)
             {
+                if (i > 0 && i % candidateYieldInterval == 0)
+                {
+                    await Task.Yield();
+                }
+
                 // Create grain such that:
                 // Its directory owner is not the Gateway silo. This way Gateway will use its directory cache.
                 // Its activation is located on the non Gateway silo as well.
@@ -281,20 +287,23 @@ namespace UnitTests.ActivationsLifeCycleTests
         private async Task<DirectoryMembershipSnapshot> WaitForDirectoryView(SiloAddress targetSilo)
         {
             var directoryMembership = ((InProcessSiloHandle)this.testCluster.Primary).ServiceProvider.GetRequiredService<DirectoryMembershipService>();
-            var timeout = DateTime.UtcNow.AddSeconds(30);
-            do
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
             {
-                var view = directoryMembership.CurrentView;
-                if (view.Members.Contains(targetSilo))
+                await foreach (var view in directoryMembership.ViewUpdates.WithCancellation(cts.Token))
                 {
-                    return view;
+                    if (view.Members.Contains(targetSilo))
+                    {
+                        return view;
+                    }
                 }
-
-                await Task.Delay(100);
             }
-            while (DateTime.UtcNow < timeout);
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                Assert.Fail($"Timed out waiting for target silo {targetSilo} to join the directory view.");
+            }
 
-            Assert.Fail($"Timed out waiting for target silo {targetSilo} to join the directory view.");
+            Assert.Fail($"Directory view updates completed before target silo {targetSilo} joined the directory view.");
             return null;
         }
     }
