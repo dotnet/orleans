@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.4" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>809ee43f-2f9d-47ca-a162-ee03f0856c17</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DurableJobsJournaling.Silo\DurableJobsJournaling.Silo.csproj" />
+    <ProjectReference Include="..\DurableJobsJournaling.Web\DurableJobsJournaling.Web.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -36,6 +36,7 @@ jobs:
     - name: Build
       run: dotnet build -bl
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      continue-on-error: true
       with:
         name: build_log_${{ matrix.os }}
         retention-days: 1
@@ -79,6 +80,7 @@ jobs:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -115,6 +117,7 @@ jobs:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.dbversion }}_${{ matrix.framework }}
@@ -164,6 +167,7 @@ jobs:
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -208,6 +212,7 @@ jobs:
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -254,6 +259,7 @@ jobs:
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -308,6 +314,7 @@ jobs:
       run: docker rm -f azurite
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -382,6 +389,7 @@ jobs:
       run: docker rm -f azurite
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -468,6 +476,7 @@ jobs:
       run: docker rm -f cosmosdb-emulator || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -501,6 +510,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -541,6 +551,7 @@ jobs:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -591,6 +602,7 @@ jobs:
         ORLEANSDYNAMODBSECRETKEY: "pass"
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -653,6 +665,7 @@ jobs:
       run: docker rm -f elasticmq
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@v4
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -708,6 +721,7 @@ jobs:
       run: docker rm -f nats
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -748,6 +762,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
@@ -781,6 +796,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Orleans
+    orgId: 1
+    folder: Orleans
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
