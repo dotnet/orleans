@@ -56,7 +56,9 @@ jobs:
           fi
           git push "${push_options[@]}" origin HEAD:"$PR_BRANCH"
 
-          if pr_number=$(gh pr view "$PR_BRANCH" --repo "$GITHUB_REPOSITORY" --json number --jq .number 2>/dev/null); then
+          repo_owner=${GITHUB_REPOSITORY%%/*}
+          pr_number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$PR_BRANCH" --base main --state open --json number,headRepositoryOwner --jq "[.[] | select(.headRepositoryOwner.login == \"$repo_owner\")][0].number // empty")
+          if [[ -n "$pr_number" ]]; then
             gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" --title "$PR_TITLE" --body "$PR_BODY" --base main
           else
             gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$PR_BRANCH" --title "$PR_TITLE" --body "$PR_BODY"
