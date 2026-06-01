@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using DurableJobsJournaling.Silo;
 using Orleans.Dashboard;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,14 +21,13 @@ builder.UseOrleans(siloBuilder =>
         .AddActivityPropagation()
         .AddIncomingGrainCallFilter<GrainRequestMetricsFilter>()
         .AddDistributedGrainDirectory()
-        .AddAzureBlobJournalStorage()
         .UseAzureBlobDurableJobs(
             options =>
             {
                 options.ContainerName = storageContainer;
                 options.GetBlobName = journalId => $"{storagePrefix}/{journalId.Value}";
-            },
-            DurableJobsJournalingJsonContext.Default)
+            })
+        .Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJournalingJsonContext.Default))
         .Configure<DurableJobsOptions>(options =>
         {
             options.ShardDuration = TimeSpan.FromMinutes(2);
