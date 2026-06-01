@@ -14,7 +14,7 @@ internal sealed class StorageInstruments
     private readonly Counter<int> _storageWriteErrorsCounter;
     private readonly Counter<int> _storageClearErrorsCounter;
 
-    internal StorageInstruments(OrleansInstruments instruments)
+    public StorageInstruments(OrleansInstruments instruments)
     {
         _storageReadHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_READ_LATENCY, "ms");
         _storageWriteHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_WRITE_LATENCY, "ms");
