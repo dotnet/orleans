@@ -2,7 +2,6 @@ using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Internal;
@@ -10,6 +9,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 
 namespace UnitTests.ActivationsLifeCycleTests
@@ -238,22 +238,22 @@ namespace UnitTests.ActivationsLifeCycleTests
         private async Task<ICollectionTestGrain> PickGrainInNonPrimary()
         {
             var targetSilo = this.testCluster.SecondarySilos.First().SiloAddress;
+            var directoryView = await WaitForDirectoryView(targetSilo);
+            var grainType = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(0).GetGrainId().Type;
 
-            for (int i = 0; i < 500; i++)
+            const int maxCandidateGrainKeys = 1_000_000;
+            for (int i = 0; i < maxCandidateGrainKeys; i++)
             {
-                if (i % 30 == 29) await Task.Delay(1000); // give some extra time to stabilize if it can't find a suitable grain
-
                 // Create grain such that:
                 // Its directory owner is not the Gateway silo. This way Gateway will use its directory cache.
                 // Its activation is located on the non Gateway silo as well.
-                ICollectionTestGrain grain = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(i);
-                GrainId grainId = grain.GetGrainId();
-                SiloAddress primaryForGrain = (await TestUtils.GetDetailedGrainReport(this.testCluster.InternalGrainFactory, grainId, this.testCluster.Primary)).PrimaryForGrain;
-                if (primaryForGrain.Equals(this.testCluster.Primary.SiloAddress))
+                var grainId = GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(i));
+                if (!directoryView.TryGetOwner(grainId, out var primaryForGrain, out _) || !primaryForGrain.Equals(targetSilo))
                 {
                     continue;
                 }
 
+                ICollectionTestGrain grain = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(grainId);
                 string siloHostingActivation;
                 try
                 {
@@ -274,7 +274,27 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
 
             Assert.True(testCluster.GetActiveSilos().Count() > 1, "This logic requires at least 1 non-primary active silo");
-            Assert.Fail("Could not find a grain that activates on a non-primary silo, and has the partition be also managed by a non-primary silo");
+            Assert.Fail($"Could not find a grain that activates on a non-primary silo, and has the partition be also managed by a non-primary silo after checking {maxCandidateGrainKeys} integer keys. Target silo {targetSilo} owns {directoryView.GetMemberRanges(targetSilo)} of the directory ring.");
+            return null;
+        }
+
+        private async Task<DirectoryMembershipSnapshot> WaitForDirectoryView(SiloAddress targetSilo)
+        {
+            var directoryMembership = ((InProcessSiloHandle)this.testCluster.Primary).ServiceProvider.GetRequiredService<DirectoryMembershipService>();
+            var timeout = DateTime.UtcNow.AddSeconds(30);
+            do
+            {
+                var view = directoryMembership.CurrentView;
+                if (view.Members.Contains(targetSilo))
+                {
+                    return view;
+                }
+
+                await Task.Delay(100);
+            }
+            while (DateTime.UtcNow < timeout);
+
+            Assert.Fail($"Timed out waiting for target silo {targetSilo} to join the directory view.");
             return null;
         }
     }
