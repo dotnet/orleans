@@ -5,24 +5,14 @@ using System.Diagnostics.Metrics;
 #nullable disable
 namespace Orleans.Runtime;
 
-internal sealed class StorageInstruments
+internal sealed class StorageInstruments(OrleansInstruments instruments)
 {
-    private readonly Histogram<double> _storageReadHistogram;
-    private readonly Histogram<double> _storageWriteHistogram;
-    private readonly Histogram<double> _storageClearHistogram;
-    private readonly Counter<int> _storageReadErrorsCounter;
-    private readonly Counter<int> _storageWriteErrorsCounter;
-    private readonly Counter<int> _storageClearErrorsCounter;
-
-    public StorageInstruments(OrleansInstruments instruments)
-    {
-        _storageReadHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_READ_LATENCY, "ms");
-        _storageWriteHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_WRITE_LATENCY, "ms");
-        _storageClearHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_CLEAR_LATENCY, "ms");
-        _storageReadErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_READ_ERRORS);
-        _storageWriteErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_WRITE_ERRORS);
-        _storageClearErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_CLEAR_ERRORS);
-    }
+    private readonly Histogram<double> _storageReadHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_READ_LATENCY, "ms");
+    private readonly Histogram<double> _storageWriteHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_WRITE_LATENCY, "ms");
+    private readonly Histogram<double> _storageClearHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_CLEAR_LATENCY, "ms");
+    private readonly Counter<int> _storageReadErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_READ_ERRORS);
+    private readonly Counter<int> _storageWriteErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_WRITE_ERRORS);
+    private readonly Counter<int> _storageClearErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_CLEAR_ERRORS);
 
     internal void OnStorageRead(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
     {
