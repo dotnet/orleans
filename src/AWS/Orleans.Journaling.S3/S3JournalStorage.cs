@@ -17,6 +17,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     internal const string CheckpointMetadataKey = "checkpoint";
     internal const string CheckpointOffsetMetadataKey = "checkpoint-offset";
     internal const string WalGenerationMetadataKey = "wal-generation";
+    internal const string MetadataVersionMetadataKey = "metadata-version";
 
     private const string MetadataHeaderPrefix = "x-amz-meta-";
     private const int MaxAppendPartsPerObject = 10_000;
@@ -119,17 +120,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         {
             for (var attempt = 0; attempt < 3; attempt++)
             {
-                GetObjectMetadataResponse? properties;
-                try
-                {
-                    properties = await GetPropertiesCoreAsync(expectedETag, cancellationToken).ConfigureAwait(false);
-                }
-                catch (AmazonS3Exception exception) when (exception.StatusCode is HttpStatusCode.PreconditionFailed)
-                {
-                    succeeded = true;
-                    return null;
-                }
-
+                var properties = await GetPropertiesCoreAsync(expectedETag: null, cancellationToken).ConfigureAwait(false);
                 if (properties is null)
                 {
                     succeeded = true;
@@ -138,6 +129,13 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
                 var walState = CreateWalState(properties);
                 var metadata = CopyMetadata(properties.Metadata);
+                if (expectedETag is not null
+                    && !string.Equals(expectedETag, CreateMetadataETag(properties.ETag, metadata), StringComparison.Ordinal))
+                {
+                    succeeded = true;
+                    return null;
+                }
+
                 if (!ApplyCallerMetadataUpdate(metadata, setValues, removeValues))
                 {
                     SetWal(walState.ETag, walState.ProviderState, walState.LastModified);
@@ -145,6 +143,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     return CreateJournalMetadata(properties.ETag, metadata);
                 }
 
+                metadata[MetadataVersionMetadataKey] = CreateMetadataVersion();
                 var copyRequest = new CopyObjectRequest
                 {
                     SourceBucket = _shared.BucketName,
@@ -152,7 +151,8 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     DestinationBucket = _shared.BucketName,
                     DestinationKey = _walObjectKey,
                     MetadataDirective = S3MetadataDirective.REPLACE,
-                    ETagToMatch = expectedETag ?? properties.ETag,
+                    ETagToMatch = properties.ETag,
+                    UnmodifiedSinceDate = properties.LastModified,
                 };
                 ApplyObjectHeaders(copyRequest, metadata);
 
@@ -833,6 +833,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         IReadOnlyDictionary<string, string>? callerMetadata = null)
     {
         var metadata = CreateObjectMetadata(_shared.JournalFormatKey);
+        metadata[MetadataVersionMetadataKey] = CreateMetadataVersion();
         metadata[WalGenerationMetadataKey] = Guid.NewGuid().ToString("N");
         if (callerMetadata is not null)
         {
@@ -855,6 +856,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     private Dictionary<string, string> CreateWalMetadata(WalManifest manifest)
     {
         var metadata = CreateObjectMetadata(manifest.Metadata.Format);
+        metadata[MetadataVersionMetadataKey] = manifest.MetadataVersion ?? CreateMetadataVersion();
         if (manifest.Generation is { Length: > 0 })
         {
             metadata[WalGenerationMetadataKey] = manifest.Generation;
@@ -883,15 +885,16 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
     private static WalManifest CreateWalManifest(IDictionary<string, string>? metadata)
     {
-        var fileMetadata = CreateJournalMetadata(eTag: null, metadata);
+        var fileMetadata = CreateJournalMetadata(objectETag: null, metadata);
         var generation = metadata is not null
             && metadata.TryGetValue(WalGenerationMetadataKey, out var storedGeneration)
             && storedGeneration is { Length: > 0 }
                 ? storedGeneration
                 : null;
+        var metadataVersion = GetMetadataVersion(metadata);
         if (metadata is null || !metadata.TryGetValue(CheckpointMetadataKey, out var checkpointName) || checkpointName is not { Length: > 0 })
         {
-            return new WalManifest(fileMetadata, Checkpoint: null, generation);
+            return new WalManifest(fileMetadata, Checkpoint: null, generation, metadataVersion);
         }
 
         var checkpointOffset = 0L;
@@ -903,7 +906,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 $"S3 journal checkpoint offset metadata is invalid: '{checkpointOffsetValue}'.");
         }
 
-        return new WalManifest(fileMetadata, new CheckpointReference(checkpointName, checkpointOffset), generation);
+        return new WalManifest(fileMetadata, new CheckpointReference(checkpointName, checkpointOffset), generation, metadataVersion);
     }
 
     private static WalState CreateWalState(GetObjectMetadataResponse properties)
@@ -947,7 +950,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
             }
         }
 
-        return CreateJournalMetadata(eTag: null, checkpointMetadata);
+        return CreateJournalMetadata(objectETag: null, checkpointMetadata);
     }
 
     private async ValueTask<GetObjectMetadataResponse?> GetPropertiesCoreAsync(
@@ -971,8 +974,29 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         }
     }
 
-    private static IJournalMetadata CreateJournalMetadata(string? eTag, IDictionary<string, string>? metadata)
-        => new JournalMetadata(GetFormatKeyMetadata(metadata), eTag, CopyCallerMetadata(metadata));
+    private static IJournalMetadata CreateJournalMetadata(string? objectETag, IDictionary<string, string>? metadata)
+        => new JournalMetadata(GetFormatKeyMetadata(metadata), CreateMetadataETag(objectETag, metadata), CopyCallerMetadata(metadata));
+
+    private static string? CreateMetadataETag(string? objectETag, IDictionary<string, string>? metadata)
+    {
+        if (objectETag is null)
+        {
+            return null;
+        }
+
+        return GetMetadataVersion(metadata) is { Length: > 0 } metadataVersion
+            ? $"{objectETag}:{metadataVersion}"
+            : objectETag;
+    }
+
+    private static string? GetMetadataVersion(IDictionary<string, string>? metadata)
+        => metadata is not null
+            && metadata.TryGetValue(MetadataVersionMetadataKey, out var metadataVersion)
+            && metadataVersion is { Length: > 0 }
+                ? metadataVersion
+                : null;
+
+    private static string CreateMetadataVersion() => Guid.NewGuid().ToString("N");
 
     private static Dictionary<string, string> CopyCallerMetadata(IDictionary<string, string>? metadata)
     {
@@ -1120,6 +1144,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
             || string.Equals(key, CheckpointMetadataKey, StringComparison.OrdinalIgnoreCase)
             || string.Equals(key, CheckpointOffsetMetadataKey, StringComparison.OrdinalIgnoreCase)
             || string.Equals(key, WalGenerationMetadataKey, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, MetadataVersionMetadataKey, StringComparison.OrdinalIgnoreCase)
             || key.StartsWith("$", StringComparison.Ordinal);
     }
 
@@ -1189,7 +1214,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         Message = "Failed to delete obsolete S3 journal checkpoint \"{BucketName}/{ObjectKey}\"")]
     private static partial void LogCheckpointCleanupFailure(ILogger logger, string bucketName, string objectKey, Exception exception);
 
-    private sealed record WalManifest(IJournalMetadata Metadata, CheckpointReference? Checkpoint, string? Generation);
+    private sealed record WalManifest(IJournalMetadata Metadata, CheckpointReference? Checkpoint, string? Generation, string? MetadataVersion);
 
     private readonly record struct WalProviderState(
         string? Format,

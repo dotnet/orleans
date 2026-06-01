@@ -131,6 +131,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         Assert.NotNull(updated);
         Assert.Equal("json-lines", updated.Format);
         Assert.Equal("closed", updated.Properties["catalog"]);
+        Assert.NotEqual(before.ETag, updated.ETag);
 
         var stale = await storage.UpdateMetadataAsync(
             set: new Dictionary<string, string> { ["catalog"] = "stale" },
@@ -154,7 +155,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         await CreateStorage("other/beta").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var listed = new List<JournalId>();
-        await foreach (var journalId in provider.ListAsync(new JournalId("journals/"), CancellationToken.None))
+        await foreach (var journalId in provider.ListAsync(new JournalId("journals"), CancellationToken.None))
         {
             listed.Add(journalId);
         }
