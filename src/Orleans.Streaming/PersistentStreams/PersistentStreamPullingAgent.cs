@@ -42,6 +42,9 @@ namespace Orleans.Streams
         private DateTime lastTimeCleanedPubSubCache;
         private IGrainTimer timer;
 
+        // Reusable list to avoid allocation in the periodic delivery progress scan.
+        private readonly List<StreamSequenceToken> _deliveryProgressTokens = new();
+
         private Task receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
         private bool IsShutdown => timer is null;
@@ -206,6 +209,10 @@ namespace Orleans.Streams
 
             await _activePumpTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+            // Final delivery progress scan so the receiver has the latest watermark
+            // before FlushAsync persists the checkpoint.
+            NotifyDeliveryProgress();
+
             this.queueCache = null;
 
             try
@@ -304,7 +311,7 @@ namespace Orleans.Streams
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
                 var startToken = data.LastToken?.Token ?? cacheToken ?? data.PendingStartToken;
-                queueCache?.NotifySubscriptionAdded(streamId.StreamId, subscriptionId, startToken);
+                data.LastProcessedToken = startToken;
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
@@ -394,7 +401,6 @@ namespace Orleans.Streams
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed)
             {
-                queueCache?.NotifySubscriptionRemoved(streamId.StreamId, subscriptionId);
                 StreamingEvents.EmitSubscriptionDetached(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 StreamingEvents.EmitSubscriptionRemoved(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 LogDebugRemovedConsumer(subscriptionId, streamId);
@@ -411,6 +417,11 @@ namespace Orleans.Streams
             {
                 return Task.CompletedTask;
             }
+
+            // Push delivery progress on every timer tick (~100ms) so checkpoint
+            // advancement reflects cursor delivery that happens asynchronously,
+            // even while a pump is still reading from the queue.
+            NotifyDeliveryProgress();
 
             if (!_activePumpTask.IsCompleted)
             {
@@ -587,19 +598,41 @@ namespace Orleans.Streams
                 if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
                 {
                     pubSubCache.Remove(tuple.Key);
-                    NotifySubscriptionsRemoved(tuple.Key, tuple.Value);
                     tuple.Value.DisposeAll(logger);
                     StreamingEvents.EmitStreamInactive(streamProviderName, tuple.Key.StreamId, options.StreamInactivityPeriod, Silo);
                 }
             }
         }
 
-        private void NotifySubscriptionsRemoved(QualifiedStreamId streamId, StreamConsumerCollection streamData)
+        /// <summary>
+        /// Scans <see cref="pubSubCache"/> for the current delivery progress of all registered
+        /// subscriptions and pushes a snapshot to the queue cache so it can compute a safe
+        /// checkpoint watermark. Called periodically from the read loop and once at shutdown.
+        /// </summary>
+        private void NotifyDeliveryProgress()
         {
-            foreach (var consumerData in streamData.AllConsumers())
+            if (queueCache is null) return;
+
+            _deliveryProgressTokens.Clear();
+            bool hasPending = false;
+
+            foreach (var (_, collection) in pubSubCache)
             {
-                queueCache?.NotifySubscriptionRemoved(streamId.StreamId, consumerData.SubscriptionId);
+                if (collection.RegistrationTask is { IsCompleted: false })
+                {
+                    hasPending = true;
+                }
+
+                foreach (var consumer in collection.AllConsumers())
+                {
+                    if (consumer.IsRegistered)
+                    {
+                        _deliveryProgressTokens.Add(consumer.LastProcessedToken);
+                    }
+                }
             }
+
+            queueCache.UpdateDeliveryProgress(_deliveryProgressTokens, hasPending);
         }
 
         private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
@@ -616,7 +649,6 @@ namespace Orleans.Streams
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
             var pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
-            queueCache?.NotifyStreamRegistrationStarted(streamId.StreamId);
             streamData.RegistrationTask = RegisterStreamAsync();
             pubSubCache.Add(streamId, streamData);
 
@@ -665,7 +697,6 @@ namespace Orleans.Streams
                 finally
                 {
                     streamData.RegistrationTask = null;
-                    queueCache?.NotifyStreamRegistrationCompleted(streamId.StreamId);
 
                     // Disposed after all initial subscriber handshakes complete so the first
                     // batch stays pinned until each subscriber has its own cache cursor.
@@ -684,7 +715,6 @@ namespace Orleans.Streams
                     pubSubCache.Remove(streamId);
                 }
 
-                NotifySubscriptionsRemoved(streamId, streamData);
                 streamData.DisposeAll(logger);
             }
 
@@ -775,7 +805,7 @@ namespace Orleans.Streams
 
                         if (nextBatch.Batch is null)
                         {
-                            queueCache?.NotifyBatchProcessed(consumerData.StreamId.StreamId, consumerData.SubscriptionId, nextBatch.ProgressToken);
+                            consumerData.LastProcessedToken = nextBatch.ProgressToken;
                             continue;
                         }
                     }
@@ -800,9 +830,8 @@ namespace Orleans.Streams
                                 this.options.MaxEventDeliveryTime,
                                 deliveryBackoffProvider);
 
-                            // Notify the cache after successful delivery so it can advance checkpoints
-                            // based on actual subscription progress, including filtered batches.
-                            queueCache?.NotifyBatchProcessed(consumerData.StreamId.StreamId, consumerData.SubscriptionId, nextBatch.ProgressToken);
+                            // Track progress for the periodic delivery scan.
+                            consumerData.LastProcessedToken = nextBatch.ProgressToken;
 
                             if (newToken != null)
                             {
@@ -969,7 +998,6 @@ namespace Orleans.Streams
             if (exceptionOccured is ClientNotAvailableException)
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
-                queueCache?.NotifySubscriptionRemoved(consumerData.StreamId.StreamId, consumerData.SubscriptionId);
                 pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId).Ignore();
                 return true;
             }

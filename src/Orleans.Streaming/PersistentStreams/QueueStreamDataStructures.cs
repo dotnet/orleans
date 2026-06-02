@@ -35,6 +35,13 @@ namespace Orleans.Streams
         [NonSerialized]
         public StreamSequenceToken? PendingStartToken;
 
+        /// <summary>
+        /// The sequence token of the last batch processed (delivered or filtered) by this subscription.
+        /// Used by the pulling agent's periodic scan to compute the delivery-based checkpoint watermark.
+        /// </summary>
+        [NonSerialized]
+        public StreamSequenceToken? LastProcessedToken;
+
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
             SubscriptionId = subscriptionId;

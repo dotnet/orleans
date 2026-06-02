@@ -1479,12 +1479,8 @@ namespace Orleans.Streams
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken token);
         bool IsUnderPressure();
-        void NotifyBatchProcessed(Runtime.StreamId streamId, Runtime.GuidId subscriptionId, StreamSequenceToken token) { }
-        void NotifyStreamRegistrationCompleted(Runtime.StreamId streamId) { }
-        void NotifyStreamRegistrationStarted(Runtime.StreamId streamId) { }
-        void NotifySubscriptionAdded(Runtime.StreamId streamId, Runtime.GuidId subscriptionId, StreamSequenceToken token) { }
-        void NotifySubscriptionRemoved(Runtime.StreamId streamId, Runtime.GuidId subscriptionId) { }
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
+        void UpdateDeliveryProgress(System.Collections.Generic.IReadOnlyList<StreamSequenceToken> subscriptionTokens, bool hasPendingRegistrations) { }
     }
 
     public partial interface IQueueCacheCursor : System.IDisposable

@@ -34,41 +34,20 @@ namespace Orleans.Streams
         bool IsUnderPressure();
 
         /// <summary>
-        /// Notifies the cache that stream registration has started and checkpoints should not advance past this stream
-        /// until registration completes.
+        /// Updates the cache with the current delivery progress of all active subscriptions.
+        /// Called periodically by the pulling agent so the cache can compute a safe checkpoint
+        /// offset (e.g., the low watermark across all subscriptions).
         /// </summary>
-        /// <param name="streamId">The stream identifier.</param>
-        void NotifyStreamRegistrationStarted(StreamId streamId) { }
-
-        /// <summary>
-        /// Notifies the cache that stream registration has completed.
-        /// </summary>
-        /// <param name="streamId">The stream identifier.</param>
-        void NotifyStreamRegistrationCompleted(StreamId streamId) { }
-
-        /// <summary>
-        /// Notifies the cache that a subscription is active on the specified stream.
-        /// </summary>
-        /// <param name="streamId">The stream identifier.</param>
-        /// <param name="subscriptionId">The subscription identifier.</param>
-        /// <param name="token">The sequence token from which the subscription starts, or <see langword="null"/> if unknown.</param>
-        void NotifySubscriptionAdded(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token) { }
-
-        /// <summary>
-        /// Notifies the cache that a subscription is no longer active on the specified stream.
-        /// </summary>
-        /// <param name="streamId">The stream identifier.</param>
-        /// <param name="subscriptionId">The subscription identifier.</param>
-        void NotifySubscriptionRemoved(StreamId streamId, GuidId subscriptionId) { }
-
-        /// <summary>
-        /// Notifies the cache that a batch with the given sequence token has been successfully
-        /// processed by a specific subscription on the specified stream. Processing can mean either
-        /// delivery to the subscription or filtering/skipping by the pulling agent.
-        /// </summary>
-        /// <param name="streamId">The stream identifier.</param>
-        /// <param name="subscriptionId">The subscription identifier.</param>
-        /// <param name="token">The sequence token of the processed batch.</param>
-        void NotifyBatchProcessed(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token) { }
+        /// <param name="subscriptionTokens">
+        /// The last processed sequence token for each registered subscription.
+        /// A <see langword="null"/> entry indicates a subscription whose progress is not yet known
+        /// (e.g., it has not processed any batch), which should block checkpoint advancement.
+        /// The list is only valid for the duration of the call and must not be stored.
+        /// </param>
+        /// <param name="hasPendingRegistrations">
+        /// <see langword="true"/> if any stream registration is still in progress,
+        /// meaning the full set of subscriptions is not yet known and checkpoints should not advance.
+        /// </param>
+        void UpdateDeliveryProgress(IReadOnlyList<StreamSequenceToken> subscriptionTokens, bool hasPendingRegistrations) { }
     }
 }

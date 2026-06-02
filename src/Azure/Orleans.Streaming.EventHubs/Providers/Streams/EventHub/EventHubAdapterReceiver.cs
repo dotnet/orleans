@@ -57,12 +57,8 @@ namespace Orleans.Streaming.EventHubs
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
 
-        // Per-subscription progress tracking for low-watermark checkpointing.
-        // Tracks the max processed EventHub offset per (stream, subscription) so a fast
-        // subscription cannot advance the checkpoint past a slower active subscription.
-        private readonly object deliveryTrackingLock = new();
-        private readonly Dictionary<(StreamId StreamId, GuidId SubscriptionId), long?> processedOffsets = new();
-        private readonly HashSet<StreamId> pendingRegistrations = new();
+        // Tracks the purge offset reported by the cache eviction strategy.
+        // Used as a fallback checkpoint when no active subscriptions exist.
         private long? cachePurgeOffset;
 
         // Receiver life cycle
@@ -228,133 +224,50 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public void NotifyStreamRegistrationStarted(StreamId streamId)
+        public void UpdateDeliveryProgress(IReadOnlyList<StreamSequenceToken> subscriptionTokens, bool hasPendingRegistrations)
         {
-            lock (deliveryTrackingLock)
-            {
-                pendingRegistrations.Add(streamId);
-            }
-        }
-
-        public void NotifyStreamRegistrationCompleted(StreamId streamId)
-        {
-            string checkpointOffset;
-            lock (deliveryTrackingLock)
-            {
-                pendingRegistrations.Remove(streamId);
-                checkpointOffset = GetCheckpointOffset();
-            }
-
-            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
-        }
-
-        public void NotifySubscriptionAdded(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token)
-        {
-            var hasStartOffset = TryGetOffset(token, out var startOffset);
-            string checkpointOffset;
-            var key = (streamId, subscriptionId);
-            lock (deliveryTrackingLock)
-            {
-                if (!processedOffsets.TryGetValue(key, out var offset)
-                    || (hasStartOffset && (!offset.HasValue || startOffset < offset.Value)))
-                {
-                    processedOffsets[key] = hasStartOffset ? startOffset : null;
-                }
-
-                checkpointOffset = GetCheckpointOffset();
-            }
-
-            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
-        }
-
-        public void NotifySubscriptionRemoved(StreamId streamId, GuidId subscriptionId)
-        {
-            string checkpointOffset;
-            lock (deliveryTrackingLock)
-            {
-                processedOffsets.Remove((streamId, subscriptionId));
-                checkpointOffset = GetCheckpointOffset();
-            }
-
-            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
-        }
-
-        public void NotifyBatchProcessed(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token)
-        {
-            if (!TryGetOffset(token, out var offset))
+            if (hasPendingRegistrations)
             {
                 return;
             }
 
             string checkpointOffset;
-            var key = (streamId, subscriptionId);
-            lock (deliveryTrackingLock)
+            if (subscriptionTokens.Count == 0)
             {
-                if (!processedOffsets.TryGetValue(key, out var currentOffset)
-                    || !currentOffset.HasValue
-                    || offset > currentOffset.Value)
+                // No active subscriptions — fall back to the cache purge offset.
+                checkpointOffset = cachePurgeOffset?.ToString(CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                long watermark = long.MaxValue;
+                foreach (var token in subscriptionTokens)
                 {
-                    processedOffsets[key] = offset;
+                    if (!TryGetOffset(token, out var offset))
+                    {
+                        // A subscription has unknown progress — don't advance the checkpoint.
+                        return;
+                    }
+
+                    watermark = Math.Min(watermark, offset);
                 }
 
-                checkpointOffset = GetCheckpointOffset();
+                checkpointOffset = watermark == long.MaxValue ? null : watermark.ToString(CultureInfo.InvariantCulture);
             }
 
-            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
+            if (checkpointOffset is not null)
+            {
+                this.checkpointer?.Update(checkpointOffset, DateTime.UtcNow);
+            }
         }
 
-        private void NotifyCachePurged(string offset, DateTime utcNow)
+        private void NotifyCachePurged(string offset)
         {
-            if (!long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset))
-            {
-                return;
-            }
-
-            string checkpointOffset;
-            lock (deliveryTrackingLock)
+            if (long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset))
             {
                 if (!cachePurgeOffset.HasValue || parsedOffset > cachePurgeOffset.Value)
                 {
                     cachePurgeOffset = parsedOffset;
                 }
-
-                checkpointOffset = GetCheckpointOffset();
-            }
-
-            UpdateCheckpoint(checkpointOffset, utcNow);
-        }
-
-        private string GetCheckpointOffset()
-        {
-            if (pendingRegistrations.Count > 0)
-            {
-                return null;
-            }
-
-            if (processedOffsets.Count == 0)
-            {
-                return cachePurgeOffset?.ToString(CultureInfo.InvariantCulture);
-            }
-
-            long watermark = long.MaxValue;
-            foreach (var offset in processedOffsets.Values)
-            {
-                if (!offset.HasValue)
-                {
-                    return null;
-                }
-
-                watermark = Math.Min(watermark, offset.Value);
-            }
-
-            return watermark == long.MaxValue ? null : watermark.ToString(CultureInfo.InvariantCulture);
-        }
-
-        private void UpdateCheckpoint(string offset, DateTime utcNow)
-        {
-            if (offset is not null)
-            {
-                this.checkpointer?.Update(offset, utcNow);
             }
         }
 
@@ -433,7 +346,9 @@ namespace Orleans.Streaming.EventHubs
 
             public void Update(string offset, DateTime utcNow)
             {
-                receiver.NotifyCachePurged(offset, utcNow);
+                // Only track the purge offset — do not checkpoint directly.
+                // UpdateDeliveryProgress uses this as a fallback when no subscriptions exist.
+                receiver.NotifyCachePurged(offset);
             }
 
             public Task FlushAsync()

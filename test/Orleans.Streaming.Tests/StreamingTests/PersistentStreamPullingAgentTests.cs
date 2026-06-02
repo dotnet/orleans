@@ -147,7 +147,7 @@ namespace UnitTests.StreamingTests
             Assert.Empty(pubSub.ReceivedCalls());
         }
 
-        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub pubSub, QueueId queueId, IQueueAdapterReceiver receiver = null)
+        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub pubSub, QueueId queueId, IQueueAdapterReceiver receiver = null, IQueueAdapterCache queueAdapterCache = null)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -188,7 +188,7 @@ namespace UnitTests.StreamingTests
                 queueId,
                 new StreamPullingAgentOptions(),
                 queueAdapter,
-                queueAdapterCache: null,
+                queueAdapterCache,
                 new NoOpStreamDeliveryFailureHandler(),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
@@ -325,6 +325,95 @@ namespace UnitTests.StreamingTests
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
             await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task RunQueuePump_PushesDeliveryProgressToCache()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+
+            var queueCache = Substitute.For<IQueueCache>();
+            queueCache.GetMaxAddCount().Returns(1000);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+
+            var agent = CreateAgent(pubSub: null, queueId, receiver, queueAdapterCache);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+
+            // RunQueuePump should call UpdateDeliveryProgress on the cache.
+            queueCache.Received().UpdateDeliveryProgress(
+                Arg.Any<IReadOnlyList<StreamSequenceToken>>(),
+                Arg.Any<bool>());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task RunQueuePump_ReportsPendingRegistrations()
+        {
+            var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default)
+                .ReturnsForAnyArgs(_ => registration.Task);
+
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+                .Returns(
+                    Task.FromResult<IList<IBatchContainer>>([
+                        new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
+                    ]),
+                    Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+
+            var queueCache = Substitute.For<IQueueCache>();
+            queueCache.GetMaxAddCount().Returns(1000);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+
+            var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            // First tick: pump reads messages and kicks off a cold stream registration.
+            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+
+            // Verify the cache has the pending stream registered.
+            var cache = await testAccessor.GetPubSubCache();
+            Assert.Single(cache);
+            var (_, streamData) = cache.Single();
+            Assert.NotNull(streamData.RegistrationTask);
+            Assert.False(streamData.RegistrationTask.IsCompleted, "Registration should still be in progress");
+
+            // Complete registration so shutdown can proceed cleanly.
+            registration.SetResult(new HashSet<PubSubSubscriptionState>());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Shutdown_PushesFinalDeliveryProgress()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
+
+            var queueCache = Substitute.For<IQueueCache>();
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+
+            var agent = CreateAgent(pubSub: null, queueId, receiver, queueAdapterCache);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            await testAccessor.Shutdown();
+
+            // Shutdown should push a final delivery progress snapshot before tearing down.
+            queueCache.Received().UpdateDeliveryProgress(
+                Arg.Any<IReadOnlyList<StreamSequenceToken>>(),
+                Arg.Any<bool>());
         }
     }
 }

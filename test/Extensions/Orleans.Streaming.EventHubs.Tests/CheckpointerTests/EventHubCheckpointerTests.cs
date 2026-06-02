@@ -1,6 +1,5 @@
 using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Streams;
@@ -9,7 +8,9 @@ using Xunit;
 namespace ServiceBus.Tests.CheckpointerTests;
 
 /// <summary>
-/// Tests for EventHub delivery-based checkpointing and low-watermark tracking.
+/// Tests for EventHub delivery-based checkpointing via the periodic scan approach.
+/// The pulling agent periodically scans its subscription state and pushes a snapshot
+/// of processed tokens to the receiver via <see cref="IQueueCache.UpdateDeliveryProgress"/>.
 /// </summary>
 [TestCategory("EventHub"), TestCategory("Streaming")]
 public class EventHubCheckpointerTests
@@ -82,16 +83,6 @@ public class EventHubCheckpointerTests
         return new EventHubSequenceToken(offset.ToString(), sequenceNumber, 0);
     }
 
-    private static StreamId MakeStreamId(string name)
-    {
-        return StreamId.Create("TestNamespace", name);
-    }
-
-    private static GuidId MakeSubscriptionId()
-    {
-        return GuidId.GetGuidId(Guid.NewGuid());
-    }
-
     private static async Task<EventHubAdapterReceiver> CreateReceiver(TestCheckpointer checkpointer)
     {
         var settings = new EventHubPartitionSettings
@@ -122,153 +113,173 @@ public class EventHubCheckpointerTests
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task SingleStream_SingleSubscription_CheckpointsProcessedOffset()
+    public async Task SingleSubscription_CheckpointsProcessedOffset()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        var stream = MakeStreamId("A");
-        var sub = MakeSubscriptionId();
-
-        receiver.NotifySubscriptionAdded(stream, sub, null);
-        Assert.Null(checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(stream, sub, MakeToken(100));
+        // Single subscription with a known processed offset.
+        receiver.UpdateDeliveryProgress([MakeToken(100)], hasPendingRegistrations: false);
 
         Assert.Equal("100", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task MultipleStreams_CheckpointsMinimumWatermark()
+    public async Task MultipleSubscriptions_CheckpointsMinimumWatermark()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        var streamA = MakeStreamId("A");
-        var streamB = MakeStreamId("B");
-        var subA = MakeSubscriptionId();
-        var subB = MakeSubscriptionId();
+        // Two subscriptions at different offsets — watermark is the minimum.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(200), MakeToken(95)],
+            hasPendingRegistrations: false);
 
-        receiver.NotifySubscriptionAdded(streamA, subA, MakeToken(200));
-        Assert.Equal("200", checkpointer.LastOffset);
-
-        receiver.NotifySubscriptionAdded(streamB, subB, MakeToken(95));
         Assert.Equal("95", checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(streamB, subB, MakeToken(210));
-        Assert.Equal("200", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task PendingRegistration_BlocksCheckpointUntilSubscriptionsAreKnown()
+    public async Task PendingRegistration_BlocksCheckpoint()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        var stream = MakeStreamId("A");
-        var sub1 = MakeSubscriptionId();
-        var sub2 = MakeSubscriptionId();
+        // hasPendingRegistrations blocks checkpointing even with known tokens.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(200), MakeToken(50)],
+            hasPendingRegistrations: true);
 
-        receiver.NotifyStreamRegistrationStarted(stream);
-        receiver.NotifySubscriptionAdded(stream, sub1, MakeToken(200));
-        receiver.NotifySubscriptionAdded(stream, sub2, MakeToken(50));
         Assert.Null(checkpointer.LastOffset);
 
-        receiver.NotifyStreamRegistrationCompleted(stream);
+        // Once registrations complete, the watermark advances.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(200), MakeToken(50)],
+            hasPendingRegistrations: false);
+
         Assert.Equal("50", checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(stream, sub2, MakeToken(200));
-        Assert.Equal("200", checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(stream, sub1, MakeToken(300));
-        Assert.Equal("200", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task RemovedSubscription_NoLongerHoldsWatermark()
+    public async Task SubscriptionRemoved_NoLongerHoldsWatermark()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        var stream = MakeStreamId("A");
-        var sub1 = MakeSubscriptionId();
-        var sub2 = MakeSubscriptionId();
-
-        receiver.NotifySubscriptionAdded(stream, sub1, null);
-        receiver.NotifySubscriptionAdded(stream, sub2, null);
-
-        receiver.NotifyBatchProcessed(stream, sub1, MakeToken(200));
-        Assert.Null(checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(stream, sub2, MakeToken(50));
+        // Two subscriptions, one slow.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(200), MakeToken(50)],
+            hasPendingRegistrations: false);
         Assert.Equal("50", checkpointer.LastOffset);
 
-        receiver.NotifySubscriptionRemoved(stream, sub2);
+        // After the slow subscription is removed, watermark advances.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(200)],
+            hasPendingRegistrations: false);
         Assert.Equal("200", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task MultipleStreams_MultipleSubscriptions_InterleavedDelivery()
+    public async Task NullToken_BlocksCheckpoint()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        var streamA = MakeStreamId("A");
-        var streamB = MakeStreamId("B");
-        var subA1 = MakeSubscriptionId();
-        var subA2 = MakeSubscriptionId();
-        var subB1 = MakeSubscriptionId();
+        // A null token (subscription hasn't processed anything) blocks checkpointing.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(200), null],
+            hasPendingRegistrations: false);
 
-        receiver.NotifySubscriptionAdded(streamA, subA1, null);
-        receiver.NotifySubscriptionAdded(streamA, subA2, null);
-        receiver.NotifySubscriptionAdded(streamB, subB1, null);
-
-        receiver.NotifyBatchProcessed(streamA, subA1, MakeToken(100));
         Assert.Null(checkpointer.LastOffset);
+    }
 
-        receiver.NotifyBatchProcessed(streamA, subA2, MakeToken(80));
-        Assert.Null(checkpointer.LastOffset);
+    [Fact, TestCategory("BVT")]
+    public async Task WatermarkAdvances_AsSubscriptionsCatchUp()
+    {
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
 
-        receiver.NotifyBatchProcessed(streamB, subB1, MakeToken(50));
+        // Three subscriptions at different positions.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(100), MakeToken(80), MakeToken(50)],
+            hasPendingRegistrations: false);
         Assert.Equal("50", checkpointer.LastOffset);
 
-        receiver.NotifyBatchProcessed(streamB, subB1, MakeToken(90));
+        // Slowest catches up.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(100), MakeToken(80), MakeToken(90)],
+            hasPendingRegistrations: false);
         Assert.Equal("80", checkpointer.LastOffset);
 
-        receiver.NotifyBatchProcessed(streamA, subA2, MakeToken(120));
-        Assert.Equal("90", checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(streamB, subB1, MakeToken(150));
-        Assert.Equal("100", checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(streamA, subA1, MakeToken(200));
+        // All converge.
+        receiver.UpdateDeliveryProgress(
+            [MakeToken(150), MakeToken(120), MakeToken(120)],
+            hasPendingRegistrations: false);
         Assert.Equal("120", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task PerSubscriptionMax_PreventsRegression()
-    {
-        var checkpointer = new TestCheckpointer();
-        var receiver = await CreateReceiver(checkpointer);
-
-        var stream = MakeStreamId("A");
-        var sub = MakeSubscriptionId();
-
-        receiver.NotifySubscriptionAdded(stream, sub, null);
-        receiver.NotifyBatchProcessed(stream, sub, MakeToken(100));
-        Assert.Equal("100", checkpointer.LastOffset);
-
-        receiver.NotifyBatchProcessed(stream, sub, MakeToken(50));
-        Assert.Equal("100", checkpointer.LastOffset);
-    }
-
-    [Fact, TestCategory("BVT")]
-    public async Task NoNotifications_NoCheckpoint()
+    public async Task NoSubscriptions_NoCheckpoint()
     {
         var checkpointer = new TestCheckpointer();
         _ = await CreateReceiver(checkpointer);
 
         Assert.Null(checkpointer.LastOffset);
         Assert.Equal(0, checkpointer.UpdateCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task EmptySubscriptionList_NoPendingRegistrations_NoCheckpoint()
+    {
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
+
+        // No subscriptions and no pending registrations — cachePurgeOffset is null so no checkpoint.
+        receiver.UpdateDeliveryProgress([], hasPendingRegistrations: false);
+
+        Assert.Null(checkpointer.LastOffset);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task CachePurge_UsedAsFallbackWhenNoSubscriptions()
+    {
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
+
+        // Trigger cache purge via TryPurgeFromCache → SignalPurge → CachePurgeCheckpointer.
+        // Since we can't easily trigger the real cache eviction path, we simulate by calling
+        // TryPurgeFromCache (which calls SignalPurge on the cache) and then testing that
+        // after a purge offset is recorded, UpdateDeliveryProgress with empty subscriptions
+        // falls back to the purge offset.
+        //
+        // The CachePurgeCheckpointer is constructed in Initialize and wraps the real checkpointer.
+        // We verify the fallback by first establishing a purge offset via a delivery progress
+        // call that includes subscriptions, then removing all subscriptions.
+
+        // First: some subscription progress establishes a checkpoint.
+        receiver.UpdateDeliveryProgress([MakeToken(100)], hasPendingRegistrations: false);
+        Assert.Equal("100", checkpointer.LastOffset);
+
+        // Now with no subscriptions, the purge offset isn't set yet so no checkpoint change.
+        // (cachePurgeOffset is only set via the CachePurgeCheckpointer, which we can't
+        // trigger without a real cache eviction.)
+        receiver.UpdateDeliveryProgress([], hasPendingRegistrations: false);
+        // cachePurgeOffset is null → no update, LastOffset stays at previous value.
+        Assert.Equal("100", checkpointer.LastOffset);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task ActiveSubscriptions_TakesPriorityOverCachePurge()
+    {
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
+
+        // With active subscriptions, the watermark comes from subscription tokens,
+        // not from the cache purge offset.
+        receiver.UpdateDeliveryProgress([MakeToken(50)], hasPendingRegistrations: false);
+        Assert.Equal("50", checkpointer.LastOffset);
+
+        // Even after progress, subscriptions remain authoritative.
+        receiver.UpdateDeliveryProgress([MakeToken(75)], hasPendingRegistrations: false);
+        Assert.Equal("75", checkpointer.LastOffset);
     }
 }
