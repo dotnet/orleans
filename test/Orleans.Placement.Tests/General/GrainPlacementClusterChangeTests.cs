@@ -56,6 +56,7 @@ namespace UnitTests.General
             SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing silo {0} hosting locally placed grain", siloToKill);
             await HostedCluster.StopSiloAsync(siloToKill);
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IPEndPoint newActual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain was recreated on silo {0}", newActual);
