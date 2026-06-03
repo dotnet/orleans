@@ -602,7 +602,7 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Scans <see cref="pubSubCache"/> for the current delivery progress of all registered
+        /// Scans <see cref="pubSubCache"/> for the current delivery progress of all
         /// subscriptions and pushes a snapshot to the queue cache so it can compute a safe
         /// checkpoint watermark. Called periodically from the read loop and once at shutdown.
         /// Skips notifying the cache while stream registrations are pending.
@@ -624,7 +624,7 @@ namespace Orleans.Streams
                 {
                     if (!consumer.IsRegistered)
                     {
-                        continue;
+                        return;
                     }
 
                     var current = consumer.LastProcessedToken;
@@ -633,7 +633,7 @@ namespace Orleans.Streams
                         return;
                     }
 
-                    if (earliest is null || current.CompareTo(earliest) < 0)
+                    if (earliest is null || IsBefore(current, earliest))
                     {
                         earliest = current;
                     }
@@ -641,6 +641,12 @@ namespace Orleans.Streams
             }
 
             queueCache.UpdateDeliveryProgress(earliest);
+        }
+
+        private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
+        {
+            var difference = current.SequenceNumber.CompareTo(other.SequenceNumber);
+            return difference < 0 || difference == 0 && current.EventIndex < other.EventIndex;
         }
 
         private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
