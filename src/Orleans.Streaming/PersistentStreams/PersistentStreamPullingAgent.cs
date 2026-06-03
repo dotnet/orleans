@@ -605,6 +605,7 @@ namespace Orleans.Streams
         /// Scans <see cref="pubSubCache"/> for the current delivery progress of all registered
         /// subscriptions and pushes a snapshot to the queue cache so it can compute a safe
         /// checkpoint watermark. Called periodically from the read loop and once at shutdown.
+        /// Skips notifying the cache while stream registrations are pending.
         /// </summary>
         private void NotifyDeliveryProgress()
         {
@@ -616,7 +617,6 @@ namespace Orleans.Streams
             {
                 if (streamConsumers.RegistrationTask is { IsCompleted: false })
                 {
-                    queueCache.UpdateDeliveryProgress(earliestSubscriptionToken: null, hasPendingRegistrations: true);
                     return;
                 }
 
@@ -640,7 +640,7 @@ namespace Orleans.Streams
                 }
             }
 
-            queueCache.UpdateDeliveryProgress(earliest, hasPendingRegistrations: false);
+            queueCache.UpdateDeliveryProgress(earliest);
         }
 
         private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)

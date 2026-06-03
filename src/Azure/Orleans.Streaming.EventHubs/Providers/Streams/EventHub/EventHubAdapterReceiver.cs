@@ -224,13 +224,8 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, bool hasPendingRegistrations)
+        public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken)
         {
-            if (hasPendingRegistrations)
-            {
-                return;
-            }
-
             string checkpointOffset;
             if (earliestSubscriptionToken is null)
             {

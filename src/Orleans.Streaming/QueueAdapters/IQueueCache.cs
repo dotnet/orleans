@@ -35,18 +35,14 @@ namespace Orleans.Streams
 
         /// <summary>
         /// Updates the cache with the current delivery progress of all active subscriptions.
-        /// Called periodically by the pulling agent so the cache can compute a safe checkpoint
-        /// offset (e.g., the low watermark across all subscriptions).
+        /// Called periodically by the pulling agent when no registrations are pending so the cache
+        /// can compute a safe checkpoint offset (e.g., the low watermark across all subscriptions).
         /// </summary>
         /// <param name="earliestSubscriptionToken">
         /// The earliest last processed sequence token across registered subscriptions.
         /// A <see langword="null"/> value indicates that there are no active subscriptions.
         /// The token is only valid for the duration of the call and must not be stored.
         /// </param>
-        /// <param name="hasPendingRegistrations">
-        /// <see langword="true"/> if any stream registration is still in progress,
-        /// meaning the full set of subscriptions is not yet known and checkpoints should not advance.
-        /// </param>
-        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, bool hasPendingRegistrations) { }
+        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken) { }
     }
 }

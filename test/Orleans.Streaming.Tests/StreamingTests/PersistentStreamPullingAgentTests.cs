@@ -347,9 +347,7 @@ namespace UnitTests.StreamingTests
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
             // RunQueuePump should call UpdateDeliveryProgress on the cache.
-            queueCache.Received().UpdateDeliveryProgress(
-                Arg.Any<StreamSequenceToken>(),
-                Arg.Any<bool>());
+            queueCache.Received().UpdateDeliveryProgress(Arg.Any<StreamSequenceToken>());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -376,6 +374,8 @@ namespace UnitTests.StreamingTests
             await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
             var streamData = (await testAccessor.GetPubSubCache()).Single().Value;
+            Assert.Null(streamData.RegistrationTask);
+
             var newestConsumer = streamData.AddConsumer(
                 GuidId.GetGuidId(Guid.NewGuid()),
                 streamId,
@@ -396,13 +396,11 @@ namespace UnitTests.StreamingTests
 
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
-            queueCache.Received().UpdateDeliveryProgress(
-                earliestConsumer.LastProcessedToken,
-                hasPendingRegistrations: false);
+            queueCache.Received().UpdateDeliveryProgress(earliestConsumer.LastProcessedToken);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_ReportsPendingRegistrations()
+        public async Task RunQueuePump_SkipsDeliveryProgressForPendingRegistrations()
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -438,11 +436,10 @@ namespace UnitTests.StreamingTests
             Assert.NotNull(streamData.RegistrationTask);
             Assert.False(streamData.RegistrationTask.IsCompleted, "Registration should still be in progress");
 
+            queueCache.ClearReceivedCalls();
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
-            queueCache.Received().UpdateDeliveryProgress(
-                earliestSubscriptionToken: null,
-                hasPendingRegistrations: true);
+            queueCache.DidNotReceive().UpdateDeliveryProgress(Arg.Any<StreamSequenceToken>());
 
             // Complete registration so shutdown can proceed cleanly.
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
@@ -466,9 +463,7 @@ namespace UnitTests.StreamingTests
             await testAccessor.Shutdown();
 
             // Shutdown should push a final delivery progress snapshot before tearing down.
-            queueCache.Received().UpdateDeliveryProgress(
-                Arg.Any<StreamSequenceToken>(),
-                Arg.Any<bool>());
+            queueCache.Received().UpdateDeliveryProgress(Arg.Any<StreamSequenceToken>());
         }
     }
 }
