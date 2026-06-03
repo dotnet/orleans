@@ -190,7 +190,7 @@ namespace Orleans.Runtime.MembershipService
                     if (isDirectProbe)
                     {
                         // Probe the silo directly.
-                        probeResult = await this.ProbeDirectly(cancellation.Token).ConfigureAwait(false);
+                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout).ConfigureAwait(false);
                     }
                     else
                     {
@@ -255,12 +255,14 @@ namespace Orleans.Runtime.MembershipService
         /// Probes the remote silo.
         /// </summary>
         /// <param name="cancellation">A token to cancel and fail the probe attempt.</param>
+        /// <param name="probeTimeout">The timeout used for this probe, for GC pause evaluation.</param>
         /// <returns>The number of failed probes since the last successful probe.</returns>
-        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation)
+        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout)
         {
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
 
+            var gcPauseBefore = GC.GetTotalPauseDuration();
             var roundTripTimer = ValueStopwatch.StartNew();
             ProbeResult probeResult;
             Exception? failureException;
@@ -295,12 +297,24 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                MessagingInstruments.OnPingReplyMissed(TargetSiloAddress);
+                // Check if a GC pause consumed a significant portion of the probe timeout.
+                // If so, the local silo may have been unable to process the response in time,
+                // so we treat this as an inconclusive result rather than a failure.
+                var gcPauseDuring = GC.GetTotalPauseDuration() - gcPauseBefore;
+                if (gcPauseDuring > probeTimeout.Multiply(0.25))
+                {
+                    LogWarningProbeFailureDuringGcPause(_log, id, TargetSiloAddress, roundTripTimer.Elapsed, gcPauseDuring, _failedProbes);
+                    probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
+                }
+                else
+                {
+                    MessagingInstruments.OnPingReplyMissed(TargetSiloAddress);
 
-                var failedProbes = ++_failedProbes;
-                LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTimer.Elapsed, failedProbes);
+                    var failedProbes = ++_failedProbes;
+                    LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTimer.Elapsed, failedProbes);
 
-                probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
+                    probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
+                }
             }
 
             return probeResult;
@@ -470,5 +484,11 @@ namespace Orleans.Runtime.MembershipService
             Message = "Exception monitoring silo {SiloAddress}"
         )]
         private static partial void LogErrorExceptionMonitoringSilo(ILogger logger, Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Probe #{Id} to silo {SiloAddress} failed after {Elapsed}, but a GC pause of {GcPauseDuration} was detected during the probe. Treating as inconclusive. Consecutive failed probes remains at {FailedProbeCount}."
+        )]
+        private static partial void LogWarningProbeFailureDuringGcPause(ILogger logger, int id, SiloAddress siloAddress, TimeSpan elapsed, TimeSpan gcPauseDuration, int failedProbeCount);
     }
 }
