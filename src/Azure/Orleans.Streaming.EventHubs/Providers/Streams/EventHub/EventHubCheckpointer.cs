@@ -133,9 +133,13 @@ namespace Orleans.Streaming.EventHubs
                 return;
             }
 
+            // The safe delivery watermark can move backwards when a newly registered
+            // subscriber requests replay from an older token. Persist that rewind
+            // immediately so recovery starts before the slowest known subscriber's
+            // required event.
             var mustSaveNow = IsBefore(offset, entity.Offset);
 
-            // Always track the latest offset in memory so FlushAsync can persist it.
+            // Always track the latest safe offset in memory so FlushAsync can persist it.
             latestOffset = offset;
 
             // If we've saved before but it's not time for another save or the last save operation has not completed,

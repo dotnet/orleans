@@ -171,6 +171,22 @@ public class EventHubCheckpointerTests
     }
 
     [Fact, TestCategory("BVT")]
+    public async Task ReplayingSubscription_CanMoveCheckpointBackward()
+    {
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
+
+        receiver.UpdateDeliveryProgress(MakeToken(200));
+        Assert.Equal("200", checkpointer.LastOffset);
+
+        // A newly registered subscriber can request replay from an older token.
+        // The safe delivery watermark must be allowed to move backwards so a
+        // restart does not skip the messages that subscriber still needs.
+        receiver.UpdateDeliveryProgress(MakeToken(50));
+        Assert.Equal("50", checkpointer.LastOffset);
+    }
+
+    [Fact, TestCategory("BVT")]
     public async Task NoSubscriptions_NoCheckpoint()
     {
         var checkpointer = new TestCheckpointer();
