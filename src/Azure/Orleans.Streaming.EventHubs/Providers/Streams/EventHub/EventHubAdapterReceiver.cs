@@ -224,7 +224,7 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public void UpdateDeliveryProgress(IReadOnlyList<StreamSequenceToken> subscriptionTokens, bool hasPendingRegistrations)
+        public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, bool hasPendingRegistrations)
         {
             if (hasPendingRegistrations)
             {
@@ -232,26 +232,19 @@ namespace Orleans.Streaming.EventHubs
             }
 
             string checkpointOffset;
-            if (subscriptionTokens.Count == 0)
+            if (earliestSubscriptionToken is null)
             {
                 // No active subscriptions — fall back to the cache purge offset.
                 checkpointOffset = cachePurgeOffset?.ToString(CultureInfo.InvariantCulture);
             }
             else
             {
-                long watermark = long.MaxValue;
-                foreach (var token in subscriptionTokens)
+                if (!TryGetOffset(earliestSubscriptionToken, out var offset))
                 {
-                    if (!TryGetOffset(token, out var offset))
-                    {
-                        // A subscription has unknown progress — don't advance the checkpoint.
-                        return;
-                    }
-
-                    watermark = Math.Min(watermark, offset);
+                    return;
                 }
 
-                checkpointOffset = watermark == long.MaxValue ? null : watermark.ToString(CultureInfo.InvariantCulture);
+                checkpointOffset = offset.ToString(CultureInfo.InvariantCulture);
             }
 
             if (checkpointOffset is not null)

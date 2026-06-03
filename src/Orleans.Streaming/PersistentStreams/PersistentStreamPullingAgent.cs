@@ -42,9 +42,6 @@ namespace Orleans.Streams
         private DateTime lastTimeCleanedPubSubCache;
         private IGrainTimer timer;
 
-        // Reusable list to avoid allocation in the periodic delivery progress scan.
-        private readonly List<StreamSequenceToken> _deliveryProgressTokens = new();
-
         private Task receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
         private bool IsShutdown => timer is null;
@@ -613,26 +610,37 @@ namespace Orleans.Streams
         {
             if (queueCache is null) return;
 
-            _deliveryProgressTokens.Clear();
-            bool hasPending = false;
+            StreamSequenceToken earliest = null;
 
-            foreach (var (_, collection) in pubSubCache)
+            foreach (var streamConsumers in pubSubCache.Values)
             {
-                if (collection.RegistrationTask is { IsCompleted: false })
+                if (streamConsumers.RegistrationTask is { IsCompleted: false })
                 {
-                    hasPending = true;
+                    queueCache.UpdateDeliveryProgress(earliestSubscriptionToken: null, hasPendingRegistrations: true);
+                    return;
                 }
 
-                foreach (var consumer in collection.AllConsumers())
+                foreach (var consumer in streamConsumers.AllConsumers())
                 {
-                    if (consumer.IsRegistered)
+                    if (!consumer.IsRegistered)
                     {
-                        _deliveryProgressTokens.Add(consumer.LastProcessedToken);
+                        continue;
+                    }
+
+                    var current = consumer.LastProcessedToken;
+                    if (current is null)
+                    {
+                        return;
+                    }
+
+                    if (earliest is null || current.CompareTo(earliest) < 0)
+                    {
+                        earliest = current;
                     }
                 }
             }
 
-            queueCache.UpdateDeliveryProgress(_deliveryProgressTokens, hasPending);
+            queueCache.UpdateDeliveryProgress(earliest, hasPendingRegistrations: false);
         }
 
         private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
