@@ -798,6 +798,8 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_RecoveryRetry_ReplaysFixedStorage()
     {
         var validBytes = CreatePersistedValueBytes("value", 42);
+        // The manager retries recovery on its background work loop, so the repaired
+        // storage state must be available on the retry without depending on test-thread timing.
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3], validBytes);
         var sut = CreateTestSystem(storage: storage);
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
@@ -1636,6 +1638,8 @@ public class StateManagerTests : JournalingTestBase
 
         public MutableReadStorage(params byte[][] readSnapshots)
         {
+            // Recovery retry tests model storage being repaired after a failed read.
+            // The sequence makes that repair deterministic instead of racing the manager's retry.
             if (readSnapshots.Length == 0)
             {
                 throw new ArgumentException("At least one read snapshot is required.", nameof(readSnapshots));
