@@ -1474,15 +1474,14 @@ namespace Orleans.Streams
         System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout);
     }
 
-    public delegate bool TryGetDeliveryProgress(out StreamSequenceToken? earliestSubscriptionToken);
-
     public partial interface IQueueCache : IQueueFlowController
     {
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken token);
         bool IsUnderPressure();
+        bool IsUpdateDue(System.DateTime utcNow) { return true; }
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
-        void UpdateDeliveryProgress(TryGetDeliveryProgress tryGetDeliveryProgress, bool force) { }
+        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
     }
 
     public partial interface IQueueCacheCursor : System.IDisposable

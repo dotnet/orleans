@@ -224,27 +224,12 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public void UpdateDeliveryProgress(TryGetDeliveryProgress tryGetDeliveryProgress, bool force)
+        public bool IsUpdateDue(DateTime utcNow)
         {
-            ArgumentNullException.ThrowIfNull(tryGetDeliveryProgress);
-
-            var utcNow = DateTime.UtcNow;
-            if (!force
-                && this.checkpointer is { } checkpointer
-                && !checkpointer.IsUpdateDue(utcNow))
-            {
-                return;
-            }
-
-            if (!tryGetDeliveryProgress(out var earliestSubscriptionToken))
-            {
-                return;
-            }
-
-            UpdateDeliveryProgress(earliestSubscriptionToken, utcNow);
+            return this.checkpointer?.IsUpdateDue(utcNow) ?? false;
         }
 
-        private void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
+        public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
         {
             string checkpointOffset;
             if (earliestSubscriptionToken is null)

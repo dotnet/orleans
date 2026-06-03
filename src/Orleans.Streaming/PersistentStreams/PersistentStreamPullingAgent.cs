@@ -34,7 +34,6 @@ namespace Orleans.Streams
         private readonly IStreamFailureHandler streamFailureHandler;
         private readonly StreamInstruments _streamInstruments;
         private readonly TimeProvider _timeProvider;
-        private readonly TryGetDeliveryProgress _tryGetDeliveryProgress;
         internal readonly QueueId QueueId;
 
         private int numMessages;
@@ -89,7 +88,6 @@ namespace Orleans.Streams
             this.queueReaderBackoffProvider = queueReaderBackoffProvider;
             _streamInstruments = streamInstruments;
             _timeProvider = timeProvider ?? TimeProvider.System;
-            _tryGetDeliveryProgress = TryGetDeliveryProgress;
             numMessages = 0;
 
             logger = shared.LoggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -602,14 +600,22 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Gives the queue cache a lazy callback for retrieving delivery progress.
-        /// The cache invokes the callback when it needs a current checkpoint watermark.
+        /// Computes delivery progress when the queue cache is ready for a checkpoint update.
         /// </summary>
         private void NotifyDeliveryProgress(bool force)
         {
             if (queueCache is null) return;
 
-            queueCache.UpdateDeliveryProgress(_tryGetDeliveryProgress, force);
+            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+            if (!force && !queueCache.IsUpdateDue(utcNow))
+            {
+                return;
+            }
+
+            if (TryGetDeliveryProgress(out var earliest))
+            {
+                queueCache.UpdateDeliveryProgress(earliest, utcNow);
+            }
         }
 
         private bool TryGetDeliveryProgress(out StreamSequenceToken earliest)

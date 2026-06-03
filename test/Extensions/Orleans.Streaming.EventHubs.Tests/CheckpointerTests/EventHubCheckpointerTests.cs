@@ -9,9 +9,8 @@ using Xunit;
 namespace ServiceBus.Tests.CheckpointerTests;
 
 /// <summary>
-/// Tests for EventHub delivery-based checkpointing via lazy delivery progress callbacks.
-/// The pulling agent exposes its current subscription state to the receiver, which evaluates
-/// it only when a checkpoint update is due or a forced update is needed.
+/// Tests for EventHub delivery-based checkpointing via pulling-agent progress snapshots.
+/// The pulling agent asks the receiver whether an update is due before computing progress.
 /// </summary>
 [TestCategory("EventHub"), TestCategory("Streaming")]
 public class EventHubCheckpointerTests
@@ -104,26 +103,14 @@ public class EventHubCheckpointerTests
         return new EventHubSequenceToken(offset.ToString(), sequenceNumber, 0);
     }
 
-    private static void UpdateDeliveryProgress(EventHubAdapterReceiver receiver, StreamSequenceToken token, bool force = true)
+    private static void UpdateDeliveryProgress(EventHubAdapterReceiver receiver, StreamSequenceToken token)
     {
-        receiver.UpdateDeliveryProgress(
-            (out StreamSequenceToken earliestSubscriptionToken) =>
-            {
-                earliestSubscriptionToken = token;
-                return true;
-            },
-            force);
+        receiver.UpdateDeliveryProgress(token, DateTime.UtcNow);
     }
 
-    private static void UpdateDeliveryProgressWithNoSubscriptions(EventHubAdapterReceiver receiver, bool force = true)
+    private static void UpdateDeliveryProgressWithNoSubscriptions(EventHubAdapterReceiver receiver)
     {
-        receiver.UpdateDeliveryProgress(
-            (out StreamSequenceToken earliestSubscriptionToken) =>
-            {
-                earliestSubscriptionToken = null;
-                return true;
-            },
-            force);
+        receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
     }
 
     private static async Task<EventHubAdapterReceiver> CreateReceiver(TestCheckpointer checkpointer)
@@ -156,36 +143,18 @@ public class EventHubCheckpointerTests
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task DeliveryProgress_IsEvaluatedOnlyWhenCheckpointUpdateIsDue()
+    public async Task IsUpdateDue_UsesCheckpointerCadence()
     {
         var checkpointer = new ThrottledTestCheckpointer { IsUpdateDueResult = false };
         var receiver = await CreateReceiver(checkpointer);
-        var wasEvaluated = false;
 
-        receiver.UpdateDeliveryProgress(
-            (out StreamSequenceToken earliestSubscriptionToken) =>
-            {
-                wasEvaluated = true;
-                earliestSubscriptionToken = MakeToken(100);
-                return true;
-            },
-            force: false);
-
+        Assert.False(receiver.IsUpdateDue(DateTime.UtcNow));
         Assert.Equal(1, checkpointer.IsUpdateDueCount);
-        Assert.False(wasEvaluated);
-        Assert.Null(checkpointer.LastOffset);
 
-        receiver.UpdateDeliveryProgress(
-            (out StreamSequenceToken earliestSubscriptionToken) =>
-            {
-                wasEvaluated = true;
-                earliestSubscriptionToken = MakeToken(100);
-                return true;
-            },
-            force: true);
+        checkpointer.IsUpdateDueResult = true;
 
-        Assert.True(wasEvaluated);
-        Assert.Equal("100", checkpointer.LastOffset);
+        Assert.True(receiver.IsUpdateDue(DateTime.UtcNow));
+        Assert.Equal(2, checkpointer.IsUpdateDueCount);
     }
 
     [Fact, TestCategory("BVT")]

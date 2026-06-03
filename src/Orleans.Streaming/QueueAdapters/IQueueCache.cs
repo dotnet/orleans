@@ -1,21 +1,9 @@
+using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    /// <summary>
-    /// Attempts to retrieve the current delivery progress for a queue cache.
-    /// </summary>
-    /// <param name="earliestSubscriptionToken">
-    /// The earliest last processed sequence token across registered subscriptions,
-    /// or <see langword="null"/> when there are no active subscriptions.
-    /// </param>
-    /// <returns>
-    /// <see langword="true"/> if delivery progress was available; otherwise,
-    /// <see langword="false"/> when progress is temporarily unavailable.
-    /// </returns>
-    public delegate bool TryGetDeliveryProgress(out StreamSequenceToken? earliestSubscriptionToken);
-
     public interface IQueueCache : IQueueFlowController
     {
         /// <summary>
@@ -47,14 +35,21 @@ namespace Orleans.Streams
         bool IsUnderPressure();
 
         /// <summary>
-        /// Updates the cache with the current delivery progress of all active subscriptions.
-        /// The cache invokes <paramref name="tryGetDeliveryProgress"/> when it needs a current
-        /// delivery-progress snapshot to compute a safe checkpoint offset.
+        /// Returns <see langword="true"/> if the cache is due for a delivery progress update.
         /// </summary>
-        /// <param name="tryGetDeliveryProgress">The callback used to retrieve current delivery progress.</param>
-        /// <param name="force">
-        /// <see langword="true"/> when the cache should retrieve progress even if its normal checkpointing cadence has not elapsed.
+        /// <param name="utcNow">The current UTC time.</param>
+        /// <returns><see langword="true"/> if an update is due; otherwise, <see langword="false"/>.</returns>
+        bool IsUpdateDue(DateTime utcNow) => true;
+
+        /// <summary>
+        /// Updates the cache with the current delivery progress of all active subscriptions.
+        /// </summary>
+        /// <param name="earliestSubscriptionToken">
+        /// The earliest last processed sequence token across registered subscriptions.
+        /// A <see langword="null"/> value indicates that there are no active subscriptions.
+        /// The token is only valid for the duration of the call and must not be stored.
         /// </param>
-        void UpdateDeliveryProgress(TryGetDeliveryProgress tryGetDeliveryProgress, bool force) { }
+        /// <param name="utcNow">The current UTC time.</param>
+        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow) { }
     }
 }
