@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
@@ -120,7 +121,7 @@ namespace Orleans.Streaming.EventHubs
 
         /// <summary>
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
-        /// The latest offset is always tracked in memory so that <see cref="FlushAsync"/> can persist it on shutdown.
+        /// The latest offset is always tracked in memory so that <see cref="FlushAsync(CancellationToken)"/> can persist it on shutdown.
         /// </summary>
         /// <param name="offset"></param>
         /// <param name="utcNow"></param>
@@ -170,14 +171,15 @@ namespace Orleans.Streaming.EventHubs
         /// Flushes any pending checkpoint to persistent storage.
         /// Awaits any in-progress save, then persists the latest offset if it has advanced beyond the last saved value.
         /// </summary>
-        public async Task FlushAsync()
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task FlushAsync(CancellationToken cancellationToken)
         {
-            await inProgressSave;
+            await inProgressSave.WaitAsync(cancellationToken);
             if (string.Compare(entity.Offset, latestOffset, StringComparison.Ordinal) != 0)
             {
                 entity.Offset = latestOffset;
                 inProgressSave = dataManager.UpsertTableEntryAsync(entity);
-                await inProgressSave;
+                await inProgressSave.WaitAsync(cancellationToken);
             }
         }
 

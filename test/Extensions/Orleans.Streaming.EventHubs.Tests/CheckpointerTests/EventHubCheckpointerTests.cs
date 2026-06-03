@@ -32,7 +32,7 @@ public class EventHubCheckpointerTests
             UpdateCount++;
         }
 
-        public Task FlushAsync()
+        public Task FlushAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

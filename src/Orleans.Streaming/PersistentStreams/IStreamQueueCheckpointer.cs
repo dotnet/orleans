@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
@@ -45,7 +46,8 @@ namespace Orleans.Streams
         /// Flushes any pending checkpoint to persistent storage, ensuring the latest offset is durably saved.
         /// Called during shutdown or rebalancing to prevent message replay on restart.
         /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A <see cref="Task"/> representing the flush operation.</returns>
-        Task FlushAsync() => Task.CompletedTask;
+        Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

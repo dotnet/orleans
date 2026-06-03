@@ -358,7 +358,7 @@ namespace Orleans.Streaming.EventHubs
 
         public void Update(string offset, System.DateTime utcNow) { }
 
-        public System.Threading.Tasks.Task FlushAsync() { throw null; }
+        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public partial class EventHubCheckpointerFactory : Streams.IStreamQueueCheckpointerFactory

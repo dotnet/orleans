@@ -288,7 +288,8 @@ namespace Orleans.Streaming.EventHubs
                 // so the latest processed offset is persisted and not replayed on restart.
                 if (this.checkpointer != null)
                 {
-                    await this.checkpointer.FlushAsync();
+                    using var flushCancellation = timeout == Timeout.InfiniteTimeSpan ? null : new CancellationTokenSource(timeout);
+                    await this.checkpointer.FlushAsync(flushCancellation?.Token ?? CancellationToken.None);
                 }
 
                 // clear cache and receiver
@@ -339,9 +340,9 @@ namespace Orleans.Streaming.EventHubs
                 receiver.NotifyCachePurged(offset);
             }
 
-            public Task FlushAsync()
+            public Task FlushAsync(CancellationToken cancellationToken)
             {
-                return receiver.checkpointer?.FlushAsync() ?? Task.CompletedTask;
+                return receiver.checkpointer?.FlushAsync(cancellationToken) ?? Task.CompletedTask;
             }
         }
 

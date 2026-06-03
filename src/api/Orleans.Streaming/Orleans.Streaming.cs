@@ -1585,7 +1585,7 @@ namespace Orleans.Streams
 
         System.Threading.Tasks.Task<TCheckpoint> Load();
         void Update(TCheckpoint offset, System.DateTime utcNow);
-        System.Threading.Tasks.Task FlushAsync() { return System.Threading.Tasks.Task.CompletedTask; }
+        System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { return System.Threading.Tasks.Task.CompletedTask; }
     }
 
     public partial interface IStreamQueueMapper

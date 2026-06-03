@@ -145,7 +145,7 @@ internal sealed class RedisStreamStorage
 
         if (checkpointer is not null)
         {
-            await checkpointer.FlushAsync();
+            await checkpointer.FlushAsync(CancellationToken.None);
         }
 
         if (multiplexer is not null && !isSharedMultiplexer)
