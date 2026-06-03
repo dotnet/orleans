@@ -1688,7 +1688,7 @@ public class StateManagerTests : JournalingTestBase
             {
                 if (_readSnapshots.TryDequeue(out var readSnapshot))
                 {
-                    _bytes = readSnapshot.ToArray();
+                    _bytes = readSnapshot;
                     snapshot = readSnapshot.ToArray();
                 }
                 else
