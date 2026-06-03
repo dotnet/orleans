@@ -4,11 +4,11 @@ using System.Diagnostics.Metrics;
 #nullable disable
 namespace Orleans.Runtime;
 
-public static class ClientInstruments
+internal sealed class ClientInstruments(OrleansInstruments instruments)
 {
-    internal static ObservableGauge<int> ConnectedGatewayCount;
-    internal static void RegisterConnectedGatewayCountObserve(Func<int> observeValue)
+    private ObservableGauge<int> _connectedGatewayCount;
+    internal void RegisterConnectedGatewayCountObserve(Func<int> observeValue)
     {
-        ConnectedGatewayCount = Instruments.Meter.CreateObservableGauge(InstrumentNames.CLIENT_CONNECTED_GATEWAY_COUNT, observeValue);
+        _connectedGatewayCount = instruments.Meter.CreateObservableGauge(InstrumentNames.CLIENT_CONNECTED_GATEWAY_COUNT, observeValue);
     }
 }

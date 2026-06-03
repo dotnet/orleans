@@ -78,6 +78,7 @@ namespace Orleans.Messaging
             IClusterConnectionStatusListener connectionStatusListener,
             ILoggerFactory loggerFactory,
             ConnectionManager connectionManager,
+            ClientInstruments clientInstruments,
             GatewayManager gatewayManager)
         {
             this.connectionManager = connectionManager;
@@ -90,7 +91,7 @@ namespace Orleans.Messaging
             numMessages = 0;
             this.grainBuckets = new WeakReference<ClientOutboundConnection>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
-            ClientInstruments.RegisterConnectedGatewayCountObserve(() => connectionManager.ConnectionCount);
+            clientInstruments.RegisterConnectedGatewayCountObserve(() => connectionManager.ConnectionCount);
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)

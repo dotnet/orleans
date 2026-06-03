@@ -1254,10 +1254,6 @@ namespace Orleans.Runtime
         public const string WaitMigration = "wait migration";
     }
 
-    public static partial class ClientInstruments
-    {
-    }
-
     [GenerateSerializer]
     [Immutable]
     public partial class ClusterManifestUpdate
