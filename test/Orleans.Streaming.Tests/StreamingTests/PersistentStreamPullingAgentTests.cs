@@ -167,7 +167,7 @@ namespace UnitTests.StreamingTests
                 Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null!,
                 timerRegistry: timerRegistry,
-                activations: new ActivationDirectory(),
+                activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments());
 
             receiver ??= Substitute.For<IQueueAdapterReceiver>();
@@ -202,6 +202,15 @@ namespace UnitTests.StreamingTests
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<SchedulerInstruments>();
             return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
+        }
+
+        private static CatalogInstruments CreateCatalogInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<CatalogInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]

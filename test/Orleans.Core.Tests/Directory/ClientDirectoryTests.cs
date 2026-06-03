@@ -80,7 +80,7 @@ namespace NonSilo.Tests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory(),
+                activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments());
 
             _directory = new ClientDirectory(
@@ -105,6 +105,15 @@ namespace NonSilo.Tests.Directory
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<SchedulerInstruments>();
             return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
+        }
+
+        private static CatalogInstruments CreateCatalogInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<CatalogInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
         }
 
         /// <summary>

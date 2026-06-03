@@ -13,9 +13,9 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
 
     private readonly ConcurrentDictionary<GrainId, IGrainContext> _activations = new();
 
-    public ActivationDirectory()
+    public ActivationDirectory(CatalogInstruments catalogInstruments)
     {
-        CatalogInstruments.RegisterActivationCountObserve(() => Count);
+        catalogInstruments.RegisterActivationCountObserve(() => Count);
     }
 
     public int Count => _activationsCount;

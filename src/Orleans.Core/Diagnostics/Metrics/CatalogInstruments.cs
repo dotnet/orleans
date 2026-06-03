@@ -4,7 +4,7 @@ using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
 
-internal static class CatalogInstruments
+internal sealed class CatalogInstruments(OrleansInstruments instruments)
 {
     private const string MillisecondsUnit = "ms";
     private const string StatusTagName = "status";
@@ -27,21 +27,23 @@ internal static class CatalogInstruments
 
     internal struct ActivationMetricTracker
     {
+        private readonly CatalogInstruments _instruments;
         private readonly ValueStopwatch _stopwatch;
         private readonly bool _usesDirectory;
         private string? _status;
 
-        private ActivationMetricTracker(ValueStopwatch stopwatch, bool usesDirectory, string status)
+        private ActivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, bool usesDirectory, string status)
         {
+            _instruments = instruments;
             _stopwatch = stopwatch;
             _usesDirectory = usesDirectory;
             _status = status;
         }
 
-        public static ActivationMetricTracker Start(bool usesDirectory)
+        public static ActivationMetricTracker Start(CatalogInstruments instruments, bool usesDirectory)
         {
-            return ActivationLatencyEnabled
-                ? new(ValueStopwatch.StartNew(), usesDirectory, ActivationStatusError)
+            return instruments.ActivationLatencyEnabled
+                ? new(instruments, ValueStopwatch.StartNew(), usesDirectory, ActivationStatusError)
                 : default;
         }
 
@@ -61,12 +63,12 @@ internal static class CatalogInstruments
 
         public void Record()
         {
-            if (_status is null)
+            if (_status is null || _instruments is null)
             {
                 return;
             }
 
-            OnActivationCompleted(_stopwatch.Elapsed, _status, _usesDirectory);
+            _instruments.OnActivationCompleted(_stopwatch.Elapsed, _status, _usesDirectory);
         }
 
         private void SetStatus(string status)
@@ -80,21 +82,23 @@ internal static class CatalogInstruments
 
     internal readonly struct DeactivationMetricTracker
     {
+        private readonly CatalogInstruments _instruments;
         private readonly ValueStopwatch _stopwatch;
         private readonly string? _via;
         private readonly bool _recorded;
 
-        private DeactivationMetricTracker(ValueStopwatch stopwatch, string via, bool recorded)
+        private DeactivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, string via, bool recorded)
         {
+            _instruments = instruments;
             _stopwatch = stopwatch;
             _via = via;
             _recorded = recorded;
         }
 
-        public static DeactivationMetricTracker Start()
+        public static DeactivationMetricTracker Start(CatalogInstruments instruments)
         {
-            return DeactivationLatencyEnabled
-                ? new(ValueStopwatch.StartNew(), DeactivationViaUnknown, recorded: false)
+            return instruments.DeactivationLatencyEnabled
+                ? new(instruments, ValueStopwatch.StartNew(), DeactivationViaUnknown, recorded: false)
                 : default;
         }
 
@@ -108,77 +112,77 @@ internal static class CatalogInstruments
 
         public DeactivationMetricTracker Record()
         {
-            if (_via is null || _recorded)
+            if (_via is null || _recorded || _instruments is null)
             {
                 return this;
             }
 
-            OnDeactivationCompleted(_stopwatch.Elapsed, _via);
-            return new(_stopwatch, _via, recorded: true);
+            _instruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
+            return new(_instruments, _stopwatch, _via, recorded: true);
         }
 
         public void RecordIfNeeded()
         {
-            if (_via is null || _recorded)
+            if (_via is null || _recorded || _instruments is null)
             {
                 return;
             }
 
-            OnDeactivationCompleted(_stopwatch.Elapsed, _via);
+            _instruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
         }
 
-        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_stopwatch, via, _recorded);
+        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_instruments, _stopwatch, via, _recorded);
     }
 
-    internal static Counter<int> ActivationFailedToActivate = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
+    private readonly Counter<int> _activationFailedToActivate = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
 
-    internal static Counter<int> ActivationCollections = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
+    private readonly Counter<int> _activationCollections = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
 
-    internal static Counter<int> ActivationShutdown = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN);
+    private readonly Counter<int> _activationShutdown = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN);
 
-    internal static void ActivationShutdownViaCollection() => OnActivationShutdown(DeactivationViaCollection);
-    internal static void ActivationShutdownViaDeactivateOnIdle() => OnActivationShutdown(DeactivationViaDeactivateOnIdle);
-    internal static void ActivationShutdownViaMigration() => OnActivationShutdown(DeactivationViaMigration);
-    internal static void ActivationShutdownViaDeactivateStuckActivation() => OnActivationShutdown(DeactivationViaDeactivateStuckActivation);
+    internal void ActivationShutdownViaCollection() => OnActivationShutdown(DeactivationViaCollection);
+    internal void ActivationShutdownViaDeactivateOnIdle() => OnActivationShutdown(DeactivationViaDeactivateOnIdle);
+    internal void ActivationShutdownViaMigration() => OnActivationShutdown(DeactivationViaMigration);
+    internal void ActivationShutdownViaDeactivateStuckActivation() => OnActivationShutdown(DeactivationViaDeactivateStuckActivation);
 
-    internal static Histogram<double> DeactivationLatency = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_DEACTIVATION_LATENCY, MillisecondsUnit);
-    internal static bool DeactivationLatencyEnabled => DeactivationLatency.Enabled;
+    private readonly Histogram<double> _deactivationLatency = instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_DEACTIVATION_LATENCY, MillisecondsUnit);
+    internal bool DeactivationLatencyEnabled => _deactivationLatency.Enabled;
 
-    internal static void OnDeactivationCompleted(TimeSpan latency, string via)
+    internal void OnDeactivationCompleted(TimeSpan latency, string via)
     {
-        if (DeactivationLatency.Enabled)
+        if (_deactivationLatency.Enabled)
         {
-            DeactivationLatency.Record(latency.TotalMilliseconds, new KeyValuePair<string, object?>(ViaTagName, via));
+            _deactivationLatency.Record(latency.TotalMilliseconds, new KeyValuePair<string, object?>(ViaTagName, via));
         }
     }
 
-    internal static Counter<int> NonExistentActivations = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS);
+    private readonly Counter<int> _nonExistentActivations = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS);
 
-    internal static Counter<int> ActivationConcurrentRegistrationAttempts = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS);
+    private readonly Counter<int> _activationConcurrentRegistrationAttempts = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS);
 
-    internal static readonly Counter<int> ActivationsCreated = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CREATED);
-    internal static readonly Counter<int> ActivationsDestroyed = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
-    private static readonly Histogram<double> ActivationLatency = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_ACTIVATION_LATENCY, MillisecondsUnit);
-    internal static bool ActivationLatencyEnabled => ActivationLatency.Enabled;
+    private readonly Counter<int> _activationsCreated = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CREATED);
+    private readonly Counter<int> _activationsDestroyed = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
+    private readonly Histogram<double> _activationLatency = instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_ACTIVATION_LATENCY, MillisecondsUnit);
+    internal bool ActivationLatencyEnabled => _activationLatency.Enabled;
 
-    internal static ObservableGauge<int>? ActivationCount;
+    private ObservableGauge<int>? _activationCount;
 
-    internal static void RegisterActivationCountObserve(Func<int> observeValue)
+    internal void RegisterActivationCountObserve(Func<int> observeValue)
     {
-        ActivationCount = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_COUNT, observeValue);
+        _activationCount = instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_COUNT, observeValue);
     }
 
-    internal static ObservableGauge<int>? ActivationWorkingSet;
-    internal static void RegisterActivationWorkingSetObserve(Func<int> observeValue)
+    private ObservableGauge<int>? _activationWorkingSet;
+    internal void RegisterActivationWorkingSetObserve(Func<int> observeValue)
     {
-        ActivationWorkingSet = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, observeValue);
+        _activationWorkingSet = instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, observeValue);
     }
 
-    internal static void OnActivationCompleted(TimeSpan latency, string status, bool usesDirectory)
+    internal void OnActivationCompleted(TimeSpan latency, string status, bool usesDirectory)
     {
-        if (ActivationLatency.Enabled)
+        if (_activationLatency.Enabled)
         {
-            ActivationLatency.Record(
+            _activationLatency.Record(
                 Math.Max(0, latency.TotalMilliseconds),
                 [
                     new KeyValuePair<string, object?>(StatusTagName, status),
@@ -187,27 +191,47 @@ internal static class CatalogInstruments
         }
     }
 
-    internal static void OnActivationFailedToActivate()
+    internal void OnActivationFailedToActivate()
     {
-        if (ActivationFailedToActivate.Enabled)
+        if (_activationFailedToActivate.Enabled)
         {
-            ActivationFailedToActivate.Add(1);
+            _activationFailedToActivate.Add(1);
         }
     }
 
-    internal static void OnActivationConcurrentRegistrationAttempt()
+    internal void OnActivationConcurrentRegistrationAttempt()
     {
-        if (ActivationConcurrentRegistrationAttempts.Enabled)
+        if (_activationConcurrentRegistrationAttempts.Enabled)
         {
-            ActivationConcurrentRegistrationAttempts.Add(1);
+            _activationConcurrentRegistrationAttempts.Add(1);
         }
     }
 
-    private static void OnActivationShutdown(string via)
+    internal void OnActivationCollected()
     {
-        if (ActivationShutdown.Enabled)
+        _activationCollections.Add(1);
+    }
+
+    internal void OnActivationCreated()
+    {
+        _activationsCreated.Add(1);
+    }
+
+    internal void OnActivationDestroyed()
+    {
+        _activationsDestroyed.Add(1);
+    }
+
+    internal void OnNonExistentActivation()
+    {
+        _nonExistentActivations.Add(1);
+    }
+
+    private void OnActivationShutdown(string via)
+    {
+        if (_activationShutdown.Enabled)
         {
-            ActivationShutdown.Add(1, new KeyValuePair<string, object?>(ViaTagName, via));
+            _activationShutdown.Add(1, new KeyValuePair<string, object?>(ViaTagName, via));
         }
     }
 }

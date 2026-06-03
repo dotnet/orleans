@@ -16,6 +16,7 @@ namespace Orleans.Runtime
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly GrainContextActivator grainActivator;
+        private readonly CatalogInstruments _catalogInstruments;
         private ISiloStatusOracle _siloStatusOracle;
 
         // Lock striping is used for activation creation to reduce contention
@@ -33,6 +34,7 @@ namespace Orleans.Runtime
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
             GrainContextActivator grainActivator,
+            CatalogInstruments catalogInstruments,
             SystemTargetShared shared)
             : base(Constants.CatalogType, shared)
         {
@@ -41,6 +43,7 @@ namespace Orleans.Runtime
             this.grainActivator = grainActivator;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
+            _catalogInstruments = catalogInstruments;
 
             // Initialize lock striping array
             for (var i = 0; i < LockCount; i++)
@@ -95,7 +98,7 @@ namespace Orleans.Runtime
 
                 // this should be removed once we've refactored the deactivation code path. For now safe to keep.
                 activationCollector.TryCancelCollection(activation as ICollectibleGrainContext);
-                CatalogInstruments.ActivationsDestroyed.Add(1);
+                _catalogInstruments.OnActivationDestroyed();
             }
         }
 
@@ -188,7 +191,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            CatalogInstruments.ActivationsCreated.Add(1);
+            _catalogInstruments.OnActivationCreated();
 
             // Rehydration occurs before activation.
             if (rehydrationContext is not null)
@@ -215,7 +218,7 @@ namespace Orleans.Runtime
                     self.LogDebugUnableToCreateActivation(grainId);
                 }
 
-                CatalogInstruments.NonExistentActivations.Add(1);
+                self._catalogInstruments.OnNonExistentActivation();
 
                 var grainLocator = self.serviceProvider.GetRequiredService<GrainLocator>();
                 grainLocator.InvalidateCache(grainId);

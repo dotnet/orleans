@@ -1620,7 +1620,7 @@ internal sealed partial class ActivationData :
 
     public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
     {
-        var metrics = CatalogInstruments.ActivationMetricTracker.Start(IsUsingGrainDirectory);
+        var metrics = CatalogInstruments.ActivationMetricTracker.Start(_shared.CatalogInstruments, IsUsingGrainDirectory);
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
@@ -1708,7 +1708,7 @@ internal sealed partial class ActivationData :
                                 }
 
                                 success = false;
-                                CatalogInstruments.OnActivationConcurrentRegistrationAttempt();
+                                _shared.CatalogInstruments.OnActivationConcurrentRegistrationAttempt();
                                 LogDuplicateActivation(
                                     _shared.Logger,
                                     Address,
@@ -1810,7 +1810,7 @@ internal sealed partial class ActivationData :
                     {
                         if (cancellationToken.IsCancellationRequested && exception is ObjectDisposedException or OperationCanceledException)
                         {
-                            CatalogInstruments.OnActivationFailedToActivate();
+                            _shared.CatalogInstruments.OnActivationFailedToActivate();
 
                             // This captures the case where user code in OnActivateAsync doesn't use the passed cancellation token
                             // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation,
@@ -1864,7 +1864,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                CatalogInstruments.OnActivationFailedToActivate();
+                _shared.CatalogInstruments.OnActivationFailedToActivate();
                 activationMetrics.Failed(cancellationToken.IsCancellationRequested);
                 var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                 LogErrorActivatingGrain(_shared.Logger, sourceException, this);
@@ -1924,7 +1924,7 @@ internal sealed partial class ActivationData :
     {
         using var _ = deactivateCommand.Activity;
 
-        var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start();
+        var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments);
         var migrating = false;
         var encounteredError = false;
         try
@@ -2029,22 +2029,22 @@ internal sealed partial class ActivationData :
             if (IsStuckDeactivating)
             {
                 deactivationMetrics = deactivationMetrics.DeactivateStuckActivation();
-                CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation();
+                _shared.CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation();
             }
             else if (migrating)
             {
                 deactivationMetrics = deactivationMetrics.Migration();
-                CatalogInstruments.ActivationShutdownViaMigration();
+                _shared.CatalogInstruments.ActivationShutdownViaMigration();
             }
             else if (_isInWorkingSet)
             {
                 deactivationMetrics = deactivationMetrics.DeactivateOnIdle();
-                CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
+                _shared.CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
             }
             else
             {
                 deactivationMetrics = deactivationMetrics.Collection();
-                CatalogInstruments.ActivationShutdownViaCollection();
+                _shared.CatalogInstruments.ActivationShutdownViaCollection();
             }
 
             UnregisterMessageTarget();

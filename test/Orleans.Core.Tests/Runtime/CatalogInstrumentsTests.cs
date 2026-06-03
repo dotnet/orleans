@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Xunit;
 
@@ -10,6 +11,13 @@ public class CatalogInstrumentsTests
     [Fact, TestCategory("BVT"), TestCategory("Runtime")]
     public void ActivationLifecycleLatencyMetrics_AreHistograms()
     {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+
+        using var serviceProvider = services.BuildServiceProvider();
+        var meterFactory = serviceProvider.GetRequiredService<IMeterFactory>();
+        var instruments = new CatalogInstruments(new OrleansInstruments(meterFactory));
+
         Instrument activationLatencyInstrument = null!;
         Instrument deactivationLatencyInstrument = null!;
         var activationLatencyMeasurement = 0d;
@@ -46,8 +54,8 @@ public class CatalogInstrumentsTests
 
         listener.Start();
 
-        CatalogInstruments.OnActivationCompleted(TimeSpan.FromMilliseconds(12), CatalogInstruments.ActivationStatusSuccess, usesDirectory: true);
-        CatalogInstruments.OnDeactivationCompleted(TimeSpan.FromMilliseconds(34), CatalogInstruments.DeactivationViaCollection);
+        instruments.OnActivationCompleted(TimeSpan.FromMilliseconds(12), CatalogInstruments.ActivationStatusSuccess, usesDirectory: true);
+        instruments.OnDeactivationCompleted(TimeSpan.FromMilliseconds(34), CatalogInstruments.DeactivationViaCollection);
 
         Assert.IsType<Histogram<double>>(activationLatencyInstrument);
         Assert.IsType<Histogram<double>>(deactivationLatencyInstrument);

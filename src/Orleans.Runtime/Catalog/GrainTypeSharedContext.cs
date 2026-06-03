@@ -58,6 +58,7 @@ public sealed class GrainTypeSharedContext
         SchedulingOptions = schedulingOptions.Value;
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
+        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
 
         CollectionAgeLimit = GetCollectionAgeLimit(
             grainType,
@@ -70,6 +71,8 @@ public sealed class GrainTypeSharedContext
     /// Gets the grain instance type name, if available.
     /// </summary>
     public string? GrainTypeName { get; }
+
+    internal CatalogInstruments CatalogInstruments { get; }
 
     private static TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
     {

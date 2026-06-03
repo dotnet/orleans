@@ -33,12 +33,13 @@ namespace Orleans.Runtime
         public ActivationWorkingSet(
             IAsyncTimerFactory asyncTimerFactory,
             ILogger<ActivationWorkingSet> logger,
-            IEnumerable<IActivationWorkingSetObserver> observers)
+            IEnumerable<IActivationWorkingSetObserver> observers,
+            CatalogInstruments catalogInstruments)
         {
             _logger = logger;
             _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(5_000), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet));
             _observers = observers.ToList();
-            CatalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
+            catalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
         }
 
         public int Count => _activeCount;
