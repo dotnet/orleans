@@ -34,6 +34,7 @@ namespace Orleans.Streams
         private readonly IStreamFailureHandler streamFailureHandler;
         private readonly StreamInstruments _streamInstruments;
         private readonly TimeProvider _timeProvider;
+        private readonly TryGetDeliveryProgress _tryGetDeliveryProgress;
         internal readonly QueueId QueueId;
 
         private int numMessages;
@@ -88,6 +89,7 @@ namespace Orleans.Streams
             this.queueReaderBackoffProvider = queueReaderBackoffProvider;
             _streamInstruments = streamInstruments;
             _timeProvider = timeProvider ?? TimeProvider.System;
+            _tryGetDeliveryProgress = TryGetDeliveryProgress;
             numMessages = 0;
 
             logger = shared.LoggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -208,7 +210,7 @@ namespace Orleans.Streams
 
             // Final delivery progress scan so the receiver has the latest watermark
             // before FlushAsync persists the checkpoint.
-            NotifyDeliveryProgress();
+            NotifyDeliveryProgress(force: true);
 
             this.queueCache = null;
 
@@ -311,6 +313,10 @@ namespace Orleans.Streams
                 data.LastProcessedToken = startToken;
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
+                // A newly registered subscriber can request an older token than the
+                // current checkpoint. Force a progress update so the receiver can
+                // persist that rewind immediately instead of waiting for its cadence.
+                NotifyDeliveryProgress(force: true);
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 if (data.State == StreamConsumerDataState.Inactive)
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
@@ -415,10 +421,8 @@ namespace Orleans.Streams
                 return Task.CompletedTask;
             }
 
-            // Push delivery progress on every timer tick (~100ms) so checkpoint
-            // advancement reflects cursor delivery that happens asynchronously,
-            // even while a pump is still reading from the queue.
-            NotifyDeliveryProgress();
+            // Let the cache lazily request delivery progress when its checkpoint cadence elapses.
+            NotifyDeliveryProgress(force: false);
 
             if (!_activePumpTask.IsCompleted)
             {
@@ -602,35 +606,38 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Scans <see cref="pubSubCache"/> for the current delivery progress of all
-        /// subscriptions and pushes a snapshot to the queue cache so it can compute a safe
-        /// checkpoint watermark. Called periodically from the read loop and once at shutdown.
-        /// Skips notifying the cache while stream registrations are pending.
+        /// Gives the queue cache a lazy callback for retrieving delivery progress.
+        /// The cache invokes the callback when it needs a current checkpoint watermark.
         /// </summary>
-        private void NotifyDeliveryProgress()
+        private void NotifyDeliveryProgress(bool force)
         {
             if (queueCache is null) return;
 
-            StreamSequenceToken earliest = null;
+            queueCache.UpdateDeliveryProgress(_tryGetDeliveryProgress, force);
+        }
+
+        private bool TryGetDeliveryProgress(out StreamSequenceToken earliest)
+        {
+            earliest = null;
 
             foreach (var streamConsumers in pubSubCache.Values)
             {
                 if (streamConsumers.RegistrationTask is { IsCompleted: false })
                 {
-                    return;
+                    return false;
                 }
 
                 foreach (var consumer in streamConsumers.AllConsumers())
                 {
                     if (!consumer.IsRegistered)
                     {
-                        return;
+                        return false;
                     }
 
                     var current = consumer.LastProcessedToken;
                     if (current is null)
                     {
-                        return;
+                        return false;
                     }
 
                     if (earliest is null || IsBefore(current, earliest))
@@ -640,7 +647,7 @@ namespace Orleans.Streams
                 }
             }
 
-            queueCache.UpdateDeliveryProgress(earliest);
+            return true;
         }
 
         private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
@@ -711,6 +718,7 @@ namespace Orleans.Streams
                 finally
                 {
                     streamData.RegistrationTask = null;
+                    NotifyDeliveryProgress(force: true);
 
                     // Disposed after all initial subscriber handshakes complete so the first
                     // batch stays pinned until each subscriber has its own cache cursor.

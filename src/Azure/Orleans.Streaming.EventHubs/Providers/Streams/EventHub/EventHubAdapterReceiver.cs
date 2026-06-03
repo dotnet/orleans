@@ -224,7 +224,27 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken)
+        public void UpdateDeliveryProgress(TryGetDeliveryProgress tryGetDeliveryProgress, bool force)
+        {
+            ArgumentNullException.ThrowIfNull(tryGetDeliveryProgress);
+
+            var utcNow = DateTime.UtcNow;
+            if (!force
+                && this.checkpointer is IEventHubCheckpointerUpdateCadence updateCadence
+                && !updateCadence.IsUpdateDue(utcNow))
+            {
+                return;
+            }
+
+            if (!tryGetDeliveryProgress(out var earliestSubscriptionToken))
+            {
+                return;
+            }
+
+            UpdateDeliveryProgress(earliestSubscriptionToken, utcNow);
+        }
+
+        private void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
         {
             string checkpointOffset;
             if (earliestSubscriptionToken is null)
@@ -244,7 +264,7 @@ namespace Orleans.Streaming.EventHubs
 
             if (checkpointOffset is not null)
             {
-                this.checkpointer?.Update(checkpointOffset, DateTime.UtcNow);
+                this.checkpointer?.Update(checkpointOffset, utcNow);
             }
         }
 

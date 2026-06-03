@@ -12,6 +12,11 @@ using Orleans.Configuration.Overrides;
 #nullable disable
 namespace Orleans.Streaming.EventHubs
 {
+    internal interface IEventHubCheckpointerUpdateCadence
+    {
+        bool IsUpdateDue(DateTime utcNow);
+    }
+
     public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
         private readonly ILoggerFactory loggerFactory;
@@ -43,7 +48,7 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// This class stores EventHub partition checkpointer information (a partition offset) in azure table storage.
     /// </summary>
-    public partial class EventHubCheckpointer : IStreamQueueCheckpointer<string>
+    public partial class EventHubCheckpointer : IStreamQueueCheckpointer<string>, IEventHubCheckpointerUpdateCadence
     {
         private readonly AzureTableDataManager<EventHubPartitionCheckpointEntity> dataManager;
         private readonly TimeSpan persistInterval;
@@ -130,6 +135,7 @@ namespace Orleans.Streaming.EventHubs
             // if offset has not changed, do nothing
             if (string.Compare(latestOffset, offset, StringComparison.Ordinal) == 0)
             {
+                throttleSavesUntilUtc = utcNow + persistInterval;
                 return;
             }
 
@@ -162,6 +168,12 @@ namespace Orleans.Streaming.EventHubs
             }
 
             inProgressSave.Ignore();
+        }
+
+        bool IEventHubCheckpointerUpdateCadence.IsUpdateDue(DateTime utcNow)
+        {
+            return inProgressSave.IsCompleted
+                && (!throttleSavesUntilUtc.HasValue || throttleSavesUntilUtc.Value <= utcNow);
         }
 
         private async Task SaveLatestAfter(Task previousSave)
