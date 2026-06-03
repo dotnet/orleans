@@ -12,11 +12,6 @@ using Orleans.Configuration.Overrides;
 #nullable disable
 namespace Orleans.Streaming.EventHubs
 {
-    internal interface IEventHubCheckpointerUpdateCadence
-    {
-        bool IsUpdateDue(DateTime utcNow);
-    }
-
     public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
         private readonly ILoggerFactory loggerFactory;
@@ -48,7 +43,7 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// This class stores EventHub partition checkpointer information (a partition offset) in azure table storage.
     /// </summary>
-    public partial class EventHubCheckpointer : IStreamQueueCheckpointer<string>, IEventHubCheckpointerUpdateCadence
+    public partial class EventHubCheckpointer : IStreamQueueCheckpointer<string>
     {
         private readonly AzureTableDataManager<EventHubPartitionCheckpointEntity> dataManager;
         private readonly TimeSpan persistInterval;
@@ -132,25 +127,19 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="utcNow"></param>
         public void Update(string offset, DateTime utcNow)
         {
-            // if offset has not changed, do nothing
-            if (string.Compare(latestOffset, offset, StringComparison.Ordinal) == 0)
+            // Checkpoints are monotonic: if a subscriber requests replay from before
+            // the current checkpoint, keep the checkpoint at the latest safe offset.
+            if (!IsAfter(offset, latestOffset))
             {
                 throttleSavesUntilUtc = utcNow + persistInterval;
                 return;
             }
 
-            // The safe delivery watermark can move backwards when a newly registered
-            // subscriber requests replay from an older token. Persist that rewind
-            // immediately so recovery starts before the slowest known subscriber's
-            // required event.
-            var mustSaveNow = IsBefore(offset, entity.Offset);
-
             // Always track the latest safe offset in memory so FlushAsync can persist it.
             latestOffset = offset;
 
-            // If we've saved before but it's not time for another save or the last save operation has not completed,
-            // do nothing unless this update lowers the checkpoint to protect a slower subscription.
-            if (!mustSaveNow && throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
+            // If we've saved before but it's not time for another save or the last save operation has not completed, do nothing.
+            if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
             {
                 return;
             }
@@ -170,7 +159,7 @@ namespace Orleans.Streaming.EventHubs
             inProgressSave.Ignore();
         }
 
-        bool IEventHubCheckpointerUpdateCadence.IsUpdateDue(DateTime utcNow)
+        bool IStreamQueueCheckpointer<string>.IsUpdateDue(DateTime utcNow)
         {
             return inProgressSave.IsCompleted
                 && (!throttleSavesUntilUtc.HasValue || throttleSavesUntilUtc.Value <= utcNow);
@@ -199,11 +188,13 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        private static bool IsBefore(string offset, string currentOffset)
+        private static bool IsAfter(string offset, string currentOffset)
         {
+            currentOffset ??= EventHubConstants.StartOfStream;
+
             return long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset)
                 && long.TryParse(currentOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedCurrentOffset)
-                && parsedOffset < parsedCurrentOffset;
+                && parsedOffset > parsedCurrentOffset;
         }
 
         [LoggerMessage(

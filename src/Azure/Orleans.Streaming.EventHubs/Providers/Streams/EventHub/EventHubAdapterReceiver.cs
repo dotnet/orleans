@@ -230,8 +230,8 @@ namespace Orleans.Streaming.EventHubs
 
             var utcNow = DateTime.UtcNow;
             if (!force
-                && this.checkpointer is IEventHubCheckpointerUpdateCadence updateCadence
-                && !updateCadence.IsUpdateDue(utcNow))
+                && this.checkpointer is { } checkpointer
+                && !checkpointer.IsUpdateDue(utcNow))
             {
                 return;
             }

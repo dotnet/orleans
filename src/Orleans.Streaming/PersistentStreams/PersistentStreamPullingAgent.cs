@@ -313,10 +313,6 @@ namespace Orleans.Streams
                 data.LastProcessedToken = startToken;
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
-                // A newly registered subscriber can request an older token than the
-                // current checkpoint. Force a progress update so the receiver can
-                // persist that rewind immediately instead of waiting for its cadence.
-                NotifyDeliveryProgress(force: true);
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 if (data.State == StreamConsumerDataState.Inactive)
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
@@ -718,7 +714,6 @@ namespace Orleans.Streams
                 finally
                 {
                     streamData.RegistrationTask = null;
-                    NotifyDeliveryProgress(force: true);
 
                     // Disposed after all initial subscriber handshakes complete so the first
                     // batch stays pinned until each subscriber has its own cache cursor.

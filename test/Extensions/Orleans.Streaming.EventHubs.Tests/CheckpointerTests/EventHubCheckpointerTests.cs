@@ -1,3 +1,4 @@
+using System.Globalization;
 using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.EventHubs;
@@ -28,6 +29,12 @@ public class EventHubCheckpointerTests
 
         public void Update(string offset, DateTime utcNow)
         {
+            if (LastOffset is not null
+                && long.Parse(offset, CultureInfo.InvariantCulture) <= long.Parse(LastOffset, CultureInfo.InvariantCulture))
+            {
+                return;
+            }
+
             LastOffset = offset;
             UpdateCount++;
         }
@@ -36,14 +43,16 @@ public class EventHubCheckpointerTests
         {
             return Task.CompletedTask;
         }
+
+        public virtual bool IsUpdateDue(DateTime utcNow) => true;
     }
 
-    private sealed class ThrottledTestCheckpointer : TestCheckpointer, IEventHubCheckpointerUpdateCadence
+    private sealed class ThrottledTestCheckpointer : TestCheckpointer
     {
         public bool IsUpdateDueResult { get; set; }
         public int IsUpdateDueCount { get; private set; }
 
-        public bool IsUpdateDue(DateTime utcNow)
+        public override bool IsUpdateDue(DateTime utcNow)
         {
             IsUpdateDueCount++;
             return IsUpdateDueResult;
@@ -238,7 +247,7 @@ public class EventHubCheckpointerTests
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task ReplayingSubscription_CanMoveCheckpointBackward()
+    public async Task ReplayingSubscription_DoesNotMoveCheckpointBackward()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
@@ -246,11 +255,10 @@ public class EventHubCheckpointerTests
         UpdateDeliveryProgress(receiver, MakeToken(200));
         Assert.Equal("200", checkpointer.LastOffset);
 
-        // A newly registered subscriber can request replay from an older token.
-        // The safe delivery watermark must be allowed to move backwards so a
-        // restart does not skip the messages that subscriber still needs.
+        // A newly registered subscriber can request replay from an older token,
+        // but the checkpoint only advances and must not move backwards.
         UpdateDeliveryProgress(receiver, MakeToken(50));
-        Assert.Equal("50", checkpointer.LastOffset);
+        Assert.Equal("200", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]

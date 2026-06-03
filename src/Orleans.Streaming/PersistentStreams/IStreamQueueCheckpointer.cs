@@ -43,6 +43,13 @@ namespace Orleans.Streams
         void Update(TCheckpoint offset, DateTime utcNow);
 
         /// <summary>
+        /// Returns <see langword="true"/> if the checkpointer is due for an update.
+        /// </summary>
+        /// <param name="utcNow">The current UTC time.</param>
+        /// <returns><see langword="true"/> if an update is due; otherwise, <see langword="false"/>.</returns>
+        bool IsUpdateDue(DateTime utcNow) => true;
+
+        /// <summary>
         /// Flushes any pending checkpoint to persistent storage, ensuring the latest offset is durably saved.
         /// Called during shutdown or rebalancing to prevent message replay on restart.
         /// </summary>
