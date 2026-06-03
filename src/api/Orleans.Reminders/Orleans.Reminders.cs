@@ -166,6 +166,13 @@ namespace Orleans.Reminders.Diagnostics
         public const string ListenerName = "Orleans.Reminders";
         public static System.IObservable<ReminderEvent> AllEvents { get { throw null; } }
 
+        public sealed partial class LocalReminderScheduleChanged : ReminderEvent
+        {
+            public readonly object Identity;
+            public readonly long ScheduleVersion;
+            public LocalReminderScheduleChanged(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
+        }
+
         public sealed partial class LocalReminderStarted : ReminderEvent
         {
             public readonly object Identity;
@@ -179,20 +186,6 @@ namespace Orleans.Reminders.Diagnostics
             public LocalReminderStopped(Runtime.GrainId grainId, string reminderName, object identity, LocalReminderStopReason reason, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
         }
 
-        public sealed partial class LocalReminderScheduleChanged : ReminderEvent
-        {
-            public readonly object Identity;
-            public readonly long ScheduleVersion;
-            public LocalReminderScheduleChanged(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
-        }
-
-        public sealed partial class LocalReminderTickWaitArmed : ReminderEvent
-        {
-            public readonly object Identity;
-            public readonly long ScheduleVersion;
-            public LocalReminderTickWaitArmed(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
-        }
-
         public enum LocalReminderStopReason
         {
             Unknown = 0,
@@ -201,6 +194,13 @@ namespace Orleans.Reminders.Diagnostics
             RemovedFromRange = 3,
             RemovedFromTable = 4,
             ServiceStopped = 5
+        }
+
+        public sealed partial class LocalReminderTickWaitArmed : ReminderEvent
+        {
+            public readonly object Identity;
+            public readonly long ScheduleVersion;
+            public LocalReminderTickWaitArmed(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
         }
 
         public sealed partial class Registered : ReminderEvent

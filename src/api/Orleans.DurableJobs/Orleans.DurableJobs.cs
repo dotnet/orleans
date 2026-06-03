@@ -199,6 +199,8 @@ namespace Orleans.Hosting
 
         public System.TimeSpan ShardActivationBufferPeriod { get { throw null; } set { } }
 
+        public System.TimeSpan ShardBatchLingerDelay { get { throw null; } set { } }
+
         public int ShardClaimInitialBudget { get { throw null; } set { } }
 
         public int ShardClaimMaxBudget { get { throw null; } set { } }

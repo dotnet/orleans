@@ -14,7 +14,6 @@ namespace Orleans.Journaling
         public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
         public static readonly System.TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
         public static readonly System.TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
-
         public Azure.Storage.Blobs.BlobServiceClient? BlobServiceClient { get { throw null; } set { } }
 
         public System.Func<System.IServiceProvider, AzureBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }

@@ -1046,7 +1046,7 @@ namespace Orleans.Runtime.Diagnostics
 
     public static partial class GrainLifecycleEvents
     {
-        public const string ListenerName = "Orleans.GrainsLifecycle";
+        public const string ListenerName = "Orleans.GrainLifecycle";
         public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
 
         public sealed partial class Activated : LifecycleEvent
