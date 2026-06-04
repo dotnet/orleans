@@ -234,9 +234,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                             : _migrationSnapshotRequired
                                                 ? JournalingInstruments.CompactionReasonMigration
                                                 : JournalingInstruments.CompactionReasonStorageRequested;
-                                        JournalingInstruments.OnCompactionTriggered(compactionReason);
+                                        _shared.Instruments.OnCompactionTriggered(compactionReason);
                                     }
-                                    JournalingInstruments.OnWriteCoalesced(operationLabel, workItem.CallerCount);
+                                    _shared.Instruments.OnWriteCoalesced(operationLabel, workItem.CallerCount);
                                     var gatherStartTimestamp = _shared.TimeProvider.GetTimestamp();
                                     var statesScanned = 0L;
                                     ArcBuffer committedBuffer = default;
@@ -334,7 +334,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         }
                                     }
 
-                                    JournalingInstruments.OnGather(
+                                    _shared.Instruments.OnGather(
                                         operationLabel,
                                         _shared.TimeProvider.GetElapsedTime(gatherStartTimestamp),
                                         statesScanned);
@@ -495,7 +495,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                         if (recordQueueDuration && queueOperation is not null)
                         {
-                            JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: true);
+                            _shared.Instruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: true);
                         }
 
                         storageActivity?.SetStatus(ActivityStatusCode.Ok);
@@ -505,7 +505,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     {
                         if (recordQueueDuration && queueOperation is not null)
                         {
-                            JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: false);
+                            _shared.Instruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: false);
                         }
 
                         if (storageActivity is not null)
@@ -651,11 +651,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             await task;
-            JournalingInstruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
+            _shared.Instruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
         }
         catch
         {
-            JournalingInstruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
+            _shared.Instruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
             throw;
         }
     }
@@ -671,11 +671,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             await ReadStorageAsync(this, cancellationToken).ConfigureAwait(true);
-            JournalingInstruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
+            _shared.Instruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
         }
         catch
         {
-            JournalingInstruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
+            _shared.Instruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
             throw;
         }
 
@@ -829,11 +829,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             await pendingWrite.WaitAsync(cancellationToken);
-            JournalingInstruments.OnStateWriteRequest(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
+            _shared.Instruments.OnStateWriteRequest(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
         }
         catch
         {
-            JournalingInstruments.OnStateWriteRequest(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
+            _shared.Instruments.OnStateWriteRequest(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
             throw;
         }
     }
@@ -844,11 +844,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             await _storage.ReadAsync(consumer, cancellationToken).ConfigureAwait(true);
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationRead, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: true);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationRead, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: true);
         }
         catch
         {
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationRead, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: false);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationRead, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: false);
             throw;
         }
     }
@@ -859,11 +859,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             await _storage.AppendAsync(value, cancellationToken).ConfigureAwait(true);
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
         }
         catch
         {
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationAppend, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
             throw;
         }
     }
@@ -874,11 +874,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             await _storage.ReplaceAsync(value, cancellationToken).ConfigureAwait(true);
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: true);
         }
         catch
         {
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationReplace, _shared.TimeProvider.GetElapsedTime(startTimestamp), value.Length, succeeded: false);
             throw;
         }
     }
@@ -889,11 +889,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             await _storage.DeleteAsync(cancellationToken).ConfigureAwait(true);
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationDelete, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: true);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationDelete, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: true);
         }
         catch
         {
-            JournalingInstruments.OnStorageOperation(JournalingInstruments.OperationDelete, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: false);
+            _shared.Instruments.OnStorageOperation(JournalingInstruments.OperationDelete, _shared.TimeProvider.GetElapsedTime(startTimestamp), bytes: 0, succeeded: false);
             throw;
         }
     }

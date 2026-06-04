@@ -9,6 +9,7 @@ public static class HostingExtensions
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<JournaledStateManagerOptions>();
+        builder.Services.TryAddSingleton<JournalingInstruments>();
         builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager, JournaledStateManager>();
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory, JournaledStateManagerFactory>();
