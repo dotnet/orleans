@@ -34,7 +34,15 @@ public sealed class RedisMultiplexerOwnershipTests
     }
 
     private static ConfigurationOptions GetConfigurationOptions()
-        => ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+    {
+        var connectionString = TestDefaultConfiguration.RedisConnectionString;
+
+        // The dispose-before-initialize tests do not require a live Redis and never connect, so fall back to an
+        // empty configuration when no connection string is configured rather than failing to parse a null value.
+        return string.IsNullOrWhiteSpace(connectionString)
+            ? new ConfigurationOptions()
+            : ConfigurationOptions.Parse(connectionString);
+    }
 
     [SkippableTheory]
     [InlineData(false)]
