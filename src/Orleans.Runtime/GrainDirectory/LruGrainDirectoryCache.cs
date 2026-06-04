@@ -14,14 +14,15 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
     public LruGrainDirectoryCache(
         int maxCacheSize,
         TimeSpan maxCacheTTL,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        DirectoryInstruments directoryInstruments)
         : base(
             capacity: maxCacheSize,
             comparer: null,
             timeToLive: maxCacheTTL,
             timeProvider: timeProvider)
     {
-        _cacheSizeRegistration = DirectoryInstruments.RegisterCacheSizeObserve(() => Count);
+        _cacheSizeRegistration = directoryInstruments.RegisterCacheSizeObserve(() => Count);
     }
 
     public void AddOrUpdate(GrainAddress activationAddress, int version) => AddOrUpdate(activationAddress.GrainId, (activationAddress, version));

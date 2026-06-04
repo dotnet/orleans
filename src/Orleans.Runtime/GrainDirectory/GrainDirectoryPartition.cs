@@ -29,6 +29,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private readonly int _partitionIndex;
     private readonly DistributedGrainDirectory _owner;
     private readonly IInternalGrainFactory _grainFactory;
+    private readonly DirectoryInstruments _directoryInstruments;
     private readonly CancellationTokenSource _drainSnapshotsCts = new();
     private readonly SiloAddress _id;
     private readonly ILogger<GrainDirectoryPartition> _logger;
@@ -56,11 +57,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         int partitionIndex,
         DistributedGrainDirectory owner,
         IInternalGrainFactory grainFactory,
+        DirectoryInstruments directoryInstruments,
         SystemTargetShared shared) : base(CreateGrainId(shared.SiloAddress, partitionIndex), shared)
     {
         _partitionIndex = partitionIndex;
         _owner = owner;
         _grainFactory = grainFactory;
+        _directoryInstruments = directoryInstruments;
         _id = shared.SiloAddress;
         _logger = shared.LoggerFactory.CreateLogger<GrainDirectoryPartition>();
         shared.ActivationDirectory.RecordNewTarget(this);
@@ -493,7 +496,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     private void UnlockRange(RingRange range, MembershipVersion version, TaskCompletionSource tcs, TimeSpan heldDuration, string operationName)
     {
-        DirectoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
+        _directoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
         var canceled = ShutdownToken.IsCancellationRequested;
         if (canceled)
         {
@@ -580,8 +583,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 false,
                 nameof(IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync)).Ignore();
 
-            DirectoryInstruments.SnapshotTransferCount.Add(1);
-            DirectoryInstruments.SnapshotTransferDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
+            _directoryInstruments.SnapshotTransferCount.Add(1);
+            _directoryInstruments.SnapshotTransferDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
 
             return true;
         }
@@ -617,8 +620,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             }
         }
 
-        DirectoryInstruments.RangeRecoveryCount.Add(1);
-        DirectoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
+        _directoryInstruments.RangeRecoveryCount.Add(1);
+        _directoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
         LogDebugCompletedRecoveringActivations(_logger, addedRange, current.Version, stopwatch.Elapsed);
     }
 

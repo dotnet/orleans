@@ -63,8 +63,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly IServiceProvider _serviceProvider;
     private readonly ImmutableArray<GrainDirectoryPartition> _partitions;
     private readonly CancellationTokenSource _stoppedCts = new();
+    private readonly DirectoryInstruments _directoryInstruments;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
+    internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
 
     // The recovery membership value is used to avoid a race between concurrent registration & recovery operations which could lead to lost registrations.
@@ -85,17 +87,19 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         ILogger<DistributedGrainDirectory> logger,
         IServiceProvider serviceProvider,
         IInternalGrainFactory grainFactory,
+        DirectoryInstruments directoryInstruments,
         SystemTargetShared shared) : base(Constants.GrainDirectoryType, shared)
     {
         _localActivations = shared.ActivationDirectory;
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;
         _logger = logger;
+        _directoryInstruments = directoryInstruments;
         var partitionsPerSilo = membershipService.PartitionsPerSilo;
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
         for (var i = 0; i < partitionsPerSilo; i++)
         {
-            partitions.Add(new GrainDirectoryPartition(i, this, grainFactory, shared));
+            partitions.Add(new GrainDirectoryPartition(i, this, grainFactory, directoryInstruments, shared));
         }
 
         _partitions = partitions.ToImmutable();

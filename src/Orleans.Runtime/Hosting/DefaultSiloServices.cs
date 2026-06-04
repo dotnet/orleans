@@ -70,6 +70,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ConsistentRingInstruments>();
             services.TryAddSingleton<StorageInstruments>();
             services.TryAddSingleton<CatalogInstruments>();
+            services.TryAddSingleton<DirectoryInstruments>();
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));

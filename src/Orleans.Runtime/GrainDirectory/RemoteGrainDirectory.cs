@@ -27,7 +27,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount)
         {
-            DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
+            router.DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
 
             return router.RegisterAsync(address, previousAddress, hopCount);
         }
@@ -69,7 +69,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
         {
-            DirectoryInstruments.ValidationsCacheReceived.Add(1);
+            router.DirectoryInstruments.ValidationsCacheReceived.Add(1);
             LogLookUpMany(grainAndETagList.Count);
 
             var result = new List<AddressAndTag>();

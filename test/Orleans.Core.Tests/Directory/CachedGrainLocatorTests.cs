@@ -56,6 +56,7 @@ namespace UnitTests.Directory
                 services,
                 this.grainDirectoryResolver, 
                 this.mockMembershipService.Target,
+                CreateDirectoryInstruments(),
                 grainDirectoryOptions);
 
             this.grainLocator.Participate(this.lifecycle);
@@ -117,6 +118,7 @@ namespace UnitTests.Directory
                 services,
                 grainDirectoryResolver,
                 membershipService.Target,
+                CreateDirectoryInstruments(),
                 Options.Create(new GrainDirectoryOptions()));
 
             grainLocator.Participate(lifecycle);
@@ -168,6 +170,7 @@ namespace UnitTests.Directory
                 developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
                 grainDirectoryOptions: Options.Create(new GrainDirectoryOptions { CachingStrategy = GrainDirectoryOptions.CachingStrategyType.Custom }),
                 loggerFactory: this.loggerFactory,
+                directoryInstruments: CreateDirectoryInstruments(),
                 systemTargetShared: systemTargetShared);
 
             await localGrainDirectory.StopAsync();
@@ -220,6 +223,7 @@ namespace UnitTests.Directory
                 developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
                 grainDirectoryOptions: Options.Create(new GrainDirectoryOptions()),
                 loggerFactory: this.loggerFactory,
+                directoryInstruments: CreateDirectoryInstruments(),
                 systemTargetShared: systemTargetShared)
             {
                 Running = true
@@ -284,6 +288,7 @@ namespace UnitTests.Directory
                 developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
                 grainDirectoryOptions: Options.Create(new GrainDirectoryOptions()),
                 loggerFactory: this.loggerFactory,
+                directoryInstruments: CreateDirectoryInstruments(),
                 systemTargetShared: systemTargetShared)
             {
                 Running = true
@@ -834,6 +839,15 @@ namespace UnitTests.Directory
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<CatalogInstruments>();
             return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
+        }
+
+        private static DirectoryInstruments CreateDirectoryInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<DirectoryInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<DirectoryInstruments>();
         }
 
         private int generation = 0;

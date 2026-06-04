@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Orleans.Runtime;
 
-internal static class DirectoryInstruments
+internal sealed class DirectoryInstruments
 {
     private const string MillisecondsUnit = "ms";
     private const string StatusTagName = "status";
@@ -16,88 +16,123 @@ internal static class DirectoryInstruments
     internal const string RegistrationStatusCanceled = "canceled";
     internal const string RegistrationStatusError = "error";
 
-    private static ImmutableArray<CacheSizeObserverRegistration> CacheSizeObservers = [];
+    private readonly Meter _meter;
+    private ImmutableArray<CacheSizeObserverRegistration> _cacheSizeObservers = [];
 
-    internal static readonly Counter<int> LookupsLocalIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
-    internal static readonly Counter<int> LookupsLocalSuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
+    internal readonly Counter<int> LookupsLocalIssued;
+    internal readonly Counter<int> LookupsLocalSuccesses;
 
-    internal static readonly Counter<int> LookupsFullIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_FULL_ISSUED);
+    internal readonly Counter<int> LookupsFullIssued;
 
-    internal static readonly Counter<int> LookupsRemoteSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_REMOTE_SENT);
-    internal static readonly Counter<int> LookupsRemoteReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_REMOTE_RECEIVED);
+    internal readonly Counter<int> LookupsRemoteSent;
+    internal readonly Counter<int> LookupsRemoteReceived;
 
-    internal static readonly Counter<int> LookupsLocalDirectoryIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCALDIRECTORY_ISSUED);
-    internal static readonly Counter<int> LookupsLocalDirectorySuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCALDIRECTORY_SUCCESSES);
+    internal readonly Counter<int> LookupsLocalDirectoryIssued;
+    internal readonly Counter<int> LookupsLocalDirectorySuccesses;
 
-    internal static readonly Counter<int> LookupsCacheIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_CACHE_ISSUED);
-    internal static readonly Counter<int> LookupsCacheSuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_CACHE_SUCCESSES);
-    internal static readonly Counter<int> ValidationsCacheReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_VALIDATIONS_CACHE_RECEIVED);
+    internal readonly Counter<int> LookupsCacheIssued;
+    internal readonly Counter<int> LookupsCacheSuccesses;
+    internal readonly Counter<int> ValidationsCacheReceived;
 
-    internal static readonly Counter<int> SnapshotTransferCount = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_COUNT);
-    internal static readonly Histogram<long> SnapshotTransferDuration = Instruments.Meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_DURATION);
-    internal static readonly Counter<long> RangeRecoveryCount = Instruments.Meter.CreateCounter<long>(InstrumentNames.DIRECTORY_RANGE_RECOVERY_COUNT);
-    internal static readonly Histogram<long> RangeRecoveryDuration = Instruments.Meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_RECOVERY_DURATION);
-    internal static readonly Histogram<long> RangeLockHeldDuration = Instruments.Meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_LOCK_HELD_DURATION);
+    internal readonly Counter<int> SnapshotTransferCount;
+    internal readonly Histogram<long> SnapshotTransferDuration;
+    internal readonly Counter<long> RangeRecoveryCount;
+    internal readonly Histogram<long> RangeRecoveryDuration;
+    internal readonly Histogram<long> RangeLockHeldDuration;
 
-    internal static ObservableGauge<int>? DirectoryPartitionSize;
-    internal static void RegisterDirectoryPartitionSizeObserve(Func<int> observeValue)
+    private ObservableGauge<int>? _directoryPartitionSize;
+    internal void RegisterDirectoryPartitionSizeObserve(Func<int> observeValue)
     {
-        DirectoryPartitionSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_PARTITION_SIZE, observeValue);
+        _directoryPartitionSize = _meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_PARTITION_SIZE, observeValue);
     }
 
-    internal static readonly ObservableGauge<int> CacheSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, ObserveCacheSize);
-    internal static IDisposable RegisterCacheSizeObserve(Func<int> observeValue)
+    private readonly ObservableGauge<int> _cacheSize;
+    internal IDisposable RegisterCacheSizeObserve(Func<int> observeValue)
     {
         ArgumentNullException.ThrowIfNull(observeValue);
 
-        var registration = new CacheSizeObserverRegistration(observeValue);
-        ImmutableInterlocked.Update(ref CacheSizeObservers, static (observers, registration) => observers.Add(registration), registration);
+        var registration = new CacheSizeObserverRegistration(this, observeValue);
+        ImmutableInterlocked.Update(ref _cacheSizeObservers, static (observers, registration) => observers.Add(registration), registration);
         return registration;
     }
 
-    internal static ObservableGauge<int>? RingSize;
-    internal static void RegisterRingSizeObserve(Func<int> observeValue)
+    private ObservableGauge<int>? _ringSize;
+    internal void RegisterRingSizeObserve(Func<int> observeValue)
     {
-        RingSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_RING_RINGSIZE, observeValue);
+        _ringSize = _meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_RING_RINGSIZE, observeValue);
     }
 
-    internal static ObservableGauge<long>? MyPortionRingDistance;
-    internal static void RegisterMyPortionRingDistanceObserve(Func<long> observeValue)
+    private ObservableGauge<long>? _myPortionRingDistance;
+    internal void RegisterMyPortionRingDistanceObserve(Func<long> observeValue)
     {
-        MyPortionRingDistance = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGDISTANCE, observeValue);
+        _myPortionRingDistance = _meter.CreateObservableGauge<long>(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGDISTANCE, observeValue);
     }
 
-    internal static ObservableGauge<float>? MyPortionRingPercentage;
-    internal static void RegisterMyPortionRingPercentageObserve(Func<float> observeValue)
+    private ObservableGauge<float>? _myPortionRingPercentage;
+    internal void RegisterMyPortionRingPercentageObserve(Func<float> observeValue)
     {
-        MyPortionRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGPERCENTAGE, observeValue);
+        _myPortionRingPercentage = _meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGPERCENTAGE, observeValue);
     }
 
-    internal static ObservableGauge<float>? MyPortionAverageRingPercentage;
-    internal static void RegisterMyPortionAverageRingPercentageObserve(Func<float> observeValue)
+    private ObservableGauge<float>? _myPortionAverageRingPercentage;
+    internal void RegisterMyPortionAverageRingPercentageObserve(Func<float> observeValue)
     {
-        MyPortionAverageRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE, observeValue);
+        _myPortionAverageRingPercentage = _meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE, observeValue);
     }
 
-    internal static readonly Counter<int> RegistrationsSingleActIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_ISSUED);
-    internal static readonly Counter<int> RegistrationsSingleActLocal = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL);
-    internal static readonly Counter<int> RegistrationsSingleActRemoteSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_SENT);
-    internal static readonly Counter<int> RegistrationsSingleActRemoteReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_RECEIVED);
-    internal static readonly Counter<int> Registrations = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS);
-    internal static readonly Histogram<double> RegistrationDuration = Instruments.Meter.CreateHistogram<double>(InstrumentNames.DIRECTORY_REGISTRATION_DURATION, MillisecondsUnit);
-    internal static bool RegistrationMetricsEnabled => Registrations.Enabled || RegistrationDuration.Enabled;
-    internal static readonly Counter<int> UnregistrationsIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_ISSUED);
-    internal static readonly Counter<int> UnregistrationsLocal = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_LOCAL);
-    internal static readonly Counter<int> UnregistrationsRemoteSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_REMOTE_SENT);
-    internal static readonly Counter<int> UnregistrationsRemoteReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_REMOTE_RECEIVED);
-    internal static readonly Counter<int> UnregistrationsManyIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_ISSUED);
-    internal static readonly Counter<int> UnregistrationsManyRemoteSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_SENT);
-    internal static readonly Counter<int> UnregistrationsManyRemoteReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_RECEIVED);
+    internal readonly Counter<int> RegistrationsSingleActIssued;
+    internal readonly Counter<int> RegistrationsSingleActLocal;
+    internal readonly Counter<int> RegistrationsSingleActRemoteSent;
+    internal readonly Counter<int> RegistrationsSingleActRemoteReceived;
+    private readonly Counter<int> _registrations;
+    private readonly Histogram<double> _registrationDuration;
+    internal bool RegistrationMetricsEnabled => _registrations.Enabled || _registrationDuration.Enabled;
+    internal readonly Counter<int> UnregistrationsIssued;
+    internal readonly Counter<int> UnregistrationsLocal;
+    internal readonly Counter<int> UnregistrationsRemoteSent;
+    internal readonly Counter<int> UnregistrationsRemoteReceived;
+    internal readonly Counter<int> UnregistrationsManyIssued;
+    internal readonly Counter<int> UnregistrationsManyRemoteSent;
+    internal readonly Counter<int> UnregistrationsManyRemoteReceived;
 
-    private static int ObserveCacheSize()
+    public DirectoryInstruments(OrleansInstruments instruments)
+    {
+        _meter = instruments.Meter;
+        LookupsLocalIssued = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
+        LookupsLocalSuccesses = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
+        LookupsFullIssued = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_FULL_ISSUED);
+        LookupsRemoteSent = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_REMOTE_SENT);
+        LookupsRemoteReceived = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_REMOTE_RECEIVED);
+        LookupsLocalDirectoryIssued = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCALDIRECTORY_ISSUED);
+        LookupsLocalDirectorySuccesses = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCALDIRECTORY_SUCCESSES);
+        LookupsCacheIssued = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_CACHE_ISSUED);
+        LookupsCacheSuccesses = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_CACHE_SUCCESSES);
+        ValidationsCacheReceived = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_VALIDATIONS_CACHE_RECEIVED);
+        SnapshotTransferCount = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_COUNT);
+        SnapshotTransferDuration = _meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_DURATION);
+        RangeRecoveryCount = _meter.CreateCounter<long>(InstrumentNames.DIRECTORY_RANGE_RECOVERY_COUNT);
+        RangeRecoveryDuration = _meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_RECOVERY_DURATION);
+        RangeLockHeldDuration = _meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_LOCK_HELD_DURATION);
+        _cacheSize = _meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, ObserveCacheSize);
+        RegistrationsSingleActIssued = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_ISSUED);
+        RegistrationsSingleActLocal = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL);
+        RegistrationsSingleActRemoteSent = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_SENT);
+        RegistrationsSingleActRemoteReceived = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_RECEIVED);
+        _registrations = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS);
+        _registrationDuration = _meter.CreateHistogram<double>(InstrumentNames.DIRECTORY_REGISTRATION_DURATION, MillisecondsUnit);
+        UnregistrationsIssued = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_ISSUED);
+        UnregistrationsLocal = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_LOCAL);
+        UnregistrationsRemoteSent = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_REMOTE_SENT);
+        UnregistrationsRemoteReceived = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_REMOTE_RECEIVED);
+        UnregistrationsManyIssued = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_ISSUED);
+        UnregistrationsManyRemoteSent = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_SENT);
+        UnregistrationsManyRemoteReceived = _meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_RECEIVED);
+    }
+
+    private int ObserveCacheSize()
     {
         var result = 0;
-        foreach (var observer in CacheSizeObservers)
+        foreach (var observer in _cacheSizeObservers)
         {
             result += observer.Observe();
         }
@@ -107,29 +142,31 @@ internal static class DirectoryInstruments
 
     private sealed class CacheSizeObserverRegistration : IDisposable
     {
-        private Func<int>? observeValue;
+        private readonly DirectoryInstruments _owner;
+        private Func<int>? _observeValue;
 
-        public CacheSizeObserverRegistration(Func<int> observeValue)
+        public CacheSizeObserverRegistration(DirectoryInstruments owner, Func<int> observeValue)
         {
-            this.observeValue = observeValue;
+            _owner = owner;
+            _observeValue = observeValue;
         }
 
         public int Observe()
         {
-            var observer = Volatile.Read(ref observeValue);
+            var observer = Volatile.Read(ref _observeValue);
             return observer is null ? 0 : observer();
         }
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref observeValue, null) is not null)
+            if (Interlocked.Exchange(ref _observeValue, null) is not null)
             {
-                ImmutableInterlocked.Update(ref CacheSizeObservers, static (observers, registration) => observers.Remove(registration), this);
+                ImmutableInterlocked.Update(ref _owner._cacheSizeObservers, static (observers, registration) => observers.Remove(registration), this);
             }
         }
     }
 
-    internal static void OnRegistrationCompleted(TimeSpan latency, string locator, string status)
+    internal void OnRegistrationCompleted(TimeSpan latency, string locator, string status)
     {
         if (!RegistrationMetricsEnabled)
         {
@@ -137,14 +174,14 @@ internal static class DirectoryInstruments
         }
 
         var tags = CreateRegistrationTags(locator, status);
-        if (Registrations.Enabled)
+        if (_registrations.Enabled)
         {
-            Registrations.Add(1, tags);
+            _registrations.Add(1, tags);
         }
 
-        if (RegistrationDuration.Enabled)
+        if (_registrationDuration.Enabled)
         {
-            RegistrationDuration.Record(Math.Max(0, latency.TotalMilliseconds), tags);
+            _registrationDuration.Record(Math.Max(0, latency.TotalMilliseconds), tags);
         }
     }
 

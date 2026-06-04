@@ -12,10 +12,12 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GrainLocator
     {
         private readonly GrainLocatorResolver _grainLocatorResolver;
+        private readonly DirectoryInstruments _directoryInstruments;
 
-        public GrainLocator(GrainLocatorResolver grainLocatorResolver)
+        public GrainLocator(GrainLocatorResolver grainLocatorResolver, DirectoryInstruments directoryInstruments)
         {
             _grainLocatorResolver = grainLocatorResolver;
+            _directoryInstruments = directoryInstruments;
         }
 
         public ValueTask<GrainAddress?> Lookup(GrainId grainId) => GetGrainLocator(grainId.Type).Lookup(grainId);
@@ -23,7 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousRegistration)
         {
             var grainLocator = GetGrainLocator(address.GrainId.Type);
-            var metrics = RegistrationMetricTracker.Start(grainLocator);
+            var metrics = RegistrationMetricTracker.Start(_directoryInstruments, grainLocator);
             try
             {
                 var result = await grainLocator.Register(address, previousRegistration);
@@ -62,19 +64,21 @@ namespace Orleans.Runtime.GrainDirectory
 
         private readonly struct RegistrationMetricTracker
         {
+            private readonly DirectoryInstruments? _directoryInstruments;
             private readonly ValueStopwatch _stopwatch;
             private readonly string? _locator;
 
-            private RegistrationMetricTracker(ValueStopwatch stopwatch, string locator)
+            private RegistrationMetricTracker(DirectoryInstruments directoryInstruments, ValueStopwatch stopwatch, string locator)
             {
+                _directoryInstruments = directoryInstruments;
                 _stopwatch = stopwatch;
                 _locator = locator;
             }
 
-            public static RegistrationMetricTracker Start(IGrainLocator grainLocator)
+            public static RegistrationMetricTracker Start(DirectoryInstruments directoryInstruments, IGrainLocator grainLocator)
             {
-                return DirectoryInstruments.RegistrationMetricsEnabled
-                    ? new(ValueStopwatch.StartNew(), GetLocatorTag(grainLocator))
+                return directoryInstruments.RegistrationMetricsEnabled
+                    ? new(directoryInstruments, ValueStopwatch.StartNew(), GetLocatorTag(grainLocator))
                     : default;
             }
 
@@ -86,12 +90,12 @@ namespace Orleans.Runtime.GrainDirectory
 
             private void Record(string status)
             {
-                if (_locator is null)
+                if (_directoryInstruments is null || _locator is null)
                 {
                     return;
                 }
 
-                DirectoryInstruments.OnRegistrationCompleted(_stopwatch.Elapsed, _locator, status);
+                _directoryInstruments.OnRegistrationCompleted(_stopwatch.Elapsed, _locator, status);
             }
         }
 

@@ -25,6 +25,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
     private readonly DistributedGrainDirectory _directory;
     private readonly ILogger<DistributedRemoteGrainDirectory> _logger;
     private readonly DirectoryMembershipService _membershipService;
+    private readonly DirectoryInstruments _directoryInstruments;
     private readonly Queue<(string Name, object State, Func<DistributedRemoteGrainDirectory, object, Task> Action)> _pendingOperations = new();
     private readonly AsyncLock _executorLock = new();
 
@@ -38,6 +39,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
         _directory = directory;
         _logger = shared.LoggerFactory.CreateLogger<DistributedRemoteGrainDirectory>();
         _membershipService = membershipService;
+        _directoryInstruments = directory.DirectoryInstruments;
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
@@ -312,7 +314,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
 
     public async Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
     {
-        DirectoryInstruments.ValidationsCacheReceived.Add(1);
+        _directoryInstruments.ValidationsCacheReceived.Add(1);
         LogInformationLookUpManyReceived(_logger, Silo, grainAndETagList.Count);
 
         using (var cts = CreateTimeoutCts(_directory.OnStoppedToken))
