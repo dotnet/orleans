@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
 using Xunit;
@@ -14,7 +15,7 @@ public class DispatcherEventsTests
     public void RuntimeMessagingTrace_OnDispatcherRejectMessage_EmitsRejected()
     {
         using var observer = new Observer(DispatcherEvents.AllEvents);
-        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance);
+        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance, CreateMessagingInstruments());
         var message = new Message();
         var exception = new InvalidOperationException("boom");
 
@@ -30,7 +31,7 @@ public class DispatcherEventsTests
     public void RuntimeMessagingTrace_OnDispatcherForwardingMultiple_EmitsForwardingMultiple()
     {
         using var observer = new Observer(DispatcherEvents.AllEvents);
-        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance);
+        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance, CreateMessagingInstruments());
         var oldAddress = new GrainAddress
         {
             GrainId = GrainId.Create("test", "grain"),
@@ -71,5 +72,14 @@ public class DispatcherEventsTests
         }
 
         public void OnNext(DispatcherEvents.DispatcherEvent value) => _events.Enqueue(value);
+    }
+
+    private static MessagingInstruments CreateMessagingInstruments()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<MessagingInstruments>();
+        return services.BuildServiceProvider().GetRequiredService<MessagingInstruments>();
     }
 }
