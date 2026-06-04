@@ -17,7 +17,8 @@ internal sealed class DurableJobReceiverExtensionShared
         ILogger<DurableJobReceiverExtension> logger,
         IOptions<DurableJobsOptions> options,
         IOptions<SiloMessagingOptions> messagingOptions,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        DurableJobsInstruments? durableJobsInstruments = null)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
@@ -25,6 +26,7 @@ internal sealed class DurableJobReceiverExtensionShared
         Logger = logger;
         MessagingOptions = messagingOptions.Value;
         Options = options.Value;
+        DurableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         TimeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -44,10 +46,11 @@ internal sealed class DurableJobReceiverExtensionShared
     /// Gets the durable jobs options used by every <see cref="DurableJobReceiverExtension"/> instance on the silo.
     /// </summary>
     public DurableJobsOptions Options { get; }
+    public DurableJobsInstruments DurableJobsInstruments { get; }
 
     /// <summary>
     /// Begins tracking an invocation of <see cref="IDurableJobHandler.ExecuteJobAsync"/>, emitting the
     /// corresponding metrics and starting a distributed-tracing activity for the lifetime of the returned tracker.
     /// </summary>
-    public HandlerExecutionTracker BeginHandlerExecution(IJobRunContext context) => new(TimeProvider, context);
+    public HandlerExecutionTracker BeginHandlerExecution(IJobRunContext context) => new(TimeProvider, DurableJobsInstruments, context);
 }

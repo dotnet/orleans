@@ -29,6 +29,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private readonly IAsyncEnumerable<ClusterMembershipSnapshot> _clusterMembershipUpdates;
     private readonly IOverloadDetector _overloadDetector;
     private readonly TimeProvider _timeProvider;
+    private readonly DurableJobsInstruments _durableJobsInstruments;
     private readonly ILogger<LocalDurableJobManager> _logger;
     private readonly DurableJobsOptions _options;
     private readonly CancellationTokenSource _cts = new();
@@ -58,7 +59,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         TimeProvider timeProvider,
         IOptions<DurableJobsOptions> options,
         SystemTargetShared shared,
-        ILogger<LocalDurableJobManager> logger)
+        ILogger<LocalDurableJobManager> logger,
+        DurableJobsInstruments? durableJobsInstruments = null)
         : base(JobManagerGrainType, shared)
     {
         _shardManager = shardManager;
@@ -67,6 +69,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         _clusterMembershipUpdates = clusterMembership.MembershipUpdates;
         _overloadDetector = overloadDetector;
         _timeProvider = timeProvider;
+        _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _logger = logger;
         _options = options.Value;
     }
@@ -82,7 +85,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
             var shardKey = GetWritableShardKey(request);
-            DurableJobsInstruments.OnStripeAssigned(shardKey.Stripe);
+            _durableJobsInstruments.OnStripeAssigned(shardKey.Stripe);
 
             while (true)
             {
@@ -104,8 +107,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     {
                         var elapsed = _timeProvider.GetElapsedTime(startTimestamp);
                         LogJobScheduled(_logger, request.JobName, job.Id, existingShard.Id, request.Target);
-                        DurableJobsInstruments.OnJobScheduled(elapsed);
-                        DurableJobsInstruments.OnScheduleJobCallSucceeded(elapsed);
+                        _durableJobsInstruments.OnJobScheduled(elapsed);
+                        _durableJobsInstruments.OnScheduleJobCallSucceeded(elapsed);
                         DurableJobsDiagnostics.SetScheduledJobTags(activity, job);
                         return job;
                     }
@@ -144,12 +147,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
         catch (OperationCanceledException)
         {
-            DurableJobsInstruments.OnScheduleJobCallCanceled(_timeProvider.GetElapsedTime(startTimestamp));
+            _durableJobsInstruments.OnScheduleJobCallCanceled(_timeProvider.GetElapsedTime(startTimestamp));
             throw;
         }
         catch (Exception ex)
         {
-            DurableJobsInstruments.OnScheduleJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
+            _durableJobsInstruments.OnScheduleJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
             DurableJobsDiagnostics.SetError(activity, ex);
             throw;
         }
@@ -252,7 +255,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 if (!await _shardManager.IsShardOwnedByLocalSiloAsync(job.ShardId, cancellationToken))
                 {
                     LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
-                    DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), canceledJob: false);
+                    _durableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), canceledJob: false);
                     return false;
                 }
 
@@ -261,10 +264,10 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 LogJobCancelled(_logger, job.Id, job.Name, job.ShardId);
                 if (wasRemoved)
                 {
-                    DurableJobsInstruments.OnJobCanceled();
+                    _durableJobsInstruments.OnJobCanceled();
                 }
 
-                DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), wasRemoved);
+                _durableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), wasRemoved);
                 return wasRemoved;
             }
 
@@ -272,7 +275,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             if (owner is null || owner.Equals(Silo))
             {
                 LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
-                DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), canceledJob: false);
+                _durableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), canceledJob: false);
                 return false;
             }
 
@@ -283,17 +286,17 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
             }
 
-            DurableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), routed);
+            _durableJobsInstruments.OnCancelJobCall(_timeProvider.GetElapsedTime(startTimestamp), routed);
             return routed;
         }
         catch (OperationCanceledException)
         {
-            DurableJobsInstruments.OnCancelJobCallCanceled(_timeProvider.GetElapsedTime(startTimestamp));
+            _durableJobsInstruments.OnCancelJobCallCanceled(_timeProvider.GetElapsedTime(startTimestamp));
             throw;
         }
         catch
         {
-            DurableJobsInstruments.OnCancelJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
+            _durableJobsInstruments.OnCancelJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
             throw;
         }
     }

@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
 
-internal static class DurableJobsInstruments
+internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
 {
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
@@ -19,99 +20,108 @@ internal static class DurableJobsInstruments
     private const string StatusOk = "ok";
     private const string StatusNotFound = "not_found";
 
-    private static readonly Counter<long> JobsScheduled = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-scheduled");
-    private static readonly Counter<long> JobAttemptsStarted = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-job-attempts-started");
-    private static readonly Counter<long> JobsCompleted = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-completed");
-    private static readonly Counter<long> JobsFailed = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-failed");
-    private static readonly Counter<long> JobsRetried = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-retried");
-    private static readonly Counter<long> JobsCanceled = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-canceled");
-    private static readonly Counter<long> ShardsProcessed = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-shards-processed");
-    private static readonly Counter<long> ScheduleJobCalls = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-schedule-job-calls");
-    private static readonly Counter<long> CancelJobCalls = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-cancel-job-calls");
-    private static readonly Counter<long> HandlerExecutionsStarted = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-handler-executions-started");
-    private static readonly Counter<long> HandlerExecutions = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-handler-executions");
-    private static readonly Counter<long> StorageBatches = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-storage-batches");
-    private static readonly Counter<long> StripeDistribution = Instruments.Meter.CreateCounter<long>("orleans-durablejobs-stripe-distribution");
+    internal static DurableJobsInstruments CreateForDirectConstruction()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<DurableJobsInstruments>();
+        return services.BuildServiceProvider().GetRequiredService<DurableJobsInstruments>();
+    }
 
-    private static readonly Histogram<double> JobScheduleDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-schedule-duration", MillisecondsUnit);
-    private static readonly Histogram<double> JobDispatchLag = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-dispatch-lag", MillisecondsUnit);
-    private static readonly Histogram<double> JobAttemptDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-attempt-duration", MillisecondsUnit);
-    private static readonly Histogram<double> ShardProcessingDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-shard-processing-duration", MillisecondsUnit);
-    private static readonly Histogram<double> ScheduleJobCallDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-schedule-job-call-duration", MillisecondsUnit);
-    private static readonly Histogram<double> CancelJobCallDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-cancel-job-call-duration", MillisecondsUnit);
-    private static readonly Histogram<double> HandlerExecutionDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-handler-execution-duration", MillisecondsUnit);
-    private static readonly Histogram<long> StorageBatchSize = Instruments.Meter.CreateHistogram<long>("orleans-durablejobs-storage-batch-size");
-    private static readonly Histogram<long> ShardBatchMutations = Instruments.Meter.CreateHistogram<long>("orleans-durablejobs-shard-batch-mutations");
-    private static readonly Histogram<long> ShardBatchBytes = Instruments.Meter.CreateHistogram<long>("orleans-durablejobs-shard-batch-bytes", BytesUnit);
-    private static readonly Histogram<long> ShardPendingDepth = Instruments.Meter.CreateHistogram<long>("orleans-durablejobs-shard-pending-depth");
-    private static readonly Histogram<double> OwnershipCheckDuration = Instruments.Meter.CreateHistogram<double>("orleans-durablejobs-ownership-check-duration", MillisecondsUnit);
+    private readonly Counter<long> JobsScheduled = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-scheduled");
+    private readonly Counter<long> JobAttemptsStarted = instruments.Meter.CreateCounter<long>("orleans-durablejobs-job-attempts-started");
+    private readonly Counter<long> JobsCompleted = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-completed");
+    private readonly Counter<long> JobsFailed = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-failed");
+    private readonly Counter<long> JobsRetried = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-retried");
+    private readonly Counter<long> JobsCanceled = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-canceled");
+    private readonly Counter<long> ShardsProcessed = instruments.Meter.CreateCounter<long>("orleans-durablejobs-shards-processed");
+    private readonly Counter<long> ScheduleJobCalls = instruments.Meter.CreateCounter<long>("orleans-durablejobs-schedule-job-calls");
+    private readonly Counter<long> CancelJobCalls = instruments.Meter.CreateCounter<long>("orleans-durablejobs-cancel-job-calls");
+    private readonly Counter<long> HandlerExecutionsStarted = instruments.Meter.CreateCounter<long>("orleans-durablejobs-handler-executions-started");
+    private readonly Counter<long> HandlerExecutions = instruments.Meter.CreateCounter<long>("orleans-durablejobs-handler-executions");
+    private readonly Counter<long> StorageBatches = instruments.Meter.CreateCounter<long>("orleans-durablejobs-storage-batches");
+    private readonly Counter<long> StripeDistribution = instruments.Meter.CreateCounter<long>("orleans-durablejobs-stripe-distribution");
 
-    internal static void OnJobScheduled(TimeSpan latency)
+    private readonly Histogram<double> JobScheduleDuration = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-schedule-duration", MillisecondsUnit);
+    private readonly Histogram<double> JobDispatchLag = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-dispatch-lag", MillisecondsUnit);
+    private readonly Histogram<double> JobAttemptDuration = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-job-attempt-duration", MillisecondsUnit);
+    private readonly Histogram<double> ShardProcessingDuration = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-shard-processing-duration", MillisecondsUnit);
+    private readonly Histogram<double> ScheduleJobCallDuration = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-schedule-job-call-duration", MillisecondsUnit);
+    private readonly Histogram<double> CancelJobCallDuration = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-cancel-job-call-duration", MillisecondsUnit);
+    private readonly Histogram<double> HandlerExecutionDuration = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-handler-execution-duration", MillisecondsUnit);
+    private readonly Histogram<long> StorageBatchSize = instruments.Meter.CreateHistogram<long>("orleans-durablejobs-storage-batch-size");
+    private readonly Histogram<long> ShardBatchMutations = instruments.Meter.CreateHistogram<long>("orleans-durablejobs-shard-batch-mutations");
+    private readonly Histogram<long> ShardBatchBytes = instruments.Meter.CreateHistogram<long>("orleans-durablejobs-shard-batch-bytes", BytesUnit);
+    private readonly Histogram<long> ShardPendingDepth = instruments.Meter.CreateHistogram<long>("orleans-durablejobs-shard-pending-depth");
+    private readonly Histogram<double> OwnershipCheckDuration = instruments.Meter.CreateHistogram<double>("orleans-durablejobs-ownership-check-duration", MillisecondsUnit);
+
+    internal void OnJobScheduled(TimeSpan latency)
     {
         JobsScheduled.Add(1);
         Record(JobScheduleDuration, latency);
     }
 
-    internal static void OnJobAttemptStarted(TimeSpan dispatchLag)
+    internal void OnJobAttemptStarted(TimeSpan dispatchLag)
     {
         JobAttemptsStarted.Add(1);
         Record(JobDispatchLag, dispatchLag);
     }
 
-    internal static void OnJobCompleted(TimeSpan latency)
+    internal void OnJobCompleted(TimeSpan latency)
     {
         JobsCompleted.Add(1);
         Record(JobAttemptDuration, latency, StatusCompleted);
     }
 
-    internal static void OnJobFailed(TimeSpan latency)
+    internal void OnJobFailed(TimeSpan latency)
     {
         JobsFailed.Add(1);
         Record(JobAttemptDuration, latency, StatusFailed);
     }
 
-    internal static void OnJobRetried(TimeSpan latency)
+    internal void OnJobRetried(TimeSpan latency)
     {
         JobsRetried.Add(1);
         Record(JobAttemptDuration, latency, StatusRetried);
     }
 
-    internal static void OnJobCanceled()
+    internal void OnJobCanceled()
     {
         JobsCanceled.Add(1);
     }
 
-    internal static void OnScheduleJobCallSucceeded(TimeSpan latency) => OnScheduleJobCall(latency, StatusOk);
+    internal void OnScheduleJobCallSucceeded(TimeSpan latency) => OnScheduleJobCall(latency, StatusOk);
 
-    internal static void OnScheduleJobCallCanceled(TimeSpan latency) => OnScheduleJobCall(latency, StatusCanceled);
+    internal void OnScheduleJobCallCanceled(TimeSpan latency) => OnScheduleJobCall(latency, StatusCanceled);
 
-    internal static void OnScheduleJobCallFailed(TimeSpan latency) => OnScheduleJobCall(latency, StatusError);
+    internal void OnScheduleJobCallFailed(TimeSpan latency) => OnScheduleJobCall(latency, StatusError);
 
-    internal static void OnCancelJobCall(TimeSpan latency, bool canceledJob) => OnCancelJobCall(latency, canceledJob ? StatusOk : StatusNotFound);
+    internal void OnCancelJobCall(TimeSpan latency, bool canceledJob) => OnCancelJobCall(latency, canceledJob ? StatusOk : StatusNotFound);
 
-    internal static void OnCancelJobCallCanceled(TimeSpan latency) => OnCancelJobCall(latency, StatusCanceled);
+    internal void OnCancelJobCallCanceled(TimeSpan latency) => OnCancelJobCall(latency, StatusCanceled);
 
-    internal static void OnCancelJobCallFailed(TimeSpan latency) => OnCancelJobCall(latency, StatusError);
+    internal void OnCancelJobCallFailed(TimeSpan latency) => OnCancelJobCall(latency, StatusError);
 
-    internal static void OnHandlerExecutionStarted()
+    internal void OnHandlerExecutionStarted()
     {
         HandlerExecutionsStarted.Add(1);
     }
 
-    internal static void OnHandlerExecutionCompleted(TimeSpan latency) => OnHandlerExecution(latency, StatusCompleted);
+    internal void OnHandlerExecutionCompleted(TimeSpan latency) => OnHandlerExecution(latency, StatusCompleted);
 
-    internal static void OnHandlerExecutionCanceled(TimeSpan latency) => OnHandlerExecution(latency, StatusCanceled);
+    internal void OnHandlerExecutionCanceled(TimeSpan latency) => OnHandlerExecution(latency, StatusCanceled);
 
-    internal static void OnHandlerExecutionFailed(TimeSpan latency) => OnHandlerExecution(latency, StatusFailed);
+    internal void OnHandlerExecutionFailed(TimeSpan latency) => OnHandlerExecution(latency, StatusFailed);
 
-    internal static void OnShardProcessed(TimeSpan latency, bool canceled, bool error)
+    internal void OnShardProcessed(TimeSpan latency, bool canceled, bool error)
     {
         var status = error ? StatusError : canceled ? StatusCanceled : StatusCompleted;
         ShardsProcessed.Add(1, [new KeyValuePair<string, object?>(StatusTagName, status)]);
         Record(ShardProcessingDuration, latency, status);
     }
 
-    internal static void OnStorageBatchWritten(long operationCount, bool canceled, bool error)
+    internal void OnStorageBatchWritten(long operationCount, bool canceled, bool error)
     {
         var status = error ? StatusError : canceled ? StatusCanceled : StatusOk;
         var tags = new KeyValuePair<string, object?>[] { new(StatusTagName, status) };
@@ -122,7 +132,7 @@ internal static class DurableJobsInstruments
         }
     }
 
-    internal static void OnShardBatch(long mutationCount)
+    internal void OnShardBatch(long mutationCount)
     {
         if (ShardBatchMutations.Enabled && mutationCount >= 0)
         {
@@ -130,7 +140,7 @@ internal static class DurableJobsInstruments
         }
     }
 
-    internal static void OnShardBatchBytes(long batchBytes)
+    internal void OnShardBatchBytes(long batchBytes)
     {
         if (ShardBatchBytes.Enabled && batchBytes >= 0)
         {
@@ -138,7 +148,7 @@ internal static class DurableJobsInstruments
         }
     }
 
-    internal static void OnShardPendingDepth(long depth)
+    internal void OnShardPendingDepth(long depth)
     {
         if (ShardPendingDepth.Enabled && depth >= 0)
         {
@@ -146,7 +156,7 @@ internal static class DurableJobsInstruments
         }
     }
 
-    internal static void OnOwnershipCheck(TimeSpan duration)
+    internal void OnOwnershipCheck(TimeSpan duration)
     {
         if (OwnershipCheckDuration.Enabled)
         {
@@ -154,7 +164,7 @@ internal static class DurableJobsInstruments
         }
     }
 
-    internal static void OnStripeAssigned(int stripe)
+    internal void OnStripeAssigned(int stripe)
     {
         if (StripeDistribution.Enabled)
         {
@@ -162,25 +172,25 @@ internal static class DurableJobsInstruments
         }
     }
 
-    private static void OnScheduleJobCall(TimeSpan latency, string status)
+    private void OnScheduleJobCall(TimeSpan latency, string status)
     {
         ScheduleJobCalls.Add(1, [new KeyValuePair<string, object?>(StatusTagName, status)]);
         Record(ScheduleJobCallDuration, latency, status);
     }
 
-    private static void OnCancelJobCall(TimeSpan latency, string status)
+    private void OnCancelJobCall(TimeSpan latency, string status)
     {
         CancelJobCalls.Add(1, [new KeyValuePair<string, object?>(StatusTagName, status)]);
         Record(CancelJobCallDuration, latency, status);
     }
 
-    private static void OnHandlerExecution(TimeSpan latency, string status)
+    private void OnHandlerExecution(TimeSpan latency, string status)
     {
         HandlerExecutions.Add(1, [new KeyValuePair<string, object?>(StatusTagName, status)]);
         Record(HandlerExecutionDuration, latency, status);
     }
 
-    private static void Record(Histogram<double> histogram, TimeSpan latency)
+    private void Record(Histogram<double> histogram, TimeSpan latency)
     {
         if (histogram.Enabled)
         {
@@ -188,7 +198,7 @@ internal static class DurableJobsInstruments
         }
     }
 
-    private static void Record(Histogram<double> histogram, TimeSpan latency, string status)
+    private void Record(Histogram<double> histogram, TimeSpan latency, string status)
     {
         if (histogram.Enabled)
         {

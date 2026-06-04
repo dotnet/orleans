@@ -22,6 +22,7 @@ internal sealed partial class ShardExecutor
     private readonly ILogger<ShardExecutor> _logger;
     private readonly DurableJobsOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly DurableJobsInstruments _durableJobsInstruments;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
     private readonly IOverloadDetector _overloadDetector;
     private int _currentCapacity;
@@ -39,12 +40,14 @@ internal sealed partial class ShardExecutor
         IOptions<DurableJobsOptions> options,
         IOverloadDetector overloadDetector,
         ILogger<ShardExecutor> logger,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        DurableJobsInstruments? durableJobsInstruments = null)
     {
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
         _overloadDetector = overloadDetector;
+        _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _timeProvider = timeProvider ?? TimeProvider.System;
 
         _currentCapacity = _options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo
@@ -127,7 +130,7 @@ internal sealed partial class ShardExecutor
             {
                 if (processingStarted)
                 {
-                    DurableJobsInstruments.OnShardProcessed(_timeProvider.GetElapsedTime(processingStartTimestamp), canceled, error);
+                    _durableJobsInstruments.OnShardProcessed(_timeProvider.GetElapsedTime(processingStartTimestamp), canceled, error);
                 }
             }
         }
@@ -220,7 +223,7 @@ internal sealed partial class ShardExecutor
 
         Exception? failureException = null;
         var attemptStartTimestamp = _timeProvider.GetTimestamp();
-        DurableJobsInstruments.OnJobAttemptStarted(_timeProvider.GetUtcNow() - jobContext.Job.DueTime);
+        _durableJobsInstruments.OnJobAttemptStarted(_timeProvider.GetUtcNow() - jobContext.Job.DueTime);
 
         using var activity = DurableJobsDiagnostics.StartExecuteActivity(jobContext.Job, jobContext.DequeueCount, jobContext.RunId);
         try
@@ -248,7 +251,7 @@ internal sealed partial class ShardExecutor
                 {
                     await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
                     LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
-                    DurableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                    _durableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                     activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
                     activity?.SetStatus(ActivityStatusCode.Ok);
                 }
@@ -273,14 +276,14 @@ internal sealed partial class ShardExecutor
                 {
                     LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
                     await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
-                    DurableJobsInstruments.OnJobRetried(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                    _durableJobsInstruments.OnJobRetried(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                     activity?.SetTag(ActivityTagKeys.DurableJobStatus, "retried");
                     DurableJobsDiagnostics.SetError(activity, failureException);
                 }
                 else
                 {
                     LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
-                    DurableJobsInstruments.OnJobFailed(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                    _durableJobsInstruments.OnJobFailed(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                     activity?.SetTag(ActivityTagKeys.DurableJobStatus, "failed");
                     DurableJobsDiagnostics.SetError(activity, failureException);
                 }

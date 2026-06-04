@@ -12,17 +12,20 @@ namespace Orleans.DurableJobs;
 internal readonly struct HandlerExecutionTracker : IDisposable
 {
     private readonly TimeProvider _timeProvider;
+    private readonly DurableJobsInstruments _durableJobsInstruments;
     private readonly long _startTimestamp;
     private readonly Activity? _activity;
 
-    public HandlerExecutionTracker(TimeProvider timeProvider, IJobRunContext context)
+    public HandlerExecutionTracker(TimeProvider timeProvider, DurableJobsInstruments durableJobsInstruments, IJobRunContext context)
     {
         ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(durableJobsInstruments);
         ArgumentNullException.ThrowIfNull(context);
 
         _timeProvider = timeProvider;
+        _durableJobsInstruments = durableJobsInstruments;
         _startTimestamp = timeProvider.GetTimestamp();
-        DurableJobsInstruments.OnHandlerExecutionStarted();
+        _durableJobsInstruments.OnHandlerExecutionStarted();
         _activity = DurableJobsDiagnostics.StartHandlerActivity(context.Job, context.DequeueCount, context.RunId);
     }
 
@@ -31,7 +34,7 @@ internal readonly struct HandlerExecutionTracker : IDisposable
     /// </summary>
     public void Completed()
     {
-        DurableJobsInstruments.OnHandlerExecutionCompleted(_timeProvider.GetElapsedTime(_startTimestamp));
+        _durableJobsInstruments.OnHandlerExecutionCompleted(_timeProvider.GetElapsedTime(_startTimestamp));
         _activity?.SetStatus(ActivityStatusCode.Ok);
     }
 
@@ -41,7 +44,7 @@ internal readonly struct HandlerExecutionTracker : IDisposable
     /// </summary>
     public void Canceled()
     {
-        DurableJobsInstruments.OnHandlerExecutionCanceled(_timeProvider.GetElapsedTime(_startTimestamp));
+        _durableJobsInstruments.OnHandlerExecutionCanceled(_timeProvider.GetElapsedTime(_startTimestamp));
     }
 
     /// <summary>
@@ -49,7 +52,7 @@ internal readonly struct HandlerExecutionTracker : IDisposable
     /// </summary>
     public void Failed(Exception exception)
     {
-        DurableJobsInstruments.OnHandlerExecutionFailed(_timeProvider.GetElapsedTime(_startTimestamp));
+        _durableJobsInstruments.OnHandlerExecutionFailed(_timeProvider.GetElapsedTime(_startTimestamp));
         DurableJobsDiagnostics.SetError(_activity, exception);
     }
 

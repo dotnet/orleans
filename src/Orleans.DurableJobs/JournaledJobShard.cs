@@ -16,6 +16,7 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly JournaledJobShardState _state;
     private readonly IJournaledStateManager _stateManager;
     private readonly JournaledJobShardManager _shardManager;
+    private readonly DurableJobsInstruments _durableJobsInstruments;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _batchLingerDelay;
     private readonly object _pendingOperationsLock = new();
@@ -51,7 +52,8 @@ internal sealed class JournaledJobShard : IJobShard
         IJournaledStateManager stateManager,
         JournaledJobShardManager shardManager,
         TimeProvider? timeProvider = null,
-        TimeSpan batchLingerDelay = default)
+        TimeSpan batchLingerDelay = default,
+        DurableJobsInstruments? durableJobsInstruments = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(stateManager);
@@ -68,6 +70,7 @@ internal sealed class JournaledJobShard : IJobShard
         _state = state;
         _stateManager = stateManager;
         _shardManager = shardManager;
+        _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _timeProvider = timeProvider ?? TimeProvider.System;
         _batchLingerDelay = batchLingerDelay;
 
@@ -256,7 +259,7 @@ internal sealed class JournaledJobShard : IJobShard
                         await LingerForMoreMutationsAsync(batch).ConfigureAwait(false);
                         DequeueConsecutiveMutations(batch);
                     }
-                    DurableJobsInstruments.OnShardPendingDepth(batch.Count);
+                    _durableJobsInstruments.OnShardPendingDepth(batch.Count);
                     await ProcessMutationBatchAsync(batch).ConfigureAwait(false);
                     batch.Clear();
                 }
@@ -364,7 +367,7 @@ internal sealed class JournaledJobShard : IJobShard
             }
             finally
             {
-                DurableJobsInstruments.OnOwnershipCheck(Stopwatch.GetElapsedTime(ownershipStartTimestamp));
+                _durableJobsInstruments.OnOwnershipCheck(Stopwatch.GetElapsedTime(ownershipStartTimestamp));
             }
 
             if (!isOwned)
@@ -400,17 +403,17 @@ internal sealed class JournaledJobShard : IJobShard
             }
 
             var pendingBytesAfterApply = _stateManager.PendingWriteByteCount;
-            DurableJobsInstruments.OnShardBatch(appliedOperations.Count);
+            _durableJobsInstruments.OnShardBatch(appliedOperations.Count);
             if (pendingBytesBeforeApply >= 0 && pendingBytesAfterApply >= pendingBytesBeforeApply)
             {
-                DurableJobsInstruments.OnShardBatchBytes(pendingBytesAfterApply - pendingBytesBeforeApply);
+                _durableJobsInstruments.OnShardBatchBytes(pendingBytesAfterApply - pendingBytesBeforeApply);
             }
 
             try
             {
                 using var batchActivity = DurableJobsDiagnostics.StartPersistBatchActivity(appliedOperations, Id);
                 await _stateManager.WriteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
-                DurableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: false);
+                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: false);
                 batchActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
                 foreach (var operation in appliedOperations)
                 {
@@ -419,7 +422,7 @@ internal sealed class JournaledJobShard : IJobShard
             }
             catch (OperationCanceledException exception) when (_shutdownCancellation.IsCancellationRequested)
             {
-                DurableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: true, error: false);
+                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: true, error: false);
                 foreach (var operation in appliedOperations)
                 {
                     operation.TrySetCanceled(exception.CancellationToken);
@@ -427,7 +430,7 @@ internal sealed class JournaledJobShard : IJobShard
             }
             catch (Exception exception)
             {
-                DurableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: true);
+                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: true);
                 foreach (var operation in appliedOperations)
                 {
                     operation.TrySetException(exception);

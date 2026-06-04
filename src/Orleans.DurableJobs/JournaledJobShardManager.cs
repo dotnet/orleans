@@ -30,6 +30,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private readonly IJournalStorageCatalog _catalog;
     private readonly IClusterMembershipService _membershipService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly DurableJobsInstruments _durableJobsInstruments;
     private readonly DurableJobsOptions _options;
     private readonly JournaledStateManagerOptions _journaledStateManagerOptions;
     private readonly TimeProvider _timeProvider;
@@ -48,7 +49,8 @@ internal sealed class JournaledJobShardManager : JobShardManager
         IClusterMembershipService membershipService,
         IServiceProvider serviceProvider,
         IOptions<DurableJobsOptions> options,
-        IOptions<JournaledStateManagerOptions> journaledStateManagerOptions)
+        IOptions<JournaledStateManagerOptions> journaledStateManagerOptions,
+        DurableJobsInstruments? durableJobsInstruments = null)
         : base(GetSiloAddress(localSiloDetails))
     {
         ArgumentNullException.ThrowIfNull(localSiloDetails);
@@ -65,6 +67,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         _catalog = catalog;
         _membershipService = membershipService;
         _serviceProvider = serviceProvider;
+        _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _options = options.Value;
         _journaledStateManagerOptions = journaledStateManagerOptions.Value;
         _timeProvider = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
@@ -398,7 +401,8 @@ internal sealed class JournaledJobShardManager : JobShardManager
             manager,
             this,
             _timeProvider,
-            _options.ShardBatchLingerDelay);
+            _options.ShardBatchLingerDelay,
+            _durableJobsInstruments);
     }
 
     private IDurableValueCommandCodec<DurableJobShardJournalRecord> CreateOperationCodec()

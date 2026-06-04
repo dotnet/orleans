@@ -36,6 +36,7 @@ public static class DurableJobsExtensions
             return;
         }
 
+        services.TryAddSingleton<DurableJobsInstruments>();
         services.AddSingleton<IConfigurationValidator, DurableJobsOptionsValidator>();
         services.AddSingleton<IConfigurationValidator, DurableJobsJournalingConfigurationValidator>();
         services.AddSingleton<ShardExecutor>();
@@ -46,7 +47,8 @@ public static class DurableJobsExtensions
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
             sp.GetRequiredService<IOptions<SiloMessagingOptions>>(),
-            sp.GetService<TimeProvider>()));
+            sp.GetService<TimeProvider>(),
+            sp.GetRequiredService<DurableJobsInstruments>()));
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
