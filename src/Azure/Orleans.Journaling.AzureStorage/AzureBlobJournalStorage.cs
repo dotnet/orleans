@@ -87,7 +87,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         finally
         {
-            AzureBlobJournalStorageInstruments.OnOperationCompleted(
+            _shared.Instruments.OnOperationCompleted(
                 AzureBlobJournalStorageInstruments.OperationCreate,
                 Stopwatch.GetElapsedTime(startTimestamp),
                 bytes: 0,
@@ -109,7 +109,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         finally
         {
-            AzureBlobJournalStorageInstruments.OnOperationCompleted(
+            _shared.Instruments.OnOperationCompleted(
                 AzureBlobJournalStorageInstruments.OperationGetMetadata,
                 Stopwatch.GetElapsedTime(startTimestamp),
                 bytes: 0,
@@ -187,7 +187,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         finally
         {
-            AzureBlobJournalStorageInstruments.OnOperationCompleted(
+            _shared.Instruments.OnOperationCompleted(
                 AzureBlobJournalStorageInstruments.OperationUpdateMetadata,
                 Stopwatch.GetElapsedTime(startTimestamp),
                 bytes: 0,
@@ -270,7 +270,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         finally
         {
-            AzureBlobJournalStorageInstruments.OnOperationCompleted(
+            _shared.Instruments.OnOperationCompleted(
                 AzureBlobJournalStorageInstruments.OperationAppend,
                 Stopwatch.GetElapsedTime(startTimestamp),
                 value.Length,
@@ -364,7 +364,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         finally
         {
-            AzureBlobJournalStorageInstruments.OnOperationCompleted(
+            _shared.Instruments.OnOperationCompleted(
                 AzureBlobJournalStorageInstruments.OperationDelete,
                 Stopwatch.GetElapsedTime(startTimestamp),
                 bytes: 0,
@@ -454,7 +454,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         finally
         {
-            AzureBlobJournalStorageInstruments.OnOperationCompleted(
+            _shared.Instruments.OnOperationCompleted(
                 AzureBlobJournalStorageInstruments.OperationRead,
                 Stopwatch.GetElapsedTime(startTimestamp),
                 bytes,
@@ -572,7 +572,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         finally
         {
-            AzureBlobJournalStorageInstruments.OnOperationCompleted(
+            _shared.Instruments.OnOperationCompleted(
                 AzureBlobJournalStorageInstruments.OperationReplace,
                 Stopwatch.GetElapsedTime(startTimestamp),
                 value.Length,
@@ -1121,6 +1121,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             ILogger<AzureBlobJournalStorage> logger,
             IOptions<AzureBlobJournalStorageOptions> options,
             BlobClientProvider blobClientProvider,
+            AzureBlobJournalStorageInstruments instruments,
             string? mimeType = null,
             string? journalFormatKey = null)
         {
@@ -1149,6 +1150,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             MimeType = mimeType;
             JournalFormatKey = journalFormatKey;
             BlobClientProvider = blobClientProvider;
+            Instruments = instruments;
         }
 
         public ILogger<AzureBlobJournalStorage> Logger { get; }
@@ -1160,6 +1162,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         public string? JournalFormatKey { get; }
 
         public BlobClientProvider BlobClientProvider { get; }
+        public AzureBlobJournalStorageInstruments Instruments { get; }
     }
 
     internal abstract class BlobClientProvider

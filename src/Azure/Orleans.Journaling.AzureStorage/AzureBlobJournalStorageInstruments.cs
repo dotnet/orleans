@@ -3,7 +3,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal static class AzureBlobJournalStorageInstruments
+internal sealed class AzureBlobJournalStorageInstruments(OrleansInstruments instruments)
 {
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
@@ -20,26 +20,26 @@ internal static class AzureBlobJournalStorageInstruments
     internal const string OperationRead = "read";
     internal const string OperationReplace = "replace";
 
-    private static readonly Counter<long> Operations = Instruments.Meter.CreateCounter<long>("orleans-journaling-azure-blob-operations");
-    private static readonly Counter<long> OperationBytes = Instruments.Meter.CreateCounter<long>("orleans-journaling-azure-blob-operation-bytes", BytesUnit);
-    private static readonly Histogram<double> OperationDuration = Instruments.Meter.CreateHistogram<double>("orleans-journaling-azure-blob-operation-duration", MillisecondsUnit);
+    private readonly Counter<long> _operations = instruments.Meter.CreateCounter<long>("orleans-journaling-azure-blob-operations");
+    private readonly Counter<long> _operationBytes = instruments.Meter.CreateCounter<long>("orleans-journaling-azure-blob-operation-bytes", BytesUnit);
+    private readonly Histogram<double> _operationDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-azure-blob-operation-duration", MillisecondsUnit);
 
-    internal static void OnOperationCompleted(string operation, TimeSpan latency, long bytes, bool succeeded)
+    internal void OnOperationCompleted(string operation, TimeSpan latency, long bytes, bool succeeded)
     {
         var tags = CreateTags(operation, succeeded);
-        if (Operations.Enabled)
+        if (_operations.Enabled)
         {
-            Operations.Add(1, tags);
+            _operations.Add(1, tags);
         }
 
-        if (OperationDuration.Enabled)
+        if (_operationDuration.Enabled)
         {
-            OperationDuration.Record(Math.Max(0, latency.TotalMilliseconds), tags);
+            _operationDuration.Record(Math.Max(0, latency.TotalMilliseconds), tags);
         }
 
-        if (succeeded && bytes > 0 && OperationBytes.Enabled)
+        if (succeeded && bytes > 0 && _operationBytes.Enabled)
         {
-            OperationBytes.Add(bytes, [new KeyValuePair<string, object?>(OperationTagName, operation)]);
+            _operationBytes.Add(bytes, [new KeyValuePair<string, object?>(OperationTagName, operation)]);
         }
     }
 

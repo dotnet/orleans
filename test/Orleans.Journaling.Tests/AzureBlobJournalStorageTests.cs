@@ -4,8 +4,10 @@ using Azure;
 using Azure.Core;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 using Orleans.Storage;
 using Xunit;
 
@@ -645,9 +647,19 @@ public sealed class AzureBlobJournalStorageTests
                 NullLogger<AzureBlobJournalStorage>.Instance,
                 Options.Create(new AzureBlobJournalStorageOptions { DeleteOldCheckpoints = deleteOldCheckpoints }),
                 new FakeBlobClientProvider(appendBlobs, checkpoints),
+                CreateAzureBlobJournalStorageInstruments(),
                 mimeType,
                 journalFormatKey),
             JournalId.FromGrainId(GrainId.Create("test-grain", "0")));
+    }
+
+    private static AzureBlobJournalStorageInstruments CreateAzureBlobJournalStorageInstruments()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<AzureBlobJournalStorageInstruments>();
+        return services.BuildServiceProvider().GetRequiredService<AzureBlobJournalStorageInstruments>();
     }
 
     private static Dictionary<string, string> WalMetadata(string? format = null, string? generation = null)
