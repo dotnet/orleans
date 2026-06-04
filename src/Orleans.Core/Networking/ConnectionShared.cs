@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Messaging
         MessageFactory messageFactory,
         MessagingTrace messagingTrace,
         OrleansInstruments orleansInstruments,
+        MessagingInstruments messagingInstruments,
         ILogger<Connection> logger,
         IMessageStatisticsSink messageStatisticsSink)
     {
@@ -18,5 +19,6 @@ namespace Orleans.Runtime.Messaging
         public ILogger<Connection> Logger { get; } = logger;
         public IMessageStatisticsSink MessageStatisticsSink { get; } = messageStatisticsSink;
         public MessagingTrace MessagingTrace { get; } = messagingTrace;
+        public MessagingInstruments MessagingInstruments { get; } = messagingInstruments;
     }
 }

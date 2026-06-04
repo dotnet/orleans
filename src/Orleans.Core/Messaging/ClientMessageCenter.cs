@@ -67,6 +67,7 @@ namespace Orleans.Messaging
         private int numberOfConnectedGateways = 0;
         private readonly MessageFactory messageFactory;
         private readonly IClusterConnectionStatusListener connectionStatusListener;
+        private readonly MessagingInstruments _messagingInstruments;
         private readonly ConnectionManager connectionManager;
         private readonly LocalClientDetails _localClientDetails;
 
@@ -79,9 +80,11 @@ namespace Orleans.Messaging
             ILoggerFactory loggerFactory,
             ConnectionManager connectionManager,
             ClientInstruments clientInstruments,
+            MessagingInstruments messagingInstruments,
             GatewayManager gatewayManager)
         {
             this.connectionManager = connectionManager;
+            _messagingInstruments = messagingInstruments;
             _localClientDetails = localClientDetails;
             this.RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;
@@ -384,7 +387,7 @@ namespace Orleans.Messaging
             else
             {
                 LogRejectingMessage(msg, reason);
-                MessagingInstruments.OnRejectedMessage(msg);
+                _messagingInstruments.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
             }

@@ -57,12 +57,12 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
         }
 
         protected override void OnReceivedMessage(Message msg)
@@ -95,7 +95,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                MessagingInstruments.OnRejectedMessage(msg);
+                MessagingInstrumentation.OnRejectedMessage(msg);
                 var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping", new SiloUnavailableException());
                 this.Send(rejection);
                 return;
@@ -121,7 +121,7 @@ namespace Orleans.Runtime.Messaging
             // (if it was a request), or drop it on the floor if it was a response or one-way.
             if (msg.Direction == Message.Directions.Request)
             {
-                MessagingInstruments.OnRejectedMessage(msg);
+                MessagingInstrumentation.OnRejectedMessage(msg);
                 var rejection = this.MessageFactory.CreateRejectionResponse(
                     msg,
                     Message.RejectionTypes.Transient,
@@ -141,7 +141,7 @@ namespace Orleans.Runtime.Messaging
 
         private void HandlePingMessage(Message msg)
         {
-            MessagingInstruments.OnPingReceive(msg.SendingSilo);
+            MessagingInstrumentation.OnPingReceive(msg.SendingSilo);
 
             var objectId = RuntimeHelpers.GetHashCode(msg);
             LogTraceRespondingToPing(this.Log, msg.SendingSilo!, objectId, msg);
@@ -149,7 +149,7 @@ namespace Orleans.Runtime.Messaging
             if (!this.LocalSiloAddress.Equals(msg.TargetSilo))
             {
                 // Got ping that is not destined to me. For example, got a ping to my older incarnation.
-                MessagingInstruments.OnRejectedMessage(msg);
+                MessagingInstrumentation.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
                     $"The target silo is no longer active: target was {msg.TargetSilo}, but this silo is {LocalSiloAddress}. The rejected ping message is {msg}.");
                 this.Send(rejection);
@@ -266,7 +266,7 @@ namespace Orleans.Runtime.Messaging
                 LogWarningFailedPingMessage(this.Log, msg);
             }
 
-            MessagingInstruments.OnFailedSentMessage(msg);
+            MessagingInstrumentation.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 LogDebugSiloRejectingMessage(this.Log, this.LocalSiloAddress, msg, reason);

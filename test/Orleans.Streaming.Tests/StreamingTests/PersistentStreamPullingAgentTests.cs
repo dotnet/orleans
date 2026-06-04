@@ -169,7 +169,8 @@ namespace UnitTests.StreamingTests
                 timerRegistry: timerRegistry,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
-                grainInstruments: CreateGrainInstruments());
+                grainInstruments: CreateGrainInstruments(),
+                messagingInstruments: CreateMessagingInstruments());
 
             receiver ??= Substitute.For<IQueueAdapterReceiver>();
             receiver.Initialize(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
@@ -221,6 +222,15 @@ namespace UnitTests.StreamingTests
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<GrainInstruments>();
             return services.BuildServiceProvider().GetRequiredService<GrainInstruments>();
+        }
+
+        private static MessagingInstruments CreateMessagingInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<MessagingInstruments>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]

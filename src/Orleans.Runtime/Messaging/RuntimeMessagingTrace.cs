@@ -3,7 +3,7 @@ using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime;
 
-internal sealed partial class RuntimeMessagingTrace(ILoggerFactory loggerFactory) : MessagingTrace(loggerFactory)
+internal sealed partial class RuntimeMessagingTrace(ILoggerFactory loggerFactory, MessagingInstruments messagingInstruments) : MessagingTrace(loggerFactory, messagingInstruments)
 {
     internal void OnDispatcherReceiveInvalidActivation(Message message, ActivationState activationState)
     {
@@ -27,7 +27,7 @@ internal sealed partial class RuntimeMessagingTrace(ILoggerFactory loggerFactory
     internal void OnDispatcherRejectMessage(Message message, Message.RejectionTypes rejectionType, string? reason, Exception? exception)
     {
         DispatcherEvents.EmitRejected(message, rejectionType, reason, exception);
-        MessagingInstruments.OnRejectedMessage(message);
+        MessagingInstrumentation.OnRejectedMessage(message);
         LogDispatcherRejectedMessage(Logger, message, new RejectionReasonLogRecord(reason), rejectionType, exception);
     }
 

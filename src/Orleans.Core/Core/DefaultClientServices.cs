@@ -52,6 +52,7 @@ namespace Orleans
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<ClientInstruments>();
+            services.TryAddSingleton<MessagingInstruments>();
 
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));

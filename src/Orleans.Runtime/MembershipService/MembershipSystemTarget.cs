@@ -13,17 +13,20 @@ namespace Orleans.Runtime.MembershipService
         private readonly IMembershipManager membershipManager;
         private readonly ILogger<MembershipSystemTarget> log;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly MessagingInstruments _messagingInstruments;
 
         public MembershipSystemTarget(
             IMembershipManager membershipManager,
             ILogger<MembershipSystemTarget> log,
             IInternalGrainFactory grainFactory,
+            MessagingInstruments messagingInstruments,
             SystemTargetShared shared)
             : base(Constants.MembershipServiceType, shared)
         {
             this.membershipManager = membershipManager;
             this.log = log;
             this.grainFactory = grainFactory;
+            _messagingInstruments = messagingInstruments;
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
@@ -173,7 +176,7 @@ namespace Orleans.Runtime.MembershipService
                 task = remoteOracle.Ping(probeNumber);
 
                 // Update stats counter. Only count Pings that were successfully sent, but not necessarily replied to.
-                MessagingInstruments.OnPingSend(remoteSilo);
+                _messagingInstruments.OnPingSend(remoteSilo);
             }
             finally
             {

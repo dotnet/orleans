@@ -66,6 +66,7 @@ namespace Orleans.Runtime.Messaging
         protected ConnectionContext Context { get; }
         protected ILogger Log => this.shared.Logger;
         protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
+        protected MessagingInstruments MessagingInstrumentation => this.shared.MessagingInstruments;
         protected abstract ConnectionDirection ConnectionDirection { get; }
         protected MessageFactory MessageFactory => this.shared.MessageFactory;
         protected abstract IMessageCenter MessageCenter { get; }
@@ -442,7 +443,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // The message body was not successfully decoded, but the headers were.
-            MessagingInstruments.OnRejectedMessage(message);
+            MessagingInstrumentation.OnRejectedMessage(message);
 
             if (message.HasDirection)
             {
@@ -482,7 +483,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            MessagingInstruments.OnFailedSentMessage(message);
+            MessagingInstrumentation.OnFailedSentMessage(message);
 
             if (message.Direction == Message.Directions.Request)
             {
@@ -509,7 +510,7 @@ namespace Orleans.Runtime.Messaging
                     exception,
                     message);
 
-                MessagingInstruments.OnDroppedSentMessage(message);
+                MessagingInstrumentation.OnDroppedSentMessage(message);
             }
 
             return true;

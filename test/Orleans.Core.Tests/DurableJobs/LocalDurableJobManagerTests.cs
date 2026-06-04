@@ -611,7 +611,8 @@ public class LocalDurableJobManagerTests
         timerRegistry: null!,
         activations: new ActivationDirectory(CreateCatalogInstruments()),
         schedulerInstruments: CreateSchedulerInstruments(),
-        grainInstruments: CreateGrainInstruments());
+        grainInstruments: CreateGrainInstruments(),
+        messagingInstruments: CreateMessagingInstruments());
 
     private static SchedulerInstruments CreateSchedulerInstruments()
     {        var services = new ServiceCollection();
@@ -637,6 +638,15 @@ public class LocalDurableJobManagerTests
         services.AddSingleton<OrleansInstruments>();
         services.AddSingleton<GrainInstruments>();
         return services.BuildServiceProvider().GetRequiredService<GrainInstruments>();
+    }
+
+    private static MessagingInstruments CreateMessagingInstruments()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<MessagingInstruments>();
+        return services.BuildServiceProvider().GetRequiredService<MessagingInstruments>();
     }
 
     private static IJobShard CreateSubstituteShard(string id, DateTimeOffset start, DateTimeOffset end)

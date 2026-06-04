@@ -49,13 +49,13 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
             this.gatewayInstruments.OnGatewayReceived();
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
             this.gatewayInstruments.OnGatewaySent();
         }
 
@@ -71,7 +71,7 @@ namespace Orleans.Runtime.Messaging
             // Are we overloaded?
             if (this.overloadDetector.IsOverloaded)
             {
-                MessagingInstruments.OnRejectedMessage(msg);
+                MessagingInstrumentation.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 this.messageCenter.TryDeliverToProxy(rejection, targetCache: null);
                 LogRejectingRequestDueToOverloading(this.Log, msg);
@@ -92,7 +92,7 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
                 }
 
-                MessagingInstruments.OnMessageReRoute(msg);
+                MessagingInstrumentation.OnMessageReRoute(msg);
                 this.messageCenter.RerouteMessage(msg);
             }
             else
@@ -161,7 +161,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingInstruments.OnFailedSentMessage(msg);
+            MessagingInstrumentation.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 LogSiloRejectingMessage(this.Log, this.myAddress, msg, reason);
@@ -176,7 +176,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 LogSiloDroppingMessage(this.Log, this.myAddress, msg, reason);
-                MessagingInstruments.OnDroppedSentMessage(msg);
+                MessagingInstrumentation.OnDroppedSentMessage(msg);
             }
         }
 

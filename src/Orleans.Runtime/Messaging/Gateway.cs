@@ -29,6 +29,7 @@ namespace Orleans.Runtime.Messaging
 
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private readonly MessageCenter messageCenter;
+        private readonly MessagingInstruments _messagingInstruments;
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -42,9 +43,11 @@ namespace Orleans.Runtime.Messaging
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options,
             IAsyncTimerFactory timerFactory,
-            OrleansInstruments orleansInstruments)
+            OrleansInstruments orleansInstruments,
+            MessagingInstruments messagingInstruments)
         {
             this.messageCenter = messageCenter;
+            _messagingInstruments = messagingInstruments;
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
@@ -143,7 +146,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     clientState = new ClientState(this, clientId);
                     clients[clientId] = clientState;
-                    MessagingInstruments.ConnectedClient.Add(1);
+                    _messagingInstruments.ConnectedClient.Add(1);
                 }
                 clientState.RecordConnection(connection);
                 clientConnections[connection] = clientState;
@@ -240,7 +243,7 @@ namespace Orleans.Runtime.Messaging
                             }
 
                             clientsCollectionVersion++;
-                            MessagingInstruments.ConnectedClient.Add(-1);
+                            _messagingInstruments.ConnectedClient.Add(-1);
                         }
                     }
                 }

@@ -4,9 +4,10 @@ using Orleans.Core.Diagnostics;
 
 namespace Orleans.Runtime;
 
-internal partial class MessagingTrace(ILoggerFactory loggerFactory)
+internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingInstruments messagingInstruments)
 {
     protected ILogger Logger { get; } = loggerFactory.CreateLogger(MessagingEvents.ListenerName);
+    protected MessagingInstruments MessagingInstrumentation { get; } = messagingInstruments;
 
     public void OnSendMessage(Message message)
     {
@@ -30,7 +31,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory)
     internal void OnDropExpiredMessage(Message message, MessagingInstruments.Phase phase)
     {
         MessagingEvents.EmitExpired(message, phase);
-        MessagingInstruments.OnMessageExpired(phase);
+        MessagingInstrumentation.OnMessageExpired(phase);
         LogDropExpiredMessage(Logger, message, phase);
     }
 
@@ -43,7 +44,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory)
     internal void OnSiloDropSendingMessage(SiloAddress localSiloAddress, Message message, string reason)
     {
         MessagingEvents.EmitSendingDropped(localSiloAddress, message, reason);
-        MessagingInstruments.OnDroppedSentMessage(message);
+        MessagingInstrumentation.OnDroppedSentMessage(message);
         LogSiloDropSendingMessage(Logger, localSiloAddress, message, reason);
     }
 
@@ -82,7 +83,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory)
 
     public void OnRejectSendMessageToDeadSilo(SiloAddress localSilo, Message message)
     {
-        MessagingInstruments.OnFailedSentMessage(message);
+        MessagingInstrumentation.OnFailedSentMessage(message);
         MessagingEvents.EmitRejectedDeadSilo(localSilo, message);
         LogRejectSendMessageToDeadSilo(
             Logger,
