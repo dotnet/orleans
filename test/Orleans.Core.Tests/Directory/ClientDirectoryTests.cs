@@ -81,7 +81,8 @@ namespace NonSilo.Tests.Directory
                 grainReferenceActivator: null,
                 timerRegistry: null,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
-                schedulerInstruments: CreateSchedulerInstruments());
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments());
 
             _directory = new ClientDirectory(
                 grainFactory: _grainFactory,
@@ -114,6 +115,15 @@ namespace NonSilo.Tests.Directory
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<CatalogInstruments>();
             return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
+        }
+
+        private static GrainInstruments CreateGrainInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<GrainInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<GrainInstruments>();
         }
 
         /// <summary>

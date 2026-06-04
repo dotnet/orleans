@@ -159,7 +159,8 @@ namespace UnitTests.Directory
                 grainReferenceActivator: null,
                 timerRegistry: null,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
-                schedulerInstruments: CreateSchedulerInstruments());
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -212,7 +213,8 @@ namespace UnitTests.Directory
                 grainReferenceActivator: null,
                 timerRegistry: null,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
-                schedulerInstruments: CreateSchedulerInstruments());
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -277,7 +279,8 @@ namespace UnitTests.Directory
                 grainReferenceActivator: null,
                 timerRegistry: null,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
-                schedulerInstruments: CreateSchedulerInstruments());
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -848,6 +851,15 @@ namespace UnitTests.Directory
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<DirectoryInstruments>();
             return services.BuildServiceProvider().GetRequiredService<DirectoryInstruments>();
+        }
+
+        private static GrainInstruments CreateGrainInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<GrainInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<GrainInstruments>();
         }
 
         private int generation = 0;

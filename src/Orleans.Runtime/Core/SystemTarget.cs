@@ -81,7 +81,7 @@ namespace Orleans.Runtime
             WorkItemGroup = _shared.CreateWorkItemGroup(this);
             if (!Constants.IsSingletonSystemTarget(GrainId.Type))
             {
-                GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+                _shared.GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
             }
         }
 
@@ -390,7 +390,7 @@ namespace Orleans.Runtime
         {
             if (!Constants.IsSingletonSystemTarget(GrainId.Type))
             {
-                GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+                _shared.GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
             }
 
             StopAllTimers();
