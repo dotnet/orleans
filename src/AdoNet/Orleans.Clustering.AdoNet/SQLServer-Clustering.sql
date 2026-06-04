@@ -22,6 +22,7 @@ CREATE TABLE OrleansMembershipTable
 	Status INT NOT NULL,
 	ProxyPort INT NULL,
 	SuspectTimes VARCHAR(8000) NULL,
+	MetadataJson NVARCHAR(4000) NULL,
 	StartTime DATETIME2(3) NOT NULL,
 	IAmAliveTime DATETIME2(3) NOT NULL,
 
@@ -94,6 +95,7 @@ SELECT
 		HostName,
 		Status,
 		ProxyPort,
+		MetadataJson,
 		StartTime,
 		IAmAliveTime
 	)
@@ -106,6 +108,7 @@ SELECT
 		@HostName,
 		@Status,
 		@ProxyPort,
+		@MetadataJson,
 		@StartTime,
 		@IAmAliveTime
 	WHERE NOT EXISTS
@@ -162,6 +165,7 @@ SELECT
 	SET
 		Status = @Status,
 		SuspectTimes = @SuspectTimes,
+		MetadataJson = @MetadataJson,
 		IAmAliveTime = @IAmAliveTime
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
@@ -214,6 +218,7 @@ SELECT
 		m.Status,
 		m.ProxyPort,
 		m.SuspectTimes,
+		m.MetadataJson,
 		m.StartTime,
 		m.IAmAliveTime,
 		v.Version
@@ -247,6 +252,7 @@ SELECT
 		m.Status,
 		m.ProxyPort,
 		m.SuspectTimes,
+		m.MetadataJson,
 		m.StartTime,
 		m.IAmAliveTime,
 		v.Version

@@ -264,6 +264,9 @@ namespace Orleans
         [Id(10)]
         public System.DateTime IAmAliveTime { get { throw null; } set { } }
 
+        [Id(11)]
+        public System.Collections.Immutable.ImmutableDictionary<string, string>? Metadata { get { throw null; } set { } }
+
         [Id(3)]
         public int ProxyPort { get { throw null; } set { } }
 
