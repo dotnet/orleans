@@ -20,6 +20,7 @@ CREATE TABLE OrleansMembershipTable
     Status INT NOT NULL,
     ProxyPort INT NULL,
     SuspectTimes VARCHAR(8000) NULL,
+    MetadataJson TEXT NULL,
     StartTime DATETIME NOT NULL,
     IAmAliveTime DATETIME NOT NULL,
 
@@ -69,7 +70,7 @@ VALUES
 (
     'InsertMembershipKey','
     call InsertMembershipKey(@DeploymentId, @Address, @Port, @Generation,
-    @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime);'
+    @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime, @MetadataJson);'
 );
 
 DELIMITER $$
@@ -85,7 +86,8 @@ CREATE PROCEDURE InsertMembershipKey(
     in    _Status INT,
     in    _ProxyPort INT,
     in    _StartTime DATETIME,
-    in    _IAmAliveTime DATETIME
+    in    _IAmAliveTime DATETIME,
+    in    _MetadataJson TEXT
 )
 BEGIN
     DECLARE _ROWCOUNT INT;
@@ -100,6 +102,7 @@ BEGIN
         HostName,
         Status,
         ProxyPort,
+        MetadataJson,
         StartTime,
         IAmAliveTime
     )
@@ -112,6 +115,7 @@ BEGIN
         _HostName,
         _Status,
         _ProxyPort,
+        _MetadataJson,
         _StartTime,
         _IAmAliveTime) AS TMP
     WHERE NOT EXISTS
@@ -164,6 +168,7 @@ VALUES
     SET
         Status = @Status,
         SuspectTimes = @SuspectTimes,
+        MetadataJson = @MetadataJson,
         IAmAliveTime = @IAmAliveTime
     WHERE
         DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
@@ -206,6 +211,7 @@ VALUES
         m.Status,
         m.ProxyPort,
         m.SuspectTimes,
+        m.MetadataJson,
         m.StartTime,
         m.IAmAliveTime,
         v.Version
@@ -234,6 +240,7 @@ VALUES
         m.Status,
         m.ProxyPort,
         m.SuspectTimes,
+        m.MetadataJson,
         m.StartTime,
         m.IAmAliveTime,
         v.Version

@@ -64,6 +64,13 @@ internal partial class SiloMetadataCache(
                     .Where(e => !e.Value.HasMissedIAmAlives(clusterMembershipOptions.Value, now));
                 foreach (var membershipEntry in recentlyActiveSilos)
                 {
+                    if (membershipEntry.Value.Metadata is { } membershipMetadata)
+                    {
+                        _metadata[membershipEntry.Key] = new SiloMetadata(membershipMetadata);
+                        _negativeCache.Remove(membershipEntry.Key, out _);
+                        continue;
+                    }
+
                     if (!_metadata.ContainsKey(membershipEntry.Key))
                     {
                         if (_negativeCache.TryGetValue(membershipEntry.Key, out var expiration) && expiration > now)

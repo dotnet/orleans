@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -60,6 +61,10 @@ namespace Orleans.Tests.SqlUtils
             this.storage = storage;
             this.dbStoredQueries = dbStoredQueries;
         }
+
+#if CLUSTERING_ADONET || TESTER_SQLUTILS
+        internal bool SupportsMembershipMetadata => dbStoredQueries.SupportsMembershipMetadata();
+#endif
 
         /// <summary>
         /// Creates an instance of a database of type <see cref="RelationalOrleansQueries"/> and Initializes Orleans queries from the database.
@@ -335,7 +340,8 @@ namespace Orleans.Tests.SqlUtils
             string etag)
         {
             return ReadAsync(dbStoredQueries.InsertMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command)
+            {
+                var columns = new DbStoredQueries.Columns(command)
                 {
                     DeploymentId = deploymentId,
                     IAmAliveTime = membershipEntry.IAmAliveTime,
@@ -346,7 +352,15 @@ namespace Orleans.Tests.SqlUtils
                     Status = membershipEntry.Status,
                     ProxyPort = membershipEntry.ProxyPort,
                     Version = etag
-                }, ret => ret.First());
+                };
+
+                if (dbStoredQueries.SupportsMembershipMetadata())
+                {
+                    columns.MetadataJson = SerializeMetadata(membershipEntry);
+                }
+
+                return columns;
+            }, ret => ret.First());
         }
 
         /// <summary>
@@ -360,7 +374,8 @@ namespace Orleans.Tests.SqlUtils
             string etag)
         {
             return ReadAsync(dbStoredQueries.UpdateMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command)
+            {
+                var columns = new DbStoredQueries.Columns(command)
                 {
                     DeploymentId = deploymentId,
                     SiloAddress = membershipEntry.SiloAddress,
@@ -368,8 +383,19 @@ namespace Orleans.Tests.SqlUtils
                     Status = membershipEntry.Status,
                     SuspectTimes = membershipEntry.SuspectTimes,
                     Version = etag
-                }, ret => ret.First());
+                };
+
+                if (dbStoredQueries.SupportsMembershipMetadata())
+                {
+                    columns.MetadataJson = SerializeMetadata(membershipEntry);
+                }
+
+                return columns;
+            }, ret => ret.First());
         }
+
+        private static string? SerializeMetadata(MembershipEntry membershipEntry)
+            => membershipEntry.Metadata is not null ? JsonSerializer.Serialize(membershipEntry.Metadata) : null;
 
         private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry?, int>> ret)
         {

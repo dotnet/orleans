@@ -84,17 +84,19 @@ internal sealed class CassandraClusteringTable : IMembershipTable
             }
         }
 
+        ClearMetadataIfUnavailable(entry);
         var query = await Session.ExecuteAsync(await Queries.InsertMembership(_identifier, entry, tableVersion.Version - 1));
         return (bool)query.First()["[applied]"];
     }
 
     async Task<bool> IMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
     {
+        ClearMetadataIfUnavailable(entry);
         var query = await Session.ExecuteAsync(await Queries.UpdateMembership(_identifier, entry, tableVersion.Version - 1));
         return (bool)query.First()["[applied]"];
     }
 
-    private static MembershipEntry? GetMembershipEntry(Row row)
+    private static MembershipEntry? GetMembershipEntry(Row row, bool metadataColumnAvailable)
     {
         if (row["start_time"] == null)
         {
@@ -109,7 +111,8 @@ internal sealed class CassandraClusteringTable : IMembershipTable
             Status = (SiloStatus)(int)row["status"],
             ProxyPort = (int)row["proxy_port"],
             StartTime = ((DateTimeOffset)row["start_time"]).UtcDateTime,
-            IAmAliveTime = ((DateTimeOffset)row["i_am_alive_time"]).UtcDateTime
+            IAmAliveTime = ((DateTimeOffset)row["i_am_alive_time"]).UtcDateTime,
+            Metadata = metadataColumnAvailable ? OrleansQueries.DeserializeMetadata((string?)row["metadata_json"]) : null
         };
 
         var suspectingSilos = (string)row["suspect_times"];
@@ -138,7 +141,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
             var entries = new List<Tuple<MembershipEntry, string>>();
             foreach (var row in new[] { firstRow }.Concat(rows))
             {
-                var entry = GetMembershipEntry(row);
+                var entry = GetMembershipEntry(row, Queries.MetadataColumnAvailable);
                 if (entry != null)
                 {
                     entries.Add(new Tuple<MembershipEntry, string>(entry, string.Empty));
@@ -195,7 +198,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
     {
         var allEntries =
             (await Session.ExecuteAsync(await Queries.MembershipReadAll(_identifier)))
-            .Select(GetMembershipEntry)
+            .Select(row => GetMembershipEntry(row, Queries.MetadataColumnAvailable))
             .Where((MembershipEntry? e) => e is not null)
             .Cast<MembershipEntry>();
 
@@ -205,6 +208,14 @@ internal sealed class CassandraClusteringTable : IMembershipTable
             {
                 await Session.ExecuteAsync(await Queries.DeleteMembershipEntry(_identifier, e));
             }
+        }
+    }
+
+    private void ClearMetadataIfUnavailable(MembershipEntry entry)
+    {
+        if (!Queries.MetadataColumnAvailable)
+        {
+            entry.Metadata = null;
         }
     }
 }

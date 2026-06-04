@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -253,6 +255,11 @@ namespace Orleans.Runtime.MembershipService
             parse.IAmAliveTime = !string.IsNullOrEmpty(tableEntry.IAmAliveTime) ?
                 LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default;
 
+            if (!string.IsNullOrEmpty(tableEntry.Metadata))
+            {
+                parse.Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(tableEntry.Metadata)?.ToImmutableDictionary();
+            }
+
             var suspectingSilos = new List<SiloAddress>();
             var suspectingTimes = new List<DateTime>();
 
@@ -300,7 +307,8 @@ namespace Orleans.Runtime.MembershipService
                 UpdateZone = memEntry.UpdateZone.ToString(CultureInfo.InvariantCulture),
                 FaultZone = memEntry.FaultZone.ToString(CultureInfo.InvariantCulture),
                 StartTime = LogFormatter.PrintDate(memEntry.StartTime),
-                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime)
+                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
+                Metadata = memEntry.Metadata is not null ? JsonSerializer.Serialize(memEntry.Metadata) : null
             };
 
             if (memEntry.SuspectTimes != null)

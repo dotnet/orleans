@@ -188,6 +188,39 @@ namespace Orleans.Runtime
                 }
             }
 
+            foreach (var entry in Entries)
+            {
+                if (MetadataChanged(entry.Value, other.Entries[entry.Key]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool MetadataChanged(MembershipEntry entry, MembershipEntry otherEntry)
+        {
+            var metadata = entry.Metadata;
+            var otherMetadata = otherEntry.Metadata;
+            if (ReferenceEquals(metadata, otherMetadata))
+            {
+                return false;
+            }
+
+            if (metadata is null || otherMetadata is null || metadata.Count != otherMetadata.Count)
+            {
+                return true;
+            }
+
+            foreach (var (key, value) in metadata)
+            {
+                if (!otherMetadata.TryGetValue(key, out var otherValue) || !string.Equals(value, otherValue, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
