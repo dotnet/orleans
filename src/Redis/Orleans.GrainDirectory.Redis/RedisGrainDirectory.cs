@@ -191,6 +191,8 @@ namespace Orleans.GrainDirectory.Redis
 
         public void Dispose()
         {
+            _disposed = true;
+
             var redis = _redis;
             if (redis is null)
             {
@@ -202,7 +204,6 @@ namespace Orleans.GrainDirectory.Redis
             redis.ConnectionFailed -= LogConnectionFailed;
             redis.ErrorMessage -= LogErrorMessage;
             redis.InternalError -= LogInternalError;
-            _disposed = true;
             _redis = null!;
             _database = null!;
             _redisIsShared = false;
@@ -215,6 +216,8 @@ namespace Orleans.GrainDirectory.Redis
 
         public async ValueTask DisposeAsync()
         {
+            _disposed = true;
+
             var redis = _redis;
             if (redis is null)
             {
@@ -226,7 +229,6 @@ namespace Orleans.GrainDirectory.Redis
             redis.ConnectionFailed -= LogConnectionFailed;
             redis.ErrorMessage -= LogErrorMessage;
             redis.InternalError -= LogInternalError;
-            _disposed = true;
             _redis = null!;
             _database = null!;
             _redisIsShared = false;
