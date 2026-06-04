@@ -16,6 +16,22 @@ public record SiloMetadata
     public static SiloMetadata Empty { get; } = new SiloMetadata();
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="SiloMetadata"/> class.
+    /// </summary>
+    public SiloMetadata()
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SiloMetadata"/> class.
+    /// </summary>
+    /// <param name="metadata">The metadata key-value pairs associated with the silo.</param>
+    public SiloMetadata(IEnumerable<KeyValuePair<string, string>> metadata)
+    {
+        AddMetadata(metadata);
+    }
+
+    /// <summary>
     /// Gets the metadata key-value pairs associated with the silo.
     /// </summary>
     [Id(0)]
