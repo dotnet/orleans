@@ -15,14 +15,16 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
         int maxCacheSize,
         TimeSpan maxCacheTTL,
         TimeProvider timeProvider,
-        DirectoryInstruments directoryInstruments)
+        DirectoryInstruments directoryInstruments = null)
         : base(
             capacity: maxCacheSize,
             comparer: null,
             timeToLive: maxCacheTTL,
             timeProvider: timeProvider)
     {
-        _cacheSizeRegistration = directoryInstruments.RegisterCacheSizeObserve(() => Count);
+        _cacheSizeRegistration = directoryInstruments is null
+            ? NoOpDisposable.Instance
+            : directoryInstruments.RegisterCacheSizeObserve(() => Count);
     }
 
     public void AddOrUpdate(GrainAddress activationAddress, int version) => AddOrUpdate(activationAddress.GrainId, (activationAddress, version));
@@ -63,4 +65,13 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync() => await DisposeAsync();
+
+    private sealed class NoOpDisposable : IDisposable
+    {
+        public static readonly NoOpDisposable Instance = new();
+
+        public void Dispose()
+        {
+        }
+    }
 }

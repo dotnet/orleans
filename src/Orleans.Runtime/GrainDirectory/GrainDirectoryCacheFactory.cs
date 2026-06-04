@@ -80,7 +80,7 @@ namespace Orleans.Runtime.GrainDirectory
         private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, DirectoryInstruments directoryInstruments)
         {
             var timeProvider = services?.GetService<TimeProvider>() ?? TimeProvider.System;
-            directoryInstruments ??= services.GetRequiredService<DirectoryInstruments>();
+            directoryInstruments ??= services?.GetService<DirectoryInstruments>();
             return new LruGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL, timeProvider, directoryInstruments);
         }
     }
