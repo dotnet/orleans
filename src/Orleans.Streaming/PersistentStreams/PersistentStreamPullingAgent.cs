@@ -32,6 +32,7 @@ namespace Orleans.Streams
         private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IQueueAdapter queueAdapter;
         private readonly IStreamFailureHandler streamFailureHandler;
+        private readonly StreamInstruments _streamInstruments;
         private readonly TimeProvider _timeProvider;
         internal readonly QueueId QueueId;
 
@@ -68,7 +69,8 @@ namespace Orleans.Streams
             IBackoffProvider deliveryBackoffProvider,
             IBackoffProvider queueReaderBackoffProvider,
             TimeProvider timeProvider,
-            SystemTargetShared shared)
+            SystemTargetShared shared,
+            StreamInstruments streamInstruments = null)
             : base(id, shared)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
@@ -84,6 +86,7 @@ namespace Orleans.Streams
             this.queueAdapterCache = queueAdapterCache;
             this.deliveryBackoffProvider = deliveryBackoffProvider;
             this.queueReaderBackoffProvider = queueReaderBackoffProvider;
+            _streamInstruments = streamInstruments;
             _timeProvider = timeProvider ?? TimeProvider.System;
             numMessages = 0;
 
@@ -179,7 +182,7 @@ namespace Orleans.Streams
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterGrainTimer(RunQueuePump, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
-            StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
+            _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
             LogInfoTakingQueue(new(QueueId));
             return Task.CompletedTask;
@@ -530,7 +533,7 @@ namespace Orleans.Streams
 
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
-            StreamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count);
+            _streamInstruments?.PersistentStreamReadMessages.Add(multiBatch.Count);
 
             LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
 
@@ -749,7 +752,7 @@ namespace Orleans.Streams
 
                     try
                     {
-                        StreamInstruments.PersistentStreamSentMessages.Add(1);
+                        _streamInstruments?.PersistentStreamSentMessages.Add(1);
                         if (IsShutdown)
                         {
                             break;

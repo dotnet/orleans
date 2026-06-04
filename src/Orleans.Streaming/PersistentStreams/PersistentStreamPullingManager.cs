@@ -39,6 +39,7 @@ namespace Orleans.Streams
         private readonly IStreamFilter streamFilter;
         private readonly IQueueAdapterFactory adapterFactory;
         private readonly TimeProvider _timeProvider;
+        private readonly StreamInstruments _streamInstruments;
         private RunState managerState;
         private IDisposable queuePrintTimer;
         private int nextAgentId;
@@ -57,6 +58,7 @@ namespace Orleans.Streams
             IBackoffProvider deliveryBackoffProvider,
             IBackoffProvider queueReaderBackoffProvider,
             TimeProvider timeProvider,
+            StreamInstruments streamInstruments,
             SystemTargetShared shared)
             : base(managerId, shared)
         {
@@ -89,11 +91,12 @@ namespace Orleans.Streams
             _deliveryBackoffProvider = deliveryBackoffProvider;
             _queueReaderBackoffProvider = queueReaderBackoffProvider;
             _timeProvider = timeProvider ?? TimeProvider.System;
+            _streamInstruments = streamInstruments;
             _systemTargetShared = shared;
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = shared.LoggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
             LogInfoCreated(GetType().Name, streamProviderName);
-            StreamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
+            _streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
@@ -255,7 +258,8 @@ namespace Orleans.Streams
                             _deliveryBackoffProvider,
                             _queueReaderBackoffProvider,
                             _timeProvider,
-                            _systemTargetShared);
+                            _systemTargetShared,
+                            _streamInstruments);
                         queuesToAgentsMap.Add(queueId, agent);
                         agents.Add(agent);
                     }
