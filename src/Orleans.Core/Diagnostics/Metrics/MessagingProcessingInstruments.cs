@@ -4,97 +4,106 @@ using System.Diagnostics.Metrics;
 #nullable disable
 namespace Orleans.Runtime;
 
-internal static class MessagingProcessingInstruments
+internal sealed class MessagingProcessingInstruments
 {
-    private static readonly CounterAggregatorGroup DispatcherMessagesProcessedCounterAggregatorGroup = new();
-    private static readonly ObservableCounter<long> DispatcherMessagesProcessedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_PROCESSED, DispatcherMessagesProcessedCounterAggregatorGroup.Collect);
+    private readonly Meter _meter;
+    private readonly CounterAggregatorGroup _dispatcherMessagesProcessedCounterAggregatorGroup = new();
+    private readonly ObservableCounter<long> _dispatcherMessagesProcessedCounter;
 
-    private static readonly CounterAggregatorGroup DispatcherMessagesReceivedCounterAggregatorGroup = new();
-    private static readonly ObservableCounter<long> DispatcherMessagesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_RECEIVED, DispatcherMessagesReceivedCounterAggregatorGroup.Collect);
+    private readonly CounterAggregatorGroup _dispatcherMessagesReceivedCounterAggregatorGroup = new();
+    private readonly ObservableCounter<long> _dispatcherMessagesReceivedCounter;
 
-    private static readonly CounterAggregator DispatcherMessagesForwardedCounterAggregator = new();
-    private static readonly ObservableCounter<long> DispatcherMessagesForwardedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_FORWARDED, DispatcherMessagesForwardedCounterAggregator.Collect);
-    private static readonly CounterAggregator ImaReceivedCounterAggregator = new();
-    private static readonly ObservableCounter<long> ImaReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_RECEIVED, ImaReceivedCounterAggregator.Collect);
-    private static readonly CounterAggregatorGroup ImaEnqueuedCounterAggregatorGroup = new();
-    private static readonly ObservableCounter<long> ImaEnqueuedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_ENQUEUED, ImaEnqueuedCounterAggregatorGroup.Collect);
-    private static readonly CounterAggregator ImaMessageEnqueuedNullContext;
-    private static readonly CounterAggregator ImaMessageEnqueuedSystemTarget;
-    private static readonly CounterAggregator ImaMessageEnqueuedGrain;
-    private static readonly CounterAggregator[] DispatcherMessagesReceivedCounters_NullContext;
-    private static readonly CounterAggregator[] DispatcherMessagesReceivedCounters_Grain;
+    private readonly CounterAggregator _dispatcherMessagesForwardedCounterAggregator = new();
+    private readonly ObservableCounter<long> _dispatcherMessagesForwardedCounter;
+    private readonly CounterAggregator _imaReceivedCounterAggregator = new();
+    private readonly ObservableCounter<long> _imaReceivedCounter;
+    private readonly CounterAggregatorGroup _imaEnqueuedCounterAggregatorGroup = new();
+    private readonly ObservableCounter<long> _imaEnqueuedCounter;
+    private readonly CounterAggregator _imaMessageEnqueuedNullContext;
+    private readonly CounterAggregator _imaMessageEnqueuedSystemTarget;
+    private readonly CounterAggregator _imaMessageEnqueuedGrain;
+    private readonly CounterAggregator[] _dispatcherMessagesReceivedCountersNullContext;
+    private readonly CounterAggregator[] _dispatcherMessagesReceivedCountersGrain;
 
-    private static readonly CounterAggregator[] DispatcherMessagesProcessedCounters_Ok;
-    private static readonly CounterAggregator[] DispatcherMessagesProcessedCounters_Error;
+    private readonly CounterAggregator[] _dispatcherMessagesProcessedCountersOk;
+    private readonly CounterAggregator[] _dispatcherMessagesProcessedCountersError;
+    private ObservableGauge<long> _activationDataAll;
 
-    static MessagingProcessingInstruments()
+    public MessagingProcessingInstruments(OrleansInstruments instruments)
     {
-        ImaMessageEnqueuedNullContext = ImaEnqueuedCounterAggregatorGroup.FindOrCreate(new("Context", "ToNull"));
-        ImaMessageEnqueuedSystemTarget = ImaEnqueuedCounterAggregatorGroup.FindOrCreate(new("Context", "ToSystemTarget"));
-        ImaMessageEnqueuedGrain = ImaEnqueuedCounterAggregatorGroup.FindOrCreate(new("Context", "ToGrain"));
+        _meter = instruments.Meter;
+        _dispatcherMessagesProcessedCounter = _meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_PROCESSED, _dispatcherMessagesProcessedCounterAggregatorGroup.Collect);
+        _dispatcherMessagesReceivedCounter = _meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_RECEIVED, _dispatcherMessagesReceivedCounterAggregatorGroup.Collect);
+        _dispatcherMessagesForwardedCounter = _meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_DISPATCHER_FORWARDED, _dispatcherMessagesForwardedCounterAggregator.Collect);
+        _imaReceivedCounter = _meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_RECEIVED, _imaReceivedCounterAggregator.Collect);
+        _imaEnqueuedCounter = _meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_IMA_ENQUEUED, _imaEnqueuedCounterAggregatorGroup.Collect);
+
+        _imaMessageEnqueuedNullContext = _imaEnqueuedCounterAggregatorGroup.FindOrCreate(new("Context", "ToNull"));
+        _imaMessageEnqueuedSystemTarget = _imaEnqueuedCounterAggregatorGroup.FindOrCreate(new("Context", "ToSystemTarget"));
+        _imaMessageEnqueuedGrain = _imaEnqueuedCounterAggregatorGroup.FindOrCreate(new("Context", "ToGrain"));
         var directionEnumValues = Enum.GetValues<Message.Directions>();
-        DispatcherMessagesReceivedCounters_NullContext = new CounterAggregator[directionEnumValues.Length + 1];
-        DispatcherMessagesReceivedCounters_Grain = new CounterAggregator[directionEnumValues.Length + 1];
-        DispatcherMessagesProcessedCounters_Ok = new CounterAggregator[directionEnumValues.Length + 1];
-        DispatcherMessagesProcessedCounters_Error = new CounterAggregator[directionEnumValues.Length + 1];
+        _dispatcherMessagesReceivedCountersNullContext = new CounterAggregator[directionEnumValues.Length + 1];
+        _dispatcherMessagesReceivedCountersGrain = new CounterAggregator[directionEnumValues.Length + 1];
+        _dispatcherMessagesProcessedCountersOk = new CounterAggregator[directionEnumValues.Length + 1];
+        _dispatcherMessagesProcessedCountersError = new CounterAggregator[directionEnumValues.Length + 1];
         foreach (var value in directionEnumValues)
         {
-            DispatcherMessagesReceivedCounters_NullContext[(int)value] = DispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(new("Context", "None", "Direction", value.ToString()));
-            DispatcherMessagesReceivedCounters_Grain[(int)value] = DispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(new("Context", "Grain", "Direction", value.ToString()));
+            _dispatcherMessagesReceivedCountersNullContext[(int)value] = _dispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(new("Context", "None", "Direction", value.ToString()));
+            _dispatcherMessagesReceivedCountersGrain[(int)value] = _dispatcherMessagesReceivedCounterAggregatorGroup.FindOrCreate(new("Context", "Grain", "Direction", value.ToString()));
 
-            DispatcherMessagesProcessedCounters_Ok[(int)value] = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new("Direction", value.ToString(), "Status", "Ok"));
-            DispatcherMessagesProcessedCounters_Error[(int)value] = DispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new("Direction", value.ToString(), "Status", "Error"));
+            _dispatcherMessagesProcessedCountersOk[(int)value] = _dispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new("Direction", value.ToString(), "Status", "Ok"));
+            _dispatcherMessagesProcessedCountersError[(int)value] = _dispatcherMessagesProcessedCounterAggregatorGroup.FindOrCreate(new("Direction", value.ToString(), "Status", "Error"));
         }
     }
 
-    internal static void OnDispatcherMessageReceive(Message msg)
+    internal void OnDispatcherMessageReceive(Message msg)
     {
-        if (!DispatcherMessagesReceivedCounter.Enabled)
+        if (!_dispatcherMessagesReceivedCounter.Enabled)
             return;
         var context = RuntimeContext.Current;
         var counters = context switch
         {
-            null => DispatcherMessagesReceivedCounters_NullContext,
-            _ => DispatcherMessagesReceivedCounters_Grain,
+            null => _dispatcherMessagesReceivedCountersNullContext,
+            _ => _dispatcherMessagesReceivedCountersGrain,
         };
         counters[(int)msg.Direction].Add(1);
     }
 
-    internal static void OnDispatcherMessageProcessedOk(Message msg)
+    internal void OnDispatcherMessageProcessedOk(Message msg)
     {
-        if (DispatcherMessagesProcessedCounter.Enabled)
+        if (_dispatcherMessagesProcessedCounter.Enabled)
         {
-            DispatcherMessagesProcessedCounters_Ok[(int)msg.Direction].Add(1);
+            _dispatcherMessagesProcessedCountersOk[(int)msg.Direction].Add(1);
         }
     }
 
-    internal static void OnDispatcherMessageProcessedError(Message msg)
+    internal void OnDispatcherMessageProcessedError(Message msg)
     {
-        if (DispatcherMessagesProcessedCounter.Enabled)
+        if (_dispatcherMessagesProcessedCounter.Enabled)
         {
-            DispatcherMessagesProcessedCounters_Error[(int)msg.Direction].Add(1);
+            _dispatcherMessagesProcessedCountersError[(int)msg.Direction].Add(1);
         }
     }
 
-    internal static void OnDispatcherMessageForwared(Message msg)
+    internal void OnDispatcherMessageForwared(Message msg)
     {
-        if (DispatcherMessagesForwardedCounter.Enabled)
+        if (_dispatcherMessagesForwardedCounter.Enabled)
         {
-            DispatcherMessagesForwardedCounterAggregator.Add(1);
+            _dispatcherMessagesForwardedCounterAggregator.Add(1);
         }
     }
 
-    internal static void OnImaMessageReceived(Message msg)
+    internal void OnImaMessageReceived(Message msg)
     {
-        if (ImaReceivedCounter.Enabled)
+        if (_imaReceivedCounter.Enabled)
         {
-            ImaReceivedCounterAggregator.Add(1);
+            _imaReceivedCounterAggregator.Add(1);
         }
     }
 
-    internal static void OnImaMessageEnqueued(IGrainContext context)
+    internal void OnImaMessageEnqueued(IGrainContext context)
     {
-        if (!ImaEnqueuedCounter.Enabled)
+        if (!_imaEnqueuedCounter.Enabled)
         {
             return;
         }
@@ -102,21 +111,19 @@ internal static class MessagingProcessingInstruments
         switch (context)
         {
             case null:
-                ImaMessageEnqueuedNullContext.Add(1);
+                _imaMessageEnqueuedNullContext.Add(1);
                 break;
             case ISystemTargetBase:
-                ImaMessageEnqueuedSystemTarget.Add(1);
+                _imaMessageEnqueuedSystemTarget.Add(1);
                 break;
             default:
-                ImaMessageEnqueuedGrain.Add(1);
+                _imaMessageEnqueuedGrain.Add(1);
                 break;
         }
     }
 
-    internal static ObservableGauge<long> ActivationDataAll;
-
-    internal static void RegisterActivationDataAllObserve(Func<long> observeValue)
+    internal void RegisterActivationDataAllObserve(Func<long> observeValue)
     {
-        ActivationDataAll = Instruments.Meter.CreateObservableGauge(InstrumentNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, observeValue);
+        _activationDataAll = _meter.CreateObservableGauge(InstrumentNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, observeValue);
     }
 }

@@ -20,6 +20,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionManager connectionManager;
         private readonly RuntimeMessagingTrace messagingTrace;
         private readonly MessagingInstruments _messagingInstruments;
+        private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
         private readonly SiloAddress _siloAddress;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
@@ -41,6 +42,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionManager senderManager,
             RuntimeMessagingTrace messagingTrace,
             MessagingInstruments messagingInstruments,
+            MessagingProcessingInstruments messagingProcessingInstruments,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
             GrainLocator grainLocator,
@@ -52,6 +54,7 @@ namespace Orleans.Runtime.Messaging
             this.connectionManager = senderManager;
             this.messagingTrace = messagingTrace;
             _messagingInstruments = messagingInstruments;
+            _messagingProcessingInstruments = messagingProcessingInstruments;
             this.placementService = placementService;
             _grainLocator = grainLocator;
             _messageObserver = messageStatisticsSink.GetMessageObserver();
@@ -430,7 +433,7 @@ namespace Orleans.Runtime.Messaging
             if (!MayForward(message, this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
-            MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
+            _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
 
             ResendMessageImpl(message, forwardingAddress);
             return true;
@@ -561,7 +564,7 @@ namespace Orleans.Runtime.Messaging
 
             void HandleReceiveFailure(Message msg, Exception ex)
             {
-                MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
+                _messagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
                 LogErrorCreatingActivation(log, ex, msg.TargetGrain, msg.InterfaceType, msg);
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);

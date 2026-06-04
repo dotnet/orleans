@@ -3,12 +3,15 @@ using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime;
 
-internal sealed partial class RuntimeMessagingTrace(ILoggerFactory loggerFactory, MessagingInstruments messagingInstruments) : MessagingTrace(loggerFactory, messagingInstruments)
+internal sealed partial class RuntimeMessagingTrace(
+    ILoggerFactory loggerFactory,
+    MessagingInstruments messagingInstruments,
+    MessagingProcessingInstruments messagingProcessingInstruments) : MessagingTrace(loggerFactory, messagingInstruments, messagingProcessingInstruments)
 {
     internal void OnDispatcherReceiveInvalidActivation(Message message, ActivationState activationState)
     {
         DispatcherEvents.EmitReceivedInvalidActivation(message, activationState);
-        MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+        MessagingProcessingInstrumentation.OnDispatcherMessageProcessedError(message);
         LogDispatcherReceiveInvalidActivation(Logger, activationState, message);
     }
 
@@ -42,7 +45,7 @@ internal sealed partial class RuntimeMessagingTrace(ILoggerFactory loggerFactory
             failedOperation,
             message.ForwardCount,
             exception);
-        MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
+        MessagingProcessingInstrumentation.OnDispatcherMessageForwared(message);
     }
 
     internal void OnDispatcherForwardingFailed(Message message, GrainAddress? oldAddress, SiloAddress? forwardingAddress, string failedOperation, Exception? exception)
@@ -73,7 +76,7 @@ internal sealed partial class RuntimeMessagingTrace(ILoggerFactory loggerFactory
     internal void OnDispatcherSelectTargetFailed(Message message, Exception exception)
     {
         DispatcherEvents.EmitSelectTargetFailed(message, exception);
-        MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+        MessagingProcessingInstrumentation.OnDispatcherMessageProcessedError(message);
         if (ShouldLogError(exception))
         {
             LogDispatcherSelectTargetFailed(Logger, message, exception);

@@ -60,6 +60,7 @@ public sealed class GrainTypeSharedContext
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
         CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
+        MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
 
         CollectionAgeLimit = GetCollectionAgeLimit(
             grainType,
@@ -75,6 +76,7 @@ public sealed class GrainTypeSharedContext
 
     internal CatalogInstruments CatalogInstruments { get; }
     internal GrainInstruments GrainInstruments { get; }
+    internal MessagingProcessingInstruments MessagingProcessingInstruments { get; }
 
     private static TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
     {

@@ -15,7 +15,7 @@ public class DispatcherEventsTests
     public void RuntimeMessagingTrace_OnDispatcherRejectMessage_EmitsRejected()
     {
         using var observer = new Observer(DispatcherEvents.AllEvents);
-        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance, CreateMessagingInstruments());
+        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance, CreateMessagingInstruments(), CreateMessagingProcessingInstruments());
         var message = new Message();
         var exception = new InvalidOperationException("boom");
 
@@ -31,7 +31,7 @@ public class DispatcherEventsTests
     public void RuntimeMessagingTrace_OnDispatcherForwardingMultiple_EmitsForwardingMultiple()
     {
         using var observer = new Observer(DispatcherEvents.AllEvents);
-        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance, CreateMessagingInstruments());
+        var trace = new RuntimeMessagingTrace(NullLoggerFactory.Instance, CreateMessagingInstruments(), CreateMessagingProcessingInstruments());
         var oldAddress = new GrainAddress
         {
             GrainId = GrainId.Create("test", "grain"),
@@ -81,5 +81,14 @@ public class DispatcherEventsTests
         services.AddSingleton<OrleansInstruments>();
         services.AddSingleton<MessagingInstruments>();
         return services.BuildServiceProvider().GetRequiredService<MessagingInstruments>();
+    }
+
+    private static MessagingProcessingInstruments CreateMessagingProcessingInstruments()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<MessagingProcessingInstruments>();
+        return services.BuildServiceProvider().GetRequiredService<MessagingProcessingInstruments>();
     }
 }

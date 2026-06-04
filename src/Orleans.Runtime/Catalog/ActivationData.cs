@@ -1433,7 +1433,7 @@ internal sealed partial class ActivationData :
     /// <param name="message"></param>
     private void InvokeIncomingRequest(Message message)
     {
-        MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+        _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
         _shared.InternalRuntime.MessagingTrace.OnScheduleMessage(message);
 
         try
@@ -1514,7 +1514,7 @@ internal sealed partial class ActivationData :
         // Don't process messages that have already timed out
         if (message.IsExpired)
         {
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+            _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
             return;
         }
@@ -1539,7 +1539,7 @@ internal sealed partial class ActivationData :
         }
         else
         {
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+            _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
         }
 
         _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
@@ -1550,7 +1550,7 @@ internal sealed partial class ActivationData :
         var overloadException = CheckOverloaded();
         if (overloadException != null && !message.IsLocalOnly)
         {
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+            _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
             return;
         }

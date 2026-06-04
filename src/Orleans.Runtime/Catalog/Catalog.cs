@@ -17,6 +17,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly GrainContextActivator grainActivator;
         private readonly CatalogInstruments _catalogInstruments;
+        private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
         private ISiloStatusOracle _siloStatusOracle;
 
         // Lock striping is used for activation creation to reduce contention
@@ -35,6 +36,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             GrainContextActivator grainActivator,
             CatalogInstruments catalogInstruments,
+            MessagingProcessingInstruments messagingProcessingInstruments,
             SystemTargetShared shared)
             : base(Constants.CatalogType, shared)
         {
@@ -44,6 +46,7 @@ namespace Orleans.Runtime
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
             _catalogInstruments = catalogInstruments;
+            _messagingProcessingInstruments = messagingProcessingInstruments;
 
             // Initialize lock striping array
             for (var i = 0; i < LockCount; i++)
@@ -53,7 +56,7 @@ namespace Orleans.Runtime
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
-            MessagingProcessingInstruments.RegisterActivationDataAllObserve(() =>
+            _messagingProcessingInstruments.RegisterActivationDataAllObserve(() =>
             {
                 long counter = 0;
                 foreach (var activation in activations)

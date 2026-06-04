@@ -18,7 +18,8 @@ internal sealed class SystemTargetShared(
     ActivationDirectory activations,
     SchedulerInstruments schedulerInstruments,
     GrainInstruments grainInstruments,
-    MessagingInstruments messagingInstruments)
+    MessagingInstruments messagingInstruments,
+    MessagingProcessingInstruments messagingProcessingInstruments)
 {
     public SiloAddress SiloAddress => localSiloDetails.SiloAddress;
 
@@ -27,7 +28,7 @@ internal sealed class SystemTargetShared(
     public GrainReferenceActivator GrainReferenceActivator => grainReferenceActivator;
     public ITimerRegistry TimerRegistry => timerRegistry;
 
-    public RuntimeMessagingTrace MessagingTrace { get; } = new(loggerFactory, messagingInstruments);
+    public RuntimeMessagingTrace MessagingTrace { get; } = new(loggerFactory, messagingInstruments, messagingProcessingInstruments);
     public InsideRuntimeClient RuntimeClient => runtimeClient;
     public ActivationDirectory ActivationDirectory => activations;
     public GrainInstruments GrainInstruments => grainInstruments;

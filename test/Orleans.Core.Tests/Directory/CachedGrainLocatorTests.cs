@@ -161,7 +161,8 @@ namespace UnitTests.Directory
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
                 grainInstruments: CreateGrainInstruments(),
-                messagingInstruments: CreateMessagingInstruments());
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -216,7 +217,8 @@ namespace UnitTests.Directory
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
                 grainInstruments: CreateGrainInstruments(),
-                messagingInstruments: CreateMessagingInstruments());
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -283,7 +285,8 @@ namespace UnitTests.Directory
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
                 grainInstruments: CreateGrainInstruments(),
-                messagingInstruments: CreateMessagingInstruments());
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -872,6 +875,15 @@ namespace UnitTests.Directory
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<MessagingInstruments>();
             return services.BuildServiceProvider().GetRequiredService<MessagingInstruments>();
+        }
+
+        private static MessagingProcessingInstruments CreateMessagingProcessingInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingProcessingInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<MessagingProcessingInstruments>();
         }
 
         private int generation = 0;

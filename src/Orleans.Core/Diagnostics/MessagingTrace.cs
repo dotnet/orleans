@@ -4,10 +4,11 @@ using Orleans.Core.Diagnostics;
 
 namespace Orleans.Runtime;
 
-internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingInstruments messagingInstruments)
+internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingInstruments messagingInstruments, MessagingProcessingInstruments messagingProcessingInstruments)
 {
     protected ILogger Logger { get; } = loggerFactory.CreateLogger(MessagingEvents.ListenerName);
     protected MessagingInstruments MessagingInstrumentation { get; } = messagingInstruments;
+    protected MessagingProcessingInstruments MessagingProcessingInstrumentation { get; } = messagingProcessingInstruments;
 
     public void OnSendMessage(Message message)
     {
@@ -18,14 +19,14 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
     {
         MessagingEvents.EmitReceivedByIncomingAgent(message);
         OrleansIncomingMessageAgentEvent.Log.ReceiveMessage(message);
-        MessagingProcessingInstruments.OnImaMessageReceived(message);
+        MessagingProcessingInstrumentation.OnImaMessageReceived(message);
     }
 
     public void OnDispatcherReceiveMessage(Message message)
     {
         MessagingEvents.EmitReceivedByDispatcher(message);
         OrleansDispatcherEvent.Instance.ReceiveMessage(message);
-        MessagingProcessingInstruments.OnDispatcherMessageReceive(message);
+        MessagingProcessingInstrumentation.OnDispatcherMessageReceive(message);
     }
 
     internal void OnDropExpiredMessage(Message message, MessagingInstruments.Phase phase)
@@ -73,7 +74,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
     public void OnEnqueueMessageOnActivation(Message message, IGrainContext context)
     {
         MessagingEvents.EmitEnqueuedOnActivation(message, context);
-        MessagingProcessingInstruments.OnImaMessageEnqueued(context);
+        MessagingProcessingInstrumentation.OnImaMessageEnqueued(context);
     }
 
     public void OnInvokeMessage(Message message)

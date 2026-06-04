@@ -53,6 +53,7 @@ namespace Orleans
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<ClientInstruments>();
             services.TryAddSingleton<MessagingInstruments>();
+            services.TryAddSingleton<MessagingProcessingInstruments>();
 
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
