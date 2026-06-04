@@ -29,6 +29,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly GrainReferenceActivator _referenceActivator;
         private readonly GrainInterfaceType _grainInterfaceType;
         private readonly TimeProvider _timeProvider;
+        private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
         private uint initialReadCallCount = 0;
         private Task? runTask;
@@ -45,6 +46,7 @@ namespace Orleans.Runtime.ReminderService
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
             TimeProvider timeProvider,
+            ReminderInstruments reminderInstruments,
             SystemTargetShared shared)
             : base(
                   SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null!, shared.SiloAddress),
@@ -57,7 +59,8 @@ namespace Orleans.Runtime.ReminderService
             this.reminderTable = reminderTable;
             this.asyncTimerFactory = asyncTimerFactory;
             _timeProvider = timeProvider;
-            ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
+            _reminderInstruments = reminderInstruments;
+            _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
@@ -905,10 +908,10 @@ namespace Orleans.Runtime.ReminderService
 
                             LogTraceTriggeringTick(_shared.logger, this, status, before);
                             ReminderEvents.EmitTickFiring(entry.GrainId, entry.ReminderName, status, _shared.Silo);
-                            if (ReminderInstruments.TardinessSeconds.Enabled)
+                            if (_shared._reminderInstruments.TardinessSecondsEnabled)
                             {
                                 var tardiness = CalculateTardiness(status);
-                                ReminderInstruments.TardinessSeconds.Record(tardiness.TotalSeconds);
+                                _shared._reminderInstruments.OnTardiness(tardiness);
                             }
 
                             try
@@ -924,7 +927,7 @@ namespace Orleans.Runtime.ReminderService
                                 }
 
                                 ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
-                                ReminderInstruments.TicksDelivered.Add(1);
+                                _shared._reminderInstruments.OnTickDelivered();
                             }
                             catch (Exception exc)
                             {

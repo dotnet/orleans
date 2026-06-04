@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime;
 using Orleans.Configuration.Internal;
 using System.Linq;
@@ -28,6 +29,7 @@ public static class SiloBuilderReminderExtensions
             return;
         }
 
+        services.TryAddSingleton<ReminderInstruments>();
         services.AddSingleton<LocalReminderService>();
         services.AddFromExisting<IGrainService, LocalReminderService>();
         services.AddFromExisting<IReminderService, LocalReminderService>();
