@@ -83,6 +83,12 @@ namespace Orleans.Runtime
 
         private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
+        private string GetTargetGrainType()
+        {
+            var type = Message.TargetGrain.Type;
+            return type.IsDefault ? "unknown" : type.ToString()!;
+        }
+
         private void OnCancellation()
         {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
@@ -104,7 +110,7 @@ namespace Orleans.Runtime
             SignalCancellation();
             shared.Unregister(Message);
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
-            _applicationRequestInstruments.OnAppRequestsTimedOut();
+            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
             _cancellationTokenRegistration.Dispose();
@@ -126,7 +132,7 @@ namespace Orleans.Runtime
             this.shared.Unregister(this.Message);
             _cancellationTokenRegistration.Dispose();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
-            _applicationRequestInstruments.OnAppRequestsTimedOut();
+            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
 
