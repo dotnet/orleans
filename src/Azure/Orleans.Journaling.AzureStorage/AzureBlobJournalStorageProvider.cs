@@ -21,8 +21,8 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         IOptions<AzureBlobJournalStorageOptions> options,
         IOptions<JournaledStateManagerOptions> managerOptions,
         IServiceProvider serviceProvider,
-        AzureBlobJournalStorageInstruments instruments,
-        ILogger<AzureBlobJournalStorage> logger)
+        ILogger<AzureBlobJournalStorage> logger,
+        AzureBlobJournalStorageInstruments? instruments = null)
     {
         _options = options.Value;
         _containerFactory = _options.BuildContainerFactory(serviceProvider, _options);
@@ -32,7 +32,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
             logger,
             options,
             new AzureBlobJournalStorage.OptionsBlobClientProvider(_containerFactory, _options),
-            instruments,
+            instruments ?? AzureBlobJournalStorageInstruments.CreateForDirectConstruction(),
             mimeType: journalFormat.MimeType,
             journalFormatKey: journalFormatKey);
     }

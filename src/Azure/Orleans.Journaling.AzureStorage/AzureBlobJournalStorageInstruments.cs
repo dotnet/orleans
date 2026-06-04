@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
@@ -19,6 +20,15 @@ internal sealed class AzureBlobJournalStorageInstruments(OrleansInstruments inst
     internal const string OperationDelete = "delete";
     internal const string OperationRead = "read";
     internal const string OperationReplace = "replace";
+
+    internal static AzureBlobJournalStorageInstruments CreateForDirectConstruction()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<AzureBlobJournalStorageInstruments>();
+        return services.BuildServiceProvider().GetRequiredService<AzureBlobJournalStorageInstruments>();
+    }
 
     private readonly Counter<long> _operations = instruments.Meter.CreateCounter<long>("orleans-journaling-azure-blob-operations");
     private readonly Counter<long> _operationBytes = instruments.Meter.CreateCounter<long>("orleans-journaling-azure-blob-operation-bytes", BytesUnit);
