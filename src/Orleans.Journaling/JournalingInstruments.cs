@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
@@ -27,14 +26,7 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
     internal const string CompactionReasonStorageRequested = "storage_requested";
     internal const string CompactionReasonMigration = "migration";
 
-    internal static JournalingInstruments CreateForDirectConstruction()
-    {
-        var services = new ServiceCollection();
-        services.AddMetrics();
-        services.AddSingleton<OrleansInstruments>();
-        services.AddSingleton<JournalingInstruments>();
-        return services.BuildServiceProvider().GetRequiredService<JournalingInstruments>();
-    }
+    internal static JournalingInstruments CreateForDirectConstruction() => new(new OrleansInstruments(new DirectMeterFactory()));
 
     private readonly Counter<long> StateWriteRequests = instruments.Meter.CreateCounter<long>("orleans-journaling-state-write-requests");
     private readonly Counter<long> StateDeleteRequests = instruments.Meter.CreateCounter<long>("orleans-journaling-state-delete-requests");
@@ -145,4 +137,13 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
             new(OperationTagName, operation),
             new(StatusTagName, succeeded ? StatusOk : StatusError)
         ];
+
+    private sealed class DirectMeterFactory : IMeterFactory
+    {
+        public Meter Create(MeterOptions options) => new(options);
+
+        public void Dispose()
+        {
+        }
+    }
 }
