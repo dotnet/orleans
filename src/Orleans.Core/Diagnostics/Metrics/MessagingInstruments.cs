@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         private long _headerBytesSent;
         private long _headerBytesReceived;
 
-        internal MessagingInstruments(OrleansInstruments instruments)
+        public MessagingInstruments(OrleansInstruments instruments)
         {
             HeaderBytesSentCounter = instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_BYTES_HEADER, () => _headerBytesSent, "bytes");
             HeaderBytesReceivedCounter = instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_RECEIVED_BYTES_HEADER, () => _headerBytesReceived, "bytes");
