@@ -20,6 +20,7 @@ CREATE TABLE OrleansMembershipTable
     Status integer NOT NULL,
     ProxyPort integer NULL,
     SuspectTimes varchar(8000) NULL,
+    MetadataJson text NULL,
     StartTime timestamptz(3) NOT NULL,
     IAmAliveTime timestamptz(3) NOT NULL,
 
@@ -115,6 +116,7 @@ CREATE FUNCTION insert_membership(
     ProxyPortArg    OrleansMembershipTable.ProxyPort%TYPE,
     StartTimeArg    OrleansMembershipTable.StartTime%TYPE,
     IAmAliveTimeArg OrleansMembershipTable.IAmAliveTime%TYPE,
+    MetadataJsonArg OrleansMembershipTable.MetadataJson%TYPE,
     VersionArg      OrleansMembershipVersionTable.Version%TYPE)
   RETURNS TABLE(row_count integer) AS
 $func$
@@ -133,6 +135,7 @@ BEGIN
             HostName,
             Status,
             ProxyPort,
+            MetadataJson,
             StartTime,
             IAmAliveTime
         )
@@ -145,6 +148,7 @@ BEGIN
             HostNameArg,
             StatusArg,
             ProxyPortArg,
+            MetadataJsonArg,
             StartTimeArg,
             IAmAliveTimeArg
         ON CONFLICT (DeploymentId, Address, Port, Generation) DO
@@ -191,6 +195,7 @@ VALUES
         @ProxyPort,
         @StartTime,
         @IAmAliveTime,
+        @MetadataJson,
         @Version
     );
 ');
@@ -203,6 +208,7 @@ CREATE FUNCTION update_membership(
     StatusArg       OrleansMembershipTable.Status%TYPE,
     SuspectTimesArg OrleansMembershipTable.SuspectTimes%TYPE,
     IAmAliveTimeArg OrleansMembershipTable.IAmAliveTime%TYPE,
+    MetadataJsonArg OrleansMembershipTable.MetadataJson%TYPE,
     VersionArg      OrleansMembershipVersionTable.Version%TYPE
   )
   RETURNS TABLE(row_count integer) AS
@@ -228,6 +234,7 @@ BEGIN
     SET
         Status = StatusArg,
         SuspectTimes = SuspectTimesArg,
+        MetadataJson = MetadataJsonArg,
         IAmAliveTime = IAmAliveTimeArg
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
@@ -263,6 +270,7 @@ VALUES
         @Status,
         @SuspectTimes,
         @IAmAliveTime,
+        @MetadataJson,
         @Version
     );
 ');
@@ -281,6 +289,7 @@ VALUES
         m.Status,
         m.ProxyPort,
         m.SuspectTimes,
+        m.MetadataJson,
         m.StartTime,
         m.IAmAliveTime,
         v.Version
@@ -309,6 +318,7 @@ VALUES
         m.Status,
         m.ProxyPort,
         m.SuspectTimes,
+        m.MetadataJson,
         m.StartTime,
         m.IAmAliveTime,
         v.Version

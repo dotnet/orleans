@@ -1,4 +1,5 @@
 using System.Net;
+using System.Collections.Immutable;
 using Orleans.Clustering.Cosmos.Models;
 
 namespace Orleans.Clustering.Cosmos;
@@ -452,6 +453,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
         entry.IAmAliveTime = entity.IAmAliveTime.UtcDateTime;
 
+        entry.Metadata = entity.Metadata?.ToImmutableDictionary();
+
         var suspectingSilos = new List<SiloAddress>();
         var suspectingTimes = new List<DateTime>();
 
@@ -492,7 +495,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
             ProxyPort = memEntry.ProxyPort,
             SiloName = memEntry.SiloName,
             StartTime = memEntry.StartTime,
-            IAmAliveTime = memEntry.IAmAliveTime
+            IAmAliveTime = memEntry.IAmAliveTime,
+            Metadata = memEntry.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
         };
 
         if (memEntry.SuspectTimes != null)

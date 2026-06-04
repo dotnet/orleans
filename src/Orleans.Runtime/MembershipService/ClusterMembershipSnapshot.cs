@@ -100,7 +100,7 @@ namespace Orleans.Runtime
             foreach (var entry in this.Members)
             {
                 // Include any entry which is new or has changed state.
-                if (!previous.Members.TryGetValue(entry.Key, out var previousEntry) || previousEntry.Status != entry.Value.Status)
+                if (!previous.Members.TryGetValue(entry.Key, out var previousEntry) || !entry.Value.Equals(previousEntry))
                 {
                     changes.Add(entry.Value);
                 }
@@ -111,7 +111,9 @@ namespace Orleans.Runtime
             {
                 if (!this.Members.TryGetValue(entry.Key, out _))
                 {
-                    changes.Add(new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name));
+                    changes.Add(entry.Value.IsMetadataAvailable
+                        ? new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name, entry.Value.Metadata)
+                        : new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name));
                 }
             }
 

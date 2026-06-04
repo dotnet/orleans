@@ -510,6 +510,13 @@ namespace Orleans.Runtime
     {
         public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name) { }
 
+        public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name, Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata metadata) { }
+
+        public bool IsMetadataAvailable { get { throw null; } }
+
+        [Id(3)]
+        public Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata Metadata { get { throw null; } }
+
         [Id(2)]
         public string Name { get { throw null; } }
 
@@ -1276,8 +1283,12 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata
 
     [GenerateSerializer]
     [Alias("Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata")]
-    public partial record SiloMetadata()
+    public partial record SiloMetadata
     {
+        public SiloMetadata() { }
+
+        public SiloMetadata(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> metadata) { }
+
         public static SiloMetadata Empty { get { throw null; } }
 
         [Id(0)]

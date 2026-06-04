@@ -7,10 +7,12 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 #nullable disable
@@ -448,6 +450,11 @@ namespace Orleans.Clustering.DynamoDB
             parse.IAmAliveTime = !string.IsNullOrEmpty(tableEntry.IAmAliveTime) ?
                 LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default;
 
+            if (!string.IsNullOrEmpty(tableEntry.Metadata))
+            {
+                parse.Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(tableEntry.Metadata)?.ToImmutableDictionary();
+            }
+
             var suspectingSilos = new List<SiloAddress>();
             var suspectingTimes = new List<DateTime>();
 
@@ -490,6 +497,7 @@ namespace Orleans.Clustering.DynamoDB
                 SiloName = memEntry.SiloName,
                 StartTime = LogFormatter.PrintDate(memEntry.StartTime),
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
+                Metadata = memEntry.Metadata is not null ? JsonSerializer.Serialize(memEntry.Metadata) : null,
                 SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(memEntry.SiloAddress),
                 MembershipVersion = tableVersion.Version
             };

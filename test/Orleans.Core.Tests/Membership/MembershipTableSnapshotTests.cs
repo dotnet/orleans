@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AwesomeAssertions.Common;
 using Orleans;
 using Orleans.Runtime;
@@ -82,6 +83,36 @@ namespace NonSilo.Tests.Membership
                 var iAmAliveTime = newSnapshot.Entries[originalSilo].IAmAliveTime;
                 Assert.Equal(laterDate, iAmAliveTime);
             }
+        }
+
+        [Fact]
+        public void MembershipEntry_CopyPreservesMetadata()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var metadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "west")]);
+            var entry = Entry(silo, SiloStatus.Active);
+            entry.Metadata = metadata;
+
+            var copy = entry.WithStatus(SiloStatus.Stopping);
+
+            Assert.Same(metadata, copy.Metadata);
+            Assert.Equal(SiloStatus.Stopping, copy.Status);
+        }
+
+        [Fact]
+        public void MembershipTableSnapshot_MetadataChangeIsSuccessor()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var originalEntry = Entry(silo, SiloStatus.Active);
+            originalEntry.Metadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "west")]);
+
+            var updatedEntry = Entry(silo, SiloStatus.Active);
+            updatedEntry.Metadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "east")]);
+
+            var originalSnapshot = MembershipTableSnapshot.Create(Table(originalEntry));
+            var updatedSnapshot = MembershipTableSnapshot.Update(originalSnapshot, Table(updatedEntry));
+
+            Assert.True(updatedSnapshot.IsSuccessorTo(originalSnapshot));
         }
 
         [Fact]
