@@ -41,6 +41,8 @@ internal class RollingUpgradeTestGrain : Grain, IRollingUpgradeTestGrain
 [TestCategory("Directory"), TestCategory("Functional")]
 public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 {
+    private static readonly TimeSpan DirectoryConvergenceTimeout = TimeSpan.FromSeconds(30);
+
     [Fact]
     public async Task RollingUpgrade_LocalToDistributed_NoErrors()
     {
@@ -94,6 +96,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     var newSilo = await cluster.StartAdditionalSiloAsync();
                     output.WriteLine($"  Started new silo: {newSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync();
+                    await WaitForDirectoryConvergenceAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
                     await ValidateDirectoryIntegrityAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
                     await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
                 }
@@ -111,6 +114,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     await cluster.StopSiloAsync(oldSilo);
                     output.WriteLine($"  Stopped old silo: {oldSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync();
+                    await WaitForDirectoryConvergenceAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
                     await ValidateDirectoryIntegrityAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
                     await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
                 }
@@ -156,6 +160,101 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
 
         Assert.Empty(errors);
+    }
+
+    private async Task WaitForDirectoryConvergenceAsync(InProcessTestCluster cluster, string stage)
+    {
+        var distributedSilos = new List<(InProcessSiloHandle Silo, DirectoryMembershipService MembershipService)>();
+        foreach (var silo in cluster.Silos)
+        {
+            if (silo.ServiceProvider.GetService<DirectoryMembershipService>() is { } membershipService)
+            {
+                distributedSilos.Add((silo, membershipService));
+            }
+        }
+
+        if (distributedSilos.Count == 0)
+        {
+            return;
+        }
+
+        output.WriteLine($"  Waiting for grain directory convergence {stage}...");
+        var expectedMembers = cluster.Silos.Select(static silo => silo.SiloAddress).ToHashSet();
+        var targetVersion = new MembershipVersion(cluster.Silos.Max(static silo =>
+            silo.ServiceProvider.GetRequiredService<ClusterMembershipService>().CurrentSnapshot.Version.Value));
+
+        using var timeout = new CancellationTokenSource(DirectoryConvergenceTimeout);
+        try
+        {
+            var views = await Task.WhenAll(distributedSilos.Select(silo =>
+                WaitForDirectoryViewAsync(silo.MembershipService, targetVersion, expectedMembers, stage, timeout.Token)));
+
+            var partitionWaits = new List<Task>();
+            for (var i = 0; i < distributedSilos.Count; i++)
+            {
+                var (silo, membershipService) = distributedSilos[i];
+                var view = views[i];
+                for (var partitionIndex = 0; partitionIndex < membershipService.PartitionsPerSilo; partitionIndex++)
+                {
+                    var replica = cluster.InternalClient.GetSystemTarget<IGrainDirectoryTestHooks>(
+                        GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
+                    partitionWaits.Add(replica.WaitForMembershipVersionAsync(view.Version).AsTask());
+                }
+            }
+
+            await Task.WhenAll(partitionWaits).WaitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Timed out waiting for grain directory convergence {stage} after {DirectoryConvergenceTimeout}.");
+        }
+    }
+
+    private static async Task<DirectoryMembershipSnapshot> WaitForDirectoryViewAsync(
+        DirectoryMembershipService membershipService,
+        MembershipVersion targetVersion,
+        HashSet<SiloAddress> expectedMembers,
+        string stage,
+        CancellationToken cancellationToken)
+    {
+        if (IsExpectedDirectoryView(membershipService.CurrentView, targetVersion, expectedMembers))
+        {
+            return membershipService.CurrentView;
+        }
+
+        var refreshedView = await membershipService.RefreshViewAsync(targetVersion, cancellationToken);
+        if (IsExpectedDirectoryView(refreshedView, targetVersion, expectedMembers))
+        {
+            return refreshedView;
+        }
+
+        await foreach (var view in membershipService.ViewUpdates.WithCancellation(cancellationToken))
+        {
+            if (IsExpectedDirectoryView(view, targetVersion, expectedMembers))
+            {
+                return view;
+            }
+        }
+
+        throw new TimeoutException($"Timed out waiting for grain directory membership view {stage}.");
+    }
+
+    private static bool IsExpectedDirectoryView(DirectoryMembershipSnapshot view, MembershipVersion targetVersion, HashSet<SiloAddress> expectedMembers)
+    {
+        if (view.Version < targetVersion || view.Members.Length != expectedMembers.Count)
+        {
+            return false;
+        }
+
+        foreach (var member in view.Members)
+        {
+            if (!expectedMembers.Contains(member))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private async Task ValidateDirectoryIntegrityAsync(InProcessTestCluster cluster, string stage)

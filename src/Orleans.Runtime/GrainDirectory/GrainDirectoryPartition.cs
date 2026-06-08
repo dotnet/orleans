@@ -882,6 +882,12 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         await ((IGrainDirectoryTestHooks)this).CheckIntegrityAsync();
     }
 
+    async ValueTask IGrainDirectoryTestHooks.WaitForMembershipVersionAsync(MembershipVersion version)
+    {
+        GrainRuntime.CheckRuntimeContext(this);
+        await WaitForRange(RingRange.Full, version);
+    }
+
     async ValueTask<Immutable<List<GrainId>>> IGrainDirectoryTestHooks.CheckActivationsAsync(Immutable<List<GrainAddress>> activations)
     {
         GrainRuntime.CheckRuntimeContext(this);
