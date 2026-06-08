@@ -286,9 +286,10 @@ public class StateManagerTests : JournalingTestBase
         var observedBytes = new ConcurrentBag<MetricMeasurement<long>>();
         using var listener = CreateMetricListener("orleans-journaling-storage-operation-bytes", observedBytes);
         var operation = $"test-{Guid.NewGuid():N}";
+        var instruments = JournalingInstruments.CreateForDirectConstruction();
 
-        JournalingInstruments.OnStorageOperation(operation, TimeSpan.Zero, bytes: 0, succeeded: true);
-        JournalingInstruments.OnStorageOperation(operation, TimeSpan.Zero, bytes: 1, succeeded: false);
+        instruments.OnStorageOperation(operation, TimeSpan.Zero, bytes: 0, succeeded: true);
+        instruments.OnStorageOperation(operation, TimeSpan.Zero, bytes: 1, succeeded: false);
 
         Assert.DoesNotContain(observedBytes, measurement => measurement.Operation == operation);
     }

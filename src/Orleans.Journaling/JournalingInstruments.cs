@@ -5,7 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal static class JournalingInstruments
+internal sealed class JournalingInstruments(OrleansInstruments instruments)
 {
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
@@ -26,42 +26,44 @@ internal static class JournalingInstruments
     internal const string CompactionReasonStorageRequested = "storage_requested";
     internal const string CompactionReasonMigration = "migration";
 
-    private static readonly Counter<long> StateWriteRequests = Instruments.Meter.CreateCounter<long>("orleans-journaling-state-write-requests");
-    private static readonly Counter<long> StateDeleteRequests = Instruments.Meter.CreateCounter<long>("orleans-journaling-state-delete-requests");
-    private static readonly Counter<long> Recoveries = Instruments.Meter.CreateCounter<long>("orleans-journaling-recoveries");
-    private static readonly Counter<long> StorageOperations = Instruments.Meter.CreateCounter<long>("orleans-journaling-storage-operations");
-    private static readonly Counter<long> StorageBytes = Instruments.Meter.CreateCounter<long>("orleans-journaling-storage-bytes", BytesUnit);
-    private static readonly Counter<long> CompactionTriggers = Instruments.Meter.CreateCounter<long>("orleans-journaling-compaction-triggers");
+    internal static JournalingInstruments CreateForDirectConstruction() => new(new OrleansInstruments(new DirectMeterFactory()));
 
-    private static readonly Histogram<double> StateWriteDuration = Instruments.Meter.CreateHistogram<double>("orleans-journaling-state-write-duration", MillisecondsUnit);
-    private static readonly Histogram<double> StateDeleteDuration = Instruments.Meter.CreateHistogram<double>("orleans-journaling-state-delete-duration", MillisecondsUnit);
-    private static readonly Histogram<double> RecoveryDuration = Instruments.Meter.CreateHistogram<double>("orleans-journaling-recovery-duration", MillisecondsUnit);
-    private static readonly Histogram<double> StorageOperationDuration = Instruments.Meter.CreateHistogram<double>("orleans-journaling-storage-operation-duration", MillisecondsUnit);
-    private static readonly Histogram<long> StorageOperationBytes = Instruments.Meter.CreateHistogram<long>("orleans-journaling-storage-operation-bytes", BytesUnit);
-    private static readonly Histogram<double> StorageOperationQueueDuration = Instruments.Meter.CreateHistogram<double>("orleans-journaling-storage-operation-queue-duration", MillisecondsUnit);
-    private static readonly Histogram<long> WriteCoalescedCallers = Instruments.Meter.CreateHistogram<long>("orleans-journaling-write-coalesced-callers");
-    private static readonly Histogram<double> GatherDuration = Instruments.Meter.CreateHistogram<double>("orleans-journaling-gather-duration", MillisecondsUnit);
-    private static readonly Histogram<long> StateScanCount = Instruments.Meter.CreateHistogram<long>("orleans-journaling-state-scan-count");
+    private readonly Counter<long> StateWriteRequests = instruments.Meter.CreateCounter<long>("orleans-journaling-state-write-requests");
+    private readonly Counter<long> StateDeleteRequests = instruments.Meter.CreateCounter<long>("orleans-journaling-state-delete-requests");
+    private readonly Counter<long> Recoveries = instruments.Meter.CreateCounter<long>("orleans-journaling-recoveries");
+    private readonly Counter<long> StorageOperations = instruments.Meter.CreateCounter<long>("orleans-journaling-storage-operations");
+    private readonly Counter<long> StorageBytes = instruments.Meter.CreateCounter<long>("orleans-journaling-storage-bytes", BytesUnit);
+    private readonly Counter<long> CompactionTriggers = instruments.Meter.CreateCounter<long>("orleans-journaling-compaction-triggers");
 
-    internal static void OnStateWriteRequest(string operation, TimeSpan latency, bool succeeded)
+    private readonly Histogram<double> StateWriteDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-state-write-duration", MillisecondsUnit);
+    private readonly Histogram<double> StateDeleteDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-state-delete-duration", MillisecondsUnit);
+    private readonly Histogram<double> RecoveryDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-recovery-duration", MillisecondsUnit);
+    private readonly Histogram<double> StorageOperationDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-storage-operation-duration", MillisecondsUnit);
+    private readonly Histogram<long> StorageOperationBytes = instruments.Meter.CreateHistogram<long>("orleans-journaling-storage-operation-bytes", BytesUnit);
+    private readonly Histogram<double> StorageOperationQueueDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-storage-operation-queue-duration", MillisecondsUnit);
+    private readonly Histogram<long> WriteCoalescedCallers = instruments.Meter.CreateHistogram<long>("orleans-journaling-write-coalesced-callers");
+    private readonly Histogram<double> GatherDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-gather-duration", MillisecondsUnit);
+    private readonly Histogram<long> StateScanCount = instruments.Meter.CreateHistogram<long>("orleans-journaling-state-scan-count");
+
+    internal void OnStateWriteRequest(string operation, TimeSpan latency, bool succeeded)
     {
         Add(StateWriteRequests, operation, succeeded);
         Record(StateWriteDuration, operation, latency, succeeded);
     }
 
-    internal static void OnStateDeleteRequest(TimeSpan latency, bool succeeded)
+    internal void OnStateDeleteRequest(TimeSpan latency, bool succeeded)
     {
         Add(StateDeleteRequests, OperationDelete, succeeded);
         Record(StateDeleteDuration, OperationDelete, latency, succeeded);
     }
 
-    internal static void OnRecovery(TimeSpan latency, bool succeeded)
+    internal void OnRecovery(TimeSpan latency, bool succeeded)
     {
         Add(Recoveries, OperationRecovery, succeeded);
         Record(RecoveryDuration, OperationRecovery, latency, succeeded);
     }
 
-    internal static void OnStorageOperation(string operation, TimeSpan latency, long bytes, bool succeeded)
+    internal void OnStorageOperation(string operation, TimeSpan latency, long bytes, bool succeeded)
     {
         Add(StorageOperations, operation, succeeded);
         Record(StorageOperationDuration, operation, latency, succeeded);
@@ -72,12 +74,12 @@ internal static class JournalingInstruments
         }
     }
 
-    internal static void OnStorageOperationQueued(string operation, TimeSpan latency, bool succeeded)
+    internal void OnStorageOperationQueued(string operation, TimeSpan latency, bool succeeded)
     {
         Record(StorageOperationQueueDuration, operation, latency, succeeded);
     }
 
-    internal static void OnWriteCoalesced(string operation, long callerCount)
+    internal void OnWriteCoalesced(string operation, long callerCount)
     {
         if (WriteCoalescedCallers.Enabled && callerCount > 0)
         {
@@ -85,7 +87,7 @@ internal static class JournalingInstruments
         }
     }
 
-    internal static void OnGather(string operation, TimeSpan duration, long stateScanCount)
+    internal void OnGather(string operation, TimeSpan duration, long stateScanCount)
     {
         if (GatherDuration.Enabled)
         {
@@ -98,7 +100,7 @@ internal static class JournalingInstruments
         }
     }
 
-    internal static void OnCompactionTriggered(string reason)
+    internal void OnCompactionTriggered(string reason)
     {
         if (CompactionTriggers.Enabled)
         {
@@ -106,7 +108,7 @@ internal static class JournalingInstruments
         }
     }
 
-    private static void Add(Counter<long> counter, string operation, bool succeeded)
+    private void Add(Counter<long> counter, string operation, bool succeeded)
     {
         if (counter.Enabled)
         {
@@ -114,7 +116,7 @@ internal static class JournalingInstruments
         }
     }
 
-    private static void Record(Histogram<double> histogram, string operation, TimeSpan latency, bool succeeded)
+    private void Record(Histogram<double> histogram, string operation, TimeSpan latency, bool succeeded)
     {
         if (histogram.Enabled)
         {
@@ -122,7 +124,7 @@ internal static class JournalingInstruments
         }
     }
 
-    private static void Record(Histogram<long> histogram, string operation, long value, bool succeeded)
+    private void Record(Histogram<long> histogram, string operation, long value, bool succeeded)
     {
         if (histogram.Enabled)
         {
@@ -135,4 +137,13 @@ internal static class JournalingInstruments
             new(OperationTagName, operation),
             new(StatusTagName, succeeded ? StatusOk : StatusError)
         ];
+
+    private sealed class DirectMeterFactory : IMeterFactory
+    {
+        public Meter Create(MeterOptions options) => new(options);
+
+        public void Dispose()
+        {
+        }
+    }
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling.Json;
+using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
@@ -9,6 +10,10 @@ public static class HostingExtensions
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<JournaledStateManagerOptions>();
+        builder.Services.TryAddSingleton(static serviceProvider =>
+            serviceProvider.GetService<OrleansInstruments>() is { } instruments
+                ? new JournalingInstruments(instruments)
+                : JournalingInstruments.CreateForDirectConstruction());
         builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager, JournaledStateManager>();
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory, JournaledStateManagerFactory>();
