@@ -36,7 +36,9 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             0,
             expectedFrom: 99,
             expectedTo: 1,
-            "the transaction manager committed its durable state before the storage exception was surfaced");
+            "the transaction manager committed its durable state before the storage exception was surfaced",
+            // Run the deposit first so the deposit account joins first and deterministically becomes the transaction manager.
+            useDepositAsManager: true);
     }
 
     [SkippableFact]
@@ -54,7 +56,9 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             0,
             expectedFrom: 99,
             expectedTo: 1,
-            "a generic exception surfaced after the underlying storage write must recover the durable commit instead of partially aborting it");
+            "a generic exception surfaced after the underlying storage write must recover the durable commit instead of partially aborting it",
+            // Run the deposit first so the deposit account joins first and deterministically becomes the transaction manager.
+            useDepositAsManager: true);
     }
 
     [SkippableFact]
@@ -81,7 +85,8 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         long expectedFrom,
         long expectedTo,
         string because,
-        Func<IBankTransferFaultInjectionAccountGrain, IBankTransferFaultInjectionAccountGrain, IReadOnlyList<StorageWriteCompletedFaultScope>> createDiagnosticFaults = null)
+        Func<IBankTransferFaultInjectionAccountGrain, IBankTransferFaultInjectionAccountGrain, IReadOnlyList<StorageWriteCompletedFaultScope>> createDiagnosticFaults = null,
+        bool useDepositAsManager = false)
     {
         BankTransferTrace.Clear();
 
@@ -98,7 +103,9 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         {
             diagnosticFaults = createDiagnosticFaults?.Invoke(from, to);
             exception = await Assert.ThrowsAnyAsync<OrleansTransactionException>(
-                () => teller.TransferReturnBalances(from, to, 1, commitFault, commitFault));
+                () => useDepositAsManager
+                    ? teller.TransferReturnBalancesWithDepositAsManager(from, to, 1, commitFault)
+                    : teller.TransferReturnBalances(from, to, 1, commitFault, commitFault));
         }
         finally
         {
