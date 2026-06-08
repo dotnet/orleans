@@ -95,6 +95,8 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public Task CollectActivations(TimeSpan ageLimit, CancellationToken cancellationToken) => CollectActivationsImpl(false, ageLimit, cancellationToken);
 
+        internal Task CollectStaleActivations(CancellationToken cancellationToken) => CollectActivationsImpl(scanStale: true, ageLimit: default, cancellationToken: cancellationToken);
+
         /// <summary>
         /// Schedules the provided grain context for collection if it becomes idle for the specified duration.
         /// </summary>
