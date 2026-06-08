@@ -248,33 +248,14 @@ jobs:
       run: |
         set -euo pipefail
 
-        pull_image() {
-          local image="$1"
-          local attempts="$2"
-
-          for attempt in $(seq 1 "$attempts"); do
-            if docker pull "$image"; then
-              return 0
-            fi
-
-            if [ "$attempt" -eq "$attempts" ]; then
-              return 1
-            fi
-
-            local delay=$((attempt * 15))
-            echo "MariaDB image pull failed (attempt ${attempt}/${attempts}); retrying in ${delay}s..."
-            sleep "$delay"
-          done
-        }
-
         mariadb_image="$MARIADB_IMAGE"
-        if ! pull_image "$mariadb_image" 5; then
+        if ! bash .github/scripts/docker-pull-with-retry.sh "$mariadb_image"; then
           echo "Mirror pull failed; trying Docker Hub fallback pinned to the same digest."
           mariadb_image="$MARIADB_FALLBACK_IMAGE"
-          pull_image "$mariadb_image" 3
+          bash .github/scripts/docker-pull-with-retry.sh "$mariadb_image"
         fi
 
-        docker run -d --name mariadb \
+        docker run -d --pull=never --name mariadb \
           -p 3306:3306 \
           -e MARIADB_ROOT_PASSWORD="$MARIADB_ROOT_PASSWORD" \
           --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -p${MARIADB_ROOT_PASSWORD} --silent" \
