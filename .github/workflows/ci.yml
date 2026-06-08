@@ -230,20 +230,77 @@ jobs:
       matrix:
         provider: ["MySql"]
         framework: ["net8.0", "net10.0"]
-    services:
-      mariadb:
-        image: mariadb:10.6
-        ports:
-          - 3306:3306
-        env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
-          MARIADB_ROOT_PASSWORD: "mariadb"
+    env:
+      # The official MariaDB 10.6 image is not published to GHCR. Use Google's Docker Hub mirror
+      # pinned to the official Docker Hub digest; the fallback keeps the same digest if the mirror misses.
+      MARIADB_IMAGE: mirror.gcr.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
+      MARIADB_FALLBACK_IMAGE: docker.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      MARIADB_ROOT_PASSWORD: "mariadb"
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Start MariaDB
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        pull_image() {
+          local image="$1"
+          local attempts="$2"
+
+          for attempt in $(seq 1 "$attempts"); do
+            if docker pull "$image"; then
+              return 0
+            fi
+
+            if [ "$attempt" -eq "$attempts" ]; then
+              return 1
+            fi
+
+            local delay=$((attempt * 15))
+            echo "MariaDB image pull failed (attempt ${attempt}/${attempts}); retrying in ${delay}s..."
+            sleep "$delay"
+          done
+        }
+
+        mariadb_image="$MARIADB_IMAGE"
+        if ! pull_image "$mariadb_image" 5; then
+          echo "Mirror pull failed; trying Docker Hub fallback pinned to the same digest."
+          mariadb_image="$MARIADB_FALLBACK_IMAGE"
+          pull_image "$mariadb_image" 3
+        fi
+
+        docker run -d --name mariadb \
+          -p 3306:3306 \
+          -e MARIADB_ROOT_PASSWORD="$MARIADB_ROOT_PASSWORD" \
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -p${MARIADB_ROOT_PASSWORD} --silent" \
+          --health-interval 5s \
+          --health-timeout 5s \
+          --health-retries 24 \
+          "$mariadb_image"
+
+        for attempt in $(seq 1 60); do
+          status="$(docker inspect --format '{{.State.Health.Status}}' mariadb)"
+          case "$status" in
+            healthy)
+              exit 0
+              ;;
+            unhealthy)
+              docker logs mariadb
+              exit 1
+              ;;
+          esac
+
+          sleep 2
+        done
+
+        echo "MariaDB did not become healthy in time."
+        docker logs mariadb
+        exit 1
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
