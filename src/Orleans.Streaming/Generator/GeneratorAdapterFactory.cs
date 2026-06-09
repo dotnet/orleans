@@ -40,6 +40,7 @@ namespace Orleans.Providers.Streams.Generator
         private readonly Serialization.Serializer serializer;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<GeneratorAdapterFactory> logger;
+        private readonly OrleansInstruments orleansInstruments;
         private IStreamGeneratorConfig generatorConfig;
         private IStreamQueueMapper streamQueueMapper;
         private IStreamFailureHandler streamFailureHandler;
@@ -89,6 +90,7 @@ namespace Orleans.Providers.Streams.Generator
             this.serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<GeneratorAdapterFactory>();
+            this.orleansInstruments = serviceProvider.GetService<OrleansInstruments>();
         }
 
         /// <summary>
@@ -98,9 +100,9 @@ namespace Orleans.Providers.Streams.Generator
         {
             this.receivers = new ConcurrentDictionary<QueueId, Receiver>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
+                this.CacheMonitorFactory = (dimensions) => this.orleansInstruments is not null ? new DefaultCacheMonitor(dimensions, this.orleansInstruments) : new DefaultCacheMonitor(dimensions);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+                this.BlockPoolMonitorFactory = (dimensions) => this.orleansInstruments is not null ? new DefaultBlockPoolMonitor(dimensions, this.orleansInstruments) : new DefaultBlockPoolMonitor(dimensions);
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             generatorConfig = this.serviceProvider.GetKeyedService<IStreamGeneratorConfig>(this.Name);
