@@ -46,6 +46,8 @@ jobs:
     name: Redis provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["Redis"]
@@ -92,6 +94,8 @@ jobs:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["Cassandra"]
@@ -129,6 +133,8 @@ jobs:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["PostgreSql"]
@@ -179,6 +185,8 @@ jobs:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["MySql"]
@@ -224,6 +232,8 @@ jobs:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["SqlServer"]
@@ -271,6 +281,8 @@ jobs:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         framework: ["net8.0", "net10.0"]
@@ -326,6 +338,8 @@ jobs:
     name: Azure Event Hubs provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         framework: ["net8.0", "net10.0"]
@@ -401,6 +415,8 @@ jobs:
     name: Azure Cosmos DB provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         framework: ["net8.0", "net10.0"]
@@ -488,6 +504,8 @@ jobs:
     name: Consul provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["Consul"]
@@ -522,6 +540,8 @@ jobs:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["ZooKeeper"]
@@ -563,6 +583,8 @@ jobs:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["DynamoDB"]
@@ -614,6 +636,8 @@ jobs:
     name: AWS SQS provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["SQS"]
@@ -677,6 +701,8 @@ jobs:
     name: NATS stream provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["NATS"]
