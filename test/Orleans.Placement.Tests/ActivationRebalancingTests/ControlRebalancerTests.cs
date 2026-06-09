@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Placement.Rebalancing;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -13,67 +14,70 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>
 {
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
     [Fact]
     public async Task Rebalancer_Should_Be_Controllable_And_Report_To_Listeners()
     {
         var serviceProvider = Cluster.GetSiloServiceProvider();
         var rebalancer = serviceProvider.GetRequiredService<IActivationRebalancer>();
+        using var rebalancerEvents = RebalancerDiagnosticObserver.Create();
 
+        var sessionStarted = rebalancerEvents.WaitForSessionStartAsync(WaitTimeout);
         await rebalancer.ResumeRebalancing();
-        var report = await WaitForReportAsync(
-            rebalancer,
-            static report => report is { Status: RebalancerStatus.Executing, SuspensionDuration: null } &&
-                !report.Host.Equals(SiloAddress.Zero),
-            "an executing report");
-
-        var host = report.Host;
+        var host = (await sessionStarted).SiloAddress;
+        var report = await rebalancer.GetRebalancingReport();
 
         Assert.NotEqual(SiloAddress.Zero, host);
+        Assert.Equal(RebalancerStatus.Executing, report.Status);
+        Assert.Null(report.SuspensionDuration);
+        Assert.Equal(host, report.Host);
 
         // Publish-Subscribe
         var listener = new Listener();
         rebalancer.SubscribeToReports(listener);
+        Assert.Equal(0, listener.Snapshot.ReportCount);
 
         var reportCount = listener.Snapshot.ReportCount;
 
-        await rebalancer.SuspendRebalancing();
-        await WaitForListenerReportAsync(
-            listener,
+        var listenerReport = listener.WaitForReportAsync(
             reportCount,
             report => report.Status == RebalancerStatus.Suspended &&
                 report.SuspensionDuration.HasValue &&
                 report.Host.Equals(host),
             "a fresh suspended report");
+        await rebalancer.SuspendRebalancing();
+        await listenerReport;
 
         reportCount = listener.Snapshot.ReportCount;
-        await rebalancer.ResumeRebalancing();
-        await WaitForListenerReportAsync(
-            listener,
+        var resumed = rebalancerEvents.WaitForSessionStartAsync(
+            sessionStart => sessionStart.SiloAddress.Equals(host),
+            WaitTimeout);
+        listenerReport = listener.WaitForReportAsync(
             reportCount,
             report => report is { Status: RebalancerStatus.Executing, SuspensionDuration: null } &&
                 report.Host.Equals(host),
             "a fresh executing report");
+        await rebalancer.ResumeRebalancing();
+        await resumed;
+        await listenerReport;
 
         reportCount = listener.Snapshot.ReportCount;
-        await rebalancer.SuspendRebalancing();
-        await WaitForListenerReportAsync(
-            listener,
+        listenerReport = listener.WaitForReportAsync(
             reportCount,
             report => report.Status == RebalancerStatus.Suspended &&
                 report.SuspensionDuration.HasValue &&
                 report.Host.Equals(host),
             "a fresh suspended report before unsubscribing");
+        await rebalancer.SuspendRebalancing();
+        await listenerReport;
 
         rebalancer.UnsubscribeFromReports(listener);
         var unsubscribedSnapshot = listener.Snapshot;
+        resumed = rebalancerEvents.WaitForSessionStartAsync(
+            sessionStart => sessionStart.SiloAddress.Equals(host),
+            WaitTimeout);
         await rebalancer.ResumeRebalancing();
-        await WaitForReportAsync(
-            rebalancer,
-            report => report is { Status: RebalancerStatus.Executing, SuspensionDuration: null } &&
-                report.Host.Equals(host),
-            "an executing report after unsubscribing");
+        await resumed;
 
         Assert.True(unsubscribedSnapshot.Report.HasValue);
         Assert.Equal(RebalancerStatus.Suspended, unsubscribedSnapshot.Report.Value.Status);
@@ -82,80 +86,26 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         Assert.Equal(unsubscribedSnapshot.Report, afterResumeSnapshot.Report);
 
         // Request-Reply
-        var duration = TimeSpan.FromSeconds(5);
+        var duration = TimeSpan.FromSeconds(2);
         await rebalancer.SuspendRebalancing(duration); // Suspend for some time
-        report = await WaitForReportAsync(
-            rebalancer,
-            report => report.Status == RebalancerStatus.Suspended && report.SuspensionDuration.HasValue,
-            "a suspended report");
+        report = await rebalancer.GetRebalancingReport();
 
+        Assert.Equal(RebalancerStatus.Suspended, report.Status);
+        Assert.True(report.SuspensionDuration.HasValue);
         // Must be less than the time it was told to be suspended
         Assert.True(report.SuspensionDuration.Value < duration); 
         Assert.Equal(host, report.Host);
 
-        await WaitForReportAsync(
-            rebalancer,
-            report => report is { Status: RebalancerStatus.Executing, SuspensionDuration: null } &&
-                report.Host.Equals(host),
-            "an executing report after timed suspension");
+        resumed = rebalancerEvents.WaitForSessionStartAsync(
+            sessionStart => sessionStart.SiloAddress.Equals(host),
+            WaitTimeout);
+        await resumed;
 
         await rebalancer.SuspendRebalancing(); // Suspend indefinitely
-        await WaitForReportAsync(
-            rebalancer,
-            report => report.Status == RebalancerStatus.Suspended &&
-                report.SuspensionDuration.HasValue &&
-                report.Host.Equals(host),
-            "an indefinitely suspended report");
-    }
-
-    private static async Task<RebalancingReport> WaitForReportAsync(
-        IActivationRebalancer rebalancer,
-        Func<RebalancingReport, bool> predicate,
-        string expectedState)
-    {
-        var deadline = DateTime.UtcNow + WaitTimeout;
-        RebalancingReport report = default;
-        while (DateTime.UtcNow < deadline)
-        {
-            report = await rebalancer.GetRebalancingReport(force: true);
-            if (predicate(report))
-            {
-                return report;
-            }
-
-            await Task.Delay(PollInterval);
-        }
-
-        Assert.Fail($"Timed out waiting for {expectedState}. Last report: {Format(report)}");
-        return report;
-    }
-
-    private static async Task<RebalancingReport> WaitForListenerReportAsync(
-        Listener listener,
-        int previousReportCount,
-        Func<RebalancingReport, bool> predicate,
-        string expectedState)
-    {
-        var deadline = DateTime.UtcNow + WaitTimeout;
-        var snapshot = listener.Snapshot;
-        while (DateTime.UtcNow < deadline)
-        {
-            snapshot = listener.Snapshot;
-            if (snapshot.ReportCount > previousReportCount &&
-                snapshot.Report is { } report &&
-                predicate(report))
-            {
-                return report;
-            }
-
-            await Task.Delay(PollInterval);
-        }
-
-        var lastReport = snapshot.Report is { } value ? Format(value) : "<none>";
-        Assert.Fail(
-            $"Timed out waiting for {expectedState}. Last listener report count: {snapshot.ReportCount}. Last report: {lastReport}");
-
-        return default;
+        report = await rebalancer.GetRebalancingReport();
+        Assert.Equal(RebalancerStatus.Suspended, report.Status);
+        Assert.True(report.SuspensionDuration.HasValue);
+        Assert.Equal(host, report.Host);
     }
 
     private static string Format(RebalancingReport report) =>
@@ -164,6 +114,7 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
     private class Listener : IActivationRebalancerReportListener
     {
         private readonly object _lock = new();
+        private readonly List<ReportWaiter> _waiters = [];
         private RebalancingReport? _report;
         private int _reportCount;
 
@@ -178,12 +129,77 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
             }
         }
 
+        public Task<RebalancingReport> WaitForReportAsync(
+            int previousReportCount,
+            Func<RebalancingReport, bool> predicate,
+            string expectedState)
+        {
+            lock (_lock)
+            {
+                if (_reportCount > previousReportCount &&
+                    _report is { } report &&
+                    predicate(report))
+                {
+                    return Task.FromResult(report);
+                }
+
+                var waiter = new ReportWaiter(previousReportCount, predicate);
+                _waiters.Add(waiter);
+                return WaitWithTimeoutAsync(waiter, expectedState);
+            }
+        }
+
         public void OnReport(RebalancingReport report)
         {
             lock (_lock)
             {
                 _report = report;
                 _reportCount++;
+
+                for (var i = _waiters.Count - 1; i >= 0; i--)
+                {
+                    if (_waiters[i].TryComplete(_reportCount, report))
+                    {
+                        _waiters.RemoveAt(i);
+                    }
+                }
+            }
+        }
+
+        private async Task<RebalancingReport> WaitWithTimeoutAsync(ReportWaiter waiter, string expectedState)
+        {
+            try
+            {
+                return await waiter.Task.WaitAsync(WaitTimeout);
+            }
+            catch (TimeoutException)
+            {
+                lock (_lock)
+                {
+                    _waiters.Remove(waiter);
+                }
+
+                var snapshot = Snapshot;
+                var lastReport = snapshot.Report is { } value ? Format(value) : "<none>";
+                throw new TimeoutException(
+                    $"Timed out waiting for {expectedState}. Last listener report count: {snapshot.ReportCount}. Last report: {lastReport}");
+            }
+        }
+
+        private sealed class ReportWaiter(int previousReportCount, Func<RebalancingReport, bool> predicate)
+        {
+            private readonly TaskCompletionSource<RebalancingReport> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public Task<RebalancingReport> Task => _completion.Task;
+
+            public bool TryComplete(int reportCount, RebalancingReport report)
+            {
+                if (reportCount <= previousReportCount || !predicate(report))
+                {
+                    return false;
+                }
+
+                return _completion.TrySetResult(report);
             }
         }
     }

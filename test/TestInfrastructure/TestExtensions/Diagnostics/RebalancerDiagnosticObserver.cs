@@ -19,6 +19,8 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     private readonly ConcurrentQueue<ActivationRebalancerEvents.CycleStop> _cycleStopEvents = new();
     private readonly ConcurrentQueue<ActivationRebalancerEvents.SessionStart> _sessionStartEvents = new();
     private readonly ConcurrentQueue<ActivationRebalancerEvents.SessionStop> _sessionStopEvents = new();
+    private readonly object _waitersLock = new();
+    private readonly List<IWaiter> _waiters = [];
     private IDisposable? _subscription;
 
     /// <summary>
@@ -62,36 +64,13 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
     /// <returns>A task that completes when the expected count is reached.</returns>
     /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
-    public async Task WaitForCycleCountAsync(int expectedCount, TimeSpan? timeout = null)
+    public Task WaitForCycleCountAsync(int expectedCount, TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        while (!cts.Token.IsCancellationRequested)
-        {
-            var currentCount = GetCycleCount();
-            if (currentCount >= expectedCount)
-            {
-                return;
-            }
-
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
-        var finalCount = GetCycleCount();
-        if (finalCount >= expectedCount)
-        {
-            return;
-        }
-
-        throw new TimeoutException($"Timed out waiting for {expectedCount} rebalancing cycles. Current count: {finalCount} after {effectiveTimeout}");
+        return WaitUntilAsync(
+            () => GetCycleCount() >= expectedCount,
+            effectiveTimeout,
+            () => $"Timed out waiting for {expectedCount} rebalancing cycles. Current count: {GetCycleCount()} after {effectiveTimeout}");
     }
 
     /// <summary>
@@ -102,36 +81,13 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
     /// <returns>A task that completes when the expected count is reached.</returns>
     /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
-    public async Task WaitForCycleCountAsync(SiloAddress siloAddress, int expectedCount, TimeSpan? timeout = null)
+    public Task WaitForCycleCountAsync(SiloAddress siloAddress, int expectedCount, TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        while (!cts.Token.IsCancellationRequested)
-        {
-            var currentCount = GetCycleCount(siloAddress);
-            if (currentCount >= expectedCount)
-            {
-                return;
-            }
-
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
-        var finalCount = GetCycleCount(siloAddress);
-        if (finalCount >= expectedCount)
-        {
-            return;
-        }
-
-        throw new TimeoutException($"Timed out waiting for {expectedCount} rebalancing cycles on silo {siloAddress}. Current count: {finalCount} after {effectiveTimeout}");
+        return WaitUntilAsync(
+            () => GetCycleCount(siloAddress) >= expectedCount,
+            effectiveTimeout,
+            () => $"Timed out waiting for {expectedCount} rebalancing cycles on silo {siloAddress}. Current count: {GetCycleCount(siloAddress)} after {effectiveTimeout}");
     }
 
     /// <summary>
@@ -139,31 +95,41 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     /// </summary>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
     /// <returns>The cycle stop event payload.</returns>
-    public async Task<ActivationRebalancerEvents.CycleStop> WaitForCycleAsync(TimeSpan? timeout = null)
+    public Task<ActivationRebalancerEvents.CycleStop> WaitForCycleAsync(TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-        var initialCount = _cycleStopEvents.Count;
+        return WaitForEventAsync<ActivationRebalancerEvents.CycleStop>(
+            static _ => true,
+            effectiveTimeout,
+            () => $"Timed out waiting for rebalancing cycle after {effectiveTimeout}");
+    }
 
-        while (!cts.Token.IsCancellationRequested)
-        {
-            var events = _cycleStopEvents.ToArray();
-            if (events.Length > initialCount)
-            {
-                return events[initialCount];
-            }
+    /// <summary>
+    /// Waits for a rebalancing session to start.
+    /// </summary>
+    /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
+    /// <returns>The session start event payload.</returns>
+    public Task<ActivationRebalancerEvents.SessionStart> WaitForSessionStartAsync(TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
+        return WaitForSessionStartAsync(static _ => true, effectiveTimeout);
+    }
 
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for rebalancing cycle after {effectiveTimeout}");
+    /// <summary>
+    /// Waits for a rebalancing session matching the specified predicate to start.
+    /// </summary>
+    /// <param name="predicate">The predicate used to match session start events.</param>
+    /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
+    /// <returns>The session start event payload.</returns>
+    public Task<ActivationRebalancerEvents.SessionStart> WaitForSessionStartAsync(
+        Func<ActivationRebalancerEvents.SessionStart, bool> predicate,
+        TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
+        return WaitForEventAsync(
+            predicate,
+            effectiveTimeout,
+            () => $"Timed out waiting for rebalancing session start after {effectiveTimeout}");
     }
 
     /// <summary>
@@ -171,31 +137,27 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     /// </summary>
     /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
     /// <returns>The session stop event payload.</returns>
-    public async Task<ActivationRebalancerEvents.SessionStop> WaitForSessionStopAsync(TimeSpan? timeout = null)
+    public Task<ActivationRebalancerEvents.SessionStop> WaitForSessionStopAsync(TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-        var initialCount = _sessionStopEvents.Count;
+        return WaitForSessionStopAsync(static _ => true, effectiveTimeout);
+    }
 
-        while (!cts.Token.IsCancellationRequested)
-        {
-            var events = _sessionStopEvents.ToArray();
-            if (events.Length > initialCount)
-            {
-                return events[initialCount];
-            }
-
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for rebalancing session stop after {effectiveTimeout}");
+    /// <summary>
+    /// Waits for a rebalancing session matching the specified predicate to complete.
+    /// </summary>
+    /// <param name="predicate">The predicate used to match session stop events.</param>
+    /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
+    /// <returns>The session stop event payload.</returns>
+    public Task<ActivationRebalancerEvents.SessionStop> WaitForSessionStopAsync(
+        Func<ActivationRebalancerEvents.SessionStop, bool> predicate,
+        TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
+        return WaitForEventAsync(
+            predicate,
+            effectiveTimeout,
+            () => $"Timed out waiting for rebalancing session stop after {effectiveTimeout}");
     }
 
     /// <summary>
@@ -205,36 +167,13 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
     /// <returns>A task that completes when the expected count is reached.</returns>
     /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
-    public async Task WaitForSessionStopCountAsync(int expectedCount, TimeSpan? timeout = null)
+    public Task WaitForSessionStopCountAsync(int expectedCount, TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        while (!cts.Token.IsCancellationRequested)
-        {
-            var currentCount = _sessionStopEvents.Count;
-            if (currentCount >= expectedCount)
-            {
-                return;
-            }
-
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
-        var finalCount = _sessionStopEvents.Count;
-        if (finalCount >= expectedCount)
-        {
-            return;
-        }
-
-        throw new TimeoutException($"Timed out waiting for {expectedCount} session stops. Current count: {finalCount} after {effectiveTimeout}");
+        return WaitUntilAsync(
+            () => _sessionStopEvents.Count >= expectedCount,
+            effectiveTimeout,
+            () => $"Timed out waiting for {expectedCount} session stops. Current count: {_sessionStopEvents.Count} after {effectiveTimeout}");
     }
 
     /// <summary>
@@ -286,22 +225,105 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
         _sessionStopEvents.Clear();
     }
 
+    private Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout, Func<string> timeoutMessage)
+    {
+        lock (_waitersLock)
+        {
+            if (predicate())
+            {
+                return Task.CompletedTask;
+            }
+
+            var waiter = new ConditionWaiter(predicate);
+            _waiters.Add(waiter);
+            return WaitWithTimeoutAsync(waiter, timeout, timeoutMessage);
+        }
+    }
+
+    private Task<TEvent> WaitForEventAsync<TEvent>(
+        Func<TEvent, bool> predicate,
+        TimeSpan timeout,
+        Func<string> timeoutMessage)
+        where TEvent : ActivationRebalancerEvents.RebalancerEvent
+    {
+        lock (_waitersLock)
+        {
+            var waiter = new EventWaiter<TEvent>(predicate);
+            _waiters.Add(waiter);
+            return WaitWithTimeoutAsync(waiter, timeout, timeoutMessage);
+        }
+    }
+
+    private async Task WaitWithTimeoutAsync(ConditionWaiter waiter, TimeSpan timeout, Func<string> timeoutMessage)
+    {
+        try
+        {
+            await waiter.Task.WaitAsync(timeout);
+        }
+        catch (TimeoutException)
+        {
+            RemoveWaiter(waiter);
+            throw new TimeoutException(timeoutMessage());
+        }
+    }
+
+    private async Task<TEvent> WaitWithTimeoutAsync<TEvent>(
+        EventWaiter<TEvent> waiter,
+        TimeSpan timeout,
+        Func<string> timeoutMessage)
+        where TEvent : ActivationRebalancerEvents.RebalancerEvent
+    {
+        try
+        {
+            return await waiter.Task.WaitAsync(timeout);
+        }
+        catch (TimeoutException)
+        {
+            RemoveWaiter(waiter);
+            throw new TimeoutException(timeoutMessage());
+        }
+    }
+
+    private void RemoveWaiter(IWaiter waiter)
+    {
+        lock (_waitersLock)
+        {
+            _waiters.Remove(waiter);
+        }
+    }
+
+    private void SignalWaiters(ActivationRebalancerEvents.RebalancerEvent value)
+    {
+        for (var i = _waiters.Count - 1; i >= 0; i--)
+        {
+            if (_waiters[i].TryComplete(value))
+            {
+                _waiters.RemoveAt(i);
+            }
+        }
+    }
+
     void IObserver<ActivationRebalancerEvents.RebalancerEvent>.OnNext(ActivationRebalancerEvents.RebalancerEvent value)
     {
-        switch (value)
+        lock (_waitersLock)
         {
-            case ActivationRebalancerEvents.CycleStart cycleStart:
-                _cycleStartEvents.Enqueue(cycleStart);
-                break;
-            case ActivationRebalancerEvents.CycleStop cycleStop:
-                _cycleStopEvents.Enqueue(cycleStop);
-                break;
-            case ActivationRebalancerEvents.SessionStart sessionStart:
-                _sessionStartEvents.Enqueue(sessionStart);
-                break;
-            case ActivationRebalancerEvents.SessionStop sessionStop:
-                _sessionStopEvents.Enqueue(sessionStop);
-                break;
+            switch (value)
+            {
+                case ActivationRebalancerEvents.CycleStart cycleStart:
+                    _cycleStartEvents.Enqueue(cycleStart);
+                    break;
+                case ActivationRebalancerEvents.CycleStop cycleStop:
+                    _cycleStopEvents.Enqueue(cycleStop);
+                    break;
+                case ActivationRebalancerEvents.SessionStart sessionStart:
+                    _sessionStartEvents.Enqueue(sessionStart);
+                    break;
+                case ActivationRebalancerEvents.SessionStop sessionStop:
+                    _sessionStopEvents.Enqueue(sessionStop);
+                    break;
+            }
+
+            SignalWaiters(value);
         }
     }
 
@@ -316,5 +338,45 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     public void Dispose()
     {
         _subscription?.Dispose();
+    }
+
+    private interface IWaiter
+    {
+        bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value);
+    }
+
+    private sealed class ConditionWaiter(Func<bool> predicate) : IWaiter
+    {
+        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Task => _completion.Task;
+
+        public bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value)
+        {
+            if (!predicate())
+            {
+                return false;
+            }
+
+            return _completion.TrySetResult();
+        }
+    }
+
+    private sealed class EventWaiter<TEvent>(Func<TEvent, bool> predicate) : IWaiter
+        where TEvent : ActivationRebalancerEvents.RebalancerEvent
+    {
+        private readonly TaskCompletionSource<TEvent> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<TEvent> Task => _completion.Task;
+
+        public bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value)
+        {
+            if (value is not TEvent evt || !predicate(evt))
+            {
+                return false;
+            }
+
+            return _completion.TrySetResult(evt);
+        }
     }
 }
