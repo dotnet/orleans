@@ -587,6 +587,8 @@ namespace Orleans.Providers.Streams.Common
 
         protected DefaultQueueAdapterReceiverMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
 
+        protected DefaultQueueAdapterReceiverMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
+
         public void TrackInitialization(bool success, System.TimeSpan callTime, System.Exception exception) { }
 
         public void TrackMessagesReceived(long count, System.DateTime? oldestMessageEnqueueTimeUtc, System.DateTime? newestMessageEnqueueTimeUtc) { }

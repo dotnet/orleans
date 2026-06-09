@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -14,6 +15,11 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="dimensions">Aggregation Dimension bag for EventhubReceiverMonitor</param>
         public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions)
             : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) })
+        {
+        }
+
+        internal DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, OrleansInstruments instruments)
+            : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) }, instruments)
         {
         }
     }

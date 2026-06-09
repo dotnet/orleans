@@ -23,6 +23,7 @@ namespace Orleans.Streaming.EventHubs
     {
         private readonly ILoggerFactory loggerFactory;
         private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
+        private readonly OrleansInstruments orleansInstruments;
 
         /// <summary>
         /// Data adapter
@@ -125,6 +126,7 @@ namespace Orleans.Streaming.EventHubs
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.environmentStatisticsProvider = environmentStatisticsProvider;
+            this.orleansInstruments = serviceProvider.GetService<OrleansInstruments>();
         }
 
         public virtual void Init()
@@ -151,7 +153,7 @@ namespace Orleans.Streaming.EventHubs
 
             if (this.ReceiverMonitorFactory == null)
             {
-                this.ReceiverMonitorFactory = (dimensions, logger) => new DefaultEventHubReceiverMonitor(dimensions);
+                this.ReceiverMonitorFactory = (dimensions, logger) => this.orleansInstruments is not null ? new DefaultEventHubReceiverMonitor(dimensions, this.orleansInstruments) : new DefaultEventHubReceiverMonitor(dimensions);
             }
 
             this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.EventHubName}");

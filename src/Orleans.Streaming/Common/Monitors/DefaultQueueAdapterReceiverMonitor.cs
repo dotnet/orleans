@@ -30,23 +30,33 @@ namespace Orleans.Providers.Streams.Common
         private long _messagesReceived;
 
         protected DefaultQueueAdapterReceiverMonitor(KeyValuePair<string,object>[] dimensions)
+            : this(dimensions, Instruments.Meter)
+        {
+        }
+
+        protected DefaultQueueAdapterReceiverMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
+            : this(dimensions, instruments.Meter)
+        {
+        }
+
+        private DefaultQueueAdapterReceiverMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)
         {
             _dimensions = dimensions;
-            _initializationFailureCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_FAILURES);
-            _initializationCallTimeCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_DURATION);
-            _initializationExceptionCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_EXCEPTIONS);
+            _initializationFailureCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_FAILURES);
+            _initializationCallTimeCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_DURATION);
+            _initializationExceptionCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_EXCEPTIONS);
 
-            _readFailureCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_FAILURES);
-            _readCallTimeCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_DURATION);
-            _readExceptionCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_EXCEPTIONS);
+            _readFailureCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_FAILURES);
+            _readCallTimeCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_DURATION);
+            _readExceptionCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_EXCEPTIONS);
 
-            _shutdownFailureCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_FAILURES);
-            _shutdownCallTimeCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_DURATION);
-            _shutdownExceptionCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_EXCEPTIONS);
+            _shutdownFailureCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_FAILURES);
+            _shutdownCallTimeCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_DURATION);
+            _shutdownExceptionCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_EXCEPTIONS);
 
-            _messagesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_MESSAGES_RECEIVED, GetMessagesReceivedCount);
-            _oldestMessageReadEnqueueTimeToNowCounter = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_OLDEST_MESSAGE_ENQUEUE_AGE, GetOldestMessageReadEnqueueAge);
-            _newestMessageReadEnqueueTimeToNowCounter = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_NEWEST_MESSAGE_ENQUEUE_AGE, GetNewestMessageReadEnqueueAge);
+            _messagesReceivedCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_MESSAGES_RECEIVED, GetMessagesReceivedCount);
+            _oldestMessageReadEnqueueTimeToNowCounter = meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_OLDEST_MESSAGE_ENQUEUE_AGE, GetOldestMessageReadEnqueueAge);
+            _newestMessageReadEnqueueTimeToNowCounter = meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_NEWEST_MESSAGE_ENQUEUE_AGE, GetNewestMessageReadEnqueueAge);
         }
 
         /// <summary>
