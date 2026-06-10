@@ -128,6 +128,18 @@ namespace Orleans.Configuration
         public bool EnableIndirectProbes { get; set; } = true;
 
         /// <summary>
+        /// Gets or sets a value indicating whether to consider connection-level message activity when evaluating silo liveness.
+        /// </summary>
+        /// <remarks>
+        /// When enabled, if an active connection to a silo has recently received messages within the monitoring window
+        /// (<see cref="ProbeTimeout"/> × <see cref="NumMissedProbesLimit"/>), votes to suspect that silo will be suppressed
+        /// since the connection activity demonstrates the silo is alive. This helps prevent false death declarations
+        /// when probes fail due to local issues such as GC pauses or thread pool saturation.
+        /// </remarks>
+        /// <value>Connection liveness checks are enabled by default.</value>
+        public bool EnableConnectionLivenessCheck { get; set; } = true;
+
+        /// <summary>
         /// Gets or sets a value indicating whether to enable membership eviction of silos when in a state of `Joining` or `Created` for longer than MaxJoinAttemptTime
         /// </summary>
         public bool EvictWhenMaxJoinAttemptTimeExceeded { get; set; } = true;
