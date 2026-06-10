@@ -247,7 +247,7 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class DefaultEventHubReceiverMonitor : Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor
     {
-        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!) { }
+        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default(Runtime.OrleansInstruments)!) { }
     }
 
     public static partial class EventDataExtensions
@@ -467,7 +467,7 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
-        public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor> cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> blockPoolMonitorFactory = null) { }
+        public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, Runtime.OrleansInstruments instruments, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor> cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> blockPoolMonitorFactory = null) { }
 
         public System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> BlockPoolMonitorFactory { get { throw null; } set { } }
 
@@ -585,12 +585,12 @@ namespace Orleans.Streaming.EventHubs.StatisticMonitors
 {
     public partial class DefaultEventHubBlockPoolMonitor : Providers.Streams.Common.DefaultBlockPoolMonitor
     {
-        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!) { }
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default(Runtime.OrleansInstruments)!) { }
     }
 
     public partial class DefaultEventHubCacheMonitor : Providers.Streams.Common.DefaultCacheMonitor
     {
-        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!) { }
+        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default(Runtime.OrleansInstruments)!) { }
     }
 }
 
