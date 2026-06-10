@@ -9,6 +9,7 @@ using Xunit;
 using Orleans.Streaming.EventHubs.Testing;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using System.Globalization;
@@ -29,6 +30,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private readonly ObjectPool<FixedSizeBuffer> bufferPool;
         private readonly TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private readonly EventHubPartitionSettings ehSettings;
+        private readonly OrleansInstruments instruments;
         private IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
         private List<EHEvictionStrategyForTesting> evictionStrategyList;
@@ -50,9 +52,12 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             // set up serialization env
             var serviceProvider = new ServiceCollection()
+                .AddMetrics()
+                .AddSingleton<OrleansInstruments>()
                 .AddSerializer()
                 .BuildServiceProvider();
             this.serializer = serviceProvider.GetRequiredService<Serializer>();
+            this.instruments = serviceProvider.GetRequiredService<OrleansInstruments>();
 
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             var oneKB = 1024;
@@ -202,9 +207,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), environmentStatisticsProvider);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), environmentStatisticsProvider);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }
