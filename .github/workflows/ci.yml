@@ -226,16 +226,15 @@ jobs:
     continue-on-error: true
     env:
       BuildExternalAssets: "false"
-    strategy:
-      matrix:
-        provider: ["MySql"]
-        framework: ["net8.0", "net10.0"]
-    env:
       # The official MariaDB 10.6 image is not published to GHCR. Use Google's Docker Hub mirror
       # pinned to the official Docker Hub digest.
       MARIADB_IMAGE: mirror.gcr.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       MARIADB_ROOT_PASSWORD: "mariadb"
+    strategy:
+      matrix:
+        provider: ["MySql"]
+        framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
