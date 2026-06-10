@@ -90,7 +90,7 @@ namespace Orleans.Providers.Streams.Generator
             this.serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<GeneratorAdapterFactory>();
-            this.orleansInstruments = serviceProvider.GetService<OrleansInstruments>();
+            this.orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
         }
 
         /// <summary>
@@ -100,11 +100,11 @@ namespace Orleans.Providers.Streams.Generator
         {
             this.receivers = new ConcurrentDictionary<QueueId, Receiver>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions) => this.orleansInstruments is not null ? new DefaultCacheMonitor(dimensions, this.orleansInstruments) : new DefaultCacheMonitor(dimensions);
+                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions, this.orleansInstruments);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions) => this.orleansInstruments is not null ? new DefaultBlockPoolMonitor(dimensions, this.orleansInstruments) : new DefaultBlockPoolMonitor(dimensions);
+                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions, this.orleansInstruments);
             if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions, this.orleansInstruments);
             generatorConfig = this.serviceProvider.GetKeyedService<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
