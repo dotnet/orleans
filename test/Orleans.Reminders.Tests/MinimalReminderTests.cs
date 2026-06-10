@@ -1,4 +1,5 @@
-using Orleans.Runtime;
+using Orleans.Internal;
+using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,9 +16,23 @@ namespace UnitTests.CatalogTests
 
         public class Fixture : BaseTestClusterFixture
         {
+            public ReminderDiagnosticObserver ReminderObserver { get; } = ReminderDiagnosticObserver.Create();
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<SiloConfiguration>();
+            }
+
+            public override async Task DisposeAsync()
+            {
+                try
+                {
+                    await base.DisposeAsync();
+                }
+                finally
+                {
+                    ReminderObserver.Dispose();
+                }
             }
         }
 
@@ -44,86 +59,24 @@ namespace UnitTests.CatalogTests
             var period = TimeSpan.FromMilliseconds(100);
 
             var reminderGrain = this.fixture.GrainFactory.GetGrain<IReminderTestGrain2>(grainGuid);
-            _ = await WaitForReminderServiceReadiness(() => reminderGrain.StartReminder(reminderName, period, true));
+            var grainId = reminderGrain.GetGrainId();
+            var observer = this.fixture.ReminderObserver;
 
-            var r = await WaitForReminder(reminderGrain, reminderName);
-            await WaitForReminderServiceReadiness(() => reminderGrain.StopReminder(r));
-
-        }
-
-        private static async Task<IGrainReminder> WaitForReminder(IReminderTestGrain2 reminderGrain, string reminderName)
-        {
-            var deadline = DateTime.UtcNow + TestConstants.InitTimeout;
-            Exception lastException = null;
-
-            while (true)
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+            foreach (var silo in this.fixture.HostedCluster.Silos)
             {
-                var remaining = deadline - DateTime.UtcNow;
-                if (remaining <= TimeSpan.Zero)
-                {
-                    throw new TimeoutException($"Timed out waiting for reminder {reminderName} to be readable.", lastException);
-                }
-
-                try
-                {
-                    var reminder = await reminderGrain.GetReminderObject(reminderName).WaitAsync(remaining);
-                    if (reminder is not null)
-                    {
-                        return reminder;
-                    }
-                }
-                catch (OrleansException exception) when (IsReminderServiceInitializing(exception) && DateTime.UtcNow < deadline)
-                {
-                    lastException = exception;
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
             }
-        }
 
-        private static async Task<T> WaitForReminderServiceReadiness<T>(Func<Task<T>> operation)
-        {
-            return await WaitUntilSuccess(operation);
-        }
+            var registeredTask = observer.WaitForReminderRegisteredAsync(grainId, reminderName, cts.Token);
+            var reminder = await reminderGrain.StartReminder(reminderName, period, true).WaitAsync(cts.Token);
+            await registeredTask;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
 
-        private static Task WaitForReminderServiceReadiness(Func<Task> operation)
-        {
-            return WaitUntilSuccess(async () =>
-            {
-                await operation();
-                return true;
-            });
-        }
-
-        private static async Task<T> WaitUntilSuccess<T>(Func<Task<T>> operation)
-        {
-            var deadline = DateTime.UtcNow + TestConstants.InitTimeout;
-            Exception lastException = null;
-
-            while (true)
-            {
-                var remaining = deadline - DateTime.UtcNow;
-                if (remaining <= TimeSpan.Zero)
-                {
-                    throw new TimeoutException("Timed out waiting for the reminder operation to complete.", lastException);
-                }
-
-                try
-                {
-                    return await operation().WaitAsync(remaining);
-                }
-                catch (OrleansException exception) when (IsReminderServiceInitializing(exception) && DateTime.UtcNow < deadline)
-                {
-                    lastException = exception;
-                    await Task.Delay(TimeSpan.FromMilliseconds(100));
-                }
-            }
-        }
-
-        private static bool IsReminderServiceInitializing(Exception exception)
-        {
-            return exception is OrleansException { Message: { } message }
-                && message.Contains("Reminder Service is still initializing", StringComparison.Ordinal);
+            var unregisteredTask = observer.WaitForReminderUnregisteredAsync(grainId, reminderName, cts.Token);
+            await reminderGrain.StopReminder(reminder).WaitAsync(cts.Token);
+            await unregisteredTask;
+            await observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cts.Token);
         }
     }
 }

@@ -439,6 +439,7 @@ namespace Orleans.Runtime.ReminderService
 
                 Status = GrainServiceStatus.Started;
                 startedTask.TrySetResult(true);
+                ReminderEvents.EmitReminderServiceStarted(Silo);
             }
             catch (Exception ex)
             {

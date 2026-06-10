@@ -27,6 +27,31 @@ public static class ReminderEvents
     public static IObservable<ReminderEvent> AllEvents { get; } = new Observable();
 
     /// <summary>
+    /// Gets an observable sequence of reminder service events.
+    /// </summary>
+    public static IObservable<ReminderServiceEvent> ServiceEvents { get; } = new ServiceObservable();
+
+    /// <summary>
+    /// The base class used for reminder service diagnostic events.
+    /// </summary>
+    /// <param name="siloAddress">The address of the silo associated with the event, if any.</param>
+    public abstract class ReminderServiceEvent(SiloAddress? siloAddress)
+    {
+        /// <summary>
+        /// The address of the silo associated with the event, if any.
+        /// </summary>
+        public readonly SiloAddress? SiloAddress = siloAddress;
+    }
+
+    /// <summary>
+    /// Event payload for when a reminder service completes startup and is ready for reminder operations.
+    /// </summary>
+    /// <param name="siloAddress">The address of the silo whose reminder service started.</param>
+    public sealed class ReminderServiceStarted(SiloAddress? siloAddress) : ReminderServiceEvent(siloAddress)
+    {
+    }
+
+    /// <summary>
     /// The base class used for reminder diagnostic events.
     /// </summary>
     /// <param name="grainId">The grain associated with the reminder.</param>
@@ -269,6 +294,22 @@ public static class ReminderEvents
         }
     }
 
+    internal static void EmitReminderServiceStarted(SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(ReminderServiceStarted)))
+        {
+            return;
+        }
+
+        Emit(siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(ReminderServiceStarted), new ReminderServiceStarted(siloAddress));
+        }
+    }
+
     internal static void EmitUnregistered(GrainId grainId, string reminderName, SiloAddress? siloAddress)
     {
         if (!Listener.IsEnabled(nameof(Unregistered)))
@@ -452,6 +493,25 @@ public static class ReminderEvents
             public void OnNext(KeyValuePair<string, object?> value)
             {
                 if (value.Value is ReminderEvent evt)
+                {
+                    observer.OnNext(evt);
+                }
+            }
+        }
+    }
+
+    private sealed class ServiceObservable : IObservable<ReminderServiceEvent>
+    {
+        public IDisposable Subscribe(IObserver<ReminderServiceEvent> observer) => Listener.Subscribe(new Observer(observer));
+
+        private sealed class Observer(IObserver<ReminderServiceEvent> observer) : IObserver<KeyValuePair<string, object?>>
+        {
+            public void OnCompleted() => observer.OnCompleted();
+            public void OnError(Exception error) => observer.OnError(error);
+
+            public void OnNext(KeyValuePair<string, object?> value)
+            {
+                if (value.Value is ReminderServiceEvent evt)
                 {
                     observer.OnNext(evt);
                 }

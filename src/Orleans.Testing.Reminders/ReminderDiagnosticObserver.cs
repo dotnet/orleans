@@ -22,7 +22,9 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 {
     private readonly object _lock = new();
     private readonly IConnectableObservable<ReminderEvents.ReminderEvent> _events;
+    private readonly IConnectableObservable<ReminderEvents.ReminderServiceEvent> _serviceEvents;
     private readonly IDisposable _connection;
+    private readonly IDisposable _serviceConnection;
     private readonly IDisposable _storageSubscription;
     private readonly Dictionary<GrainId, int> _tickCountsByGrain = [];
     private readonly Dictionary<ReminderTickKey, int> _tickCountsByReminder = [];
@@ -49,8 +51,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     public ReminderDiagnosticObserver()
     {
         _events = ReminderEvents.AllEvents.Replay();
+        _serviceEvents = ReminderEvents.ServiceEvents.Replay();
         _storageSubscription = _events.Subscribe(StoreEvent);
         _connection = _events.Connect();
+        _serviceConnection = _serviceEvents.Connect();
     }
 
     private void StoreEvent(ReminderEvents.ReminderEvent value)
@@ -196,6 +200,17 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         return _events
             .OfType<ReminderEvents.Registered>()
             .FirstAsync(e => MatchesReminder(e, grainId, reminderName))
+            .ToTask(cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for a reminder service to complete startup.
+    /// </summary>
+    public Task<ReminderEvents.ReminderServiceStarted> WaitForReminderServiceStartedAsync(CancellationToken cancellationToken, SiloAddress? siloAddress = null)
+    {
+        return _serviceEvents
+            .OfType<ReminderEvents.ReminderServiceStarted>()
+            .FirstAsync(e => siloAddress is null || Equals(e.SiloAddress, siloAddress))
             .ToTask(cancellationToken);
     }
 
@@ -521,6 +536,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     {
         _storageSubscription.Dispose();
         _connection.Dispose();
+        _serviceConnection.Dispose();
     }
 }
 

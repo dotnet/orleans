@@ -165,6 +165,7 @@ namespace Orleans.Reminders.Diagnostics
     {
         public const string ListenerName = "Orleans.Reminders";
         public static System.IObservable<ReminderEvent> AllEvents { get { throw null; } }
+        public static System.IObservable<ReminderServiceEvent> ServiceEvents { get { throw null; } }
 
         public sealed partial class LocalReminderScheduleChanged : ReminderEvent
         {
@@ -214,6 +215,17 @@ namespace Orleans.Reminders.Diagnostics
             public readonly string ReminderName;
             public readonly Runtime.SiloAddress? SiloAddress;
             protected ReminderEvent(Runtime.GrainId grainId, string reminderName, Runtime.SiloAddress? siloAddress) { }
+        }
+
+        public abstract partial class ReminderServiceEvent
+        {
+            public readonly Runtime.SiloAddress? SiloAddress;
+            protected ReminderServiceEvent(Runtime.SiloAddress? siloAddress) { }
+        }
+
+        public sealed partial class ReminderServiceStarted : ReminderServiceEvent
+        {
+            public ReminderServiceStarted(Runtime.SiloAddress? siloAddress) : base(default) { }
         }
 
         public sealed partial class TickCompleted : ReminderEvent
