@@ -34,11 +34,6 @@ namespace Orleans.Providers.Streams.Common
         {
         }
 
-        internal DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions, OrleansInstruments instruments)
-            : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
-        {
-        }
-
         private DefaultQueueAdapterReceiverMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)
         {
             _dimensions = dimensions;
