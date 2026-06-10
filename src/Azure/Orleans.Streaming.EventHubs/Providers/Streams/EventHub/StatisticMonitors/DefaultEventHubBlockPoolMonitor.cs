@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 
 namespace Orleans.Streaming.EventHubs.StatisticMonitors
 {
@@ -13,6 +14,11 @@ namespace Orleans.Streaming.EventHubs.StatisticMonitors
         /// </summary>
         /// <param name="dimensions"></param>
         public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions) : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("ObjectPoolId", dimensions.BlockPoolId) })
+        {
+        }
+
+        internal DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
+            : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("ObjectPoolId", dimensions.BlockPoolId) }, instruments)
         {
         }
     }

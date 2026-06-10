@@ -553,6 +553,8 @@ namespace Orleans.Providers.Streams.Common
 
         protected DefaultBlockPoolMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
 
+        protected DefaultBlockPoolMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
+
         public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte) { }
 
         public void TrackMemoryAllocated(long allocatedMemoryInByte) { }
@@ -565,6 +567,8 @@ namespace Orleans.Providers.Streams.Common
         public DefaultCacheMonitor(CacheMonitorDimensions dimensions) { }
 
         protected DefaultCacheMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
+
+        protected DefaultCacheMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
 
         public void ReportCacheSize(long totalCacheSizeInByte) { }
 

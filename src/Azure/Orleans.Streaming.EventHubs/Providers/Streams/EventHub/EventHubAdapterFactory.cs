@@ -265,7 +265,7 @@ namespace Orleans.Streaming.EventHubs
         {
            var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions, this.orleansInstruments);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)

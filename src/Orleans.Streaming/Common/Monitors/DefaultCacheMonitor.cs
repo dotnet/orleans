@@ -43,6 +43,11 @@ namespace Orleans.Providers.Streams.Common
         {
         }
 
+        protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
+            : this(dimensions, instruments.Meter)
+        {
+        }
+
         internal DefaultCacheMonitor(CacheMonitorDimensions dimensions, OrleansInstruments instruments)
             : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
         {

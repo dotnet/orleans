@@ -31,6 +31,11 @@ namespace Orleans.Providers.Streams.Common
         {
         }
 
+        protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
+            : this(dimensions, instruments.Meter)
+        {
+        }
+
         internal DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
             : this(new KeyValuePair<string, object>[] { new("BlockPoolId", dimensions.BlockPoolId) }, instruments.Meter)
         {
