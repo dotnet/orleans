@@ -39,7 +39,7 @@ namespace Orleans.Providers.Streams.Common
         /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
         /// </summary>
         protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions)
-            : this(dimensions, Instruments.Meter)
+            : this(dimensions, new Meter("Microsoft.Orleans"))
         {
         }
 

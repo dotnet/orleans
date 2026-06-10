@@ -1425,11 +1425,6 @@ namespace Orleans.Runtime
         public override readonly string ToString() { throw null; }
     }
 
-    public static partial class Instruments
-    {
-        public static readonly System.Diagnostics.Metrics.Meter Meter;
-    }
-
     public partial interface IRingRange
     {
         bool InRange(GrainId grainId);

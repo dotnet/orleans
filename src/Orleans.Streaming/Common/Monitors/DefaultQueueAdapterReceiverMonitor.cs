@@ -30,7 +30,7 @@ namespace Orleans.Providers.Streams.Common
         private long _messagesReceived;
 
         protected DefaultQueueAdapterReceiverMonitor(KeyValuePair<string,object>[] dimensions)
-            : this(dimensions, Instruments.Meter)
+            : this(dimensions, new Meter("Microsoft.Orleans"))
         {
         }
 

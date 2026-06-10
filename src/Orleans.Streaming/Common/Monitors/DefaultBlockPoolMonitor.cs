@@ -27,7 +27,7 @@ namespace Orleans.Providers.Streams.Common
         /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
         /// </summary>
         protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions)
-            : this(dimensions, Instruments.Meter)
+            : this(dimensions, new Meter("Microsoft.Orleans"))
         {
         }
 
