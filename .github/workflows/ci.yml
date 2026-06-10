@@ -82,24 +82,7 @@ jobs:
           --health-retries 5 \
           "$REDIS_IMAGE"
 
-        for attempt in $(seq 1 30); do
-          status="$(docker inspect --format '{{.State.Health.Status}}' redis)"
-          case "$status" in
-            healthy)
-              exit 0
-              ;;
-            unhealthy)
-              docker logs redis
-              exit 1
-              ;;
-          esac
-
-          sleep 2
-        done
-
-        echo "Redis did not become healthy in time."
-        docker logs redis
-        exit 1
+        bash .github/scripts/docker-wait-for-health.sh redis
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -206,24 +189,7 @@ jobs:
           --health-retries 5 \
           "$POSTGRES_IMAGE"
 
-        for attempt in $(seq 1 30); do
-          status="$(docker inspect --format '{{.State.Health.Status}}' postgres)"
-          case "$status" in
-            healthy)
-              exit 0
-              ;;
-            unhealthy)
-              docker logs postgres
-              exit 1
-              ;;
-          esac
-
-          sleep 2
-        done
-
-        echo "PostgreSQL did not become healthy in time."
-        docker logs postgres
-        exit 1
+        bash .github/scripts/docker-wait-for-health.sh postgres
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
