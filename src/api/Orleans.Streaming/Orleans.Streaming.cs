@@ -549,9 +549,7 @@ namespace Orleans.Providers.Streams.Common
     public partial class DefaultBlockPoolMonitor : IBlockPoolMonitor
     {
         protected System.Collections.Generic.KeyValuePair<string, object>[] _dimensions;
-        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions) { }
-
-        protected DefaultBlockPoolMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
+        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) { }
 
         protected DefaultBlockPoolMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
 
@@ -564,9 +562,7 @@ namespace Orleans.Providers.Streams.Common
 
     public partial class DefaultCacheMonitor : ICacheMonitor
     {
-        public DefaultCacheMonitor(CacheMonitorDimensions dimensions) { }
-
-        protected DefaultCacheMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
+        public DefaultCacheMonitor(CacheMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) { }
 
         protected DefaultCacheMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
 
@@ -587,9 +583,7 @@ namespace Orleans.Providers.Streams.Common
 
     public partial class DefaultQueueAdapterReceiverMonitor : IQueueAdapterReceiverMonitor
     {
-        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions) { }
-
-        protected DefaultQueueAdapterReceiverMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
+        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) { }
 
         protected DefaultQueueAdapterReceiverMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
 

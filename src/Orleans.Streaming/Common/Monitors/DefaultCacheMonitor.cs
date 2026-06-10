@@ -35,21 +35,13 @@ namespace Orleans.Providers.Streams.Common
         private ValueStopwatch _oldestMessageDequeueAgo;
         private ValueStopwatch _oldestToNewestAge;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
-        /// </summary>
-        protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions)
-            : this(dimensions, new Meter("Microsoft.Orleans"))
+        public DefaultCacheMonitor(CacheMonitorDimensions dimensions, OrleansInstruments instruments)
+            : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
         {
         }
 
         protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
             : this(dimensions, instruments.Meter)
-        {
-        }
-
-        internal DefaultCacheMonitor(CacheMonitorDimensions dimensions, OrleansInstruments instruments)
-            : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
         {
         }
 
@@ -74,14 +66,6 @@ namespace Orleans.Providers.Streams.Common
                     yield return new Measurement<T>(selector(monitor.Value), monitor.Value.Dimensions);
                 }
             }
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
-        /// </summary>
-        /// <param name="dimensions">The dimensions.</param>
-        public DefaultCacheMonitor(CacheMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) })
-        {
         }
 
         private Measurement<long> GetOldestToNewestAge() => new(_oldestToNewestAge.ElapsedTicks, _dimensions);

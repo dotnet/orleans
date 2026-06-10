@@ -23,21 +23,13 @@ namespace Orleans.Providers.Streams.Common
         private long _releasedMemory;
         private long _allocatedMemory;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
-        /// </summary>
-        protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions)
-            : this(dimensions, new Meter("Microsoft.Orleans"))
+        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
+            : this(new KeyValuePair<string, object>[] { new("BlockPoolId", dimensions.BlockPoolId) }, instruments.Meter)
         {
         }
 
         protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
             : this(dimensions, instruments.Meter)
-        {
-        }
-
-        internal DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
-            : this(new KeyValuePair<string, object>[] { new("BlockPoolId", dimensions.BlockPoolId) }, instruments.Meter)
         {
         }
 
@@ -49,14 +41,6 @@ namespace Orleans.Providers.Streams.Common
             _claimedMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_CLAIMED_MEMORY, GetClaimedMemory, unit: "bytes");
             _releasedMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_RELEASED_MEMORY, GetReleasedMemory, unit: "bytes");
             _allocatedMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_ALLOCATED_MEMORY, GetAllocatedMemory, unit: "bytes");
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
-        /// </summary>
-        /// <param name="dimensions">The dimensions.</param>
-        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new ("BlockPoolId", dimensions.BlockPoolId) })
-        {
         }
 
         private Measurement<long> GetTotalMemory() => new(_totalMemory, _dimensions);
