@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Reflection;
 using Azure.Messaging.EventHubs;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Streams;
@@ -140,6 +142,11 @@ public class EventHubCheckpointerTests
             Partition = "TestPartition",
             ReceiverOptions = new Orleans.Configuration.EventHubReceiverOptions()
         };
+        var instruments = new ServiceCollection()
+            .AddMetrics()
+            .AddSingleton<OrleansInstruments>()
+            .BuildServiceProvider()
+            .GetRequiredService<OrleansInstruments>();
 
         var receiver = new EventHubAdapterReceiver(
             settings,
@@ -151,7 +158,8 @@ public class EventHubCheckpointerTests
                 {
                     EventHubPartition = settings.Partition,
                     EventHubPath = settings.Hub.EventHubName,
-                }),
+                },
+                instruments),
             loadSheddingOptions: new Orleans.Configuration.LoadSheddingOptions(),
             environmentStatisticsProvider: new Orleans.Statistics.EnvironmentStatisticsProvider(),
             eventHubReceiverFactory: (_, _, _) => eventHubReceiver ?? new TestEventHubReceiver());

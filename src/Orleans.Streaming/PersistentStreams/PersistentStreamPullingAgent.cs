@@ -825,7 +825,6 @@ namespace Orleans.Streams
                         if (nextBatch.Batch != null)
                         {
                             var batch = nextBatch.Batch;
-                            StreamInstruments.PersistentStreamSentMessages.Add(1);
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
