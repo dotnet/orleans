@@ -148,8 +148,13 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
     public ValueTask MigrateAsync(SiloAddress targetSilo, GrainId grainId, MigrationContext migrationContext)
     {
-        var workItem = _workItemPool.Get();
         var migrationPackage = new GrainMigrationPackage { GrainId = grainId, MigrationContext = migrationContext };
+        if (targetSilo.Equals(Silo))
+        {
+            return AcceptMigratingGrains([migrationPackage]);
+        }
+
+        var workItem = _workItemPool.Get();
         workItem.Initialize(migrationPackage);
         var workItemWriter = GetOrCreateWorker(targetSilo);
         if (!workItemWriter.TryWrite(workItem))

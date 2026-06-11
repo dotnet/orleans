@@ -113,6 +113,35 @@ namespace DefaultCluster.Tests.General
         }
 
         /// <summary>
+        /// Tests that grain migration runs through dehydrate and rehydrate when the placement director selects the current silo.
+        /// </summary>
+        [Fact, TestCategory("BVT")]
+        public async Task DirectedLocalGrainMigrationTest()
+        {
+            var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+            var expectedState = Random.Shared.Next(1, int.MaxValue);
+            await grain.SetState(expectedState);
+            var originalAddress = await grain.GetGrainAddress();
+
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, originalAddress.SiloAddress);
+            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+            GrainAddress newAddress;
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+            {
+                do
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    newAddress = await grain.GetGrainAddress();
+                } while (newAddress.ActivationId == originalAddress.ActivationId);
+            }
+
+            Assert.NotEqual(originalAddress.ActivationId, newAddress.ActivationId);
+            Assert.Equal(originalAddress.SiloAddress, newAddress.SiloAddress);
+            Assert.Equal(expectedState, await grain.GetState());
+        }
+
+        /// <summary>
         /// Tests that multiple grains can be migrated simultaneously.
         /// </summary>
         [Fact, TestCategory("BVT")]

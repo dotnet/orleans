@@ -47,9 +47,9 @@ namespace Orleans
             grain.GrainContext.Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateOnIdle)} was called."));
 
         /// <summary>
-        /// Starts an attempt to migrating this instance to another location.
-        /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a new location.
-        /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select an alternative location.
+        /// Starts an attempt to migrate this instance.
+        /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a destination.
+        /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select a location.
         /// </summary>
         public static void MigrateOnIdle(this IGrainBase grain) => grain.GrainContext.Migrate(RequestContext.CallContextData?.Value.Values);
 

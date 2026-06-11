@@ -15,7 +15,7 @@ namespace Orleans.Core.Internal
         ValueTask DeactivateOnIdle();
 
         /// <summary>
-        /// Attempts to migrate the current instance to a new location once it becomes idle.
+        /// Attempts to migrate the current instance once it becomes idle.
         /// </summary>
         /// <returns>A <see cref="Task"/> which represents the method call.</returns>
         ValueTask MigrateOnIdle();

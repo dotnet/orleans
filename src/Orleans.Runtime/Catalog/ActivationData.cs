@@ -69,6 +69,13 @@ internal sealed partial class ActivationData :
 
     private Activity? _activationActivity;
 
+    private enum MigrationHandoff
+    {
+        None,
+        Completed,
+        WaitingForLocalCatalogRemoval
+    }
+
     /// <summary>
     /// Constants for activity error event names used during activation lifecycle.
     /// </summary>
@@ -1927,6 +1934,9 @@ internal sealed partial class ActivationData :
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments);
         var migrating = false;
         var encounteredError = false;
+        var migrationHandoff = MigrationHandoff.None;
+        DehydrationContextHolder? deferredLocalMigrationContext = null;
+        IActivationMigrationManager? deferredLocalMigrationManager = null;
         try
         {
             try
@@ -1996,7 +2006,14 @@ internal sealed partial class ActivationData :
                     && _shared.MigrationManager is { } migrationManager
                     && !cancellationToken.IsCancellationRequested)
                 {
-                    migrating = await StartMigrationAsync(context, migrationManager, cancellationToken);
+                    migrationHandoff = await StartMigrationAsync(context, migrationManager, cancellationToken);
+                    if (migrationHandoff is MigrationHandoff.WaitingForLocalCatalogRemoval)
+                    {
+                        deferredLocalMigrationContext = context;
+                        deferredLocalMigrationManager = migrationManager;
+                    }
+
+                    migrating = migrationHandoff is not MigrationHandoff.None;
                 }
 
                 // If the instance is being deactivated due to a directory failure, we should not unregister it.
@@ -2004,25 +2021,27 @@ internal sealed partial class ActivationData :
 
                 if (!migrating && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure)
                 {
-                    // Unregister from directory.
-                    // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.
-                    try
-                    {
-                        await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).WaitAsync(cancellationToken);
-                    }
-                    catch (Exception exception)
-                    {
-                        if (!cancellationToken.IsCancellationRequested)
-                        {
-                            LogFailedToUnregisterActivation(_shared.Logger, exception, this);
-                        }
-                    }
+                    await UnregisterFromDirectoryAsync(cancellationToken);
                 }
             }
             catch (Exception ex)
             {
                 SetActivityError(deactivateCommand.Activity, ex, "Error in FinishDeactivating");
                 LogErrorDeactivating(_shared.Logger, ex, this);
+            }
+
+            UnregisterMessageTarget();
+
+            if (migrationHandoff is MigrationHandoff.WaitingForLocalCatalogRemoval
+                && deferredLocalMigrationContext is not null
+                && deferredLocalMigrationManager is not null
+                && !cancellationToken.IsCancellationRequested)
+            {
+                migrating = await CompleteMigrationAsync(deferredLocalMigrationContext, deferredLocalMigrationManager, cancellationToken);
+                if (!migrating && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && DeactivationReason.ReasonCode is not DeactivationReasonCode.DirectoryFailure)
+                {
+                    await UnregisterFromDirectoryAsync(cancellationToken);
+                }
             }
 
             if (IsStuckDeactivating)
@@ -2045,8 +2064,6 @@ internal sealed partial class ActivationData :
                 deactivationMetrics = deactivationMetrics.Collection();
                 _shared.CatalogInstruments.ActivationShutdownViaCollection();
             }
-
-            UnregisterMessageTarget();
 
             try
             {
@@ -2074,7 +2091,24 @@ internal sealed partial class ActivationData :
             deactivationMetrics.RecordIfNeeded();
         }
 
-        async ValueTask<bool> StartMigrationAsync(DehydrationContextHolder context, IActivationMigrationManager migrationManager, CancellationToken cancellationToken)
+        async ValueTask UnregisterFromDirectoryAsync(CancellationToken cancellationToken)
+        {
+            // Unregister from directory.
+            // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.
+            try
+            {
+                await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).WaitAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    LogFailedToUnregisterActivation(_shared.Logger, exception, this);
+                }
+            }
+        }
+
+        async ValueTask<MigrationHandoff> StartMigrationAsync(DehydrationContextHolder context, IActivationMigrationManager migrationManager, CancellationToken cancellationToken)
         {
             try
             {
@@ -2083,7 +2117,7 @@ internal sealed partial class ActivationData :
                     var selectedAddress = await PlaceMigratingGrainAsync(context.RequestContext, cancellationToken);
                     if (selectedAddress is null)
                     {
-                        return false;
+                        return MigrationHandoff.None;
                     }
 
                     ForwardingAddress = selectedAddress;
@@ -2096,10 +2130,39 @@ internal sealed partial class ActivationData :
                 }
 
                 OnDehydrate(context.MigrationContext);
+                if (ForwardingAddress is not { } forwardingAddress)
+                {
+                    return MigrationHandoff.None;
+                }
+
+                if (forwardingAddress.Equals(_shared.Runtime.SiloAddress))
+                {
+                    return MigrationHandoff.WaitingForLocalCatalogRemoval;
+                }
 
                 // Send the dehydration context to the target host.
-                await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
-                _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
+                return await CompleteMigrationAsync(context, migrationManager, cancellationToken)
+                    ? MigrationHandoff.Completed
+                    : MigrationHandoff.None;
+            }
+            catch (Exception exception)
+            {
+                LogFailedToMigrateActivation(_shared.Logger, exception, this);
+                return MigrationHandoff.None;
+            }
+        }
+
+        async ValueTask<bool> CompleteMigrationAsync(DehydrationContextHolder context, IActivationMigrationManager migrationManager, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (ForwardingAddress is not { } forwardingAddress)
+                {
+                    throw new InvalidOperationException("Migration target was not selected.");
+                }
+
+                await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
+                _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
                 return true;
             }
             catch (Exception exception)
@@ -2134,7 +2197,6 @@ internal sealed partial class ActivationData :
             return;
         }
 
-        // Only migrate if a different silo was selected.
         ForwardingAddress = selectedAddress;
         LogDebugMigrating(_shared.Logger, GrainId, ForwardingAddress);
         Migrate(requestContextData, cancellationToken: CancellationToken.None);
@@ -2158,7 +2220,6 @@ internal sealed partial class ActivationData :
                 // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
                 // silo for some other reason.
                 LogDebugPlacementStrategySelectedCurrentSilo(_shared.Logger, PlacementStrategy, GrainId);
-                return null;
             }
 
             return selectedAddress;
