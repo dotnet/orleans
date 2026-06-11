@@ -1,13 +1,16 @@
+using System.Diagnostics;
+using Azure.Data.Tables;
+using Azure.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Configuration;
-using System.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
-using Azure.Data.Tables;
-using Azure.Identity;
-using Orleans.Runtime.Placement;
 
 namespace Tester.Forwarding
 {
@@ -18,7 +21,12 @@ namespace Tester.Forwarding
     {
         public const int NumberOfSilos = 2;
 
-        public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(10);
+        public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(7);
+        private static readonly TimeSpan PendingRequestTimerDueTime = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan StuckActivationTimerDueTime = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan TimerReadinessTimeout = TimeSpan.FromSeconds(5);
+
         internal class SiloBuilderConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
@@ -27,6 +35,14 @@ namespace Tester.Forwarding
                     .Configure<GrainCollectionOptions>(options =>
                     {
                         options.DeactivationTimeout = DeactivationTimeout;
+                    })
+                    .Configure<SiloMessagingOptions>(options =>
+                    {
+                        options.MaxRequestProcessingTime = DeactivationTimeout;
+                    })
+                    .Configure<HostOptions>(options =>
+                    {
+                        options.ShutdownTimeout = ShutdownTimeout;
                     })
                     .UseAzureStorageClustering(options => options.TableServiceClient = GetTableServiceClient())
                     .ConfigureServices(services => services.AddSingleton<PlacementStrategy, ActivationCountBasedPlacement>())
@@ -86,9 +102,12 @@ namespace Tester.Forwarding
         {
             var grain = await GetTimerRequestGrainOnSecondary();
 
-            var promise = grain.StartAndWaitTimerTick(TimeSpan.FromSeconds(10));
+            var timerCreated = new TaskCompletionSource<GrainTimerEvents.Created>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var subscription = SubscribeToTimerEvent(grain.GetGrainId(), timerCreated);
 
-            await Task.Delay(500);
+            var promise = grain.StartAndWaitTimerTick(PendingRequestTimerDueTime);
+
+            await timerCreated.Task.WaitAsync(TimerReadinessTimeout);
             await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
 
             await promise;
@@ -99,9 +118,12 @@ namespace Tester.Forwarding
         {
             var grain = await GetTimerRequestGrainOnSecondary();
 
+            var timerStarted = new TaskCompletionSource<GrainTimerEvents.TickStart>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var subscription = SubscribeToTimerEvent(grain.GetGrainId(), timerStarted);
+
             await grain.StartStuckTimer(TimeSpan.Zero);
 
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await timerStarted.Task.WaitAsync(TimerReadinessTimeout);
             var stopwatch = Stopwatch.StartNew();
             await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
             stopwatch.Stop();
@@ -113,14 +135,18 @@ namespace Tester.Forwarding
         public async Task SiloGracefulShutdown_StuckActivation()
         {
             var grain = await GetTimerRequestGrainOnSecondary();
-            _ = grain.StartAndWaitTimerTick(TimeSpan.FromMinutes(2));
 
-            await Task.Delay(500);
+            var timerCreated = new TaskCompletionSource<GrainTimerEvents.Created>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var subscription = SubscribeToTimerEvent(grain.GetGrainId(), timerCreated);
+
+            _ = grain.StartAndWaitTimerTick(StuckActivationTimerDueTime);
+
+            await timerCreated.Task.WaitAsync(TimerReadinessTimeout);
             var stopwatch = Stopwatch.StartNew();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(ShutdownTimeout + TimeSpan.FromSeconds(5));
             await HostedCluster.SecondarySilos.First().StopSiloAsync(cts.Token);
             stopwatch.Stop();
-            Assert.True(stopwatch.Elapsed < TimeSpan.FromMinutes(1));
+            Assert.True(stopwatch.Elapsed < ShutdownTimeout + TimeSpan.FromSeconds(5));
         }
 
         private async Task<ILongRunningTaskGrain<T>> GetLongRunningTaskGrainOnSecondary<T>()
@@ -150,6 +176,38 @@ namespace Tester.Forwarding
                     return grain;
                 }
             }
+        }
+
+        private static IDisposable SubscribeToTimerEvent<TEvent>(GrainId grainId, TaskCompletionSource<TEvent> completion)
+            where TEvent : GrainTimerEvents.TimerEvent
+        {
+            return GrainTimerEvents.AllEvents.Subscribe(new TimerEventObserver(evt =>
+            {
+                if (evt is TEvent typedEvent && typedEvent.GrainContext.GrainId.Equals(grainId))
+                {
+                    completion.TrySetResult(typedEvent);
+                }
+            }));
+        }
+
+        private sealed class TimerEventObserver : IObserver<GrainTimerEvents.TimerEvent>
+        {
+            private readonly Action<GrainTimerEvents.TimerEvent> _onNext;
+
+            public TimerEventObserver(Action<GrainTimerEvents.TimerEvent> onNext)
+            {
+                _onNext = onNext;
+            }
+
+            public void OnCompleted()
+            {
+            }
+
+            public void OnError(Exception error)
+            {
+            }
+
+            public void OnNext(GrainTimerEvents.TimerEvent value) => _onNext(value);
         }
     }
 }
