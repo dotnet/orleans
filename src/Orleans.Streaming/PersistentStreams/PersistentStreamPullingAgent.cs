@@ -543,40 +543,29 @@ namespace Orleans.Streams
 
             LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
 
-            var streamGroups =
+            foreach (var group in
                 multiBatch
                 .Where(m => m != null)
-                .GroupBy(container => container.StreamId)
-                .Select(group => (StreamId: new QualifiedStreamId(queueAdapter.Name, group.Key), StartToken: group.First().SequenceToken))
-                .ToList();
-
-            foreach (var group in streamGroups)
+                .GroupBy(container => container.StreamId))
             {
                 if (IsShutdown || cancellationToken.IsCancellationRequested)
                 {
                     return false;
                 }
 
-                if (!pubSubCache.ContainsKey(group.StreamId))
-                {
-                    // Start all cold-stream registrations before waking any existing cursors so
-                    // delivery-based checkpointing sees pending streams before progress advances.
-                    RegisterStream(group.StreamId, group.StartToken, now);
-                }
-            }
-
-            foreach (var group in streamGroups)
-            {
-                if (IsShutdown || cancellationToken.IsCancellationRequested)
-                {
-                    return false;
-                }
-
+                var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
+                StreamSequenceToken startToken = group.First().SequenceToken;
                 StreamConsumerCollection streamData;
-                if (pubSubCache.TryGetValue(group.StreamId, out streamData))
+                if (pubSubCache.TryGetValue(streamId, out streamData))
                 {
                     streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, group.StartToken);
+                    StartInactiveCursors(streamData, startToken);
+                }
+                else
+                {
+                    // Run registration in the background so that cold-stream pubsub
+                    // calls do not stall message delivery for other streams on the same queue.
+                    RegisterStream(streamId, startToken, now);
                 }
             }
 
