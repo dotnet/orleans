@@ -20,6 +20,7 @@ using Orleans.TestingHost.InMemoryTransport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
 using Orleans.Statistics;
+using Orleans.Runtime.TestHooks;
 
 #nullable disable
 namespace Orleans.TestingHost
@@ -421,8 +422,9 @@ namespace Orleans.TestingHost
             var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
             var activeSilos = GetActiveSilos().ToArray();
+            var testHooks = activeSilos.Select(GetTestHooks).ToArray();
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
-            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAsync(this.InternalClient, activeSilos, stabilizationTime))
+            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAsync(activeSilos, testHooks, stabilizationTime))
             {
                 WriteLog("WaitForLivenessToStabilize observed a stable active silo view");
             }
@@ -430,6 +432,16 @@ namespace Orleans.TestingHost
             {
                 WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
             }
+        }
+
+        private ITestHooks GetTestHooks(SiloHandle silo)
+        {
+            if (silo is InProcessSiloHandle inProcessSilo)
+            {
+                return inProcessSilo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>();
+            }
+
+            return this.InternalClient.GetTestHooks(silo);
         }
 
         /// <summary>
