@@ -656,9 +656,11 @@ public static class StreamingEvents
         }
     }
 
-    internal static void EmitQueueChange(string streamProviderName, SiloAddress? siloAddress, HashSet<QueueId> oldQueues, HashSet<QueueId> newQueues, IStreamQueueBalancer queueBalancer)
+    internal static bool IsBalancerChangedEnabled() => Listener.IsEnabled(nameof(BalancerChanged));
+
+    internal static void EmitQueueChange(string streamProviderName, SiloAddress? siloAddress, QueueId[] oldQueues, QueueId[] newQueues, IStreamQueueBalancer queueBalancer)
     {
-        if (!Listener.IsEnabled(nameof(BalancerChanged)))
+        if (!IsBalancerChangedEnabled())
         {
             return;
         }
@@ -669,15 +671,15 @@ public static class StreamingEvents
         static void Emit(
             string streamProviderName,
             SiloAddress? siloAddress,
-            HashSet<QueueId> oldQueues,
-            HashSet<QueueId> newQueues,
+            QueueId[] oldQueues,
+            QueueId[] newQueues,
             IStreamQueueBalancer queueBalancer)
         {
             Listener.Write(nameof(BalancerChanged), new BalancerChanged(
                 streamProviderName,
                 siloAddress,
-                [.. oldQueues],
-                [.. newQueues],
+                oldQueues,
+                newQueues,
                 queueBalancer));
         }
     }
