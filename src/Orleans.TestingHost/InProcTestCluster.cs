@@ -363,8 +363,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         var activeSilos = GetActiveSilos().ToArray();
+        var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
         WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
-        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAsync(InternalClient, activeSilos, stabilizationTime))
+        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAsync(activeSilos, testHooks, stabilizationTime))
         {
             WriteLog("WaitForLivenessToStabilize observed a stable active silo view");
         }
