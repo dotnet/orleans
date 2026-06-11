@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.Generic;
 using NSubstitute;
 using Orleans.Runtime;
@@ -42,7 +43,7 @@ namespace UnitTests.Runtime
             var placementContext = Substitute.For<IPlacementContext>();
             placementContext.LocalSilo.Returns(localSilo);
             placementContext.LocalSiloStatus.Returns(localSiloStatus);
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(compatibleSilos);
+            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(ImmutableArray.Create(compatibleSilos));
             return placementContext;
         }
 
