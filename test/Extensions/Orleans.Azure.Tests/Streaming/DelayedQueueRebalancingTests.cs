@@ -7,6 +7,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -20,8 +21,9 @@ namespace Tester.AzureUtils.Streaming
 #pragma warning disable 618
         private readonly string adapterType = typeof(PersistentStreamProvider).FullName!;
 #pragma warning restore 618
-        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
-        private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(15);
+        private static readonly TimeSpan AGENT_STATE_TIMEOUT = SILO_IMMATURE_PERIOD + TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan AGENT_STATE_POLL_INTERVAL = TimeSpan.FromMilliseconds(500);
         private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -79,42 +81,58 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_1()
         {
-            await ValidateAgentsState(2, 2, "1");
+            await WaitForAgentsState(2, 2, "1");
 
-            await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);
-
-            await ValidateAgentsState(2, 4, "2");
+            await WaitForAgentsState(2, 4, "2");
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_2()
         {
-            await ValidateAgentsState(2, 2, "1");
+            await WaitForAgentsState(2, 2, "1");
 
             await this.HostedCluster.StartAdditionalSilosAsync(2, true);
-            await ValidateAgentsState(4, 2, "2");
+            await WaitForAgentsState(4, 2, "2");
 
-            await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);
-
-            await ValidateAgentsState(4, 2, "3");
+            // The expected queue distribution is unchanged after maturity, so there is no provider state transition to poll for.
+            await Task.Delay(SILO_IMMATURE_PERIOD);
+            await WaitForAgentsState(4, 2, "3");
         }
 
-        private async Task ValidateAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo, string callContext)
+        private Task WaitForAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo, string callContext)
         {
-            var mgmt = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            return TestingUtils.WaitUntilAsync(
+                assertIsTrue => ValidateAgentsState(numExpectedSilos, numExpectedAgentsPerSilo, callContext, assertIsTrue),
+                AGENT_STATE_TIMEOUT,
+                AGENT_STATE_POLL_INTERVAL);
+        }
 
-            object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
-            Assert.Equal(numExpectedSilos, results.Length);
-
-            // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
-            // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824
-            var numAgents = results.Select(Convert.ToInt32).ToArray();
-            logger.LogInformation("Got back RunningAgentCounts: {RunningAgentCounts}", Utils.EnumerableToString(numAgents));
-            int i = 0;
-            foreach (var agents in numAgents)
+        private async Task<bool> ValidateAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo, string callContext, bool assertIsTrue)
+        {
+            try
             {
-                logger.LogCritical($"Silo {i++} get agents {agents}");
-                Assert.Equal(numExpectedAgentsPerSilo, agents);
+                var mgmt = this.GrainFactory.GetGrain<IManagementGrain>(0);
+
+                object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
+
+                // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
+                // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824
+                var numAgents = results.Select(Convert.ToInt32).ToArray();
+                logger.LogInformation("Call {CallContext}: Got back RunningAgentCounts: {RunningAgentCounts}", callContext, Utils.EnumerableToString(numAgents));
+
+                var isValid = results.Length == numExpectedSilos && numAgents.All(agents => agents == numExpectedAgentsPerSilo);
+                if (!isValid && assertIsTrue)
+                {
+                    Assert.True(
+                        isValid,
+                        $"Call {callContext}: expected {numExpectedSilos} silos with {numExpectedAgentsPerSilo} agents each, got {results.Length} silos with agents {Utils.EnumerableToString(numAgents)}.");
+                }
+
+                return isValid;
+            }
+            catch when (!assertIsTrue)
+            {
+                return false;
             }
         }
     }
