@@ -58,10 +58,6 @@ namespace Orleans.Streaming.EventHubs
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
 
-        // Tracks the purge offset reported by the cache eviction strategy.
-        // Used as a fallback checkpoint when no active subscriptions exist.
-        private long? cachePurgeOffset;
-
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
 
@@ -119,7 +115,7 @@ namespace Orleans.Streaming.EventHubs
                     this.cache.Dispose();
                     this.cache = null;
                 }
-                this.cache = this.cacheFactory(this.settings.Partition, new CachePurgeCheckpointer(this), this.loggerFactory);
+                this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
                 this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
                 string offset = await this.checkpointer.Load();
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
@@ -235,8 +231,7 @@ namespace Orleans.Streaming.EventHubs
             string checkpointOffset;
             if (earliestSubscriptionToken is null)
             {
-                // No active subscriptions — fall back to the cache purge offset.
-                checkpointOffset = cachePurgeOffset?.ToString(CultureInfo.InvariantCulture);
+                return;
             }
             else
             {
@@ -251,17 +246,6 @@ namespace Orleans.Streaming.EventHubs
             if (checkpointOffset is not null)
             {
                 this.checkpointer?.Update(checkpointOffset, utcNow);
-            }
-        }
-
-        private void NotifyCachePurged(string offset)
-        {
-            if (long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset))
-            {
-                if (!cachePurgeOffset.HasValue || parsedOffset > cachePurgeOffset.Value)
-                {
-                    cachePurgeOffset = parsedOffset;
-                }
             }
         }
 
@@ -375,28 +359,6 @@ namespace Orleans.Streaming.EventHubs
         private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
             return new EventHubReceiverProxy(partitionSettings, offset, logger);
-        }
-
-        private sealed class CachePurgeCheckpointer(EventHubAdapterReceiver receiver) : IStreamQueueCheckpointer<string>
-        {
-            public bool CheckpointExists => receiver.checkpointer?.CheckpointExists ?? false;
-
-            public Task<string> Load()
-            {
-                return receiver.checkpointer?.Load() ?? Task.FromResult(EventHubConstants.StartOfStream);
-            }
-
-            public void Update(string offset, DateTime utcNow)
-            {
-                // Only track the purge offset — do not checkpoint directly.
-                // UpdateDeliveryProgress uses this as a fallback when no subscriptions exist.
-                receiver.NotifyCachePurged(offset);
-            }
-
-            public Task FlushAsync(CancellationToken cancellationToken)
-            {
-                return receiver.checkpointer?.FlushAsync(cancellationToken) ?? Task.CompletedTask;
-            }
         }
 
         /// <summary>

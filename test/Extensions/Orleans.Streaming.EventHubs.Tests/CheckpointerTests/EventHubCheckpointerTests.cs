@@ -72,7 +72,15 @@ public class EventHubCheckpointerTests
 
     private sealed class TestEventHubQueueCache : IEventHubQueueCache
     {
+        private readonly IStreamQueueCheckpointer<string> checkpointer;
+
+        public TestEventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer = null)
+        {
+            this.checkpointer = checkpointer;
+        }
+
         public int DisposeCount { get; private set; }
+        public string PurgeOffsetToReport { get; set; }
 
         public int GetMaxAddCount() => 1_000;
 
@@ -92,6 +100,10 @@ public class EventHubCheckpointerTests
 
         public void SignalPurge()
         {
+            if (PurgeOffsetToReport is not null)
+            {
+                checkpointer?.Update(PurgeOffsetToReport, DateTime.UtcNow);
+            }
         }
 
         public void Dispose()
@@ -145,7 +157,7 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, _, _) => cache ?? new TestEventHubQueueCache(),
+            cacheFactory: (_, createdCheckpointer, _) => cache ?? new TestEventHubQueueCache(createdCheckpointer),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -304,52 +316,33 @@ public class EventHubCheckpointerTests
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        // No subscriptions and cachePurgeOffset is null, so there is no checkpoint.
+        // No subscription progress is available; cache purge checkpointing is handled directly by the cache.
         UpdateDeliveryProgressWithNoSubscriptions(receiver);
 
         Assert.Null(checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task CachePurge_UsedAsFallbackWhenNoSubscriptions()
+    public async Task CachePurge_UpdatesCheckpointDirectly()
     {
         var checkpointer = new TestCheckpointer();
-        var receiver = await CreateReceiver(checkpointer);
+        var cache = new TestEventHubQueueCache(checkpointer) { PurgeOffsetToReport = "100" };
+        var receiver = await CreateReceiver(checkpointer, cache);
 
-        // Trigger cache purge via TryPurgeFromCache → SignalPurge → CachePurgeCheckpointer.
-        // Since we can't easily trigger the real cache eviction path, we simulate by calling
-        // TryPurgeFromCache (which calls SignalPurge on the cache) and then testing that
-        // after a purge offset is recorded, UpdateDeliveryProgress with no active subscriptions
-        // falls back to the purge offset.
-        //
-        // The CachePurgeCheckpointer is constructed in Initialize and wraps the real checkpointer.
-        // We verify the fallback by first establishing a purge offset via a delivery progress
-        // call that includes subscriptions, then removing all subscriptions.
+        receiver.TryPurgeFromCache(out _);
 
-        // First: some subscription progress establishes a checkpoint.
-        UpdateDeliveryProgress(receiver, MakeToken(100));
-        Assert.Equal("100", checkpointer.LastOffset);
-
-        // Now with no subscriptions, the purge offset isn't set yet so no checkpoint change.
-        // (cachePurgeOffset is only set via the CachePurgeCheckpointer, which we can't
-        // trigger without a real cache eviction.)
-        UpdateDeliveryProgressWithNoSubscriptions(receiver);
-        // cachePurgeOffset is null → no update, LastOffset stays at previous value.
         Assert.Equal("100", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public async Task ActiveSubscriptions_TakesPriorityOverCachePurge()
+    public async Task DeliveryProgress_UpdatesCheckpoint()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        // With active subscriptions, the watermark comes from subscription tokens,
-        // not from the cache purge offset.
         UpdateDeliveryProgress(receiver, MakeToken(50));
         Assert.Equal("50", checkpointer.LastOffset);
 
-        // Even after progress, subscriptions remain authoritative.
         UpdateDeliveryProgress(receiver, MakeToken(75));
         Assert.Equal("75", checkpointer.LastOffset);
     }
