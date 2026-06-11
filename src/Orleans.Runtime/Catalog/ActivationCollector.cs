@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Statistics;
 
@@ -412,7 +413,12 @@ namespace Orleans.Runtime
                     DeactivationReasonCode.HighMemoryPressure,
                     $"Process memory utilization exceeded the configured limit of '{_grainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
 
-                await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
+                await DeactivateActivationsFromCollector(
+                    candidates,
+                    cancellationToken,
+                    reason,
+                    ActivationCollectionEvents.CollectionSource.MemoryPressure,
+                    ageLimit: default);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -657,7 +663,12 @@ namespace Orleans.Runtime
             if (list is { Count: > 0 })
             {
                 LogCollectActivations(new(list));
-                await DeactivateActivationsFromCollector(list, cancellationToken);
+                await DeactivateActivationsFromCollector(
+                    list,
+                    cancellationToken,
+                    deactivationReason: null,
+                    collectionSource: scanStale ? ActivationCollectionEvents.CollectionSource.Stale : ActivationCollectionEvents.CollectionSource.AgeLimit,
+                    ageLimit: ageLimit);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -666,7 +677,12 @@ namespace Orleans.Runtime
             LogAfterCollection(number, memAfter, _activationCount, list?.Count ?? 0, this, watch.Elapsed);
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken, DeactivationReason? deactivationReason = null)
+        private async Task DeactivateActivationsFromCollector(
+            List<ICollectibleGrainContext> list,
+            CancellationToken cancellationToken,
+            DeactivationReason? deactivationReason,
+            ActivationCollectionEvents.CollectionSource collectionSource,
+            TimeSpan ageLimit)
         {
             LogDeactivateActivationsFromCollector(list.Count);
             _catalogInstruments.ActivationShutdownViaCollection();
@@ -686,6 +702,8 @@ namespace Orleans.Runtime
                 activationData.Deactivate(deactivationReason.Value, cancellationToken);
                 await activationData.Deactivated.ConfigureAwait(false);
             }).WaitAsync(cancellationToken);
+
+            ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason.Value, list);
         }
 
         public void Dispose()

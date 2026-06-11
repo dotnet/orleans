@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using Xunit.Abstractions;
 using Xunit;
 using Orleans.Transactions.Abstractions;
@@ -25,23 +24,37 @@ namespace Orleans.Transactions.Tests
             TimeSpan runTime = TimeSpan.FromSeconds(runTimeInSeconds);
             TransactionRateLoadSheddingOptions options = new TransactionRateLoadSheddingOptions { Enabled = true, Limit = limit };
             ITransactionAgentStatistics statistics = new TransactionAgentStatistics();
-            ITransactionOverloadDetector detector = new TransactionOverloadDetector(statistics, Options.Create(options));
-            Stopwatch sw = Stopwatch.StartNew();
+            var timeProvider = new TestTimeProvider(DateTimeOffset.UtcNow);
+            ITransactionOverloadDetector detector = new TransactionOverloadDetector(statistics, Options.Create(options), timeProvider);
+            var start = timeProvider.GetUtcNow();
+            var attemptInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 10_000);
             long total = 0;
-            while (sw.Elapsed < runTime)
+            while (timeProvider.GetUtcNow() - start < runTime)
             {
                 total++;
                 if (!detector.IsOverloaded())
                 {
                     statistics.TrackTransactionStarted();
                 }
+
+                timeProvider.Advance(attemptInterval);
             }
-            sw.Stop();
-            double averageRate = (statistics.TransactionsStarted * 1000) / sw.ElapsedMilliseconds;
-            this.output.WriteLine($"Average of {averageRate}, with target of {options.Limit}.  Performed {statistics.TransactionsStarted} transactions of a max of {total} in {sw.ElapsedMilliseconds}ms.");
+
+            var elapsed = timeProvider.GetUtcNow() - start;
+            double averageRate = statistics.TransactionsStarted / elapsed.TotalSeconds;
+            this.output.WriteLine($"Average of {averageRate}, with target of {options.Limit}. Performed {statistics.TransactionsStarted} transactions of a max of {total} in {elapsed.TotalMilliseconds} simulated ms.");
             // check to make sure average rate is withing rate +- 10%
             Assert.True(options.Limit * 0.9 <= averageRate);
             Assert.True(options.Limit * 1.1 >= averageRate);
+        }
+
+        private sealed class TestTimeProvider(DateTimeOffset utcNow) : TimeProvider
+        {
+            private DateTimeOffset _utcNow = utcNow;
+
+            public override DateTimeOffset GetUtcNow() => _utcNow;
+
+            public void Advance(TimeSpan timeSpan) => _utcNow += timeSpan;
         }
     }
 }

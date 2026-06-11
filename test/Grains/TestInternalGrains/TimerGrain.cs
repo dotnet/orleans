@@ -8,13 +8,18 @@ using Xunit;
 
 namespace UnitTestGrains
 {
+    internal static class TimerGrainTestConstants
+    {
+        public static readonly TimeSpan CallbackDelay = TimeSpan.FromMilliseconds(50);
+    }
+
     public class TimerGrain : Grain, ITimerGrain
     {
         private bool deactivating;
         private int counter = 0;
         private Dictionary<string, IDisposable> allTimers;
         private IDisposable defaultTimer;
-        private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);
+        private static readonly TimeSpan period = TimeSpan.FromMilliseconds(50);
         private readonly string DefaultTimerName = "DEFAULT TIMER";
         private IGrainContext context;
 
@@ -298,7 +303,7 @@ namespace UnitTestGrains
             CheckRuntimeContext(step);
 
             LogStatus("Before Delay");
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimerGrainTestConstants.CallbackDelay);
             step = "After Delay";
             LogStatus(step);
             CheckRuntimeContext(step);
@@ -445,7 +450,7 @@ namespace UnitTestGrains
             CheckReentrancy(step, expectedTickId);
 
             LogStatus("Before Delay", timerName);
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimerGrainTestConstants.CallbackDelay);
             step = "After Delay";
             LogStatus(step, timerName);
             CheckRuntimeContext(step);
@@ -662,7 +667,7 @@ namespace UnitTestGrains
         private int counter = 0;
         private Dictionary<string, IDisposable> allTimers;
         private IDisposable defaultTimer;
-        private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);
+        private static readonly TimeSpan period = TimeSpan.FromMilliseconds(50);
         private readonly string DefaultTimerName = "DEFAULT TIMER";
         private IGrainContext context;
 
@@ -955,7 +960,7 @@ namespace UnitTestGrains
             CheckRuntimeContext(step);
 
             LogStatus("Before Delay");
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimerGrainTestConstants.CallbackDelay);
             step = "After Delay";
             LogStatus(step);
             CheckRuntimeContext(step);
@@ -1284,7 +1289,7 @@ namespace UnitTestGrains
             CheckReentrancy(step, expectedTickId);
 
             LogStatus("Before Delay", timerName);
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimerGrainTestConstants.CallbackDelay);
             step = "After Delay";
             LogStatus(step, timerName);
             CheckRuntimeContext(step);
