@@ -131,7 +131,7 @@ namespace Orleans.Streams
         {
             managerState = RunState.AgentsStarted;
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
-            var previousQueues = GetCurrentAgentQueues();
+            var previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
 
             LogInfoStarting(myQueues.Count, new(myQueues));
             await AddNewQueues(myQueues, true);
@@ -142,11 +142,10 @@ namespace Orleans.Streams
         public async Task StopAgents()
         {
             managerState = RunState.AgentsStopped;
-            var previousQueues = GetCurrentAgentQueues();
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
             LogInfoStopping(queuesToRemove.Count, new(queuesToRemove));
             await RemoveQueues(queuesToRemove);
-            EmitAgentQueueChange(previousQueues);
+            EmitAgentQueueChange(queuesToRemove);
             LogInfoStopped();
         }
 
@@ -191,7 +190,7 @@ namespace Orleans.Streams
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
             HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
-            HashSet<QueueId> previousQueues = GetCurrentAgentQueues();
+            IReadOnlyCollection<QueueId> previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
             LogInfoExecutingQueueChangeNotification(
                 notificationSeqNumber,
                 currentQueues.Count,
@@ -216,20 +215,39 @@ namespace Orleans.Streams
             }
         }
 
-        private HashSet<QueueId> GetCurrentAgentQueues() => queuesToAgentsMap.Keys.ToHashSet();
+        private QueueId[] CaptureAgentQueuesIfDiagnosticsEnabled() => StreamingEvents.IsBalancerChangedEnabled() ? queuesToAgentsMap.Keys.ToArray() : null;
 
-        private void EmitAgentQueueChange(HashSet<QueueId> previousQueues)
+        private void EmitAgentQueueChange(IReadOnlyCollection<QueueId> previousQueues)
         {
-            if (queueBalancer is null)
+            if (previousQueues is null || !StreamingEvents.IsBalancerChangedEnabled())
             {
                 return;
             }
 
-            var currentQueues = GetCurrentAgentQueues();
-            if (!previousQueues.SetEquals(currentQueues))
+            if (HasSameAgentQueues(previousQueues))
             {
-                StreamingEvents.EmitQueueChange(streamProviderName, Silo, previousQueues, currentQueues, queueBalancer);
+                return;
             }
+
+            StreamingEvents.EmitQueueChange(streamProviderName, Silo, previousQueues as QueueId[] ?? [.. previousQueues], queuesToAgentsMap.Keys.ToArray(), queueBalancer);
+        }
+
+        private bool HasSameAgentQueues(IReadOnlyCollection<QueueId> previousQueues)
+        {
+            if (previousQueues.Count != queuesToAgentsMap.Count)
+            {
+                return false;
+            }
+
+            foreach (var queueId in previousQueues)
+            {
+                if (!queuesToAgentsMap.ContainsKey(queueId))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
