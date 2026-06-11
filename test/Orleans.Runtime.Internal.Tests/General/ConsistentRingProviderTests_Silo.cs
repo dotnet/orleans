@@ -145,7 +145,6 @@ namespace UnitTests.General
             {
                 await VerificationScenario(PickKey(sh.SiloAddress));
             }
-            Thread.Sleep(TimeSpan.FromSeconds(15));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
