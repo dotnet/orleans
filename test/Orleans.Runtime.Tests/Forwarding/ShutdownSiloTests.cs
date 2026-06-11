@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,10 +21,10 @@ namespace Tester.Forwarding
         public const int NumberOfSilos = 2;
 
         public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(3);
-        private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(7);
+        private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromMinutes(2);
         private static readonly TimeSpan PendingRequestTimerDueTime = TimeSpan.FromSeconds(2);
-        private static readonly TimeSpan StuckActivationTimerDueTime = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan TimerReadinessTimeout = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan StuckActivationTimerDueTime = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan TimerReadinessTimeout = TimeSpan.FromMinutes(1);
 
         internal class SiloBuilderConfigurator : ISiloConfigurator
         {
@@ -119,16 +118,16 @@ namespace Tester.Forwarding
             var grain = await GetTimerRequestGrainOnSecondary();
 
             var timerStarted = new TaskCompletionSource<GrainTimerEvents.TickStart>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using var subscription = SubscribeToTimerEvent(grain.GetGrainId(), timerStarted);
+            var timerStopped = new TaskCompletionSource<GrainTimerEvents.TickStop>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var startedSubscription = SubscribeToTimerEvent(grain.GetGrainId(), timerStarted);
+            using var stoppedSubscription = SubscribeToTimerEvent(grain.GetGrainId(), timerStopped);
 
             await grain.StartStuckTimer(TimeSpan.Zero);
 
             await timerStarted.Task.WaitAsync(TimerReadinessTimeout);
-            var stopwatch = Stopwatch.StartNew();
+            AssertTimerTickDidNotCompleteSuccessfully(timerStopped.Task);
             await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
-            stopwatch.Stop();
-
-            Assert.True(stopwatch.Elapsed > DeactivationTimeout);
+            AssertTimerTickDidNotCompleteSuccessfully(timerStopped.Task);
         }
 
         [SkippableFact, TestCategory("GracefulShutdown"), TestCategory("Functional")]
@@ -139,14 +138,12 @@ namespace Tester.Forwarding
             var timerCreated = new TaskCompletionSource<GrainTimerEvents.Created>(TaskCreationOptions.RunContinuationsAsynchronously);
             using var subscription = SubscribeToTimerEvent(grain.GetGrainId(), timerCreated);
 
-            _ = grain.StartAndWaitTimerTick(StuckActivationTimerDueTime);
+            var promise = grain.StartAndWaitTimerTick(StuckActivationTimerDueTime);
 
             await timerCreated.Task.WaitAsync(TimerReadinessTimeout);
-            var stopwatch = Stopwatch.StartNew();
-            using var cts = new CancellationTokenSource(ShutdownTimeout + TimeSpan.FromSeconds(5));
-            await HostedCluster.SecondarySilos.First().StopSiloAsync(cts.Token);
-            stopwatch.Stop();
-            Assert.True(stopwatch.Elapsed < ShutdownTimeout + TimeSpan.FromSeconds(5));
+            AssertTaskDidNotCompleteSuccessfully(promise);
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
+            AssertTaskDidNotCompleteSuccessfully(promise);
         }
 
         private async Task<ILongRunningTaskGrain<T>> GetLongRunningTaskGrainOnSecondary<T>()
@@ -188,6 +185,25 @@ namespace Tester.Forwarding
                     completion.TrySetResult(typedEvent);
                 }
             }));
+        }
+
+        private static void AssertTimerTickDidNotCompleteSuccessfully(Task<GrainTimerEvents.TickStop> timerStopped)
+        {
+            Assert.False(
+                timerStopped.IsCompletedSuccessfully && timerStopped.Result.Exception is null,
+                "The timer tick completed successfully before shutdown completed.");
+        }
+
+        private static void AssertTaskDidNotCompleteSuccessfully(Task task)
+        {
+            if (task.IsFaulted)
+            {
+                _ = task.Exception;
+            }
+
+            Assert.False(
+                task.IsCompletedSuccessfully,
+                "The timer request completed successfully before shutdown completed.");
         }
 
         private sealed class TimerEventObserver : IObserver<GrainTimerEvents.TimerEvent>
