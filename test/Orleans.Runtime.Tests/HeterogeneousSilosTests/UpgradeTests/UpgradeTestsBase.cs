@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using System.Runtime.InteropServices;
 using TestExtensions;
 using TestVersionGrainInterfaces;
@@ -14,8 +15,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     public abstract class UpgradeTestsBase : IDisposable, IAsyncLifetime
     {
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(200);
-
-        private TimeSpan waitDelay;
 
         protected IClusterClient Client => this.cluster.Client;
         protected IManagementGrain ManagementGrain => this.cluster.Client.GetGrain<IManagementGrain>(0);
@@ -174,14 +173,14 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected async Task<SiloHandle> StartSiloV1()
         {
             var handle = await StartSilo(assemblyGrainsV1);
-            await Task.Delay(waitDelay);
+            await WaitForActiveSilosAsync();
             return handle;
         }
 
         protected async Task<SiloHandle> StartSiloV2()
         {
             var handle = await StartSilo(assemblyGrainsV2);
-            await Task.Delay(waitDelay);
+            await WaitForActiveSilosAsync();
             return handle;
         }
 
@@ -202,7 +201,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 builder.Properties[nameof(CompatibilityStrategy)] = this.CompatibilityStrategy.Name;
                 builder.Properties["GrainAssembly"] = grainAssembly.FullName;
                 builder.Properties[StandaloneSiloHandle.ExecutablePathConfigKey] = grainAssembly.FullName;
-                waitDelay = TestCluster.GetLivenessStabilizationTime(new ClusterMembershipOptions(), didKill: false);
 
                 this.cluster = builder.Build();
                 await this.cluster.DeployAsync();
@@ -240,7 +238,26 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             await handle?.StopSiloAsync(true);
             this.deployedSilos.Remove(handle);
-            await Task.Delay(waitDelay);
+            await WaitForActiveSilosAsync();
+        }
+
+        private Task WaitForActiveSilosAsync()
+        {
+            var expectedSiloCount = this.deployedSilos.Count;
+            var timeout = TestCluster.GetLivenessStabilizationTime(new ClusterMembershipOptions(), didKill: false);
+            return TestingUtils.WaitUntilAsync(async assertIsTrue =>
+            {
+                var hosts = await ManagementGrain.GetHosts(false);
+                var activeSiloCount = hosts.Count(host => host.Value == SiloStatus.Active);
+                if (assertIsTrue)
+                {
+                    Assert.Equal(expectedSiloCount, activeSiloCount);
+                }
+
+                return activeSiloCount == expectedSiloCount;
+            },
+            timeout,
+            RefreshInterval);
         }
 
         public void Dispose()
