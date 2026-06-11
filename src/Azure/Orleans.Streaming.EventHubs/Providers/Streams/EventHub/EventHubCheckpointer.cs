@@ -133,7 +133,6 @@ namespace Orleans.Streaming.EventHubs
             // the current checkpoint, keep the checkpoint at the latest safe offset.
             if (!IsAfter(offset, latestOffset))
             {
-                throttleSavesUntilUtc = utcNow + persistInterval;
                 return;
             }
 
