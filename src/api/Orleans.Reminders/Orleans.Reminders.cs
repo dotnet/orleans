@@ -165,6 +165,7 @@ namespace Orleans.Reminders.Diagnostics
     {
         public const string ListenerName = "Orleans.Reminders";
         public static System.IObservable<ReminderEvent> AllEvents { get { throw null; } }
+
         public static System.IObservable<ReminderServiceEvent> ServiceEvents { get { throw null; } }
 
         public sealed partial class LocalReminderScheduleChanged : ReminderEvent

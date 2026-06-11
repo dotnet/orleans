@@ -1480,7 +1480,7 @@ namespace Orleans.Streams
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken token);
         bool IsUnderPressure();
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
-        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
+        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
     }
 
     public partial interface IQueueCacheCursor : System.IDisposable
@@ -1582,9 +1582,10 @@ namespace Orleans.Streams
     public partial interface IStreamQueueCheckpointer<TCheckpoint>
     {
         bool CheckpointExists { get; }
+
+        System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<TCheckpoint> Load();
         void Update(TCheckpoint offset, System.DateTime utcNow);
-        System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { return System.Threading.Tasks.Task.CompletedTask; }
     }
 
     public partial interface IStreamQueueMapper

@@ -249,7 +249,7 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class DefaultEventHubReceiverMonitor : Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor
     {
-        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default(Runtime.OrleansInstruments)!) { }
+        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default!) { }
     }
 
     public static partial class EventDataExtensions
@@ -354,11 +354,11 @@ namespace Orleans.Streaming.EventHubs
 
         public static System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { throw null; }
 
+        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<string> Load() { throw null; }
 
         public void Update(string offset, System.DateTime utcNow) { }
-
-        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public partial class EventHubCheckpointerFactory : Streams.IStreamQueueCheckpointerFactory
@@ -589,12 +589,12 @@ namespace Orleans.Streaming.EventHubs.StatisticMonitors
 {
     public partial class DefaultEventHubBlockPoolMonitor : Providers.Streams.Common.DefaultBlockPoolMonitor
     {
-        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default(Runtime.OrleansInstruments)!) { }
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(Providers.Streams.Common.BlockPoolMonitorDimensions)!, default!) { }
     }
 
     public partial class DefaultEventHubCacheMonitor : Providers.Streams.Common.DefaultCacheMonitor
     {
-        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default(Runtime.OrleansInstruments)!) { }
+        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(Providers.Streams.Common.CacheMonitorDimensions)!, default!) { }
     }
 }
 
