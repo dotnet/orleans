@@ -12,6 +12,7 @@ using System.Threading;
 using Orleans.Streams.Filtering;
 using Orleans.Runtime.Scheduler;
 using System.Diagnostics.Metrics;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
 #nullable disable
 namespace Orleans.Streams
@@ -130,18 +131,22 @@ namespace Orleans.Streams
         {
             managerState = RunState.AgentsStarted;
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
+            var previousQueues = GetCurrentAgentQueues();
 
             LogInfoStarting(myQueues.Count, new(myQueues));
             await AddNewQueues(myQueues, true);
+            EmitAgentQueueChange(previousQueues);
             LogInfoStarted();
         }
 
         public async Task StopAgents()
         {
             managerState = RunState.AgentsStopped;
+            var previousQueues = GetCurrentAgentQueues();
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
             LogInfoStopping(queuesToRemove.Count, new(queuesToRemove));
             await RemoveQueues(queuesToRemove);
+            EmitAgentQueueChange(previousQueues);
             LogInfoStopped();
         }
 
@@ -186,6 +191,7 @@ namespace Orleans.Streams
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
             HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
+            HashSet<QueueId> previousQueues = GetCurrentAgentQueues();
             LogInfoExecutingQueueChangeNotification(
                 notificationSeqNumber,
                 currentQueues.Count,
@@ -202,10 +208,27 @@ namespace Orleans.Streams
             }
             finally
             {
+                EmitAgentQueueChange(previousQueues);
                 LogInfoDoneExecutingQueueChangeNotification(
                     notificationSeqNumber,
                     NumberRunningAgents,
                     new(queuesToAgentsMap.Keys));
+            }
+        }
+
+        private HashSet<QueueId> GetCurrentAgentQueues() => queuesToAgentsMap.Keys.ToHashSet();
+
+        private void EmitAgentQueueChange(HashSet<QueueId> previousQueues)
+        {
+            if (queueBalancer is null)
+            {
+                return;
+            }
+
+            var currentQueues = GetCurrentAgentQueues();
+            if (!previousQueues.SetEquals(currentQueues))
+            {
+                StreamingEvents.EmitQueueChange(streamProviderName, Silo, previousQueues, currentQueues, queueBalancer);
             }
         }
 
