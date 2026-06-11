@@ -362,9 +362,16 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-        await Task.Delay(stabilizationTime);
-        WriteLog("WaitForLivenessToStabilize is done sleeping");
+        var activeSilos = GetActiveSilos().ToArray();
+        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
+        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAsync(InternalClient, activeSilos, stabilizationTime))
+        {
+            WriteLog("WaitForLivenessToStabilize observed a stable active silo view");
+        }
+        else
+        {
+            WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
+        }
     }
 
     /// <summary>
