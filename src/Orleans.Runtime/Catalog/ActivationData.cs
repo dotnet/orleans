@@ -2001,9 +2001,8 @@ internal sealed partial class ActivationData :
 
                 // If the instance is being deactivated due to a directory failure, we should not unregister it.
                 var isDirectoryFailure = DeactivationReason.ReasonCode is DeactivationReasonCode.DirectoryFailure;
-                var isShuttingDown = DeactivationReason.ReasonCode is DeactivationReasonCode.ShuttingDown;
 
-                if (!migrating && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure && !isShuttingDown)
+                if (!migrating && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure)
                 {
                     // Unregister from directory.
                     // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.
