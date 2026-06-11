@@ -14,6 +14,8 @@ internal static class GatewayEvents
 
     internal static IObservable<GatewayEvent> AllEvents { get; } = new Observable();
 
+    internal static bool IsClientDroppedEnabled() => Listener.IsEnabled(nameof(ClientDropped));
+
     internal abstract class GatewayEvent(SiloAddress siloAddress)
     {
         public readonly SiloAddress SiloAddress = siloAddress;
@@ -31,7 +33,7 @@ internal static class GatewayEvents
 
     internal static void EmitClientDropped(SiloAddress siloAddress, GrainId clientId, TimeSpan disconnectedDuration)
     {
-        if (!Listener.IsEnabled(nameof(ClientDropped)))
+        if (!IsClientDroppedEnabled())
         {
             return;
         }

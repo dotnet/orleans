@@ -229,6 +229,7 @@ namespace Orleans.Runtime.Messaging
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.
         internal void DropDisconnectedClients()
         {
+            var trackDroppedClients = GatewayEvents.IsClientDroppedEnabled();
             List<(GrainId ClientId, TimeSpan DisconnectedDuration)> droppedClients = null;
             foreach (var kv in clients)
             {
@@ -245,8 +246,11 @@ namespace Orleans.Runtime.Messaging
                             {
                                 // Reject all pending messages from the client.
                                 client.Drop();
-                                droppedClients ??= [];
-                                droppedClients.Add((kv.Key.GrainId, disconnectedDuration));
+                                if (trackDroppedClients)
+                                {
+                                    droppedClients ??= [];
+                                    droppedClients.Add((kv.Key.GrainId, disconnectedDuration));
+                                }
                             }
 
                             clientsCollectionVersion++;
