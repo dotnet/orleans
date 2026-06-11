@@ -43,8 +43,6 @@ namespace Orleans.Runtime.MembershipService
 
         private readonly Task _suspectOrKillsListTask;
         private readonly Channel<SuspectOrKillRequest> _trySuspectOrKillChannel = Channel.CreateBounded<SuspectOrKillRequest>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest });
-        private readonly AsyncEnumerable<SuspectOrKillRequestCompletion> _suspectOrKillRequestCompletions;
-        private long _suspectOrKillRequestCompletionSequence;
 
         private MembershipTableSnapshot snapshot;
 
@@ -74,10 +72,6 @@ namespace Orleans.Runtime.MembershipService
                 initialValue: this.snapshot,
                 updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
                 onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
-            this._suspectOrKillRequestCompletions = new AsyncEnumerable<SuspectOrKillRequestCompletion>(
-                initialValue: default,
-                updateValidator: (previous, proposed) => proposed.SequenceNumber > previous.SequenceNumber,
-                onPublished: _ => { });
 
             this.membershipUpdateTimer = timerFactory.Create(
                 this.clusterMembershipOptions.TableRefreshTimeout,
@@ -91,8 +85,6 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableSnapshot MembershipTableSnapshot => this.snapshot;
 
         public IAsyncEnumerable<MembershipTableSnapshot> MembershipTableUpdates => this.updates;
-
-        internal IAsyncEnumerable<SuspectOrKillRequestCompletion> TestingSuspectOrKillRequestCompletions => this._suspectOrKillRequestCompletions;
 
         public SiloStatus CurrentStatus { get; private set; } = SiloStatus.Created;
 
@@ -613,26 +605,11 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        internal enum SuspectOrKillRequestType
-        {
-            Unknown = 0,
-            SuspectOrKill,
-            Kill
-        }
-
-        internal readonly record struct SuspectOrKillRequestCompletion(
-            long SequenceNumber,
-            SiloAddress? SiloAddress,
-            SiloAddress? OtherSilo,
-            SuspectOrKillRequestType RequestType,
-            bool Success,
-            Exception? Exception);
-
         private class SuspectOrKillRequest
         {
             public required SiloAddress SiloAddress { get; init; }
             public SiloAddress? OtherSilo { get; init; }
-            public required SuspectOrKillRequestType Type { get; init; }
+            public required MembershipEvents.SuspectOrKillRequestType Type { get; init; }
             public TaskCompletionSource? Completion { get; init; }
 
             public static SuspectOrKillRequest CreateKillRequest(SiloAddress silo)
@@ -640,7 +617,7 @@ namespace Orleans.Runtime.MembershipService
                 return new SuspectOrKillRequest
                 {
                     SiloAddress = silo,
-                    Type = SuspectOrKillRequestType.Kill
+                    Type = MembershipEvents.SuspectOrKillRequestType.Kill
                 };
             }
 
@@ -650,7 +627,7 @@ namespace Orleans.Runtime.MembershipService
                 var request = new SuspectOrKillRequest
                 {
                     SiloAddress = silo,
-                    Type = SuspectOrKillRequestType.Kill,
+                    Type = MembershipEvents.SuspectOrKillRequestType.Kill,
                     Completion = completion
                 };
                 return (request, completion.Task);
@@ -662,7 +639,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     SiloAddress = silo,
                     OtherSilo = otherSilo,
-                    Type = SuspectOrKillRequestType.SuspectOrKill
+                    Type = MembershipEvents.SuspectOrKillRequestType.SuspectOrKill
                 };
             }
         }
@@ -696,10 +673,10 @@ namespace Orleans.Runtime.MembershipService
                     {
                         switch (request.Type)
                         {
-                            case SuspectOrKillRequestType.Kill:
+                            case MembershipEvents.SuspectOrKillRequestType.Kill:
                                 success = await InnerTryKill(request.SiloAddress, _shutdownCts.Token);
                                 break;
-                            case SuspectOrKillRequestType.SuspectOrKill:
+                            case MembershipEvents.SuspectOrKillRequestType.SuspectOrKill:
                                 success = await InnerTryToSuspectOrKill(request.SiloAddress, request.OtherSilo, _shutdownCts.Token);
                                 break;
                         }
@@ -734,13 +711,13 @@ namespace Orleans.Runtime.MembershipService
 
         private void PublishSuspectOrKillRequestCompletion(SuspectOrKillRequest request, bool success, Exception? exception)
         {
-            this._suspectOrKillRequestCompletions.TryPublish(new SuspectOrKillRequestCompletion(
-                Interlocked.Increment(ref this._suspectOrKillRequestCompletionSequence),
+            MembershipEvents.EmitSuspectOrKillRequestCompleted(
+                this.myAddress,
                 request.SiloAddress,
                 request.OtherSilo,
                 request.Type,
                 success,
-                exception));
+                exception);
         }
 
         private async Task<bool> InnerTryKill(SiloAddress silo, CancellationToken cancellationToken)
@@ -949,7 +926,6 @@ namespace Orleans.Runtime.MembershipService
         public void Dispose()
         {
             this.updates.Dispose();
-            this._suspectOrKillRequestCompletions.Dispose();
             this.membershipUpdateTimer.Dispose();
             _shutdownCts.Dispose();
         }

@@ -11,7 +11,7 @@ namespace UnitTests.Diagnostics;
 public class MembershipEventsTests
 {
     [Fact, TestCategory("BVT")]
-    public void EmitChanges_EmitsViewChangedOnly()
+    public void EmitViewChanged_EmitsViewChanged()
     {
         using var observer = new Observer(MembershipEvents.AllEvents);
         var observerSilo = CreateSiloAddress(11111, 1);
@@ -24,6 +24,33 @@ public class MembershipEventsTests
         var typed = Assert.IsType<MembershipEvents.ViewChanged>(viewChanged);
         Assert.Same(snapshot, typed.Snapshot);
         Assert.Same(observerSilo, typed.ObserverSiloAddress);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void EmitSuspectOrKillRequestCompleted_EmitsCompletion()
+    {
+        using var observer = new Observer(MembershipEvents.AllEvents);
+        var observerSilo = CreateSiloAddress(11121, 5);
+        var subjectSilo = CreateSiloAddress(11122, 6);
+        var otherSilo = CreateSiloAddress(11123, 7);
+        var exception = new InvalidOperationException("failed");
+
+        MembershipEvents.EmitSuspectOrKillRequestCompleted(
+            observerSilo,
+            subjectSilo,
+            otherSilo,
+            MembershipEvents.SuspectOrKillRequestType.SuspectOrKill,
+            success: false,
+            exception: exception);
+
+        var completed = Assert.Single(observer.Events);
+        var typed = Assert.IsType<MembershipEvents.SuspectOrKillRequestCompleted>(completed);
+        Assert.Same(observerSilo, typed.ObserverSiloAddress);
+        Assert.Same(subjectSilo, typed.SiloAddress);
+        Assert.Same(otherSilo, typed.OtherSiloAddress);
+        Assert.Equal(MembershipEvents.SuspectOrKillRequestType.SuspectOrKill, typed.RequestType);
+        Assert.False(typed.Success);
+        Assert.Same(exception, typed.Exception);
     }
 
     [Fact, TestCategory("BVT")]

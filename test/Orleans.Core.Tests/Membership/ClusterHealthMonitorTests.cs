@@ -4,7 +4,9 @@ using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime.MembershipService;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -217,6 +219,7 @@ namespace NonSilo.Tests.Membership
             }
 
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
             var probeCalls = new ConcurrentQueue<(SiloAddress Target, int ProbeNumber, bool IsIndirect)>();
             this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
             {
@@ -343,11 +346,15 @@ namespace NonSilo.Tests.Membership
                 if (expectedMissedProbes >= clusterMembershipOptions.NumMissedProbesLimit)
                 {
                     var expectDead = (clusterMembershipOptions.NumVotesForDeathDeclaration <= 2 && enableIndirectProbes) || numVotesForDeathDeclaration == 1;
-                    await WaitForMembershipSnapshot(testRig.Manager, snapshot =>
+                    await WaitForMembershipSnapshot(membershipEvents, snapshot =>
                     {
                         return monitoredSilos.All(siloMonitor =>
                         {
-                            var entry = snapshot.Entries[siloMonitor.TargetSiloAddress];
+                            if (!snapshot.Entries.TryGetValue(siloMonitor.TargetSiloAddress, out var entry))
+                            {
+                                return false;
+                            }
+
                             var votes = entry.GetFreshVotes(now.UtcDateTime, clusterMembershipOptions.DeathVoteExpirationTimeout);
                             return votes.Any(vote => vote.Item1.Equals(localSiloDetails.SiloAddress)) && (!expectDead || entry.Status == SiloStatus.Dead);
                         });
@@ -450,6 +457,7 @@ namespace NonSilo.Tests.Membership
             }
 
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             var otherSilos = new[]
             {
@@ -535,7 +543,7 @@ namespace NonSilo.Tests.Membership
 
             if (evictWhenMaxJoinAttemptTimeExceeded)
             {
-                await WaitForMembershipSnapshot(testRig.Manager, snapshot =>
+                await WaitForMembershipSnapshot(membershipEvents, snapshot =>
                 {
                     return snapshot.Entries.TryGetValue(Silo(joiningSilo), out var joining)
                         && joining.Status == SiloStatus.Dead
@@ -600,24 +608,14 @@ namespace NonSilo.Tests.Membership
             Assert.True(maxTimeout > 0);
         }
 
-        private static async Task<MembershipTableSnapshot> WaitForMembershipSnapshot(MembershipTableManager manager, Func<MembershipTableSnapshot, bool> condition)
+        private static async Task<MembershipTableSnapshot> WaitForMembershipSnapshot(DiagnosticEventCollector membershipEvents, Func<MembershipTableSnapshot, bool> condition)
         {
-            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(40));
-            try
-            {
-                await foreach (var snapshot in manager.MembershipTableUpdates.WithCancellation(cancellation.Token))
-                {
-                    if (condition(snapshot))
-                    {
-                        return snapshot;
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-            {
-            }
+            var diagnosticEvent = await membershipEvents.WaitForEventAsync(
+                nameof(MembershipEvents.ViewChanged),
+                evt => evt.Payload is MembershipEvents.ViewChanged viewChanged && condition(viewChanged.Snapshot),
+                TimeSpan.FromSeconds(40));
 
-            throw new TimeoutException("Timed out waiting for a matching membership update.");
+            return Assert.IsType<MembershipEvents.ViewChanged>(diagnosticEvent.Payload).Snapshot;
         }
 
         private async Task StopLifecycle(CancellationToken cancellation = default)

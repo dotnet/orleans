@@ -53,6 +53,75 @@ internal static class MembershipEvents
         public readonly SiloAddress? ObserverSiloAddress = observerSiloAddress;
     }
 
+    /// <summary>
+    /// The type of suspect or kill request.
+    /// </summary>
+    public enum SuspectOrKillRequestType
+    {
+        /// <summary>
+        /// Unknown request type.
+        /// </summary>
+        Unknown = 0,
+
+        /// <summary>
+        /// A request to suspect a silo or declare it dead.
+        /// </summary>
+        SuspectOrKill,
+
+        /// <summary>
+        /// A request to declare a silo dead.
+        /// </summary>
+        Kill
+    }
+
+    /// <summary>
+    /// Event payload for when a suspect or kill request completes.
+    /// </summary>
+    /// <param name="observerSiloAddress">The silo which processed the request.</param>
+    /// <param name="siloAddress">The silo targeted by the request.</param>
+    /// <param name="otherSiloAddress">The other silo associated with the request, if any.</param>
+    /// <param name="requestType">The request type.</param>
+    /// <param name="success">Whether the request completed successfully.</param>
+    /// <param name="exception">The exception thrown by the request, if any.</param>
+    public sealed class SuspectOrKillRequestCompleted(
+        SiloAddress observerSiloAddress,
+        SiloAddress siloAddress,
+        SiloAddress? otherSiloAddress,
+        SuspectOrKillRequestType requestType,
+        bool success,
+        Exception? exception) : MembershipEvent
+    {
+        /// <summary>
+        /// The silo which processed the request.
+        /// </summary>
+        public readonly SiloAddress ObserverSiloAddress = observerSiloAddress;
+
+        /// <summary>
+        /// The silo targeted by the request.
+        /// </summary>
+        public readonly SiloAddress SiloAddress = siloAddress;
+
+        /// <summary>
+        /// The other silo associated with the request, if any.
+        /// </summary>
+        public readonly SiloAddress? OtherSiloAddress = otherSiloAddress;
+
+        /// <summary>
+        /// The request type.
+        /// </summary>
+        public readonly SuspectOrKillRequestType RequestType = requestType;
+
+        /// <summary>
+        /// Whether the request completed successfully.
+        /// </summary>
+        public readonly bool Success = success;
+
+        /// <summary>
+        /// The exception thrown by the request, if any.
+        /// </summary>
+        public readonly Exception? Exception = exception;
+    }
+
     internal static void EmitViewChanged(MembershipTableSnapshot newSnapshot, SiloAddress observerAddress)
     {
         if (!Listener.IsEnabled(nameof(ViewChanged)))
@@ -68,6 +137,40 @@ internal static class MembershipEvents
             Listener.Write(nameof(ViewChanged), new ViewChanged(
                 newSnapshot,
                 observerAddress));
+        }
+    }
+
+    internal static void EmitSuspectOrKillRequestCompleted(
+        SiloAddress observerSiloAddress,
+        SiloAddress siloAddress,
+        SiloAddress? otherSiloAddress,
+        SuspectOrKillRequestType requestType,
+        bool success,
+        Exception? exception)
+    {
+        if (!Listener.IsEnabled(nameof(SuspectOrKillRequestCompleted)))
+        {
+            return;
+        }
+
+        Emit(observerSiloAddress, siloAddress, otherSiloAddress, requestType, success, exception);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(
+            SiloAddress observerSiloAddress,
+            SiloAddress siloAddress,
+            SiloAddress? otherSiloAddress,
+            SuspectOrKillRequestType requestType,
+            bool success,
+            Exception? exception)
+        {
+            Listener.Write(nameof(SuspectOrKillRequestCompleted), new SuspectOrKillRequestCompleted(
+                observerSiloAddress,
+                siloAddress,
+                otherSiloAddress,
+                requestType,
+                success,
+                exception));
         }
     }
 

@@ -1,15 +1,17 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Runtime.MembershipService;
-using Xunit;
-using NSubstitute;
-using Orleans.Runtime;
-using Orleans;
-using Xunit.Abstractions;
-using TestExtensions;
-using System.Collections.Concurrent;
 using NonSilo.Tests.Utilities;
+using NSubstitute;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
+using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
+using Orleans.TestingHost.Diagnostics;
+using TestExtensions;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {
@@ -450,6 +452,7 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             // Mark the silo as dead
             while (true)
@@ -462,7 +465,7 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             var victim = otherSilos.First().SiloAddress;
-            var completion = WaitForSuspectOrKillCompletion(manager, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
@@ -526,9 +529,10 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             var victim = otherSilos.First().SiloAddress;
-            var completion = WaitForSuspectOrKillCompletion(manager, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
@@ -642,10 +646,11 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             // Multiple votes from the same node should not result in the node being declared dead.
             var victim = otherSilos.First().SiloAddress;
-            var completions = WaitForSuspectOrKillCompletions(manager, victim, expectedCount: 3);
+            var completions = WaitForSuspectOrKillCompletions(membershipEvents, victim, expectedCount: 3);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
@@ -663,7 +668,7 @@ namespace NonSilo.Tests.Membership
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
-            var completion = WaitForSuspectOrKillCompletion(manager, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
@@ -683,7 +688,7 @@ namespace NonSilo.Tests.Membership
             }
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
-            completion = WaitForSuspectOrKillCompletion(manager, victim);
+            completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
             Assert.False((await completion).Success);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
@@ -763,55 +768,36 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static async Task<MembershipTableManager.SuspectOrKillRequestCompletion> WaitForSuspectOrKillCompletion(MembershipTableManager manager, SiloAddress silo)
+        private static async Task<MembershipEvents.SuspectOrKillRequestCompleted> WaitForSuspectOrKillCompletion(DiagnosticEventCollector membershipEvents, SiloAddress silo)
         {
-            var completions = await WaitForSuspectOrKillCompletions(manager, silo, expectedCount: 1);
+            var completions = await WaitForSuspectOrKillCompletions(membershipEvents, silo, expectedCount: 1);
             return completions[0];
         }
 
-        private static async Task<List<MembershipTableManager.SuspectOrKillRequestCompletion>> WaitForSuspectOrKillCompletions(
-            MembershipTableManager manager,
+        private static async Task<List<MembershipEvents.SuspectOrKillRequestCompleted>> WaitForSuspectOrKillCompletions(
+            DiagnosticEventCollector membershipEvents,
             SiloAddress silo,
             int expectedCount)
         {
             Assert.True(expectedCount > 0);
 
-            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(40));
-            await using var enumerator = manager.TestingSuspectOrKillRequestCompletions.GetAsyncEnumerator(cancellation.Token);
-            var completions = new List<MembershipTableManager.SuspectOrKillRequestCompletion>(expectedCount);
+            membershipEvents.Clear();
+            var completions = new List<MembershipEvents.SuspectOrKillRequestCompleted>(expectedCount);
 
-            try
+            while (completions.Count < expectedCount)
             {
-                if (!await enumerator.MoveNextAsync())
-                {
-                    throw new TimeoutException("Suspect/kill completion stream ended before the initial item.");
-                }
+                var diagnosticEvent = await membershipEvents.WaitForEventAsync(
+                    nameof(MembershipEvents.SuspectOrKillRequestCompleted),
+                    evt => evt.Payload is MembershipEvents.SuspectOrKillRequestCompleted completed
+                        && completed.RequestType == MembershipEvents.SuspectOrKillRequestType.SuspectOrKill
+                        && completed.SiloAddress.Equals(silo)
+                        && !completions.Contains(completed),
+                    TimeSpan.FromSeconds(40));
 
-                var startSequence = enumerator.Current.SequenceNumber;
-                while (await enumerator.MoveNextAsync())
-                {
-                    var completion = enumerator.Current;
-                    if (completion.SequenceNumber <= startSequence)
-                    {
-                        continue;
-                    }
-
-                    if (completion.RequestType == MembershipTableManager.SuspectOrKillRequestType.SuspectOrKill
-                        && completion.SiloAddress?.Equals(silo) == true)
-                    {
-                        completions.Add(completion);
-                        if (completions.Count == expectedCount)
-                        {
-                            return completions;
-                        }
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-            {
+                completions.Add(Assert.IsType<MembershipEvents.SuspectOrKillRequestCompleted>(diagnosticEvent.Payload));
             }
 
-            throw new TimeoutException($"Timed out waiting for {expectedCount} suspect/kill completion(s) for {silo}.");
+            return completions;
         }
 
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime)
