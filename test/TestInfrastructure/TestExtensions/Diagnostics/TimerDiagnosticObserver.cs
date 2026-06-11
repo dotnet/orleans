@@ -18,6 +18,8 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
     private readonly ConcurrentBag<GrainTimerEvents.TickStart> _tickStartEvents = new();
     private readonly ConcurrentBag<GrainTimerEvents.TickStop> _tickStopEvents = new();
     private readonly ConcurrentBag<GrainTimerEvents.Disposed> _disposedEvents = new();
+    private readonly object _changeLock = new();
+    private TaskCompletionSource _changed = CreateCompletionSource();
     private IDisposable? _subscription;
 
     /// <summary>
@@ -65,27 +67,27 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        var existingMatch = _createdEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
-        if (existingMatch is not null)
+        while (true)
         {
-            return existingMatch;
-        }
+            Task changed;
+            lock (_changeLock)
+            {
+                var existingMatch = _createdEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
+                if (existingMatch is not null)
+                {
+                    return existingMatch;
+                }
 
-        while (!cts.Token.IsCancellationRequested)
-        {
+                changed = _changed.Task;
+            }
+
             try
             {
-                await Task.Delay(10, cts.Token);
+                await changed.WaitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
                 break;
-            }
-
-            var match = _createdEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
-            if (match is not null)
-            {
-                return match;
             }
         }
 
@@ -103,27 +105,27 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        var existingMatch = _tickStopEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
-        if (existingMatch is not null)
+        while (true)
         {
-            return existingMatch;
-        }
+            Task changed;
+            lock (_changeLock)
+            {
+                var existingMatch = _tickStopEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
+                if (existingMatch is not null)
+                {
+                    return existingMatch;
+                }
 
-        while (!cts.Token.IsCancellationRequested)
-        {
+                changed = _changed.Task;
+            }
+
             try
             {
-                await Task.Delay(10, cts.Token);
+                await changed.WaitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
                 break;
-            }
-
-            var match = _tickStopEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
-            if (match is not null)
-            {
-                return match;
             }
         }
 
@@ -141,27 +143,27 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        var existingMatch = _tickStopEvents.FirstOrDefault(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
-        if (existingMatch is not null)
+        while (true)
         {
-            return existingMatch;
-        }
+            Task changed;
+            lock (_changeLock)
+            {
+                var existingMatch = _tickStopEvents.FirstOrDefault(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
+                if (existingMatch is not null)
+                {
+                    return existingMatch;
+                }
 
-        while (!cts.Token.IsCancellationRequested)
-        {
+                changed = _changed.Task;
+            }
+
             try
             {
-                await Task.Delay(10, cts.Token);
+                await changed.WaitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
                 break;
-            }
-
-            var match = _tickStopEvents.FirstOrDefault(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
-            if (match is not null)
-            {
-                return match;
             }
         }
 
@@ -179,27 +181,27 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        var existingMatch = _disposedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
-        if (existingMatch is not null)
+        while (true)
         {
-            return existingMatch;
-        }
+            Task changed;
+            lock (_changeLock)
+            {
+                var existingMatch = _disposedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
+                if (existingMatch is not null)
+                {
+                    return existingMatch;
+                }
 
-        while (!cts.Token.IsCancellationRequested)
-        {
+                changed = _changed.Task;
+            }
+
             try
             {
-                await Task.Delay(10, cts.Token);
+                await changed.WaitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
                 break;
-            }
-
-            var match = _disposedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
-            if (match is not null)
-            {
-                return match;
             }
         }
 
@@ -219,17 +221,23 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        while (!cts.Token.IsCancellationRequested)
+        while (true)
         {
-            var currentCount = GetTickCount(grainId);
-            if (currentCount >= expectedCount)
+            Task changed;
+            lock (_changeLock)
             {
-                return;
+                var currentCount = GetTickCount(grainId);
+                if (currentCount >= expectedCount)
+                {
+                    return;
+                }
+
+                changed = _changed.Task;
             }
 
             try
             {
-                await Task.Delay(10, cts.Token);
+                await changed.WaitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -247,6 +255,52 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
     }
 
     /// <summary>
+    /// Waits for a specific number of timer ticks to start on a grain.
+    /// </summary>
+    /// <param name="grainId">The grain ID to wait for.</param>
+    /// <param name="expectedCount">The minimum number of tick starts to wait for.</param>
+    /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
+    /// <returns>A task that completes when the expected count is reached.</returns>
+    /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
+    public async Task WaitForTickStartCountAsync(GrainId grainId, int expectedCount, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
+        using var cts = new CancellationTokenSource(effectiveTimeout);
+
+        while (true)
+        {
+            Task changed;
+            lock (_changeLock)
+            {
+                var currentCount = GetTickStartCount(grainId);
+                if (currentCount >= expectedCount)
+                {
+                    return;
+                }
+
+                changed = _changed.Task;
+            }
+
+            try
+            {
+                await changed.WaitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        var finalCount = GetTickStartCount(grainId);
+        if (finalCount >= expectedCount)
+        {
+            return;
+        }
+
+        throw new TimeoutException($"Timed out waiting for {expectedCount} timer tick starts on grain {grainId}. Current count: {finalCount} after {effectiveTimeout}");
+    }
+
+    /// <summary>
     /// Waits for a specific number of timer ticks to complete on any grain of the specified type.
     /// </summary>
     /// <param name="grainTypeName">The grain type name to match (partial match supported).</param>
@@ -259,17 +313,23 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        while (!cts.Token.IsCancellationRequested)
+        while (true)
         {
-            var currentCount = GetTickCountByGrainType(grainTypeName);
-            if (currentCount >= expectedCount)
+            Task changed;
+            lock (_changeLock)
             {
-                return;
+                var currentCount = GetTickCountByGrainType(grainTypeName);
+                if (currentCount >= expectedCount)
+                {
+                    return;
+                }
+
+                changed = _changed.Task;
             }
 
             try
             {
-                await Task.Delay(10, cts.Token);
+                await changed.WaitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -294,6 +354,16 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
     public int GetTickCount(GrainId grainId)
     {
         return _tickStopEvents.Count(e => e.GrainContext.GrainId == grainId);
+    }
+
+    /// <summary>
+    /// Gets the count of timer tick starts for a specific grain.
+    /// </summary>
+    /// <param name="grainId">The grain ID to filter by.</param>
+    /// <returns>The count of timer tick start events.</returns>
+    public int GetTickStartCount(GrainId grainId)
+    {
+        return _tickStartEvents.Count(e => e.GrainContext.GrainId == grainId);
     }
 
     /// <summary>
@@ -325,6 +395,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         _tickStartEvents.Clear();
         _tickStopEvents.Clear();
         _disposedEvents.Clear();
+        SignalChanged();
     }
 
     void IObserver<GrainTimerEvents.TimerEvent>.OnNext(GrainTimerEvents.TimerEvent value)
@@ -344,6 +415,8 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
                 _disposedEvents.Add(disposed);
                 break;
         }
+
+        SignalChanged();
     }
 
     void IObserver<GrainTimerEvents.TimerEvent>.OnError(Exception error)
@@ -360,6 +433,20 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
     }
 
     private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString()!;
+
+    private static TaskCompletionSource CreateCompletionSource() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private void SignalChanged()
+    {
+        TaskCompletionSource changed;
+        lock (_changeLock)
+        {
+            changed = _changed;
+            _changed = CreateCompletionSource();
+        }
+
+        changed.TrySetResult();
+    }
 }
 
 /// <summary>
@@ -389,6 +476,14 @@ public static class TimerDiagnosticExtensions
     public static Task WaitForTickCountAsync(this TimerDiagnosticObserver observer, IAddressable grain, int expectedCount, TimeSpan? timeout = null)
     {
         return observer.WaitForTickCountAsync(grain.GetGrainId(), expectedCount, timeout);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of timer ticks to start on a grain.
+    /// </summary>
+    public static Task WaitForTickStartCountAsync(this TimerDiagnosticObserver observer, IAddressable grain, int expectedCount, TimeSpan? timeout = null)
+    {
+        return observer.WaitForTickStartCountAsync(grain.GetGrainId(), expectedCount, timeout);
     }
 
     /// <summary>
