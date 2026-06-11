@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime.Internal;
 
 #nullable disable
@@ -23,6 +24,7 @@ namespace Orleans.Runtime.Messaging
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
         private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
+        private readonly SiloAddress siloAddress;
         private readonly SiloAddress gatewayAddress;
         private readonly IAsyncTimer gatewayMaintenanceTimer;
         private readonly Task gatewayMaintenanceTask;
@@ -53,6 +55,7 @@ namespace Orleans.Runtime.Messaging
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             this.clientDropTimeout = messagingOptions.ClientDropTimeout;
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
+            this.siloAddress = siloDetails.SiloAddress;
             this.gatewayAddress = siloDetails.GatewayAddress;
             this.GatewayInstruments = new(orleansInstruments);
             this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance));
@@ -226,6 +229,7 @@ namespace Orleans.Runtime.Messaging
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.
         internal void DropDisconnectedClients()
         {
+            List<(GrainId ClientId, TimeSpan DisconnectedDuration)> droppedClients = null;
             foreach (var kv in clients)
             {
                 if (kv.Value.ReadyToDrop())
@@ -234,18 +238,29 @@ namespace Orleans.Runtime.Messaging
                     {
                         if (clients.TryGetValue(kv.Key, out var client) && client.ReadyToDrop())
                         {
-                            LogInformationGatewayDroppingClient(logger, kv.Key, client.DisconnectedSince);
+                            var disconnectedDuration = client.DisconnectedSince;
+                            LogInformationGatewayDroppingClient(logger, kv.Key, disconnectedDuration);
 
                             if (clients.TryRemove(kv.Key, out _))
                             {
                                 // Reject all pending messages from the client.
                                 client.Drop();
+                                droppedClients ??= [];
+                                droppedClients.Add((kv.Key.GrainId, disconnectedDuration));
                             }
 
                             clientsCollectionVersion++;
                             _messagingInstruments.ConnectedClient.Add(-1);
                         }
                     }
+                }
+            }
+
+            if (droppedClients is not null)
+            {
+                foreach (var droppedClient in droppedClients)
+                {
+                    GatewayEvents.EmitClientDropped(siloAddress, droppedClient.ClientId, droppedClient.DisconnectedDuration);
                 }
             }
         }

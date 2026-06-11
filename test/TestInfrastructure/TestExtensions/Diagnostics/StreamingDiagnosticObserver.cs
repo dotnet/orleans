@@ -252,6 +252,18 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Waits for a specific subscription to be durably removed from a specific stream.
+    /// </summary>
+    public async Task<StreamingEvents.SubscriptionUnregistered> WaitForSubscriptionUnregisteredAsync(StreamId streamId, Guid subscriptionId, string? streamProvider, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.SubscriptionUnregistered>()
+            .FirstAsync(e => MatchesSubscription(e.StreamId, e.SubscriptionId, e.StreamProvider, streamId, subscriptionId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Waits for a specific number of subscriptions to be durably removed from a stream.
     /// </summary>
     public async Task WaitForSubscriptionUnregisteredCountAsync(StreamId streamId, int expectedCount, string? streamProvider, CancellationToken cancellationToken)

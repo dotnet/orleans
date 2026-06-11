@@ -3,6 +3,7 @@ using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
+using Orleans.Runtime.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -26,7 +27,7 @@ namespace UnitTests.StreamingTests
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-
+            private static readonly TimeSpan DeliveryRetryBackoff = TimeSpan.FromMilliseconds(100);
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -45,9 +46,16 @@ namespace UnitTests.StreamingTests
                             {
                                 b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                                 b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                                b.ConfigurePullingAgent(ob => ob.Configure(options => options.MaxEventDeliveryTime = TimeSpan.FromSeconds(2)));
+                                b.ConfigureBackoffProvider((_, _) => new FixedMessageDeliveryBackoffProvider(DeliveryRetryBackoff));
                                 b.UseDynamicClusterConfigDeploymentBalancer();
                             });
                 }
+            }
+
+            private sealed class FixedMessageDeliveryBackoffProvider(TimeSpan delay) : IMessageDeliveryBackoffProvider
+            {
+                public TimeSpan Next(int attempt) => delay;
             }
         }
 
