@@ -4,8 +4,6 @@ using System.Text.RegularExpressions;
 using Azure;
 using Azure.Data.Tables;
 using Azure.Data.Tables.Models;
-using Microsoft.Extensions.Logging;
-using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 //
 // Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambiguous types and build errors.
@@ -222,39 +220,6 @@ namespace Orleans.GrainDirectory.AzureStorage
             return key;
         }
 
-        internal static bool AnalyzeReadException(Exception exc, int iteration, string tableName, ILogger logger)
-        {
-            bool isLastErrorRetriable;
-            var we = exc as WebException;
-            if (we != null)
-            {
-                isLastErrorRetriable = true;
-                LogWarningIntermediateIssue(logger, exc, tableName, we.Status);
-            }
-            else
-            {
-                if (EvaluateException(exc, out var httpStatusCode, out var restStatus, true))
-                {
-                    if (nameof(TableErrorCode.ResourceNotFound).Equals(restStatus))
-                    {
-                        LogDebugDataNotFound(logger, exc, tableName, iteration == 0 ? string.Empty : (" Repeat=" + iteration), httpStatusCode, restStatus);
-                        isLastErrorRetriable = false;
-                    }
-                    else
-                    {
-                        isLastErrorRetriable = IsRetriableHttpError(httpStatusCode, restStatus);
-                        LogWarningIntermediateIssueWithRestStatusCode(logger, exc, tableName, iteration == 0 ? "" : (" Repeat=" + iteration), isLastErrorRetriable, httpStatusCode, restStatus);
-                    }
-                }
-                else
-                {
-                    LogErrorUnexpectedIssue(logger, exc, tableName);
-                    isLastErrorRetriable = false;
-                }
-            }
-            return isLastErrorRetriable;
-        }
-
         internal static string PrintStorageException(Exception exception)
         {
             if (exception is not RequestFailedException storeExc)
@@ -275,32 +240,5 @@ namespace Orleans.GrainDirectory.AzureStorage
             return TableClient.CreateQueryFilter($"((PartitionKey eq {partitionKey}) and (RowKey ge {minRowKey})) and (RowKey le {maxRowKey})");
         }
 
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            EventId = (int)Utilities.ErrorCode.AzureTable_10,
-            Message = "Intermediate issue reading Azure storage table {TableName}: HTTP status code={StatusCode}"
-        )]
-        private static partial void LogWarningIntermediateIssue(ILogger logger, Exception exception, string tableName, WebExceptionStatus statusCode);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            EventId = (int)Utilities.ErrorCode.AzureTable_DataNotFound,
-            Message = "DataNotFound reading Azure storage table {TableName}:{Retry} HTTP status code={StatusCode} REST status code={RESTStatusCode}"
-        )]
-        private static partial void LogDebugDataNotFound(ILogger logger, Exception exception, string tableName, string retry, HttpStatusCode statusCode, string restStatusCode);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            EventId = (int)Utilities.ErrorCode.AzureTable_11,
-            Message = "Intermediate issue reading Azure storage table {TableName}:{Retry} IsRetriable={IsLastErrorRetriable} HTTP status code={StatusCode} REST status code={RestStatusCode}"
-        )]
-        private static partial void LogWarningIntermediateIssueWithRestStatusCode(ILogger logger, Exception exception, string tableName, string retry, bool isLastErrorRetriable, HttpStatusCode statusCode, string restStatusCode);
-
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            EventId = (int)Utilities.ErrorCode.AzureTable_12,
-            Message = "Unexpected issue reading Azure storage table {TableName}"
-        )]
-        private static partial void LogErrorUnexpectedIssue(ILogger logger, Exception exception, string tableName);
     }
 }

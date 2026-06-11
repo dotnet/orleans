@@ -390,6 +390,7 @@ namespace Orleans.Runtime.ReminderService
         {
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
             TimeSpan? overrideDelay = RandomTimeSpan.Next(InitialReadRetryPeriod);
+            int consecutiveFailures = 0;
             while (await listRefreshTimer.NextTick(overrideDelay))
             {
                 try
@@ -409,11 +410,18 @@ namespace Orleans.Runtime.ReminderService
                             listRefreshTimer.Dispose();
                             return;
                     }
+
+                    consecutiveFailures = 0;
                 }
                 catch (Exception exception)
                 {
                     LogWarningReadingReminders(exception);
-                    overrideDelay = RandomTimeSpan.Next(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20));
+
+                    overrideDelay = BackoffComputation.ComputeBackoffDelay(
+                        ++consecutiveFailures,
+                        baseMin: TimeSpan.FromSeconds(10),
+                        baseMax: TimeSpan.FromSeconds(20),
+                        cap: TimeSpan.FromSeconds(80));
                 }
             }
         }

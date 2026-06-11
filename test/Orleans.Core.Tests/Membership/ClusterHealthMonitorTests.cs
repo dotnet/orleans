@@ -340,7 +340,11 @@ namespace NonSilo.Tests.Membership
 
                 while (probeCalls.TryDequeue(out var call)) ;
 
-                testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+                if (expectedMissedProbes >= clusterMembershipOptions.NumMissedProbesLimit)
+                {
+                    Assert.True(testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45)));
+                }
+
                 // Check that probes match the expected missed probes
                 table = await this.membershipTable.ReadAll();
                 foreach (var siloMonitor in monitoredSilos)
@@ -520,7 +524,11 @@ namespace NonSilo.Tests.Membership
 
             await testRig.Manager.Refresh();
 
-            testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+            if (evictWhenMaxJoinAttemptTimeExceeded)
+            {
+                Assert.True(testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45)));
+            }
+
             await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
             
             lastVersion = testRig.TestAccessor.ObservedVersion;

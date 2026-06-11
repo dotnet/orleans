@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
-using Orleans.Internal;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -492,46 +491,22 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                try
+                var results = new List<(T, string)>();
+                await foreach (var value in Table.QueryAsync<T>(filter))
                 {
-                    async Task<List<(T Entity, string ETag)>> executeQueryHandleContinuations()
-                    {
-                        var list = new List<(T, string)>();
-                        var results = Table.QueryAsync<T>(filter);
-                        await foreach (var value in results)
-                        {
-                            list.Add((value, value.ETag.ToString()));
-                        }
-
-                        return list;
-                    }
-
-#if !ORLEANS_TRANSACTIONS
-                    IBackoffProvider backoff = new FixedBackoff(this.StoragePolicyOptions.PauseBetweenOperationRetries);
-
-                    List<(T, string)> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                        counter => executeQueryHandleContinuations(),
-                        this.StoragePolicyOptions.MaxOperationRetries,
-                        (exc, counter) => AzureTableUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
-                        this.StoragePolicyOptions.OperationTimeout,
-                        backoff);
-#else
-                    List<(T, string)> results = await executeQueryHandleContinuations();
-#endif
-                    // Data was read successfully if we got to here
-                    return results;
-
+                    results.Add((value, value.ETag.ToString()));
                 }
-                catch (Exception exc)
+
+                return results;
+            }
+            catch (Exception exc)
+            {
+                if (!AzureTableUtils.TableStorageDataNotFound(exc))
                 {
-                    // Out of retries...
-                    if (!AzureTableUtils.TableStorageDataNotFound(exc))
-                    {
-                        LogWarningReadTable(Logger, exc, TableName);
-                    }
-
-                    throw new OrleansException($"Failed to read Azure Storage table {TableName}", exc);
+                    LogWarningReadTable(Logger, exc, TableName);
                 }
+
+                throw new OrleansException($"Failed to read Azure Storage table {TableName}", exc);
             }
             finally
             {

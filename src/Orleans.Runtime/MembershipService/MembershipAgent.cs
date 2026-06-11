@@ -16,9 +16,9 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal partial class MembershipAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable, MembershipAgent.ITestAccessor
     {
-        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(200);
-        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromMinutes(2);
-        private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromSeconds(64);
+        private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromSeconds(2);
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly IMembershipManager membershipManager;
         private readonly ILocalSiloDetails localSilo;
@@ -63,9 +63,7 @@ namespace Orleans.Runtime.MembershipService
             LogDebugStartingPeriodicMembershipLivenessTimestampUpdates();
             try
             {
-                // jitter for initial
                 TimeSpan? overrideDelayPeriod = RandomTimeSpan.Next(this.clusterMembershipOptions.IAmAliveTablePublishTimeout);
-                var exponentialBackoff = new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP);
                 var runningFailures = 0;
                 while (await this.iAmAliveTimer.NextTick(overrideDelayPeriod) && !this.membershipManager.LocalSiloStatus.IsTerminating())
                 {
@@ -82,8 +80,12 @@ namespace Orleans.Runtime.MembershipService
                     {
                         runningFailures += 1;
                         LogWarningFailedToUpdateTableEntryForThisSilo(exception);
-                        // Retry quickly and then exponentially back off
-                        overrideDelayPeriod = exponentialBackoff.Next(runningFailures);
+
+                        overrideDelayPeriod = BackoffComputation.ComputeBackoffDelay(
+                            runningFailures,
+                            baseMin: EXP_BACKOFF_CONTENTION_MIN,
+                            baseMax: EXP_BACKOFF_CONTENTION_MIN + EXP_BACKOFF_STEP,
+                            cap: EXP_BACKOFF_CONTENTION_MAX);
                     }
                 }
             }

@@ -21,10 +21,10 @@ namespace Orleans.Runtime.MembershipService
         private const int NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS = -1; // unlimited
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = TimeSpan.FromMilliseconds(1000);
-        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(100);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MAX = TimeSpan.FromMinutes(1);
-        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromMinutes(1);
-        private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromSeconds(64);
+        private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan GossipTimeout = TimeSpan.FromMilliseconds(3000);
         private static readonly string RoleName = CachedTypeResolver.GetName(Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly);
 
@@ -255,9 +255,7 @@ namespace Orleans.Runtime.MembershipService
             LogDebugStartingPeriodicMembershipTableRefreshes(this.log);
             try
             {
-                // jitter for initial
                 TimeSpan? overrideDelayPeriod = RandomTimeSpan.Next(this.clusterMembershipOptions.TableRefreshTimeout);
-                var exponentialBackoff = new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP);
                 var runningFailures = 0;
                 while (await this.membershipUpdateTimer.NextTick(overrideDelayPeriod))
                 {
@@ -267,7 +265,6 @@ namespace Orleans.Runtime.MembershipService
 
                         await this.Refresh();
                         LogTraceRefreshingMembershipTableTook(this.log, stopwatch.Elapsed);
-                        // reset to allow normal refresh period after success
                         overrideDelayPeriod = default;
                         runningFailures = 0;
                     }
@@ -276,8 +273,7 @@ namespace Orleans.Runtime.MembershipService
                         runningFailures += 1;
                         LogWarningFailedToRefreshMembershipTable(this.log, exception, runningFailures);
 
-                        // Retry quickly and then exponentially back off
-                        overrideDelayPeriod = exponentialBackoff.Next(runningFailures);
+                        overrideDelayPeriod = ComputeMembershipBackoffDelay(runningFailures);
                     }
                 }
             }
@@ -290,6 +286,15 @@ namespace Orleans.Runtime.MembershipService
             {
                 LogDebugStoppingPeriodicMembershipTableRefreshes(this.log);
             }
+        }
+
+        internal static TimeSpan ComputeMembershipBackoffDelay(int consecutiveFailures)
+        {
+            return BackoffComputation.ComputeBackoffDelay(
+                consecutiveFailures,
+                baseMin: EXP_BACKOFF_CONTENTION_MIN,
+                baseMax: EXP_BACKOFF_CONTENTION_MIN + EXP_BACKOFF_STEP,
+                cap: EXP_BACKOFF_CONTENTION_MAX);
         }
 
         private static Task<bool> MembershipExecuteWithRetries(
