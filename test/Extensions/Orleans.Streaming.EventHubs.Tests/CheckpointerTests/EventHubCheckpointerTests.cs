@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.EventHubs;
@@ -23,6 +24,7 @@ public class EventHubCheckpointerTests
         public bool CheckpointExists => true;
         public string LastOffset { get; private set; }
         public int UpdateCount { get; private set; }
+        public int FlushCount { get; private set; }
 
         public Task<string> Load() => Task.FromResult("-1");
 
@@ -38,8 +40,9 @@ public class EventHubCheckpointerTests
             UpdateCount++;
         }
 
-        public Task FlushAsync(CancellationToken cancellationToken)
+        public virtual Task FlushAsync(CancellationToken cancellationToken)
         {
+            FlushCount++;
             return Task.CompletedTask;
         }
 
@@ -58,8 +61,19 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class FailingFlushCheckpointer : TestCheckpointer
+    {
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            _ = base.FlushAsync(cancellationToken);
+            throw new InvalidOperationException("Flush failed");
+        }
+    }
+
     private sealed class TestEventHubQueueCache : IEventHubQueueCache
     {
+        public int DisposeCount { get; private set; }
+
         public int GetMaxAddCount() => 1_000;
 
         public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc) => [];
@@ -82,11 +96,14 @@ public class EventHubCheckpointerTests
 
         public void Dispose()
         {
+            DisposeCount++;
         }
     }
 
     private sealed class TestEventHubReceiver : IEventHubReceiver
     {
+        public int CloseCount { get; private set; }
+
         public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
             return Task.FromResult<IEnumerable<EventData>>([]);
@@ -94,6 +111,7 @@ public class EventHubCheckpointerTests
 
         public Task CloseAsync()
         {
+            CloseCount++;
             return Task.CompletedTask;
         }
     }
@@ -113,7 +131,10 @@ public class EventHubCheckpointerTests
         receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
     }
 
-    private static async Task<EventHubAdapterReceiver> CreateReceiver(TestCheckpointer checkpointer)
+    private static async Task<EventHubAdapterReceiver> CreateReceiver(
+        TestCheckpointer checkpointer,
+        TestEventHubQueueCache cache = null,
+        TestEventHubReceiver eventHubReceiver = null)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -124,7 +145,7 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, _, _) => new TestEventHubQueueCache(),
+            cacheFactory: (_, _, _) => cache ?? new TestEventHubQueueCache(),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -135,11 +156,48 @@ public class EventHubCheckpointerTests
                 }),
             loadSheddingOptions: new Orleans.Configuration.LoadSheddingOptions(),
             environmentStatisticsProvider: new Orleans.Statistics.EnvironmentStatisticsProvider(),
-            eventHubReceiverFactory: (_, _, _) => new TestEventHubReceiver());
+            eventHubReceiverFactory: (_, _, _) => eventHubReceiver ?? new TestEventHubReceiver());
 
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         return receiver;
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task Shutdown_DisposesCacheAndClosesReceiver_WhenFlushFails()
+    {
+        var checkpointer = new FailingFlushCheckpointer();
+        var cache = new TestEventHubQueueCache();
+        var eventHubReceiver = new TestEventHubReceiver();
+        var receiver = await CreateReceiver(checkpointer, cache, eventHubReceiver);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => receiver.Shutdown(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(1, checkpointer.FlushCount);
+        Assert.Equal(1, cache.DisposeCount);
+        Assert.Equal(1, eventHubReceiver.CloseCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task FlushBeforeLoad_DoesNotPersistUninitializedOffset()
+    {
+        var constructor = typeof(EventHubCheckpointer).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            new[] { typeof(Orleans.Configuration.AzureTableStreamCheckpointerOptions), typeof(string), typeof(string), typeof(string), typeof(Microsoft.Extensions.Logging.ILoggerFactory) },
+            modifiers: null);
+        Assert.NotNull(constructor);
+
+        var checkpointer = (EventHubCheckpointer)constructor.Invoke(new object[]
+        {
+            new Orleans.Configuration.AzureTableStreamCheckpointerOptions(),
+            "provider",
+            "partition",
+            "service",
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance
+        });
+
+        await checkpointer.FlushAsync(CancellationToken.None);
     }
 
     [Fact, TestCategory("BVT")]

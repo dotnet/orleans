@@ -853,11 +853,9 @@ namespace Orleans.Streams
                                 this.options.MaxEventDeliveryTime,
                                 deliveryBackoffProvider);
 
-                            // Track progress for the periodic delivery scan.
-                            consumerData.LastProcessedToken = nextBatch.ProgressToken;
-
                             if (newToken != null)
                             {
+                                consumerData.LastProcessedToken = newToken.Token;
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
                                 // The handshake token points to an already processed event, we need to advance the cursor to
@@ -865,6 +863,11 @@ namespace Orleans.Streams
                                 newCursor.MoveNext();
                                 consumerData.SafeDisposeCursor(logger);
                                 consumerData.Cursor = newCursor;
+                            }
+                            else
+                            {
+                                // Track progress for the periodic delivery scan.
+                                consumerData.LastProcessedToken = nextBatch.ProgressToken;
                             }
                         }
                     }

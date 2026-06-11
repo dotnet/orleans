@@ -52,7 +52,7 @@ namespace Orleans.Streaming.EventHubs
         private EventHubPartitionCheckpointEntity entity;
         private Task inProgressSave = Task.CompletedTask;
         private DateTime? throttleSavesUntilUtc;
-        private string latestOffset;
+        private string latestOffset = EventHubConstants.StartOfStream;
 
         /// <summary>
         /// Indicates if a checkpoint exists
@@ -115,8 +115,8 @@ namespace Orleans.Streaming.EventHubs
                 entity = results.Entity;
             }
 
-            latestOffset = entity.Offset;
-            return entity.Offset;
+            latestOffset = entity.Offset ?? EventHubConstants.StartOfStream;
+            return latestOffset;
         }
 
         /// <summary>

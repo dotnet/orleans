@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -289,12 +290,21 @@ namespace Orleans.Streaming.EventHubs
 
                 LogInfoStoppingReadingFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
 
-                // Flush the checkpoint before disposing the cache or closing the receiver,
-                // so the latest processed offset is persisted and not replayed on restart.
-                if (this.checkpointer != null)
+                var shutdownExceptions = new List<Exception>();
+
+                try
                 {
-                    using var flushCancellation = timeout == Timeout.InfiniteTimeSpan ? null : new CancellationTokenSource(timeout);
-                    await this.checkpointer.FlushAsync(flushCancellation?.Token ?? CancellationToken.None);
+                    // Flush the checkpoint before disposing the cache or closing the receiver,
+                    // so the latest processed offset is persisted and not replayed on restart.
+                    if (this.checkpointer != null)
+                    {
+                        using var flushCancellation = timeout == Timeout.InfiniteTimeSpan ? null : new CancellationTokenSource(timeout);
+                        await this.checkpointer.FlushAsync(flushCancellation?.Token ?? CancellationToken.None);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    shutdownExceptions.Add(ex);
                 }
 
                 // clear cache and receiver
@@ -304,15 +314,40 @@ namespace Orleans.Streaming.EventHubs
 
                 // start closing receiver
                 Task closeTask = Task.CompletedTask;
-                if (localReceiver != null)
+                try
                 {
-                    closeTask = localReceiver.CloseAsync();
+                    if (localReceiver != null)
+                    {
+                        closeTask = localReceiver.CloseAsync();
+                    }
                 }
+                catch (Exception ex)
+                {
+                    shutdownExceptions.Add(ex);
+                }
+
                 // dispose of cache
-                localCache?.Dispose();
+                try
+                {
+                    localCache?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    shutdownExceptions.Add(ex);
+                }
 
                 // finish return receiver closing task
-                await closeTask;
+                try
+                {
+                    await closeTask;
+                }
+                catch (Exception ex)
+                {
+                    shutdownExceptions.Add(ex);
+                }
+
+                ThrowIfAny(shutdownExceptions);
+
                 watch.Stop();
                 this.monitor?.TrackShutdown(true, watch.Elapsed, null);
             }
@@ -321,6 +356,19 @@ namespace Orleans.Streaming.EventHubs
                 watch.Stop();
                 this.monitor?.TrackShutdown(false, watch.Elapsed, ex);
                 throw;
+            }
+
+            static void ThrowIfAny(List<Exception> exceptions)
+            {
+                if (exceptions.Count == 1)
+                {
+                    ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+                }
+
+                if (exceptions.Count > 1)
+                {
+                    throw new AggregateException(exceptions);
+                }
             }
         }
 
