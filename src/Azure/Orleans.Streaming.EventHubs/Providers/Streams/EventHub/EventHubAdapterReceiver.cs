@@ -221,44 +221,13 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public bool IsUpdateDue(DateTime utcNow)
-        {
-            return this.checkpointer?.IsUpdateDue(utcNow) ?? false;
-        }
-
         public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
         {
-            string checkpointOffset;
-            if (earliestSubscriptionToken is null)
+            if (earliestSubscriptionToken is IEventHubPartitionLocation location
+                && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {
-                return;
+                this.checkpointer?.Update(location.EventHubOffset, utcNow);
             }
-            else
-            {
-                if (!TryGetOffset(earliestSubscriptionToken, out var offset))
-                {
-                    return;
-                }
-
-                checkpointOffset = offset.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (checkpointOffset is not null)
-            {
-                this.checkpointer?.Update(checkpointOffset, utcNow);
-            }
-        }
-
-        private static bool TryGetOffset(StreamSequenceToken token, out long offset)
-        {
-            if (token is IEventHubPartitionLocation location
-                && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out offset))
-            {
-                return true;
-            }
-
-            offset = 0;
-            return false;
         }
 
         public async Task Shutdown(TimeSpan timeout)

@@ -11,7 +11,6 @@ namespace ServiceBus.Tests.CheckpointerTests;
 
 /// <summary>
 /// Tests for EventHub delivery-based checkpointing via pulling-agent progress snapshots.
-/// The pulling agent asks the receiver whether an update is due before computing progress.
 /// </summary>
 [TestCategory("EventHub"), TestCategory("Streaming")]
 public class EventHubCheckpointerTests
@@ -46,19 +45,6 @@ public class EventHubCheckpointerTests
             return Task.CompletedTask;
         }
 
-        public virtual bool IsUpdateDue(DateTime utcNow) => true;
-    }
-
-    private sealed class ThrottledTestCheckpointer : TestCheckpointer
-    {
-        public bool IsUpdateDueResult { get; set; }
-        public int IsUpdateDueCount { get; private set; }
-
-        public override bool IsUpdateDue(DateTime utcNow)
-        {
-            IsUpdateDueCount++;
-            return IsUpdateDueResult;
-        }
     }
 
     private sealed class FailingFlushCheckpointer : TestCheckpointer
@@ -210,21 +196,6 @@ public class EventHubCheckpointerTests
         });
 
         await checkpointer.FlushAsync(CancellationToken.None);
-    }
-
-    [Fact, TestCategory("BVT")]
-    public async Task IsUpdateDue_UsesCheckpointerCadence()
-    {
-        var checkpointer = new ThrottledTestCheckpointer { IsUpdateDueResult = false };
-        var receiver = await CreateReceiver(checkpointer);
-
-        Assert.False(receiver.IsUpdateDue(DateTime.UtcNow));
-        Assert.Equal(1, checkpointer.IsUpdateDueCount);
-
-        checkpointer.IsUpdateDueResult = true;
-
-        Assert.True(receiver.IsUpdateDue(DateTime.UtcNow));
-        Assert.Equal(2, checkpointer.IsUpdateDueCount);
     }
 
     [Fact, TestCategory("BVT")]

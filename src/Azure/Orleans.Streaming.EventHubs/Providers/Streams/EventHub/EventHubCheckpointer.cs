@@ -53,6 +53,8 @@ namespace Orleans.Streaming.EventHubs
         private Task inProgressSave = Task.CompletedTask;
         private DateTime? throttleSavesUntilUtc;
         private string latestOffset = EventHubConstants.StartOfStream;
+        private string persistedOffset = EventHubConstants.StartOfStream;
+        private bool saveRequested;
 
         /// <summary>
         /// Indicates if a checkpoint exists
@@ -116,6 +118,7 @@ namespace Orleans.Streaming.EventHubs
             }
 
             latestOffset = entity.Offset ?? EventHubConstants.StartOfStream;
+            persistedOffset = latestOffset;
             return latestOffset;
         }
 
@@ -138,38 +141,58 @@ namespace Orleans.Streaming.EventHubs
             // Always track the latest safe offset in memory so FlushAsync can persist it.
             latestOffset = offset;
 
-            // If we've saved before but it's not time for another save or the last save operation has not completed, do nothing.
-            if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
+            // If we've saved before but it's not time for another save, do nothing.
+            if (throttleSavesUntilUtc.HasValue && throttleSavesUntilUtc.Value > utcNow)
             {
                 return;
             }
 
             throttleSavesUntilUtc = utcNow + persistInterval;
+            RequestSave();
+        }
+
+        private void RequestSave()
+        {
+            saveRequested = true;
             if (inProgressSave.IsCompleted)
             {
-                entity.Offset = latestOffset;
-                inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+                inProgressSave = SaveRequestedOffsets();
+                inProgressSave.Ignore();
             }
-            else
-            {
-                var previousSave = inProgressSave;
-                inProgressSave = SaveLatestAfter(previousSave);
-            }
-
-            inProgressSave.Ignore();
         }
 
-        bool IStreamQueueCheckpointer<string>.IsUpdateDue(DateTime utcNow)
+        private async Task SaveLatest()
         {
-            return inProgressSave.IsCompleted
-                && (!throttleSavesUntilUtc.HasValue || throttleSavesUntilUtc.Value <= utcNow);
-        }
-
-        private async Task SaveLatestAfter(Task previousSave)
-        {
-            await previousSave;
-            entity.Offset = latestOffset;
+            var offset = latestOffset;
+            entity.Offset = offset;
             await dataManager.UpsertTableEntryAsync(entity);
+            persistedOffset = offset;
+        }
+
+        private async Task SaveRequestedOffsets()
+        {
+            try
+            {
+                while (saveRequested)
+                {
+                    saveRequested = false;
+                    var saveTask = SaveLatest();
+                    await saveTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    if (!saveTask.IsCompletedSuccessfully)
+                    {
+                        if (saveRequested)
+                        {
+                            continue;
+                        }
+
+                        await saveTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    }
+                }
+            }
+            finally
+            {
+                inProgressSave = Task.CompletedTask;
+            }
         }
 
         /// <summary>
@@ -180,10 +203,9 @@ namespace Orleans.Streaming.EventHubs
         public async Task FlushAsync(CancellationToken cancellationToken)
         {
             await inProgressSave.WaitAsync(cancellationToken);
-            if (string.Compare(entity.Offset, latestOffset, StringComparison.Ordinal) != 0)
+            if (string.Compare(persistedOffset, latestOffset, StringComparison.Ordinal) != 0)
             {
-                entity.Offset = latestOffset;
-                inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+                inProgressSave = SaveLatest();
                 await inProgressSave.WaitAsync(cancellationToken);
             }
         }

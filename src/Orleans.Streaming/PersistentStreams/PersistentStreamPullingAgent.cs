@@ -208,7 +208,7 @@ namespace Orleans.Streams
 
             // Final delivery progress scan so the receiver has the latest watermark
             // before FlushAsync persists the checkpoint.
-            NotifyDeliveryProgress(force: true);
+            NotifyDeliveryProgress();
 
             this.queueCache = null;
 
@@ -415,9 +415,6 @@ namespace Orleans.Streams
                 return Task.CompletedTask;
             }
 
-            // Let the cache lazily request delivery progress when its checkpoint cadence elapses.
-            NotifyDeliveryProgress(force: false);
-
             if (!_activePumpTask.IsCompleted)
             {
                 return _activePumpTask;
@@ -600,18 +597,13 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Computes delivery progress when the queue cache is ready for a checkpoint update.
+        /// Computes delivery progress before shutdown so the queue can persist the latest handoff checkpoint.
         /// </summary>
-        private void NotifyDeliveryProgress(bool force)
+        private void NotifyDeliveryProgress()
         {
             if (queueCache is null) return;
 
             var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-            if (!force && !queueCache.IsUpdateDue(utcNow))
-            {
-                return;
-            }
-
             if (TryGetDeliveryProgress(out var earliest))
             {
                 queueCache.UpdateDeliveryProgress(earliest, utcNow);

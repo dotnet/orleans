@@ -35,13 +35,6 @@ namespace Orleans.Streams
         bool IsUnderPressure();
 
         /// <summary>
-        /// Returns <see langword="true"/> if the cache is due for a delivery progress update.
-        /// </summary>
-        /// <param name="utcNow">The current UTC time.</param>
-        /// <returns><see langword="true"/> if an update is due; otherwise, <see langword="false"/>.</returns>
-        bool IsUpdateDue(DateTime utcNow) => true;
-
-        /// <summary>
         /// Updates the cache with the current delivery progress of all active subscriptions.
         /// </summary>
         /// <param name="earliestSubscriptionToken">

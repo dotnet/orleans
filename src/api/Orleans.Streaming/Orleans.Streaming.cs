@@ -1479,7 +1479,6 @@ namespace Orleans.Streams
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken token);
         bool IsUnderPressure();
-        bool IsUpdateDue(System.DateTime utcNow) { return true; }
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
         void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
     }
@@ -1583,10 +1582,8 @@ namespace Orleans.Streams
     public partial interface IStreamQueueCheckpointer<TCheckpoint>
     {
         bool CheckpointExists { get; }
-
         System.Threading.Tasks.Task<TCheckpoint> Load();
         void Update(TCheckpoint offset, System.DateTime utcNow);
-        bool IsUpdateDue(System.DateTime utcNow) { return true; }
         System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { return System.Threading.Tasks.Task.CompletedTask; }
     }
 

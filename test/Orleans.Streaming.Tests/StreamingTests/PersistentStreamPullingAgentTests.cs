@@ -199,8 +199,6 @@ namespace UnitTests.StreamingTests
         private sealed class RecordingQueueCache : IQueueCache
         {
             public int DeliveryProgressCallCount { get; private set; }
-            public int IsUpdateDueCallCount { get; private set; }
-            public bool IsUpdateDueResult { get; set; } = true;
             public List<StreamSequenceToken> DeliveryProgressTokens { get; } = new();
 
             public int GetMaxAddCount() => 1000;
@@ -222,12 +220,6 @@ namespace UnitTests.StreamingTests
 
             public bool IsUnderPressure() => false;
 
-            public bool IsUpdateDue(DateTime utcNow)
-            {
-                IsUpdateDueCallCount++;
-                return IsUpdateDueResult;
-            }
-
             public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
             {
                 DeliveryProgressCallCount++;
@@ -237,7 +229,6 @@ namespace UnitTests.StreamingTests
             public void ClearDeliveryProgress()
             {
                 DeliveryProgressCallCount = 0;
-                IsUpdateDueCallCount = 0;
                 DeliveryProgressTokens.Clear();
             }
         }
@@ -268,8 +259,6 @@ namespace UnitTests.StreamingTests
             }
 
             public bool IsUnderPressure() => false;
-
-            public bool IsUpdateDue(DateTime utcNow) => true;
 
             public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
             {
@@ -360,7 +349,7 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_UsesReturnedHandshakeTokenForDeliveryProgress()
+        public async Task Shutdown_UsesReturnedHandshakeTokenForDeliveryProgress()
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -379,6 +368,7 @@ namespace UnitTests.StreamingTests
                 .Returns(
                     Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId, attemptedToken)]),
                     Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new ScriptedQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
@@ -406,7 +396,7 @@ namespace UnitTests.StreamingTests
             await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             queueCache.ClearDeliveryProgress();
-            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+            await testAccessor.Shutdown();
 
             Assert.Equal(previousToken, Assert.Single(queueCache.DeliveryProgressTokens));
         }
@@ -543,55 +533,7 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_PushesDeliveryProgressToCache()
-        {
-            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
-            var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
-
-            var queueCache = new RecordingQueueCache();
-            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
-            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-
-            var agent = CreateAgent(pubSub: null, queueId, receiver, queueAdapterCache);
-            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
-            await InitializeAgent(agent);
-
-            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
-
-            // RunQueuePump should push delivery progress when the cache update is due.
-            Assert.Equal(1, queueCache.IsUpdateDueCallCount);
-            Assert.Equal(1, queueCache.DeliveryProgressCallCount);
-            Assert.Single(queueCache.DeliveryProgressTokens);
-            Assert.Null(queueCache.DeliveryProgressTokens[0]);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_SkipsDeliveryProgressWhenUpdateIsNotDue()
-        {
-            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
-            var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
-
-            var queueCache = new RecordingQueueCache { IsUpdateDueResult = false };
-            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
-            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
-
-            var agent = CreateAgent(pubSub: null, queueId, receiver, queueAdapterCache);
-            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
-            await InitializeAgent(agent);
-
-            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
-
-            Assert.Equal(1, queueCache.IsUpdateDueCallCount);
-            Assert.Equal(0, queueCache.DeliveryProgressCallCount);
-            Assert.Empty(queueCache.DeliveryProgressTokens);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_PushesEarliestDeliveryProgressTokenToCache()
+        public async Task Shutdown_PushesEarliestDeliveryProgressTokenToCache()
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -601,6 +543,7 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
@@ -634,13 +577,13 @@ namespace UnitTests.StreamingTests
             earliestConsumer.IsRegistered = true;
             earliestConsumer.LastProcessedToken = new EventSequenceTokenV2(95);
 
-            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+            await testAccessor.Shutdown();
 
             Assert.Equal(earliestConsumer.LastProcessedToken, Assert.Single(queueCache.DeliveryProgressTokens));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_PushesEarliestDeliveryProgressUsingBaseTokenPosition()
+        public async Task Shutdown_PushesEarliestDeliveryProgressUsingBaseTokenPosition()
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -650,6 +593,7 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
@@ -683,13 +627,13 @@ namespace UnitTests.StreamingTests
             earliestConsumer.IsRegistered = true;
             earliestConsumer.LastProcessedToken = new EventSequenceTokenV2(95);
 
-            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+            await testAccessor.Shutdown();
 
             Assert.Equal(earliestConsumer.LastProcessedToken, Assert.Single(queueCache.DeliveryProgressTokens));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_SkipsDeliveryProgressForPendingRegistrations()
+        public async Task Shutdown_SkipsDeliveryProgressForPendingRegistrations()
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -699,12 +643,18 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var receiver = Substitute.For<IQueueAdapterReceiver>();
+            var receiverShutdownStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(
                     Task.FromResult<IList<IBatchContainer>>([
                         new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
                     ]),
                     Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(_ =>
+            {
+                receiverShutdownStarted.SetResult(true);
+                return Task.CompletedTask;
+            });
 
             var queueCache = new RecordingQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
@@ -725,17 +675,19 @@ namespace UnitTests.StreamingTests
             Assert.False(streamData.RegistrationTask.IsCompleted, "Registration should still be in progress");
 
             queueCache.ClearDeliveryProgress();
-            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+            var shutdownTask = testAccessor.Shutdown();
+            await receiverShutdownStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.Empty(queueCache.DeliveryProgressTokens);
             Assert.Equal(0, queueCache.DeliveryProgressCallCount);
 
             // Complete registration so shutdown can proceed cleanly.
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
+            await shutdownTask;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_SkipsDeliveryProgressForUnregisteredConsumer()
+        public async Task Shutdown_SkipsDeliveryProgressForUnregisteredConsumer()
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -745,6 +697,7 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
@@ -777,7 +730,7 @@ namespace UnitTests.StreamingTests
                 now: DateTime.UtcNow);
             unregisteredConsumer.PendingStartToken = new EventSequenceTokenV2(50);
 
-            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+            await testAccessor.Shutdown();
 
             Assert.Empty(queueCache.DeliveryProgressTokens);
             Assert.Equal(0, queueCache.DeliveryProgressCallCount);
@@ -790,7 +743,7 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
-            var queueCache = new RecordingQueueCache { IsUpdateDueResult = false };
+            var queueCache = new RecordingQueueCache();
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
 
@@ -800,9 +753,7 @@ namespace UnitTests.StreamingTests
 
             await testAccessor.Shutdown();
 
-            // Shutdown should push a final delivery progress snapshot before tearing down,
-            // even if the regular checkpoint cadence is not due.
-            Assert.Equal(0, queueCache.IsUpdateDueCallCount);
+            // Shutdown should push a final delivery progress snapshot before tearing down.
             Assert.Single(queueCache.DeliveryProgressTokens);
         }
     }
