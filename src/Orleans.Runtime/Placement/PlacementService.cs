@@ -165,47 +165,60 @@ namespace Orleans.Runtime.Placement
         {
             ThrowIfStopping();
 
+            var grainType = target.GrainIdentity.Type;
+            SiloAddress[] compatibleSilos;
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (_assumeHomogeneousSilosForTesting)
             {
-                return AllActiveSilos;
+                compatibleSilos = AllActiveSilos;
             }
-
-            var grainType = target.GrainIdentity.Type;
-            var silos = target.InterfaceVersion > 0
-                ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
-                : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
-
-            var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
-
-            ThrowIfStopping();
-            var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
-            if (filters.Length > 0)
+            else
             {
-                // Capture the parent activity context now so each filter span is parented to the
-                // current activity (e.g. PlaceGrain) rather than to sibling filter spans that may
-                // be active during deferred enumeration.
-                var parentActivityContext = Activity.Current?.Context;
+                var silos = target.InterfaceVersion > 0
+                    ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
+                    : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
 
-                IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
-                foreach (var placementFilter in filters)
-                {
-                    ThrowIfStopping();
-                    var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                    filteredSilos = InstrumentFilteredSilos(
-                        director.Filter(placementFilter, target, filteredSilos),
-                        placementFilter,
-                        grainType,
-                        parentActivityContext);
-                }
-
-                ThrowIfStopping();
-                compatibleSilos = filteredSilos.ToArray();
+                compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
             }
+
+            if (!_assumeHomogeneousSilosForTesting)
+            {
+                ThrowIfStopping();
+                var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
+                if (filters.Length > 0)
+                {
+                    // Capture the parent activity context now so each filter span is parented to the
+                    // current activity (e.g. PlaceGrain) rather than to sibling filter spans that may
+                    // be active during deferred enumeration.
+                    var parentActivityContext = Activity.Current?.Context;
+
+                    IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
+                    foreach (var placementFilter in filters)
+                    {
+                        ThrowIfStopping();
+                        var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
+                        filteredSilos = InstrumentFilteredSilos(
+                            director.Filter(placementFilter, target, filteredSilos),
+                            placementFilter,
+                            grainType,
+                            parentActivityContext);
+                    }
+
+                    ThrowIfStopping();
+                    compatibleSilos = filteredSilos.ToArray();
+                }
+            }
+
+            compatibleSilos = compatibleSilos.Intersect(AllActiveSilos).ToArray();
 
             if (compatibleSilos.Length == 0)
             {
+                if (_assumeHomogeneousSilosForTesting)
+                {
+                    throw new OrleansException($"No active nodes are compatible with grain {grainType} and interface {target.InterfaceType} version {target.InterfaceVersion}.");
+                }
+
                 var allWithType = _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
                 var versions = _grainInterfaceVersions.GetSupportedSilos(target.InterfaceType, target.InterfaceVersion).Result;
                 var allWithTypeString = string.Join(", ", allWithType.Select(s => s.ToString())) is string withGrain && !string.IsNullOrWhiteSpace(withGrain) ? withGrain : "none";
@@ -223,11 +236,22 @@ namespace Orleans.Runtime.Placement
         {
             get
             {
-                var result = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
+                var localSiloStatus = LocalSiloStatus;
+                var activeSilos = _siloStatusOracle.GetApproximateSiloStatuses(true);
+                var result = activeSilos
+                    .Where(static entry => entry.Value == SiloStatus.Active)
+                    .Select(entry => entry.Key)
+                    .Where(silo => localSiloStatus == SiloStatus.Active || !silo.Equals(LocalSilo))
+                    .ToArray();
                 if (result.Length > 0) return result;
 
-                LogWarningAllActiveSilos();
-                return new SiloAddress[] { LocalSilo };
+                if (activeSilos.Count == 0 && localSiloStatus == SiloStatus.Active)
+                {
+                    LogWarningAllActiveSilos();
+                    return new SiloAddress[] { LocalSilo };
+                }
+
+                return Array.Empty<SiloAddress>();
             }
         }
 

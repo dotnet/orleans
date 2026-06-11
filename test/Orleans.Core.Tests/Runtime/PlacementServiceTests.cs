@@ -105,16 +105,46 @@ namespace UnitTests.Runtime
             Assert.Throws<SiloUnavailableException>(() => target.GetCompatibleSilosWithVersions(placementTarget));
         }
 
-        private static PlacementService CreateTarget()
+        [Fact]
+        public void GetCompatibleSilos_WhenLocalSiloIsShuttingDown_ExcludesLocalSilo()
         {
+            var remoteSilo = SiloAddress.New(IPAddress.Loopback, 11111, Interlocked.Increment(ref _siloGeneration));
+            var target = CreateTarget(
+                configureOptions: options => options.AssumeHomogenousSilosForTesting = true,
+                configureSiloStatusOracle: (siloStatusOracle, localSilo) =>
+                {
+                    siloStatusOracle.CurrentStatus.Returns(SiloStatus.ShuttingDown);
+                    siloStatusOracle.GetApproximateSiloStatuses(true).Returns(new Dictionary<SiloAddress, SiloStatus>
+                    {
+                        [localSilo] = SiloStatus.Active,
+                        [remoteSilo] = SiloStatus.Active,
+                    });
+                });
+
+            var placementTarget = new PlacementTarget(GrainId.Create("test", "grain-1"), new Dictionary<string, object>(), default, 0);
+
+            var compatibleSilos = target.GetCompatibleSilos(placementTarget);
+
+            Assert.Equal(new[] { remoteSilo }, compatibleSilos);
+        }
+
+        private static PlacementService CreateTarget(
+            Action<SiloMessagingOptions> configureOptions = null,
+            Action<ISiloStatusOracle, SiloAddress> configureSiloStatusOracle = null)
+        {
+            var options = new SiloMessagingOptions();
+            configureOptions?.Invoke(options);
             var optionsMonitor = Substitute.For<IOptionsMonitor<SiloMessagingOptions>>();
-            optionsMonitor.CurrentValue.Returns(new SiloMessagingOptions());
+            optionsMonitor.CurrentValue.Returns(options);
 
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
-            localSiloDetails.SiloAddress.Returns(SiloAddress.New(IPAddress.Loopback, 11111, Interlocked.Increment(ref _siloGeneration)));
+            var localSilo = SiloAddress.New(IPAddress.Loopback, 11111, Interlocked.Increment(ref _siloGeneration));
+            localSiloDetails.SiloAddress.Returns(localSilo);
 
             var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
             siloStatusOracle.CurrentStatus.Returns(SiloStatus.Active);
+            siloStatusOracle.GetApproximateSiloStatuses(true).Returns(new Dictionary<SiloAddress, SiloStatus> { [localSilo] = SiloStatus.Active });
+            configureSiloStatusOracle?.Invoke(siloStatusOracle, localSilo);
 
             return new PlacementService(
                 optionsMonitor,
