@@ -54,7 +54,6 @@ namespace Orleans.Streaming.EventHubs
         private DateTime? throttleSavesUntilUtc;
         private string latestOffset = EventHubConstants.StartOfStream;
         private string persistedOffset = EventHubConstants.StartOfStream;
-        private bool saveRequested;
 
         /// <summary>
         /// Indicates if a checkpoint exists
@@ -141,58 +140,22 @@ namespace Orleans.Streaming.EventHubs
             // Always track the latest safe offset in memory so FlushAsync can persist it.
             latestOffset = offset;
 
-            // If we've saved before but it's not time for another save, do nothing.
-            if (throttleSavesUntilUtc.HasValue && throttleSavesUntilUtc.Value > utcNow)
+            // If we've saved before but it's not time for another save or the last save operation has not completed, do nothing.
+            if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
             {
                 return;
             }
 
             throttleSavesUntilUtc = utcNow + persistInterval;
-            RequestSave();
+            inProgressSave = SaveOffset(latestOffset);
+            inProgressSave.Ignore();
         }
 
-        private void RequestSave()
+        private async Task SaveOffset(string offset)
         {
-            saveRequested = true;
-            if (inProgressSave.IsCompleted)
-            {
-                inProgressSave = SaveRequestedOffsets();
-                inProgressSave.Ignore();
-            }
-        }
-
-        private async Task SaveLatest()
-        {
-            var offset = latestOffset;
             entity.Offset = offset;
             await dataManager.UpsertTableEntryAsync(entity);
             persistedOffset = offset;
-        }
-
-        private async Task SaveRequestedOffsets()
-        {
-            try
-            {
-                while (saveRequested)
-                {
-                    saveRequested = false;
-                    var saveTask = SaveLatest();
-                    await saveTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
-                    if (!saveTask.IsCompletedSuccessfully)
-                    {
-                        if (saveRequested)
-                        {
-                            continue;
-                        }
-
-                        await saveTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-                    }
-                }
-            }
-            finally
-            {
-                inProgressSave = Task.CompletedTask;
-            }
         }
 
         /// <summary>
@@ -202,10 +165,12 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="cancellationToken">The cancellation token.</param>
         public async Task FlushAsync(CancellationToken cancellationToken)
         {
-            await inProgressSave.WaitAsync(cancellationToken);
+            await inProgressSave.WaitAsync(cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.Compare(persistedOffset, latestOffset, StringComparison.Ordinal) != 0)
             {
-                inProgressSave = SaveLatest();
+                inProgressSave = SaveOffset(latestOffset);
                 await inProgressSave.WaitAsync(cancellationToken);
             }
         }
