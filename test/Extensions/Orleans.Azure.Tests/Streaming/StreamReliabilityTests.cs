@@ -938,7 +938,7 @@ namespace UnitTests.Streaming.Reliability
             _output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarting all silos - Old Silos={0}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            string.Join(", ", oldSilos));
+                            string.Join(", ", oldSilos.Select(silo => silo.ToString())));
 
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
@@ -952,7 +952,7 @@ namespace UnitTests.Streaming.Reliability
             _output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarted new silos - New Silos={0}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            string.Join(", ", newSilos));
+                            string.Join(", ", newSilos.Select(silo => silo.ToString())));
         }
 
         private async Task StopSilo(InProcessSiloHandle silo, bool kill, bool restart)
