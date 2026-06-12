@@ -23,6 +23,11 @@ namespace Orleans.Runtime.Metadata
         private readonly IFatalErrorHandler _fatalErrorHandler;
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly AsyncEnumerable<ClusterManifest> _updates;
+#if NET9_0_OR_GREATER
+        private readonly Lock _currentLock = new();
+#else
+        private readonly object _currentLock = new();
+#endif
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
@@ -30,7 +35,7 @@ namespace Orleans.Runtime.Metadata
         public ClusterManifestProvider(
             ILocalSiloDetails localSiloDetails,
             SiloManifestProvider siloManifestProvider,
-            ClusterMembershipService clusterMembershipService,
+            IClusterMembershipService clusterMembershipService,
             IFatalErrorHandler fatalErrorHandler,
             ILogger<ClusterManifestProvider> logger,
             IServiceProvider services)
@@ -50,11 +55,35 @@ namespace Orleans.Runtime.Metadata
                 onPublished: update => Interlocked.Exchange(ref _current, update));
         }
 
-        public ClusterManifest Current => _current;
+        public ClusterManifest Current => EnsureCurrentManifestVersion(_clusterMembershipService.CurrentSnapshot);
 
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
         public GrainManifest LocalGrainManifest { get; }
+
+        private ClusterManifest EnsureCurrentManifestVersion(ClusterMembershipSnapshot clusterMembership)
+        {
+            var current = _current;
+            var membershipVersion = clusterMembership.Version.Value;
+            if (current.Version.Major >= membershipVersion)
+            {
+                return current;
+            }
+
+            lock (_currentLock)
+            {
+                current = _current;
+                if (current.Version.Major >= membershipVersion)
+                {
+                    return current;
+                }
+
+                var prunedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, out _);
+                var updated = new ClusterManifest(new MajorMinorVersion(membershipVersion, 0), prunedSilos);
+                _updates.TryPublish(updated);
+                return _current;
+            }
+        }
 
         private async Task ProcessMembershipUpdates()
         {
@@ -96,30 +125,23 @@ namespace Orleans.Runtime.Metadata
 
         private async Task<bool> UpdateManifest(ClusterMembershipSnapshot clusterMembership)
         {
-            var existingManifest = _current;
-            var builder = existingManifest.Silos.ToBuilder();
-            var modified = false;
-
-            // First, remove defunct entries.
-            foreach (var entry in existingManifest.Silos)
+            var existingManifest = EnsureCurrentManifestVersion(clusterMembership);
+            if (existingManifest.Version.Major > clusterMembership.Version.Value)
             {
-                var address = entry.Key;
-                var status = clusterMembership.GetSiloStatus(address);
-
-                if (address.Equals(_localSiloAddress))
-                {
-                    // The local silo is always present in the manifest.
-                    continue;
-                }
-
-                if (status == SiloStatus.None || status == SiloStatus.Dead)
-                {
-                    builder.Remove(address);
-                    modified = true;
-                }
+                return true;
             }
 
-            // Next, fill missing entries.
+            var silos = RemoveNonActiveSilos(existingManifest.Silos, clusterMembership, out var modified);
+            var builder = silos.ToBuilder();
+
+            if (clusterMembership.GetSiloStatus(_localSiloAddress) == SiloStatus.Active
+                && !builder.ContainsKey(_localSiloAddress))
+            {
+                builder[_localSiloAddress] = LocalGrainManifest;
+                modified = true;
+            }
+
+            // Fill missing entries.
             var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
             foreach (var entry in clusterMembership.Members)
             {
@@ -127,11 +149,11 @@ namespace Orleans.Runtime.Metadata
 
                 if (member.SiloAddress.Equals(_localSiloAddress))
                 {
-                    // The local silo is always present in the manifest.
+                    // The local manifest is available without a remote call.
                     continue;
                 }
 
-                if (existingManifest.Silos.ContainsKey(member.SiloAddress))
+                if (builder.ContainsKey(member.SiloAddress))
                 {
                     // Manifest has already been retrieved for the cluster member.
                     continue;
@@ -199,6 +221,27 @@ namespace Orleans.Runtime.Metadata
             }
 
             return fetchSuccess;
+        }
+
+        private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
+            ImmutableDictionary<SiloAddress, GrainManifest> silos,
+            ClusterMembershipSnapshot clusterMembership,
+            out bool modified)
+        {
+            ImmutableDictionary<SiloAddress, GrainManifest>.Builder? builder = null;
+            foreach (var entry in silos)
+            {
+                if (clusterMembership.GetSiloStatus(entry.Key) == SiloStatus.Active)
+                {
+                    continue;
+                }
+
+                builder ??= silos.ToBuilder();
+                builder.Remove(entry.Key);
+            }
+
+            modified = builder is not null;
+            return builder?.ToImmutable() ?? silos;
         }
 
         [MemberNotNull(nameof(_runTask))]

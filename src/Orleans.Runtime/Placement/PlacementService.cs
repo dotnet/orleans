@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -168,23 +169,19 @@ namespace Orleans.Runtime.Placement
 
             var grainType = target.GrainIdentity.Type;
             ImmutableArray<SiloAddress> compatibleSilos;
+
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (_assumeHomogeneousSilosForTesting)
             {
-                compatibleSilos = AllActiveSilos;
+                compatibleSilos = _siloStatusOracle.GetActiveSilos();
             }
             else
             {
-                var silos = target.InterfaceVersion > 0
+                compatibleSilos = target.InterfaceVersion > 0
                     ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
-                    : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
+                    : _grainInterfaceVersions.GetSupportedSilos(grainType).Result.ToImmutableArray();
 
-                compatibleSilos = silos.Intersect(AllActiveSilos).ToImmutableArray();
-            }
-
-            if (!_assumeHomogeneousSilosForTesting)
-            {
                 ThrowIfStopping();
                 var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
                 if (filters.Length > 0)
@@ -207,11 +204,9 @@ namespace Orleans.Runtime.Placement
                     }
 
                     ThrowIfStopping();
-                    compatibleSilos = filteredSilos.ToImmutableArray();
+                    compatibleSilos = filteredSilos.Intersect(_siloStatusOracle.GetActiveSilos()).ToImmutableArray();
                 }
             }
-
-            compatibleSilos = compatibleSilos.Intersect(AllActiveSilos).ToImmutableArray();
 
             if (compatibleSilos.Length == 0)
             {
@@ -232,8 +227,6 @@ namespace Orleans.Runtime.Placement
 
             return compatibleSilos;
         }
-
-        public ImmutableArray<SiloAddress> AllActiveSilos => _siloStatusOracle.GetActiveSilos();
 
         public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
         {

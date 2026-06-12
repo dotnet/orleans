@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Orleans.Metadata;
 using Orleans.Runtime.Versions.Compatibility;
@@ -60,7 +61,7 @@ namespace Orleans.Runtime.Versions
             return new CachedEntry
             {
                 Version = version,
-                SuitableSilos = result.SelectMany(sv => sv.Value).Distinct().OrderBy(addr => addr).ToArray(),
+                SuitableSilos = result.SelectMany(sv => sv.Value).Distinct().OrderBy(addr => addr).ToImmutableArray(),
                 SuitableSilosByVersion = result,
             };
         }
@@ -69,7 +70,7 @@ namespace Orleans.Runtime.Versions
         {
             public MajorMinorVersion Version { get; set; }
 
-            public SiloAddress[] SuitableSilos { get; set; }
+            public ImmutableArray<SiloAddress> SuitableSilos { get; set; }
 
             public Dictionary<ushort, SiloAddress[]> SuitableSilosByVersion { get; set; }
         }
