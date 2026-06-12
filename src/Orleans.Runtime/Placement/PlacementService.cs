@@ -233,33 +233,7 @@ namespace Orleans.Runtime.Placement
             return compatibleSilos;
         }
 
-        public ImmutableArray<SiloAddress> AllActiveSilos
-        {
-            get
-            {
-                var activeSilos = _siloStatusOracle.GetActiveSilos();
-                if (LocalSiloStatus == SiloStatus.Active)
-                {
-                    if (!activeSilos.IsDefaultOrEmpty) return activeSilos;
-
-                    LogWarningAllActiveSilos();
-                    return ImmutableArray.Create(LocalSilo);
-                }
-
-                if (activeSilos.IsDefaultOrEmpty) return ImmutableArray<SiloAddress>.Empty;
-
-                var builder = ImmutableArray.CreateBuilder<SiloAddress>(activeSilos.Length);
-                foreach (var silo in activeSilos)
-                {
-                    if (!silo.Equals(LocalSilo))
-                    {
-                        builder.Add(silo);
-                    }
-                }
-
-                return builder.ToImmutable();
-            }
-        }
+        public ImmutableArray<SiloAddress> AllActiveSilos => _siloStatusOracle.GetActiveSilos();
 
         public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
         {
@@ -656,13 +630,6 @@ namespace Orleans.Runtime.Placement
             Message = "AddressMessage Placement SelectTarget {Message}"
         )]
         private partial void LogTraceAddressMessageSelectTarget(Message message);
-
-        [LoggerMessage(
-            EventId = (int)ErrorCode.Catalog_GetApproximateSiloStatuses,
-            Level = LogLevel.Warning,
-            Message = "AllActiveSilos SiloStatusOracle.GetActiveSilos empty"
-        )]
-        private partial void LogWarningAllActiveSilos();
 
         [LoggerMessage(
             Level = LogLevel.Debug,

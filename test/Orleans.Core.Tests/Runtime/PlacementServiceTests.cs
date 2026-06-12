@@ -115,7 +115,7 @@ namespace UnitTests.Runtime
                 configureSiloStatusOracle: (siloStatusOracle, localSilo) =>
                 {
                     siloStatusOracle.CurrentStatus.Returns(SiloStatus.ShuttingDown);
-                    siloStatusOracle.GetActiveSilos().Returns(ImmutableArray.Create(localSilo, remoteSilo));
+                    siloStatusOracle.GetActiveSilos().Returns(ImmutableArray.Create(remoteSilo));
                 });
 
             var placementTarget = new PlacementTarget(GrainId.Create("test", "grain-1"), new Dictionary<string, object>(), default, 0);
