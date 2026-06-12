@@ -3,6 +3,7 @@ using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Internal;
@@ -57,6 +58,23 @@ namespace UnitTests.MessageCenterTests
             await Test_GatewaySelection(listProvider);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Gateway")]
+        public async Task GatewayListUpdatedDiagnosticEventEmittedOnStart()
+        {
+            var gatewayUris = new List<Uri> { new("gwy.tcp://127.0.0.1:12345/42") };
+            var listProvider = new TestListProvider(gatewayUris);
+            using var observer = new Observer(GatewayEvents.AllEvents);
+            using var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null, TimeProvider.System);
+
+            await gatewayManager.StartAsync(CancellationToken.None);
+
+            var evt = Assert.Single(observer.Events.OfType<GatewayEvents.GatewayListUpdated>());
+            Assert.Same(gatewayManager, evt.Source);
+            var expectedGateway = SiloAddress.New(IPAddress.Loopback, 12345, 0);
+            Assert.Equal(expectedGateway, Assert.Single(evt.KnownGateways));
+            Assert.Equal(expectedGateway, Assert.Single(evt.LiveGateways));
+        }
+
         /// <summary>
         /// Core test logic for gateway selection distribution.
         /// Simulates 2300 gateway selections and verifies they are evenly distributed.
@@ -100,6 +118,31 @@ namespace UnitTests.MessageCenterTests
             Assert.True((low <= counts[1]) && (counts[1] <= up), "Gateway selection is incorrectly skewed. " + counts[1]);
             Assert.True((low <= counts[2]) && (counts[2] <= up), "Gateway selection is incorrectly skewed. " + counts[2]);
             Assert.True((low <= counts[3]) && (counts[3] <= up), "Gateway selection is incorrectly skewed. " + counts[3]);
+        }
+
+        private sealed class Observer : IObserver<GatewayEvents.GatewayEvent>, IDisposable
+        {
+            private readonly IDisposable _subscription;
+            private readonly List<GatewayEvents.GatewayEvent> _events = [];
+
+            public Observer(IObservable<GatewayEvents.GatewayEvent> observable)
+            {
+                _subscription = observable.Subscribe(this);
+            }
+
+            public GatewayEvents.GatewayEvent[] Events => _events.ToArray();
+
+            public void Dispose() => _subscription.Dispose();
+
+            public void OnCompleted()
+            {
+            }
+
+            public void OnError(Exception error)
+            {
+            }
+
+            public void OnNext(GatewayEvents.GatewayEvent value) => _events.Add(value);
         }
 
         /// <summary>

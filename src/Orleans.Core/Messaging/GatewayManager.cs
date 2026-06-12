@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using static Orleans.Internal.StandardExtensions;
@@ -92,6 +93,7 @@ namespace Orleans.Messaging
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;
             this.gatewayRefreshTimerTask ??= PeriodicallyRefreshGatewaySnapshot();
+            EmitGatewayListUpdatedIfEnabled(this.knownGateways, this.cachedLiveGateways);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -273,6 +275,8 @@ namespace Orleans.Messaging
         private async Task UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
         {
             List<SiloAddress> connectionsToKeepAlive;
+            List<SiloAddress> knownGatewaysSnapshotSource;
+            List<SiloAddress> liveGatewaysSnapshotSource;
 
             // This is a short lock, protecting the access to knownDead, knownMasked and cachedLiveGateways.
             lock (lockable)
@@ -332,6 +336,8 @@ namespace Orleans.Messaging
                 // swap cachedLiveGateways pointer in one atomic operation
                 cachedLiveGateways = live;
                 cachedLiveGatewaysSet = new HashSet<SiloAddress>(live);
+                knownGatewaysSnapshotSource = knownGateways;
+                liveGatewaysSnapshotSource = live;
 
                 DateTime prevRefresh = lastRefreshTime;
                 lastRefreshTime = now;
@@ -344,7 +350,16 @@ namespace Orleans.Messaging
                 connectionsToKeepAlive.AddRange(knownMasked.Select(e => e.Key));
             }
 
+            EmitGatewayListUpdatedIfEnabled(knownGatewaysSnapshotSource, liveGatewaysSnapshotSource);
             await this.CloseEvictedGatewayConnections(connectionsToKeepAlive);
+        }
+
+        private void EmitGatewayListUpdatedIfEnabled(List<SiloAddress> knownGatewaysSnapshotSource, List<SiloAddress> liveGatewaysSnapshotSource)
+        {
+            if (GatewayEvents.IsGatewayListUpdatedEnabled())
+            {
+                GatewayEvents.EmitGatewayListUpdated(this, knownGatewaysSnapshotSource.ToArray(), liveGatewaysSnapshotSource.ToArray());
+            }
         }
 
         private async Task CloseEvictedGatewayConnections(List<SiloAddress> liveGateways)
