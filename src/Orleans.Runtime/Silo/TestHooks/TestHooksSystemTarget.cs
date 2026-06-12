@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
 using Orleans.Statistics;
@@ -127,9 +128,47 @@ namespace Orleans.Runtime.TestHooks
             }
         }
 
+        public async Task<bool> WaitForClusterManifest(SiloAddress[] expectedSilos, TimeSpan timeout)
+        {
+            var expected = expectedSilos.ToHashSet();
+            var manifestProvider = this.serviceProvider.GetRequiredService<IClusterManifestProvider>();
+            if (ClusterManifestMatches(manifestProvider, expected))
+            {
+                return true;
+            }
+
+            if (timeout <= TimeSpan.Zero)
+            {
+                return false;
+            }
+
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var subscription = ManifestEvents.AllEvents.Subscribe(new ClusterManifestUpdatedObserver(manifestProvider, expected, completion));
+
+            if (ClusterManifestMatches(manifestProvider, expected))
+            {
+                return true;
+            }
+
+            try
+            {
+                await completion.Task.WaitAsync(timeout);
+                return true;
+            }
+            catch (TimeoutException)
+            {
+                return ClusterManifestMatches(manifestProvider, expected);
+            }
+        }
+
         private static bool ActiveSilosMatch(ISiloStatusOracle siloStatusOracle, HashSet<SiloAddress> expectedActiveSilos)
         {
             return expectedActiveSilos.SetEquals(siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys);
+        }
+
+        private static bool ClusterManifestMatches(IClusterManifestProvider manifestProvider, HashSet<SiloAddress> expectedSilos)
+        {
+            return expectedSilos.SetEquals(manifestProvider.Current.Silos.Keys);
         }
 
         private sealed class ActiveSiloSetListener : ISiloStatusListener
@@ -153,6 +192,28 @@ namespace Orleans.Runtime.TestHooks
                 if (ActiveSilosMatch(this.siloStatusOracle, this.expectedActiveSilos))
                 {
                     this.completion.TrySetResult();
+                }
+            }
+        }
+
+        private sealed class ClusterManifestUpdatedObserver(
+            IClusterManifestProvider manifestProvider,
+            HashSet<SiloAddress> expectedSilos,
+            TaskCompletionSource completion) : IObserver<ManifestEvents.ManifestEvent>
+        {
+            public void OnCompleted()
+            {
+            }
+
+            public void OnError(Exception error) => completion.TrySetException(error);
+
+            public void OnNext(ManifestEvents.ManifestEvent value)
+            {
+                if (value is ManifestEvents.ClusterManifestUpdated update
+                    && ReferenceEquals(update.Source, manifestProvider)
+                    && expectedSilos.SetEquals(update.Manifest.Silos.Keys))
+                {
+                    completion.TrySetResult();
                 }
             }
         }

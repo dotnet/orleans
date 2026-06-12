@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Runtime.Utilities;
@@ -187,7 +188,14 @@ namespace Orleans.Runtime.Metadata
             var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
             if (modified)
             {
-                return _updates.TryPublish(new ClusterManifest(version, builder.ToImmutable())) && fetchSuccess;
+                var manifest = new ClusterManifest(version, builder.ToImmutable());
+                var publishSuccess = _updates.TryPublish(manifest);
+                if (publishSuccess)
+                {
+                    ManifestEvents.EmitClusterManifestUpdated(this, manifest);
+                }
+
+                return publishSuccess && fetchSuccess;
             }
 
             return fetchSuccess;

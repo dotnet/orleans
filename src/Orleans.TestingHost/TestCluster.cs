@@ -447,6 +447,28 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Wait for active silos to observe cluster manifest updates for all active silos.
+        /// </summary>
+        /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
+        public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
+        {
+            var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+            var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
+            var activeSilos = GetActiveSilos().ToArray();
+            var testHooks = activeSilos.Select(GetTestHooks).ToArray();
+
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForClusterManifestToStabilize is waiting up to {0} for {1} active silo manifest(s)", stabilizationTime, activeSilos.Length);
+            if (await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(activeSilos, testHooks, stabilizationTime))
+            {
+                WriteLog("WaitForClusterManifestToStabilize observed stable cluster manifests");
+            }
+            else
+            {
+                WriteLog("WaitForClusterManifestToStabilize reached the fallback wait of {0}", stabilizationTime);
+            }
+        }
+
+        /// <summary>
         /// Get the timeout value to use to wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
         /// <seealso cref="WaitForLivenessToStabilizeAsync"/>
         /// </summary>
