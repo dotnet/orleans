@@ -78,13 +78,7 @@ namespace Orleans.Runtime.Metadata
                     return current;
                 }
 
-                var prunedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, _localSiloAddress, out _);
-                if (clusterMembership.GetSiloStatus(_localSiloAddress) == SiloStatus.Active
-                    && !prunedSilos.ContainsKey(_localSiloAddress))
-                {
-                    prunedSilos = prunedSilos.Add(_localSiloAddress, LocalGrainManifest);
-                }
-
+                var prunedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, out _);
                 var updated = new ClusterManifest(new MajorMinorVersion(membershipVersion, 0), prunedSilos);
                 _updates.TryPublish(updated);
                 return _current;
@@ -137,7 +131,7 @@ namespace Orleans.Runtime.Metadata
                 return true;
             }
 
-            var silos = RemoveNonActiveSilos(existingManifest.Silos, clusterMembership, _localSiloAddress, out var modified);
+            var silos = RemoveNonActiveSilos(existingManifest.Silos, clusterMembership, out var modified);
             var builder = silos.ToBuilder();
 
             if (clusterMembership.GetSiloStatus(_localSiloAddress) == SiloStatus.Active
@@ -232,13 +226,12 @@ namespace Orleans.Runtime.Metadata
         private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
             ImmutableDictionary<SiloAddress, GrainManifest> silos,
             ClusterMembershipSnapshot clusterMembership,
-            SiloAddress preserveSiloAddress,
             out bool modified)
         {
             ImmutableDictionary<SiloAddress, GrainManifest>.Builder? builder = null;
             foreach (var entry in silos)
             {
-                if (entry.Key.Equals(preserveSiloAddress) || clusterMembership.GetSiloStatus(entry.Key) == SiloStatus.Active)
+                if (clusterMembership.GetSiloStatus(entry.Key) == SiloStatus.Active)
                 {
                     continue;
                 }
