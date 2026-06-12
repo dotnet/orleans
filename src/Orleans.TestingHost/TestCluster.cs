@@ -21,6 +21,7 @@ using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
 using Orleans.Statistics;
 using Orleans.Runtime.TestHooks;
+using Orleans.Messaging;
 
 #nullable disable
 namespace Orleans.TestingHost
@@ -423,10 +424,11 @@ namespace Orleans.TestingHost
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
             var activeSilos = GetActiveSilos().ToArray();
             var testHooks = activeSilos.Select(GetTestHooks).ToArray();
+            var gatewayManager = this.InternalClient.ServiceProvider.GetRequiredService<GatewayManager>();
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
-            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAsync(activeSilos, testHooks, stabilizationTime))
+            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(activeSilos, testHooks, gatewayManager, stabilizationTime))
             {
-                WriteLog("WaitForLivenessToStabilize observed a stable active silo view");
+                WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
             }
             else
             {
