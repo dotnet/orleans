@@ -1,7 +1,6 @@
 //#define USE_GENERICS
 //#define DELETE_AFTER_TEST
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -27,7 +26,7 @@ using Orleans.Providers;
 namespace UnitTests.Streaming.Reliability
 {
     [TestCategory("Streaming"), TestCategory("Reliability")]
-    public class StreamReliabilityTests : TestClusterPerTest
+    public class StreamReliabilityTests : BaseInProcessTestClusterFixture
     {
         private readonly ITestOutputHelper _output;
         public const string MEMORY_STREAM_PROVIDER_NAME = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
@@ -36,75 +35,60 @@ namespace UnitTests.Streaming.Reliability
         private Guid _streamId;
         private string _streamProviderName;
         private int _numExpectedSilos;
+        private IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
 #if DELETE_AFTER_TEST
         private HashSet<IStreamReliabilityTestGrain> _usedGrains;
 #endif
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
 
             this._numExpectedSilos = 2;
-            builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
             builder.Options.InitialSilosCount = (short) this._numExpectedSilos;
-            builder.Options.UseTestClusterMembership = false;
 
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
+            builder.ConfigureSilo((_, siloBuilder) => ConfigureSilo(siloBuilder));
+            builder.ConfigureClient(ConfigureClient);
         }
 
-        public class ClientBuilderConfigurator : IClientBuilderConfigurator
+        private static void ConfigureClient(IClientBuilder clientBuilder)
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.UseAzureStorageClustering(gatewayOptions =>
-                {
-                    gatewayOptions.ConfigureTestDefaults();
-                })
-                .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
-                    (options, dep) =>
-                    {
-                        options.ConfigureTestDefaults();
-                        options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, QueueCount);
-                    }))
-                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(MEMORY_STREAM_PROVIDER_NAME)
-                .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(5));
-            }
-        }
-
-        public class SiloBuilderConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.UseAzureStorageClustering(options =>
-                {
-                    options.ConfigureTestDefaults();
-                })
-                .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
-                    {
-                        options.ConfigureTestDefaults();
-                        options.DeleteStateOnClear = true;
-                    }))
-                .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
-                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(MEMORY_STREAM_PROVIDER_NAME)
-                .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
-                {
-                    options.DeleteStateOnClear = true;
-                    options.ConfigureTestDefaults();
-                }))
-                .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
+            clientBuilder.AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
                 (options, dep) =>
                 {
                     options.ConfigureTestDefaults();
                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, QueueCount);
                 }))
-                .AddAzureQueueStreams("AzureQueueProvider2", ob => ob.Configure<IOptions<ClusterOptions>>(
+            .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(MEMORY_STREAM_PROVIDER_NAME)
+            .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(5));
+        }
+
+        private static void ConfigureSilo(ISiloBuilder hostBuilder)
+        {
+            hostBuilder.AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+            {
+                options.ConfigureTestDefaults();
+                options.DeleteStateOnClear = true;
+            }))
+            .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
+            .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(MEMORY_STREAM_PROVIDER_NAME)
+            .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+            {
+                options.DeleteStateOnClear = true;
+                options.ConfigureTestDefaults();
+            }))
+            .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
+                (options, dep) =>
+                {
+                    options.ConfigureTestDefaults();
+                    options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, QueueCount);
+                }))
+            .AddAzureQueueStreams("AzureQueueProvider2", ob => ob.Configure<IOptions<ClusterOptions>>(
                 (options, dep) =>
                 {
                     options.ConfigureTestDefaults();
                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", QueueCount);
                 }));
-            }
         }
 
         public StreamReliabilityTests(ITestOutputHelper output)
@@ -152,8 +136,8 @@ namespace UnitTests.Streaming.Reliability
         {
             // This test case is just a sanity-check that the silo test config is OK.
             const string testName = "Baseline_StreamRel";
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -161,7 +145,7 @@ namespace UnitTests.Streaming.Reliability
         {
             // This test case is just a sanity-check that the silo test config is OK.
             const string testName = "Baseline_StreamRel_RestartSilos";
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             CheckSilosRunning("Before Restart", _numExpectedSilos);
             var silos = this.HostedCluster.Silos;
@@ -171,7 +155,7 @@ namespace UnitTests.Streaming.Reliability
 
             Assert.NotEqual(silos, this.HostedCluster.Silos); // Should be different silos after restart
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -182,7 +166,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = MEMORY_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             // Grain Producer -> Grain Consumer
 
@@ -191,7 +175,7 @@ namespace UnitTests.Streaming.Reliability
 
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
@@ -202,14 +186,14 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
 
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         [SkippableFact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
@@ -343,7 +327,7 @@ namespace UnitTests.Streaming.Reliability
         private async Task<IStreamReliabilityTestGrain> Do_BaselineTest(long consumerGrainId, long producerGrainId)
 #endif
         {
-            logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
+            Logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
             var consumerGrain = GetGrain(consumerGrainId);
             var producerGrain = GetGrain(producerGrainId);
 #if DELETE_AFTER_TEST
@@ -356,9 +340,9 @@ namespace UnitTests.Streaming.Reliability
             string when = "Before subscribe";
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, false, false);
 
-            logger.LogInformation("AddConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("AddConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await consumerGrain.AddConsumer(_streamId, _streamProviderName);
-            logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await producerGrain.BecomeProducer(_streamId, _streamProviderName);
 
             when = "After subscribe";
@@ -381,7 +365,7 @@ namespace UnitTests.Streaming.Reliability
         private async Task<IStreamReliabilityTestGrain[]> Do_AddConsumerGrains(long baseId, int numGrains)
 #endif
         {
-            logger.LogInformation("Initializing: BaseId={BaseId} NumGrains={NumGrains}", baseId, numGrains);
+            Logger.LogInformation("Initializing: BaseId={BaseId} NumGrains={NumGrains}", baseId, numGrains);
 
 #if USE_GENERICS
             var grains = new IStreamReliabilityTestGrain<int>[numGrains];
@@ -400,7 +384,7 @@ namespace UnitTests.Streaming.Reliability
             }
             await Task.WhenAll(promises);
 
-            logger.LogInformation("AddConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("AddConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await Task.WhenAll(grains.Select(g => g.AddConsumer(_streamId, _streamProviderName)));
 
             return grains;
@@ -416,7 +400,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -464,7 +448,7 @@ namespace UnitTests.Streaming.Reliability
             // Messages received by new consumer grains
             await Task.WhenAll(grains2.Select(g => CheckReceivedCounts(when2, g, numLoops, 0)));
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_PubSub_MultiConsumerSameGrain(string testName, string streamProviderName)
@@ -472,7 +456,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
 
@@ -480,11 +464,11 @@ namespace UnitTests.Streaming.Reliability
             long producerGrainId = Random.Shared.Next();
 
             string when;
-            logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
+            Logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
             var consumerGrain = GetGrain(consumerGrainId);
             var producerGrain = GetGrain(producerGrainId);
 
-            logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await producerGrain.BecomeProducer(_streamId, _streamProviderName);
 
             when = "After BecomeProducer";
@@ -492,7 +476,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(0);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
-            logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
@@ -501,7 +485,7 @@ namespace UnitTests.Streaming.Reliability
             when = "After second AddConsumer";
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_PubSub_MultiProducerSameGrain(string testName, string streamProviderName)
@@ -509,7 +493,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
 
@@ -517,11 +501,11 @@ namespace UnitTests.Streaming.Reliability
             long producerGrainId = Random.Shared.Next();
 
             string when;
-            logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
+            Logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
             var consumerGrain = GetGrain(consumerGrainId);
             var producerGrain = GetGrain(producerGrainId);
 
-            logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await producerGrain.BecomeProducer(_streamId, _streamProviderName);
             when = "After first BecomeProducer";
             // Note: Only semantics guarenteed for producer is that they will have been registered by time that first msg is sent.
@@ -533,7 +517,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(0);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
-            logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
@@ -542,7 +526,7 @@ namespace UnitTests.Streaming.Reliability
             when = "After second AddConsumer";
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_PubSub_Unsubscribe(string testName, string streamProviderName)
@@ -550,7 +534,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
             // Note: PubSub should only count distinct grains, even if a grain has multiple consumer handles
@@ -559,11 +543,11 @@ namespace UnitTests.Streaming.Reliability
             long producerGrainId = Random.Shared.Next();
 
             string when;
-            logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
+            Logger.LogInformation("Initializing: ConsumerGrain={ConsumerGrainId} ProducerGrain={ProducerGrainId}", consumerGrainId, producerGrainId);
             var consumerGrain = GetGrain(consumerGrainId);
             var producerGrain = GetGrain(producerGrainId);
 
-            logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("BecomeProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await producerGrain.BecomeProducer(_streamId, _streamProviderName);
             await producerGrain.BecomeProducer(_streamId, _streamProviderName);
             when = "After BecomeProducer";
@@ -571,7 +555,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(0);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
-            logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             var c1 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
@@ -581,19 +565,19 @@ namespace UnitTests.Streaming.Reliability
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
             await CheckConsumerCounts(when, consumerGrain, 2);
 
-            logger.LogInformation("RemoveConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("RemoveConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await consumerGrain.RemoveConsumer(_streamId, _streamProviderName, c1);
             when = "After first RemoveConsumer";
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
             await CheckConsumerCounts(when, consumerGrain, 1);
 #if REMOVE_PRODUCER
-            logger.LogInformation("RemoveProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("RemoveProducer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await producerGrain.RemoveProducer(_streamId, _streamProviderName);
             when = "After RemoveProducer";
             await CheckPubSubCounts(when, 0, 1);
             await CheckConsumerCounts(when, consumerGrain, 1);
 #endif
-            logger.LogInformation("RemoveConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("RemoveConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await consumerGrain.RemoveConsumer(_streamId, _streamProviderName, c2);
             when = "After second RemoveConsumer";
 #if REMOVE_PRODUCER
@@ -603,7 +587,7 @@ namespace UnitTests.Streaming.Reliability
 #endif
             await CheckConsumerCounts(when, consumerGrain, 0);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -613,12 +597,12 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = MEMORY_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             var consumerGrain = this.GrainFactory.GetGrain<IStreamUnsubscribeTestGrain>(consumerGrainId);
 
-            logger.LogInformation("Subscribe: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
+            Logger.LogInformation("Subscribe: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             await consumerGrain.Subscribe(_streamId, _streamProviderName);
 
             // Restart silos
@@ -645,7 +629,7 @@ namespace UnitTests.Streaming.Reliability
                 await Task.Delay(100);
             }
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_AllSilosRestart(string testName, string streamProviderName)
@@ -653,7 +637,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -671,7 +655,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(1);
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, true, true);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_AllSilosRestart_PubSubCounts(string testName, string streamProviderName)
@@ -679,7 +663,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -712,7 +696,7 @@ namespace UnitTests.Streaming.Reliability
             var consumerGrain = GetGrain(consumerGrainId);
             await CheckReceivedCounts(when, consumerGrain, 1, 0);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_SiloDies_Consumer(string testName, string streamProviderName)
@@ -721,7 +705,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -740,7 +724,7 @@ namespace UnitTests.Streaming.Reliability
             _output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the consumer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -752,7 +736,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(1);
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, true, true);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_SiloDies_Producer(string testName, string streamProviderName)
@@ -761,7 +745,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -778,7 +762,7 @@ namespace UnitTests.Streaming.Reliability
             _output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the producer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -790,7 +774,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(1);
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, true, true);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_SiloRestarts_Consumer(string testName, string streamProviderName)
@@ -799,7 +783,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -818,7 +802,7 @@ namespace UnitTests.Streaming.Reliability
             _output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -829,7 +813,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(1);
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, true, true);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_SiloRestarts_Producer(string testName, string streamProviderName)
@@ -838,7 +822,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -856,7 +840,7 @@ namespace UnitTests.Streaming.Reliability
             _output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -867,7 +851,7 @@ namespace UnitTests.Streaming.Reliability
             await producerGrain.SendItem(1);
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, true, true);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         private async Task Test_SiloJoins(string testName, string streamProviderName)
@@ -877,7 +861,7 @@ namespace UnitTests.Streaming.Reliability
 
             const int numLoops = 3;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, Logger, HostedCluster);
 
             long consumerGrainId = Random.Shared.Next();
             long producerGrainId = Random.Shared.Next();
@@ -906,7 +890,7 @@ namespace UnitTests.Streaming.Reliability
             // Add new silo
             //SiloHandle newSilo = StartAdditionalOrleans();
             //WaitForLivenessToStabilize();
-            SiloHandle newSilo = await this.HostedCluster.StartAdditionalSiloAsync();
+            var newSilo = await this.HostedCluster.StartAdditionalSiloAsync();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
 
@@ -943,17 +927,18 @@ namespace UnitTests.Streaming.Reliability
             // New consumer received the newly published messages
             await CheckReceivedCounts(when+"-New", newConsumer, numLoops, 0);
 
-            StreamTestUtils.LogEndTest(testName, logger);
+            StreamTestUtils.LogEndTest(testName, Logger);
         }
 
         // ---------- Utility Functions ----------
 
         private async Task RestartAllSilos()
         {
+            var oldSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
             _output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
-                            "Restarting all silos - Old Primary={0} Secondary={1}" +
+                            "Restarting all silos - Old Silos={0}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary?.SiloAddress, this.HostedCluster.SecondarySilos.FirstOrDefault()?.SiloAddress);
+                            string.Join(", ", oldSilos));
 
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
@@ -963,17 +948,17 @@ namespace UnitTests.Streaming.Reliability
             // Note: Needed to reinitialize client in this test case to connect to new silos
             // this.HostedCluster.InitializeClient();
 
+            var newSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
             _output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
-                            "Restarted new silos - New Primary={0} Secondary={1}" +
+                            "Restarted new silos - New Silos={0}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary?.SiloAddress, this.HostedCluster.SecondarySilos.FirstOrDefault()?.SiloAddress);
+                            string.Join(", ", newSilos));
         }
 
-        private async Task StopSilo(SiloHandle silo, bool kill, bool restart)
+        private async Task StopSilo(InProcessSiloHandle silo, bool kill, bool restart)
         {
             SiloAddress oldSilo = silo.SiloAddress;
-            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary?.SiloAddress);
-            string siloType = isPrimary ? "Primary" : "Secondary";
+            string siloType = silo.InstanceNumber == 0 ? "Primary" : "Secondary";
             var action = (restart, kill) switch
             {
                 (true, true) => "Kill and restart",
@@ -982,30 +967,31 @@ namespace UnitTests.Streaming.Reliability
                 (false, false) => "Stop",
             };
 
-            logger.LogWarning("{Action} {SiloType} silo {OldSilo}", action, siloType, oldSilo);
+            Logger.LogWarning("{Action} {SiloType} silo {OldSilo}", action, siloType, oldSilo);
 
             if (restart)
             {
                 //RestartRuntime(silo, kill);
-                SiloHandle newSilo = await this.HostedCluster.RestartSiloAsync(silo);
+                var newSilo = await this.HostedCluster.RestartSiloAsync(silo);
+                Assert.NotNull(newSilo);
 
-                logger.LogInformation("Restarted new {SiloType} silo {SiloAddress}", siloType, newSilo.SiloAddress);
+                Logger.LogInformation("Restarted new {SiloType} silo {SiloAddress}", siloType, newSilo.SiloAddress);
 
                 Assert.NotEqual(oldSilo, newSilo.SiloAddress); //"Should be different silo address after Restart"
             }
             else if (kill)
             {
-               await this.HostedCluster.KillSiloAsync(silo);
-               Assert.False(silo.IsActive);
+                await this.HostedCluster.KillSiloAsync(silo);
+                Assert.False(silo.IsActive);
             }
             else
             {
-               await this.HostedCluster.StopSiloAsync(silo);
-               Assert.False(silo.IsActive);
+                await this.HostedCluster.StopSiloAsync(silo);
+                Assert.False(silo.IsActive);
             }
 
             // WaitForLivenessToStabilize(!kill);
-            this.HostedCluster.WaitForLivenessToStabilizeAsync(kill).Wait();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync(kill);
         }
 
 #if USE_GENERICS
