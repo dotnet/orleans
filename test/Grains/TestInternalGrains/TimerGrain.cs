@@ -28,13 +28,13 @@ namespace UnitTestGrains
             public readonly GrainId GrainId = grainId;
         }
 
-        public sealed class DelayStarted(GrainId grainId) : CallbackEvent(grainId)
+        public sealed class DelayScheduled(GrainId grainId) : CallbackEvent(grainId)
         {
         }
 
-        internal static void EmitDelayStarted(GrainId grainId)
+        internal static void EmitDelayScheduled(GrainId grainId)
         {
-            if (!Listener.IsEnabled(nameof(DelayStarted)))
+            if (!Listener.IsEnabled(nameof(DelayScheduled)))
             {
                 return;
             }
@@ -44,7 +44,7 @@ namespace UnitTestGrains
             [MethodImpl(MethodImplOptions.NoInlining)]
             static void Emit(GrainId grainId)
             {
-                Listener.Write(nameof(DelayStarted), new DelayStarted(grainId));
+                Listener.Write(nameof(DelayScheduled), new DelayScheduled(grainId));
             }
         }
 
@@ -311,8 +311,9 @@ namespace UnitTestGrains
                     Assert.NotNull(timer[0]);
                     timer[0].Dispose();
                     Assert.True(ct.IsCancellationRequested);
-                    TimerGrainCallbackEvents.EmitDelayStarted(context.GrainId);
-                    await Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider);
+                    var delay = Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider);
+                    TimerGrainCallbackEvents.EmitDelayScheduled(context.GrainId);
+                    await delay;
                     tcs.TrySetResult();
                 }
                 catch (Exception ex)
@@ -390,8 +391,9 @@ namespace UnitTestGrains
             CheckRuntimeContext(step);
 
             LogStatus("Before Delay");
-            TimerGrainCallbackEvents.EmitDelayStarted(context.GrainId);
-            await Task.Delay(TimerGrainTestConstants.CallbackDelay, timeProvider);
+            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, timeProvider);
+            TimerGrainCallbackEvents.EmitDelayScheduled(context.GrainId);
+            await delay;
             step = "After Delay";
             LogStatus(step);
             CheckRuntimeContext(step);
@@ -540,8 +542,9 @@ namespace UnitTestGrains
             CheckReentrancy(step, expectedTickId);
 
             LogStatus("Before Delay", timerName);
-            TimerGrainCallbackEvents.EmitDelayStarted(_context.GrainId);
-            await Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            TimerGrainCallbackEvents.EmitDelayScheduled(_context.GrainId);
+            await delay;
             step = "After Delay";
             LogStatus(step, timerName);
             CheckRuntimeContext(step);
@@ -1004,8 +1007,9 @@ namespace UnitTestGrains
                     Assert.NotNull(timer[0]);
                     timer[0].Dispose();
                     Assert.True(ct.IsCancellationRequested);
-                    TimerGrainCallbackEvents.EmitDelayStarted(context.GrainId);
-                    await Task.Delay(TimeSpan.FromMilliseconds(100), _timeProvider);
+                    var delay = Task.Delay(TimeSpan.FromMilliseconds(100), _timeProvider);
+                    TimerGrainCallbackEvents.EmitDelayScheduled(context.GrainId);
+                    await delay;
                     tcs.TrySetResult();
                 }
                 catch (Exception ex)
@@ -1083,8 +1087,9 @@ namespace UnitTestGrains
             CheckRuntimeContext(step);
 
             LogStatus("Before Delay");
-            TimerGrainCallbackEvents.EmitDelayStarted(context.GrainId);
-            await Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            TimerGrainCallbackEvents.EmitDelayScheduled(context.GrainId);
+            await delay;
             step = "After Delay";
             LogStatus(step);
             CheckRuntimeContext(step);
@@ -1338,8 +1343,9 @@ namespace UnitTestGrains
                     Assert.NotNull(timer[0]);
                     timer[0].Dispose();
                     tcs.TrySetResult();
-                    TimerGrainCallbackEvents.EmitDelayStarted(_context.GrainId);
-                    await Task.Delay(TimeSpan.FromMilliseconds(100), _timeProvider);
+                    var delay = Task.Delay(TimeSpan.FromMilliseconds(100), _timeProvider);
+                    TimerGrainCallbackEvents.EmitDelayScheduled(_context.GrainId);
+                    await delay;
                 }
                 catch (Exception ex)
                 {
@@ -1416,8 +1422,9 @@ namespace UnitTestGrains
             CheckReentrancy(step, expectedTickId);
 
             LogStatus("Before Delay", timerName);
-            TimerGrainCallbackEvents.EmitDelayStarted(_context.GrainId);
-            await Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            var delay = Task.Delay(TimerGrainTestConstants.CallbackDelay, _timeProvider);
+            TimerGrainCallbackEvents.EmitDelayScheduled(_context.GrainId);
+            await delay;
             step = "After Delay";
             LogStatus(step, timerName);
             CheckRuntimeContext(step);

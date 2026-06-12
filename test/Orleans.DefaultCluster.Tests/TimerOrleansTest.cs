@@ -91,13 +91,13 @@ namespace DefaultCluster.Tests.TimerTests
         {
             using var callbackObserver = TimerCallbackDiagnosticObserver.Create();
             var grainId = grain.GetGrainId();
-            var delayStartedCount = callbackObserver.GetDelayStartedCount(grainId);
+            var delayScheduledCount = callbackObserver.GetDelayScheduledCount(grainId);
 
             fixture.AdvanceTime(dueTime);
             for (var tickCount = timerObserver.GetTickCount(grain.GetGrainId()) + 1; tickCount <= expectedTickCount; tickCount++)
             {
                 await timerObserver.WaitForTickStartCountAsync(grain, tickCount, TimerDiagnosticTimeout);
-                await callbackObserver.WaitForDelayStartedCountAsync(grainId, ++delayStartedCount, TimerDiagnosticTimeout);
+                await callbackObserver.WaitForDelayScheduledCountAsync(grainId, ++delayScheduledCount, TimerDiagnosticTimeout);
 
                 var waitForTickStop = timerObserver.WaitForTickCountAsync(grain, tickCount, TimerDiagnosticTimeout);
                 fixture.AdvanceTime(callbackDelay);
@@ -110,7 +110,7 @@ namespace DefaultCluster.Tests.TimerTests
             using var callbackObserver = TimerCallbackDiagnosticObserver.Create();
             var grainId = grain.GetGrainId();
             var externalTick = grain.ExternalTick("external");
-            await callbackObserver.WaitForDelayStartedCountAsync(grainId, callbackObserver.GetDelayStartedCount(grainId) + 1, TimerDiagnosticTimeout);
+            await callbackObserver.WaitForDelayScheduledCountAsync(grainId, callbackObserver.GetDelayScheduledCount(grainId) + 1, TimerDiagnosticTimeout);
             fixture.AdvanceTime(TimerCallbackDelay);
             await externalTick;
             await AdvanceTimerToTickCountAsync(grain, timerObserver, dueTime, TimerCallbackDelay, expectedTimerTicks);
@@ -128,7 +128,7 @@ namespace DefaultCluster.Tests.TimerTests
 
         private sealed class TimerCallbackDiagnosticObserver : IDisposable, IObserver<TimerGrainCallbackEvents.CallbackEvent>
         {
-            private readonly ConcurrentBag<TimerGrainCallbackEvents.DelayStarted> delayStartedEvents = new();
+            private readonly ConcurrentBag<TimerGrainCallbackEvents.DelayScheduled> delayScheduledEvents = new();
             private readonly object changeLock = new();
             private TaskCompletionSource changed = CreateCompletionSource();
             private IDisposable subscription;
@@ -140,12 +140,12 @@ namespace DefaultCluster.Tests.TimerTests
                 return observer;
             }
 
-            public int GetDelayStartedCount(GrainId grainId)
+            public int GetDelayScheduledCount(GrainId grainId)
             {
-                return delayStartedEvents.Count(e => e.GrainId == grainId);
+                return delayScheduledEvents.Count(e => e.GrainId == grainId);
             }
 
-            public async Task WaitForDelayStartedCountAsync(GrainId grainId, int expectedCount, TimeSpan timeout)
+            public async Task WaitForDelayScheduledCountAsync(GrainId grainId, int expectedCount, TimeSpan timeout)
             {
                 using var cts = new CancellationTokenSource(timeout);
 
@@ -154,7 +154,7 @@ namespace DefaultCluster.Tests.TimerTests
                     Task changedTask;
                     lock (changeLock)
                     {
-                        var currentCount = GetDelayStartedCount(grainId);
+                        var currentCount = GetDelayScheduledCount(grainId);
                         if (currentCount >= expectedCount)
                         {
                             return;
@@ -173,20 +173,20 @@ namespace DefaultCluster.Tests.TimerTests
                     }
                 }
 
-                var finalCount = GetDelayStartedCount(grainId);
+                var finalCount = GetDelayScheduledCount(grainId);
                 if (finalCount >= expectedCount)
                 {
                     return;
                 }
 
-                throw new TimeoutException($"Timed out waiting for {expectedCount} timer callbacks to reach their fake delay on grain {grainId}. Current count: {finalCount} after {timeout}");
+                throw new TimeoutException($"Timed out waiting for {expectedCount} timer callbacks to schedule their fake delay on grain {grainId}. Current count: {finalCount} after {timeout}");
             }
 
             void IObserver<TimerGrainCallbackEvents.CallbackEvent>.OnNext(TimerGrainCallbackEvents.CallbackEvent value)
             {
-                if (value is TimerGrainCallbackEvents.DelayStarted delayStarted)
+                if (value is TimerGrainCallbackEvents.DelayScheduled delayScheduled)
                 {
-                    delayStartedEvents.Add(delayStarted);
+                    delayScheduledEvents.Add(delayScheduled);
                     SignalChanged();
                 }
             }
