@@ -1,3 +1,5 @@
+#nullable enable
+
 using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -154,24 +156,21 @@ namespace UnitTests.General
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             List<SiloHandle> failures = await getSilosToFail(Fail.Random, 1);
             uint keyToCheck = PickKey(failures[0].SiloAddress);// failures[0].SiloAddress.GetConsistentHashCode();
-            List<SiloHandle> joins = null;
 
             // kill a silo and join a new one in parallel
             logger.LogInformation("Killing silo {SiloAddress} and joining a silo", failures[0].SiloAddress);
 
-            var tasks = new Task[2]
-            {
-                Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(failures[0])),
-                this.HostedCluster.StartAdditionalSilosAsync(1).ContinueWith(t => joins = t.GetAwaiter().GetResult())
-            };
-            await Task.WhenAll(tasks).WaitAsync(endWait);
+            var killTask = this.HostedCluster.StopSiloAsync(failures[0]);
+            var joinTask = this.HostedCluster.StartAdditionalSilosAsync(1);
+            await Task.WhenAll([killTask, joinTask]).WaitAsync(endWait);
+            List<SiloHandle> joinedSilos = await joinTask;
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await AssertEventually(async () =>
             {
                 await VerificationScenario(keyToCheck); // verify failed silo's key
-                await VerificationScenario(PickKey(joins[0].SiloAddress)); // verify newly joined silo's key
+                await VerificationScenario(PickKey(joinedSilos[0].SiloAddress)); // verify newly joined silo's key
             }, failureTimeout);
         }
 
@@ -184,23 +183,20 @@ namespace UnitTests.General
             //List<SiloHandle> failures = getSilosToFail(Fail.Random, 1);
             SiloHandle fail = this.HostedCluster.SecondarySilos.First();
             uint keyToCheck = PickKey(fail.SiloAddress); //fail.SiloAddress.GetConsistentHashCode();
-            List<SiloHandle> joins = null;
 
             // kill a silo and join a new one in parallel
             logger.LogInformation("Killing secondary silo {SiloAddress} and joining a silo", fail.SiloAddress);
-            var tasks = new Task[2]
-            {
-                Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(fail)),
-                this.HostedCluster.StartAdditionalSilosAsync(1).ContinueWith(t => joins = t.GetAwaiter().GetResult())
-            };
-            await Task.WhenAll(tasks).WaitAsync(endWait);
+            var killTask = this.HostedCluster.StopSiloAsync(fail);
+            var joinTask = this.HostedCluster.StartAdditionalSilosAsync(1);
+            await Task.WhenAll([killTask, joinTask]).WaitAsync(endWait);
+            var joinedSilo = (await joinTask).Single();
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await AssertEventually(async () =>
             {
                 await VerificationScenario(keyToCheck); // verify failed silo's key
-                await VerificationScenario(PickKey(joins[0].SiloAddress));
+                await VerificationScenario(PickKey(joinedSilo.SiloAddress));
             }, failureTimeout);
         }
 
@@ -282,10 +278,8 @@ namespace UnitTests.General
             // Ping the grain to make sure it is active.
             await tableGrain.ReadRows(tableGrainId);
 
-            SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
-            // ask a detailed report from the directory partition owner, and get the activation addresses
-            var address = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddress;
-            GrainAddress reminderGrainActivation = address;
+            (SiloAddress reminderTableGrainPrimaryDirectoryAddress, SiloAddress reminderGrainActivationSiloAddress) =
+                await GetReminderTableGrainAddresses(tableGrainId);
 
             SortedList<int, SiloHandle> ids = new SortedList<int, SiloHandle>();
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
@@ -296,7 +290,7 @@ namespace UnitTests.General
                     continue;
                 }
                 // Don't fail primary directory partition and the silo hosting the ReminderTableGrain.
-                if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.SiloAddress))
+                if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivationSiloAddress))
                 {
                     continue;
                 }
@@ -346,19 +340,46 @@ namespace UnitTests.General
             return failures;
         }
 
-        // for debugging only
-        private void printSilos(string msg)
+        private async Task<(SiloAddress DirectoryAddress, SiloAddress ActivationSiloAddress)> GetReminderTableGrainAddresses(GrainId tableGrainId)
         {
-            SortedList<int, SiloAddress> ids = new SortedList<int, SiloAddress>(numAdditionalSilos + 2);
-            foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
+            SiloAddress? directoryAddress = null;
+            SiloAddress? activationSiloAddress = null;
+
+            await AssertEventually(async () =>
             {
-                ids.Add(siloHandle.SiloAddress.GetConsistentHashCode(), siloHandle.SiloAddress);
-            }
-            logger.LogInformation("{Message} list of silos: ", msg);
-            foreach (var id in ids.Keys.ToList())
-            {
-                logger.LogInformation("{From} -> {To}", ids[id], id);
-            }
+                var primaryReport = await TestUtils.GetDetailedGrainReport(
+                    this.HostedCluster.InternalGrainFactory,
+                    tableGrainId,
+                    this.HostedCluster.Primary);
+
+                if (primaryReport.PrimaryForGrain is not { } primaryForGrain)
+                {
+                    throw new XunitException($"No primary directory silo was reported for reminder table grain {tableGrainId}.");
+                }
+
+                var directorySilo = this.HostedCluster.GetSiloForAddress(primaryForGrain);
+                if (directorySilo is null)
+                {
+                    throw new XunitException($"No active silo handle was found for reminder table grain directory silo {primaryForGrain}.");
+                }
+
+                var directoryReport = await TestUtils.GetDetailedGrainReport(
+                    this.HostedCluster.InternalGrainFactory,
+                    tableGrainId,
+                    directorySilo);
+
+                if (directoryReport.LocalDirectoryActivationAddress is not { } activationAddress)
+                {
+                    throw new XunitException($"No activation address was reported for reminder table grain {tableGrainId} from directory silo {primaryForGrain}.");
+                }
+
+                directoryAddress = primaryForGrain;
+                activationSiloAddress = activationAddress.SiloAddress;
+            }, failureTimeout);
+
+            return (
+                directoryAddress ?? throw new XunitException($"No primary directory silo was reported for reminder table grain {tableGrainId}."),
+                activationSiloAddress ?? throw new XunitException($"No activation silo was reported for reminder table grain {tableGrainId}."));
         }
 
         private static async Task AssertEventually(Func<Task> assertion, TimeSpan timeout)
