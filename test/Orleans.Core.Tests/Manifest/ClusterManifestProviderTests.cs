@@ -36,6 +36,24 @@ public class ClusterManifestProviderTests
     private static readonly GrainInterfaceType TestInterfaceType = GrainInterfaceType.Create("test.interface");
 
     [Fact]
+    public void Current_WhenLocalSiloIsNotActive_PreservesLocalManifestForTypeResolution()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Created)));
+        var grainFactory = CreateGrainFactory(CreateSiloAddress(11112, 1), CreateGrainManifest());
+        var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
+
+        var current = provider.Current;
+        var typeResolver = new Orleans.GrainInterfaceTypeToGrainTypeResolver(provider);
+
+        Assert.Equal(new MajorMinorVersion(1, 0), current.Version);
+        Assert.Contains(localSilo, current.Silos.Keys);
+        Assert.Equal(TestGrainType, typeResolver.GetGrainType(TestInterfaceType));
+    }
+
+    [Fact]
     public async Task Current_WhenMembershipVersionAdvances_PrunesNonActiveSilosAtFirstMinorVersion()
     {
         var localSilo = CreateSiloAddress(11111, 1);
@@ -158,7 +176,6 @@ public class ClusterManifestProviderTests
         var placementService = CreatePlacementService(localSilo, manifest, selectorManager);
 
         _ = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
-        clusterManifestProvider.Current = CreateClusterManifest(2, 0, localSilo);
 
         var target = new PlacementTarget(
             GrainId.Create("test", "grain-1"),
@@ -262,7 +279,12 @@ public class ClusterManifestProviderTests
         [
             new KeyValuePair<GrainType, GrainProperties>(
                 TestGrainType,
-                new GrainProperties(ImmutableDictionary<string, string>.Empty))
+                new GrainProperties(ImmutableDictionary.CreateRange(
+                [
+                    new KeyValuePair<string, string>(WellKnownGrainTypeProperties.TypeName, "Test"),
+                    new KeyValuePair<string, string>(WellKnownGrainTypeProperties.FullTypeName, "UnitTests.Grains.Test"),
+                    new KeyValuePair<string, string>($"{WellKnownGrainTypeProperties.ImplementedInterfacePrefix}0", TestInterfaceType.ToString())
+                ])))
         ]);
         var interfaces = ImmutableDictionary.CreateRange(
         [
@@ -270,6 +292,7 @@ public class ClusterManifestProviderTests
                 TestInterfaceType,
                 new GrainInterfaceProperties(ImmutableDictionary.CreateRange(
                 [
+                    new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.TypeName, "ITest"),
                     new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.Version, "1")
                 ])))
         ]);
@@ -280,13 +303,61 @@ public class ClusterManifestProviderTests
     private static SiloManifestProvider CreateSiloManifestProvider()
     {
         var typeConverter = CreateTypeConverter();
+        var interfaceTypeResolver = new GrainInterfaceTypeResolver([new TestGrainInterfaceTypeProvider()], typeConverter);
+        var typeNameProvider = new TypeNameGrainPropertiesProvider();
+        var options = new GrainTypeOptions();
+        options.Classes.Add(typeof(TestManifestGrain));
+        options.Interfaces.Add(typeof(ITestManifestGrain));
+
         return new SiloManifestProvider(
-            Array.Empty<IGrainPropertiesProvider>(),
-            Array.Empty<IGrainInterfacePropertiesProvider>(),
-            Options.Create(new GrainTypeOptions()),
-            new GrainTypeResolver(Array.Empty<IGrainTypeProvider>(), typeConverter),
-            new GrainInterfaceTypeResolver(Array.Empty<IGrainInterfaceTypeProvider>(), typeConverter),
+            [typeNameProvider, new ImplementedInterfaceProvider(interfaceTypeResolver)],
+            [typeNameProvider, new TestGrainInterfacePropertiesProvider()],
+            Options.Create(options),
+            new GrainTypeResolver([new TestGrainTypeProvider()], typeConverter),
+            interfaceTypeResolver,
             typeConverter);
+    }
+
+    internal interface ITestManifestGrain : IGrainWithStringKey;
+
+    internal sealed class TestManifestGrain : ITestManifestGrain;
+
+    private sealed class TestGrainTypeProvider : IGrainTypeProvider
+    {
+        public bool TryGetGrainType(Type type, out GrainType grainType)
+        {
+            if (type == typeof(TestManifestGrain))
+            {
+                grainType = TestGrainType;
+                return true;
+            }
+
+            grainType = default;
+            return false;
+        }
+    }
+
+    private sealed class TestGrainInterfaceTypeProvider : IGrainInterfaceTypeProvider
+    {
+        public bool TryGetGrainInterfaceType(Type type, out GrainInterfaceType grainInterfaceType)
+        {
+            if (type == typeof(ITestManifestGrain))
+            {
+                grainInterfaceType = TestInterfaceType;
+                return true;
+            }
+
+            grainInterfaceType = default;
+            return false;
+        }
+    }
+
+    private sealed class TestGrainInterfacePropertiesProvider : IGrainInterfacePropertiesProvider
+    {
+        public void Populate(Type interfaceType, GrainInterfaceType grainInterfaceType, Dictionary<string, string> properties)
+        {
+            properties[WellKnownGrainInterfaceProperties.Version] = "1";
+        }
     }
 
     private static Orleans.Serialization.TypeSystem.TypeConverter CreateTypeConverter()

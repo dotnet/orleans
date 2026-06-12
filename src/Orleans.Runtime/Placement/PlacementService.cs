@@ -168,19 +168,22 @@ namespace Orleans.Runtime.Placement
             ThrowIfStopping();
 
             var grainType = target.GrainIdentity.Type;
+            var activeSilos = _siloStatusOracle.GetActiveSilos();
             ImmutableArray<SiloAddress> compatibleSilos;
 
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (_assumeHomogeneousSilosForTesting)
             {
-                compatibleSilos = _siloStatusOracle.GetActiveSilos();
+                compatibleSilos = activeSilos;
             }
             else
             {
-                compatibleSilos = target.InterfaceVersion > 0
+                IEnumerable<SiloAddress> silos = target.InterfaceVersion > 0
                     ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
-                    : _grainInterfaceVersions.GetSupportedSilos(grainType).Result.ToImmutableArray();
+                    : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
+
+                compatibleSilos = silos.Intersect(activeSilos).ToImmutableArray();
 
                 ThrowIfStopping();
                 var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
@@ -204,9 +207,11 @@ namespace Orleans.Runtime.Placement
                     }
 
                     ThrowIfStopping();
-                    compatibleSilos = filteredSilos.Intersect(_siloStatusOracle.GetActiveSilos()).ToImmutableArray();
+                    compatibleSilos = filteredSilos.ToImmutableArray();
                 }
             }
+
+            compatibleSilos = compatibleSilos.Intersect(_siloStatusOracle.GetActiveSilos()).ToImmutableArray();
 
             if (compatibleSilos.Length == 0)
             {
@@ -241,7 +246,10 @@ namespace Orleans.Runtime.Placement
                 .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
                 .SuitableSilosByVersion;
 
-            return silos;
+            var activeSilos = _siloStatusOracle.GetActiveSilos();
+            return silos.ToDictionary(
+                static entry => entry.Key,
+                entry => entry.Value.Intersect(activeSilos).ToArray());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
