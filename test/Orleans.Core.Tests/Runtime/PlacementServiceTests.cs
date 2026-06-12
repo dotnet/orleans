@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -114,11 +115,7 @@ namespace UnitTests.Runtime
                 configureSiloStatusOracle: (siloStatusOracle, localSilo) =>
                 {
                     siloStatusOracle.CurrentStatus.Returns(SiloStatus.ShuttingDown);
-                    siloStatusOracle.GetApproximateSiloStatuses(true).Returns(new Dictionary<SiloAddress, SiloStatus>
-                    {
-                        [localSilo] = SiloStatus.Active,
-                        [remoteSilo] = SiloStatus.Active,
-                    });
+                    siloStatusOracle.GetActiveSilos().Returns(ImmutableArray.Create(localSilo, remoteSilo));
                 });
 
             var placementTarget = new PlacementTarget(GrainId.Create("test", "grain-1"), new Dictionary<string, object>(), default, 0);
@@ -143,7 +140,7 @@ namespace UnitTests.Runtime
 
             var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
             siloStatusOracle.CurrentStatus.Returns(SiloStatus.Active);
-            siloStatusOracle.GetApproximateSiloStatuses(true).Returns(new Dictionary<SiloAddress, SiloStatus> { [localSilo] = SiloStatus.Active });
+            siloStatusOracle.GetActiveSilos().Returns(ImmutableArray.Create(localSilo));
             configureSiloStatusOracle?.Invoke(siloStatusOracle, localSilo);
 
             return new PlacementService(

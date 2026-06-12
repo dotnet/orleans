@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -161,12 +162,12 @@ namespace Orleans.Runtime.Placement
             LogTraceAddressMessageSelectTarget(message);
         }
 
-        public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
+        public ImmutableArray<SiloAddress> GetCompatibleSilos(PlacementTarget target)
         {
             ThrowIfStopping();
 
             var grainType = target.GrainIdentity.Type;
-            SiloAddress[] compatibleSilos;
+            ImmutableArray<SiloAddress> compatibleSilos;
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (_assumeHomogeneousSilosForTesting)
@@ -179,7 +180,7 @@ namespace Orleans.Runtime.Placement
                     ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
                     : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
 
-                compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
+                compatibleSilos = silos.Intersect(AllActiveSilos).ToImmutableArray();
             }
 
             if (!_assumeHomogeneousSilosForTesting)
@@ -206,11 +207,11 @@ namespace Orleans.Runtime.Placement
                     }
 
                     ThrowIfStopping();
-                    compatibleSilos = filteredSilos.ToArray();
+                    compatibleSilos = filteredSilos.ToImmutableArray();
                 }
             }
 
-            compatibleSilos = compatibleSilos.Intersect(AllActiveSilos).ToArray();
+            compatibleSilos = compatibleSilos.Intersect(AllActiveSilos).ToImmutableArray();
 
             if (compatibleSilos.Length == 0)
             {
@@ -232,26 +233,31 @@ namespace Orleans.Runtime.Placement
             return compatibleSilos;
         }
 
-        public SiloAddress[] AllActiveSilos
+        public ImmutableArray<SiloAddress> AllActiveSilos
         {
             get
             {
-                var localSiloStatus = LocalSiloStatus;
-                var activeSilos = _siloStatusOracle.GetApproximateSiloStatuses(true);
-                var result = activeSilos
-                    .Where(static entry => entry.Value == SiloStatus.Active)
-                    .Select(entry => entry.Key)
-                    .Where(silo => localSiloStatus == SiloStatus.Active || !silo.Equals(LocalSilo))
-                    .ToArray();
-                if (result.Length > 0) return result;
-
-                if (activeSilos.Count == 0 && localSiloStatus == SiloStatus.Active)
+                var activeSilos = _siloStatusOracle.GetActiveSilos();
+                if (LocalSiloStatus == SiloStatus.Active)
                 {
+                    if (!activeSilos.IsDefaultOrEmpty) return activeSilos;
+
                     LogWarningAllActiveSilos();
-                    return new SiloAddress[] { LocalSilo };
+                    return ImmutableArray.Create(LocalSilo);
                 }
 
-                return Array.Empty<SiloAddress>();
+                if (activeSilos.IsDefaultOrEmpty) return ImmutableArray<SiloAddress>.Empty;
+
+                var builder = ImmutableArray.CreateBuilder<SiloAddress>(activeSilos.Length);
+                foreach (var silo in activeSilos)
+                {
+                    if (!silo.Equals(LocalSilo))
+                    {
+                        builder.Add(silo);
+                    }
+                }
+
+                return builder.ToImmutable();
             }
         }
 
@@ -654,7 +660,7 @@ namespace Orleans.Runtime.Placement
         [LoggerMessage(
             EventId = (int)ErrorCode.Catalog_GetApproximateSiloStatuses,
             Level = LogLevel.Warning,
-            Message = "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty"
+            Message = "AllActiveSilos SiloStatusOracle.GetActiveSilos empty"
         )]
         private partial void LogWarningAllActiveSilos();
 

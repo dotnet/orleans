@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.MembershipService;
@@ -23,9 +24,9 @@ namespace Orleans.Runtime.Placement
                 .Where(s => s.Value.Status == SiloStatus.Active && s.Value.RoleName == siloRole)
                 .Select(s => s.Key)
                 .Intersect(context.GetCompatibleSilos(target))
-                .ToArray();
+                .ToImmutableArray();
 
-            if (compatibleSilos == null || compatibleSilos.Length == 0)
+            if (compatibleSilos.IsEmpty)
             {
                 throw new OrleansException($"Cannot place grain with RoleName {siloRole}. Either Role name is invalid or there are no active silos with type {siloRole} in MembershipTableSnapshot registered yet.");
             }

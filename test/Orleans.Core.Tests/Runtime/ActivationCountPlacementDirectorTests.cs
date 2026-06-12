@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
@@ -19,7 +20,7 @@ namespace UnitTests.Runtime
             var compatibleSilo = Silo("127.0.0.1:101@1");
             var director = CreateDirector(localSilo);
             var placementContext = Substitute.For<IPlacementContext>();
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns([compatibleSilo]);
+            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(ImmutableArray.Create(compatibleSilo));
 
             var result = await director.OnAddActivation(strategy: null!, target: default, placementContext);
 
@@ -33,7 +34,7 @@ namespace UnitTests.Runtime
             var compatibleSilo = Silo("127.0.0.1:101@1");
             var director = CreateDirector(localSilo);
             var placementContext = Substitute.For<IPlacementContext>();
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns([compatibleSilo, localSilo]);
+            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(ImmutableArray.Create(compatibleSilo, localSilo));
 
             var result = await director.OnAddActivation(strategy: null!, target: default, placementContext);
 
@@ -98,7 +99,7 @@ namespace UnitTests.Runtime
         private static IPlacementContext CreatePlacementContext(params SiloAddress[] compatibleSilos)
         {
             var placementContext = Substitute.For<IPlacementContext>();
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(compatibleSilos);
+            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(ImmutableArray.Create(compatibleSilos));
             return placementContext;
         }
 

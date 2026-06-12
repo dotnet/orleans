@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 
@@ -9,7 +10,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            SiloAddress[] silos;
+            IReadOnlyList<SiloAddress> silos;
             if (target.InterfaceVersion == 0)
             {
                 silos = context.GetCompatibleSilos(target);
@@ -30,7 +31,7 @@ namespace UnitTests.Grains
                 silos = silosByVersion[version];
             }
 
-            return Task.FromResult(silos[random.Next(silos.Length)]);
+            return Task.FromResult(silos[random.Next(silos.Count)]);
         }
     }
 

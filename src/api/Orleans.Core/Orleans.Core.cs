@@ -1631,7 +1631,7 @@ namespace Orleans.Runtime.Placement
 
         SiloStatus LocalSiloStatus { get; }
 
-        SiloAddress[] GetCompatibleSilos(PlacementTarget target);
+        System.Collections.Immutable.ImmutableArray<SiloAddress> GetCompatibleSilos(PlacementTarget target);
         System.Collections.Generic.IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target);
     }
 
@@ -1639,7 +1639,7 @@ namespace Orleans.Runtime.Placement
     {
         string PlacementHintKey { get; set; }
 
-        SiloAddress GetPlacementHint(System.Collections.Generic.Dictionary<string, object> requestContextData, SiloAddress[] compatibleSilos);
+        SiloAddress GetPlacementHint(System.Collections.Generic.Dictionary<string, object> requestContextData, System.Collections.Immutable.ImmutableArray<SiloAddress> compatibleSilos);
         System.Threading.Tasks.Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context);
     }
 
