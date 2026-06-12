@@ -277,19 +277,12 @@ namespace UnitTestGrains
 
         private void ValidateTimerChangeArguments(TimeSpan dueTime, TimeSpan period)
         {
-            var timer = this.RegisterGrainTimer(_ => Task.CompletedTask, new GrainTimerCreationOptions(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan)
+            using var validationTimer = this.RegisterGrainTimer(_ => Task.CompletedTask, new GrainTimerCreationOptions(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan)
             {
                 Interleave = true
             });
 
-            try
-            {
-                timer.Change(dueTime, period);
-            }
-            finally
-            {
-                timer.Dispose();
-            }
+            validationTimer.Change(dueTime, period);
         }
 
         public Task StopTimer(string name)
@@ -977,19 +970,12 @@ namespace UnitTestGrains
 
         private void ValidateTimerChangeArguments(TimeSpan dueTime, TimeSpan period)
         {
-            var timer = this.RegisterGrainTimer(_ => Task.CompletedTask, new GrainTimerCreationOptions(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan)
+            using var validationTimer = this.RegisterGrainTimer(_ => Task.CompletedTask, new GrainTimerCreationOptions(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan)
             {
                 Interleave = true
             });
 
-            try
-            {
-                timer.Change(dueTime, period);
-            }
-            finally
-            {
-                timer.Dispose();
-            }
+            validationTimer.Change(dueTime, period);
         }
 
         public Task StopTimer(string name)
