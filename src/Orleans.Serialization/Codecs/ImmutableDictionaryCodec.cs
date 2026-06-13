@@ -25,11 +25,17 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override ImmutableDictionary<TKey, TValue> ConvertFromSurrogate(ref ImmutableDictionarySurrogate<TKey, TValue> surrogate)
-            => ImmutableDictionary.CreateRange(surrogate.Values.Comparer, surrogate.Values);
+            => ImmutableDictionary.CreateRange(
+                surrogate.Values.Comparer,
+                surrogate.ValueComparer ?? EqualityComparer<TValue>.Default,
+                surrogate.Values);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ImmutableDictionary<TKey, TValue> value, ref ImmutableDictionarySurrogate<TKey, TValue> surrogate)
-            => surrogate.Values = new(value, value.KeyComparer);
+        {
+            surrogate.Values = new(value, value.KeyComparer);
+            surrogate.ValueComparer = value.ValueComparer != EqualityComparer<TValue>.Default ? value.ValueComparer : null;
+        }
     }
 
     /// <summary>
@@ -46,6 +52,12 @@ namespace Orleans.Serialization.Codecs
         /// <value>The values.</value>
         [Id(0)]
         public Dictionary<TKey, TValue> Values;
+
+        /// <summary>
+        /// Gets or sets the value comparer.
+        /// </summary>
+        [Id(1)]
+        public IEqualityComparer<TValue> ValueComparer;
     }
 
     /// <summary>
