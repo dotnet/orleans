@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -34,6 +35,20 @@ namespace UnitTests.Manifest
         }
 
         [Fact]
+        public void GrainProperties_DoesNotUseDictionaryComparerForKeyEquality()
+        {
+            var properties = new GrainProperties(CreatePropertyDictionary(
+                StringComparer.Ordinal,
+                new KeyValuePair<string, string>("Name", "Value")));
+            var differentProperties = new GrainProperties(CreatePropertyDictionary(
+                StringComparer.OrdinalIgnoreCase,
+                new KeyValuePair<string, string>("name", "Value")));
+
+            Assert.False(properties.Equals(differentProperties));
+            Assert.False(differentProperties.Equals(properties));
+        }
+
+        [Fact]
         public void GrainInterfaceProperties_UsesStructuralEquality()
         {
             var properties = new GrainInterfaceProperties(CreatePropertyDictionary(
@@ -53,6 +68,20 @@ namespace UnitTests.Manifest
         }
 
         [Fact]
+        public void GrainInterfaceProperties_DoesNotUseDictionaryComparerForKeyEquality()
+        {
+            var properties = new GrainInterfaceProperties(CreatePropertyDictionary(
+                StringComparer.Ordinal,
+                new KeyValuePair<string, string>("Name", "Value")));
+            var differentProperties = new GrainInterfaceProperties(CreatePropertyDictionary(
+                StringComparer.OrdinalIgnoreCase,
+                new KeyValuePair<string, string>("name", "Value")));
+
+            Assert.False(properties.Equals(differentProperties));
+            Assert.False(differentProperties.Equals(properties));
+        }
+
+        [Fact]
         public void GrainManifest_UsesStructuralEquality()
         {
             var manifest = CreateGrainManifest();
@@ -64,6 +93,31 @@ namespace UnitTests.Manifest
             Assert.Equal(manifest, equalManifest);
             Assert.Equal(manifest.GetHashCode(), equalManifest.GetHashCode());
             Assert.NotEqual(manifest, differentManifest);
+        }
+
+        [Fact]
+        public void GrainManifest_DoesNotUseDictionaryComparerForKeyEquality()
+        {
+            var grainProperties = new GrainProperties(CreatePropertyDictionary(
+                new KeyValuePair<string, string>(WellKnownGrainTypeProperties.TypeName, "Test")));
+            var manifest = new GrainManifest(
+                ImmutableDictionary.CreateRange(
+                [
+                    new KeyValuePair<GrainType, GrainProperties>(GrainType.Create("Test"), grainProperties)
+                ]),
+                ImmutableDictionary.CreateRange(
+                [
+                    new KeyValuePair<GrainInterfaceType, GrainInterfaceProperties>(
+                        TestInterfaceType,
+                        new GrainInterfaceProperties(CreatePropertyDictionary(
+                            new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.TypeName, "ITest"))))
+                ]));
+            var caseInsensitiveGrains = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>(CaseInsensitiveGrainTypeComparer.Instance);
+            caseInsensitiveGrains.Add(GrainType.Create("test"), grainProperties);
+            var differentManifest = new GrainManifest(caseInsensitiveGrains.ToImmutable(), manifest.Interfaces);
+
+            Assert.False(manifest.Equals(differentManifest));
+            Assert.False(differentManifest.Equals(manifest));
         }
 
         [Fact]
@@ -229,8 +283,11 @@ namespace UnitTests.Manifest
         }
 
         private static ImmutableDictionary<string, string> CreatePropertyDictionary(params KeyValuePair<string, string>[] properties)
+            => CreatePropertyDictionary(ConstantHashStringComparer.Instance, properties);
+
+        private static ImmutableDictionary<string, string> CreatePropertyDictionary(IEqualityComparer<string> comparer, params KeyValuePair<string, string>[] properties)
         {
-            var builder = ImmutableDictionary.CreateBuilder<string, string>(ConstantHashStringComparer.Instance);
+            var builder = ImmutableDictionary.CreateBuilder<string, string>(comparer);
             foreach (var property in properties)
             {
                 builder.Add(property.Key, property.Value);
@@ -257,6 +314,19 @@ namespace UnitTests.Manifest
             public bool Equals(string x, string y) => string.Equals(x, y, System.StringComparison.Ordinal);
 
             public int GetHashCode(string obj) => 0;
+        }
+
+        private sealed class CaseInsensitiveGrainTypeComparer : IEqualityComparer<GrainType>
+        {
+            public static readonly CaseInsensitiveGrainTypeComparer Instance = new();
+
+            private CaseInsensitiveGrainTypeComparer()
+            {
+            }
+
+            public bool Equals(GrainType x, GrainType y) => string.Equals(x.ToString(), y.ToString(), StringComparison.OrdinalIgnoreCase);
+
+            public int GetHashCode(GrainType obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ToString());
         }
     }
 }
