@@ -115,21 +115,19 @@ namespace Orleans.Metadata
 
             GrainManifest DeduplicateManifest(GrainManifest manifest)
             {
-                var grains = DeduplicateProperties(manifest.Grains, canonicalGrainProperties, out var grainsModified);
-                var interfaces = DeduplicateProperties(manifest.Interfaces, canonicalInterfaceProperties, out var interfacesModified);
-                return grainsModified || interfacesModified ? new GrainManifest(grains, interfaces) : manifest;
+                var grains = DeduplicateProperties(manifest.Grains, canonicalGrainProperties);
+                var interfaces = DeduplicateProperties(manifest.Interfaces, canonicalInterfaceProperties);
+                return ReferenceEquals(grains, manifest.Grains) && ReferenceEquals(interfaces, manifest.Interfaces) ? manifest : new GrainManifest(grains, interfaces);
             }
 
             static ImmutableDictionary<TKey, TValue> DeduplicateProperties<TKey, TValue>(
                 ImmutableDictionary<TKey, TValue> properties,
-                Dictionary<TValue, TValue> canonicalProperties,
-                out bool modified)
+                Dictionary<TValue, TValue> canonicalProperties)
                 where TKey : notnull
                 where TValue : class
             {
                 Debug.Assert(HasDefaultComparers(properties));
                 ImmutableDictionary<TKey, TValue>.Builder? builder = null;
-                modified = false;
                 foreach (var entry in properties)
                 {
                     if (canonicalProperties.TryGetValue(entry.Value, out var canonicalProperty))
@@ -138,7 +136,6 @@ namespace Orleans.Metadata
                         // canonical replacement is needed.
                         if (!ReferenceEquals(canonicalProperty, entry.Value))
                         {
-                            modified = true;
                             builder ??= properties.ToBuilder();
                             builder.Remove(entry.Key);
                             builder.Add(entry.Key, canonicalProperty);
@@ -150,7 +147,7 @@ namespace Orleans.Metadata
                     }
                 }
 
-                return modified ? builder!.ToImmutable() : properties;
+                return builder?.ToImmutable() ?? properties;
             }
         }
 
