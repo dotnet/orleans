@@ -76,8 +76,8 @@ namespace Orleans.Metadata
 
         private static bool PropertiesEqual(ImmutableDictionary<string, string> left, ImmutableDictionary<string, string> right)
         {
-            Debug.Assert(HasOrdinalComparers(left));
-            Debug.Assert(HasOrdinalComparers(right));
+            Debug.Assert(HasOrdinalKeyComparer(left));
+            Debug.Assert(HasOrdinalKeyComparer(right));
             if (ReferenceEquals(left, right))
             {
                 return true;
@@ -104,9 +104,12 @@ namespace Orleans.Metadata
             => ReferenceEquals(properties.KeyComparer, StringComparer.Ordinal)
                 && ReferenceEquals(properties.ValueComparer, StringComparer.Ordinal);
 
+        private static bool HasOrdinalKeyComparer(ImmutableDictionary<string, string> properties)
+            => ReferenceEquals(properties.KeyComparer, StringComparer.Ordinal);
+
         private static void EnsureOrdinalKeyComparer(ImmutableDictionary<string, string> properties, string paramName)
         {
-            if (!ReferenceEquals(properties.KeyComparer, StringComparer.Ordinal))
+            if (!HasOrdinalKeyComparer(properties))
             {
                 throw new ArgumentException("The dictionary must use StringComparer.Ordinal as its key comparer.", paramName);
             }

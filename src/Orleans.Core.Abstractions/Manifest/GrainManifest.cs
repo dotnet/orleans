@@ -72,8 +72,8 @@ namespace Orleans.Metadata
             ImmutableDictionary<TKey, TValue> right)
             where TKey : notnull
         {
-            Debug.Assert(HasDefaultComparers(left));
-            Debug.Assert(HasDefaultComparers(right));
+            Debug.Assert(HasDefaultKeyComparer(left));
+            Debug.Assert(HasDefaultKeyComparer(right));
             if (ReferenceEquals(left, right))
             {
                 return true;
@@ -102,10 +102,14 @@ namespace Orleans.Metadata
             => ReferenceEquals(dictionary.KeyComparer, EqualityComparer<TKey>.Default)
                 && ReferenceEquals(dictionary.ValueComparer, EqualityComparer<TValue>.Default);
 
+        private static bool HasDefaultKeyComparer<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary)
+            where TKey : notnull
+            => ReferenceEquals(dictionary.KeyComparer, EqualityComparer<TKey>.Default);
+
         private static void EnsureDefaultKeyComparer<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary, string paramName)
             where TKey : notnull
         {
-            if (!ReferenceEquals(dictionary.KeyComparer, EqualityComparer<TKey>.Default))
+            if (!HasDefaultKeyComparer(dictionary))
             {
                 throw new ArgumentException("The dictionary must use the default key comparer.", paramName);
             }
