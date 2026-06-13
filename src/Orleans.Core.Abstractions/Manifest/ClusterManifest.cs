@@ -121,7 +121,7 @@ namespace Orleans.Metadata
                 where TKey : notnull
                 where TValue : class
             {
-                var builder = ImmutableDictionary.CreateBuilder<TKey, TValue>(properties.KeyComparer, properties.ValueComparer);
+                ImmutableDictionary<TKey, TValue>.Builder? builder = null;
                 modified = false;
                 foreach (var entry in properties)
                 {
@@ -132,18 +132,18 @@ namespace Orleans.Metadata
                         if (!ReferenceEquals(canonicalProperty, entry.Value))
                         {
                             modified = true;
+                            builder ??= properties.ToBuilder();
+                            builder.Remove(entry.Key);
+                            builder.Add(entry.Key, canonicalProperty);
                         }
-
-                        builder[entry.Key] = canonicalProperty;
                     }
                     else
                     {
                         canonicalProperties.Add(entry.Value, entry.Value);
-                        builder[entry.Key] = entry.Value;
                     }
                 }
 
-                return modified ? builder.ToImmutable() : properties;
+                return modified ? builder!.ToImmutable() : properties;
             }
         }
     }
