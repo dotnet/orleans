@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 using Orleans.Runtime;
@@ -25,7 +24,7 @@ namespace Orleans.Metadata
         public GrainInterfaceProperties(ImmutableDictionary<string, string> values)
         {
             ArgumentNullException.ThrowIfNull(values);
-            this.Properties = values;
+            this.Properties = values.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -83,18 +82,9 @@ namespace Orleans.Metadata
                 return false;
             }
 
-            var rightProperties = new Dictionary<string, string>(right.Count, StringComparer.Ordinal);
-            foreach (var entry in right)
-            {
-                if (!rightProperties.TryAdd(entry.Key, entry.Value))
-                {
-                    return false;
-                }
-            }
-
             foreach (var entry in left)
             {
-                if (!rightProperties.TryGetValue(entry.Key, out var value)
+                if (!right.TryGetValue(entry.Key, out var value)
                     || !string.Equals(entry.Value, value, StringComparison.Ordinal))
                 {
                     return false;

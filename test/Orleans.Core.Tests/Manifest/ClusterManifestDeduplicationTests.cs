@@ -29,6 +29,8 @@ namespace UnitTests.Manifest
                 new KeyValuePair<string, string>("two", "different")));
 
             Assert.NotSame(properties, equalProperties);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.KeyComparer);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.ValueComparer);
             Assert.Equal(properties, equalProperties);
             Assert.Equal(properties.GetHashCode(), equalProperties.GetHashCode());
             Assert.NotEqual(properties, differentProperties);
@@ -46,6 +48,8 @@ namespace UnitTests.Manifest
 
             Assert.False(properties.Equals(differentProperties));
             Assert.False(differentProperties.Equals(properties));
+            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.KeyComparer);
+            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.ValueComparer);
         }
 
         [Fact]
@@ -62,6 +66,8 @@ namespace UnitTests.Manifest
                 new KeyValuePair<string, string>("two", "different")));
 
             Assert.NotSame(properties, equalProperties);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.KeyComparer);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.ValueComparer);
             Assert.Equal(properties, equalProperties);
             Assert.Equal(properties.GetHashCode(), equalProperties.GetHashCode());
             Assert.NotEqual(properties, differentProperties);
@@ -79,6 +85,8 @@ namespace UnitTests.Manifest
 
             Assert.False(properties.Equals(differentProperties));
             Assert.False(differentProperties.Equals(properties));
+            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.KeyComparer);
+            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.ValueComparer);
         }
 
         [Fact]
@@ -118,6 +126,7 @@ namespace UnitTests.Manifest
 
             Assert.False(manifest.Equals(differentManifest));
             Assert.False(differentManifest.Equals(manifest));
+            Assert.Same(EqualityComparer<GrainType>.Default, differentManifest.Grains.KeyComparer);
         }
 
         [Fact]

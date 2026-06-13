@@ -29,8 +29,12 @@ namespace Orleans.Metadata
         {
             ArgumentNullException.ThrowIfNull(grains);
             ArgumentNullException.ThrowIfNull(interfaces);
-            this.Interfaces = interfaces;
-            this.Grains = grains;
+            this.Interfaces = interfaces.WithComparers(
+                EqualityComparer<GrainInterfaceType>.Default,
+                EqualityComparer<GrainInterfaceProperties>.Default);
+            this.Grains = grains.WithComparers(
+                EqualityComparer<GrainType>.Default,
+                EqualityComparer<GrainProperties>.Default);
         }
 
         /// <summary>
@@ -73,19 +77,10 @@ namespace Orleans.Metadata
                 return false;
             }
 
-            var rightDictionary = new Dictionary<TKey, TValue>(right.Count);
-            foreach (var entry in right)
-            {
-                if (!rightDictionary.TryAdd(entry.Key, entry.Value))
-                {
-                    return false;
-                }
-            }
-
             var comparer = EqualityComparer<TValue>.Default;
             foreach (var entry in left)
             {
-                if (!rightDictionary.TryGetValue(entry.Key, out var value)
+                if (!right.TryGetValue(entry.Key, out var value)
                     || !comparer.Equals(entry.Value, value))
                 {
                     return false;
