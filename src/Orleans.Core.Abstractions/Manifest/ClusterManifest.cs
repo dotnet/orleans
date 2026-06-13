@@ -127,6 +127,8 @@ namespace Orleans.Metadata
                 {
                     if (canonicalProperties.TryGetValue(entry.Value, out var canonicalProperty))
                     {
+                        // The lookup above uses structural equality. Reference equality only tells us whether
+                        // canonical replacement is needed.
                         if (!ReferenceEquals(canonicalProperty, entry.Value))
                         {
                             modified = true;
