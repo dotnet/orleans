@@ -171,6 +171,34 @@ namespace UnitTests.Manifest
             Assert.Same(manifest.Silos[silo1].Interfaces[TestInterfaceType], manifest.Silos[silo2].Interfaces[TestInterfaceType]);
         }
 
+        [Fact]
+        public void ClusterManifest_DeduplicatesStringEquivalentProperties()
+        {
+            var silo1 = CreateSiloAddress(11111, 1);
+            var silo2 = CreateSiloAddress(11112, 1);
+            var propertyKey = Copy("property");
+            var propertyValue = Copy("value");
+            var equalPropertyKey = Copy("property");
+            var equalPropertyValue = Copy("value");
+            Assert.NotSame(propertyKey, equalPropertyKey);
+            Assert.NotSame(propertyValue, equalPropertyValue);
+
+            var silo1Manifest = CreateGrainManifest(new KeyValuePair<string, string>(propertyKey, propertyValue));
+            var silo2Manifest = CreateGrainManifest(new KeyValuePair<string, string>(equalPropertyKey, equalPropertyValue));
+
+            var manifest = new ClusterManifest(
+                new MajorMinorVersion(1, 0),
+                ImmutableDictionary.CreateRange(
+                [
+                    new KeyValuePair<SiloAddress, GrainManifest>(silo1, silo1Manifest),
+                    new KeyValuePair<SiloAddress, GrainManifest>(silo2, silo2Manifest)
+                ]));
+
+            Assert.Single(manifest.AllGrainManifests);
+            Assert.Same(manifest.Silos[silo1], manifest.Silos[silo2]);
+            Assert.Same(manifest.Silos[silo1].Grains[TestGrainType], manifest.Silos[silo2].Grains[TestGrainType]);
+        }
+
         private static GrainManifest CreateGrainManifest(params KeyValuePair<string, string>[] additionalGrainProperties)
         {
             var grainProperties = CreatePropertyDictionary(
@@ -215,6 +243,8 @@ namespace UnitTests.Manifest
         {
             return SiloAddress.New(new(System.Net.IPAddress.Loopback, port), generation);
         }
+
+        private static string Copy(string value) => new(value.ToCharArray());
 
         private sealed class ConstantHashStringComparer : IEqualityComparer<string>
         {
