@@ -66,10 +66,27 @@ namespace Orleans.Metadata
         {
             if (ReferenceEquals(this, other)) return true;
             if (other is null) return false;
-            if (Properties.Count != other.Properties.Count) return false;
-            foreach (var (key, value) in Properties)
+            return PropertiesEqual(Properties, other.Properties);
+        }
+
+        public override int GetHashCode() => _hashCode ??= ComputeHashCode(Properties);
+
+        private static bool PropertiesEqual(ImmutableDictionary<string, string> left, ImmutableDictionary<string, string> right)
+        {
+            if (ReferenceEquals(left, right))
             {
-                if (!other.Properties.TryGetValue(key, out var otherValue) || !string.Equals(otherValue, value, StringComparison.Ordinal))
+                return true;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            foreach (var entry in left)
+            {
+                if (!right.TryGetValue(entry.Key, out var value)
+                    || !string.Equals(entry.Value, value, StringComparison.Ordinal))
                 {
                     return false;
                 }
@@ -78,22 +95,17 @@ namespace Orleans.Metadata
             return true;
         }
 
-        public override int GetHashCode()
+        private static int ComputeHashCode(ImmutableDictionary<string, string> properties)
         {
-            if (!_hashCode.HasValue)
+            var hash = 0;
+            foreach (var entry in properties)
             {
-                var hashCode = new HashCode();
-                hashCode.Add(Properties.Count);
-                foreach (var property in Properties)
-                {
-                    hashCode.Add(property.Key);
-                    hashCode.Add(property.Value);
-                }
-
-                _hashCode = hashCode.ToHashCode();
+                hash ^= HashCode.Combine(
+                    StringComparer.Ordinal.GetHashCode(entry.Key),
+                    entry.Value is null ? 0 : StringComparer.Ordinal.GetHashCode(entry.Value));
             }
 
-            return _hashCode.Value;
+            return hash;
         }
     }
 

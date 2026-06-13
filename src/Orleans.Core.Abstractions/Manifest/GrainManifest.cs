@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using Orleans.Runtime;
 
@@ -26,6 +27,8 @@ namespace Orleans.Metadata
             ImmutableDictionary<GrainType, GrainProperties> grains,
             ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> interfaces)
         {
+            ArgumentNullException.ThrowIfNull(grains);
+            ArgumentNullException.ThrowIfNull(interfaces);
             this.Interfaces = interfaces;
             this.Grains = grains;
         }
@@ -42,30 +45,9 @@ namespace Orleans.Metadata
         [Id(1)]
         public ImmutableDictionary<GrainType, GrainProperties> Grains { get; }
 
-        public override int GetHashCode()
-        {
-            if (!_hashCode.HasValue)
-            {
-                var hashCode = new HashCode();
-                hashCode.Add(Interfaces.Count);
-                foreach (var (key, value) in Interfaces)
-                {
-                    hashCode.Add(key);
-                    hashCode.Add(value);
-                }
-
-                hashCode.Add(Grains.Count);
-                foreach (var (key, value) in Grains)
-                {
-                    hashCode.Add(key);
-                    hashCode.Add(value);
-                }
-
-                _hashCode = hashCode.ToHashCode();
-            }
-
-            return _hashCode.Value;
-        }
+        public override int GetHashCode() => _hashCode ??= HashCode.Combine(
+            ComputeHashCode(Interfaces),
+            ComputeHashCode(Grains));
 
         public override bool Equals(object? obj) => obj is GrainManifest other && Equals(other);
 
@@ -73,21 +55,47 @@ namespace Orleans.Metadata
         {
             if (ReferenceEquals(this, other)) return true;
             if (other is null) return false;
-            if (Interfaces.Count != other.Interfaces.Count) return false;
-            if (Grains.Count != other.Grains.Count) return false;
-            foreach (var (key, value) in Interfaces)
+            return DictionariesEqual(Interfaces, other.Interfaces) && DictionariesEqual(Grains, other.Grains);
+        }
+
+        private static bool DictionariesEqual<TKey, TValue>(
+            ImmutableDictionary<TKey, TValue> left,
+            ImmutableDictionary<TKey, TValue> right)
+            where TKey : notnull
+        {
+            if (ReferenceEquals(left, right))
             {
-                if (!other.Interfaces.TryGetValue(key, out var otherValue)) return false;
-                if (!value.Equals(otherValue)) return false;
+                return true;
             }
 
-            foreach (var (key, value) in Grains)
+            if (left.Count != right.Count)
             {
-                if (!other.Grains.TryGetValue(key, out var otherValue)) return false;
-                if (!value.Equals(otherValue)) return false;
+                return false;
+            }
+
+            var comparer = EqualityComparer<TValue>.Default;
+            foreach (var entry in left)
+            {
+                if (!right.TryGetValue(entry.Key, out var value)
+                    || !comparer.Equals(entry.Value, value))
+                {
+                    return false;
+                }
             }
 
             return true;
+        }
+
+        private static int ComputeHashCode<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary)
+            where TKey : notnull
+        {
+            var hash = 0;
+            foreach (var entry in dictionary)
+            {
+                hash ^= HashCode.Combine(entry.Key, entry.Value);
+            }
+
+            return hash;
         }
     }
 }
