@@ -62,7 +62,7 @@ namespace Orleans.Metadata
         public GrainBindingsResolver(IClusterManifestProvider clusterManifestProvider)
         {
             _clusterManifestProvider = clusterManifestProvider;
-            _cache = BuildCache(_clusterManifestProvider.Current);
+            _cache = BuildCache(_clusterManifestProvider.Current, _clusterManifestProvider.LocalGrainManifest);
         }
 
         /// <summary>
@@ -124,16 +124,24 @@ namespace Orleans.Metadata
                     return cache;
                 }
 
-                return _cache = BuildCache(manifest);
+                return _cache = BuildCache(manifest, _clusterManifestProvider.LocalGrainManifest);
             }
         }
 
-        private static Cache BuildCache(ClusterManifest clusterManifest)
+        private static Cache BuildCache(ClusterManifest clusterManifest, GrainManifest localGrainManifest)
         {
             var result = new Dictionary<GrainType, GrainBindings>();
 
             var bindings = new Dictionary<string, Dictionary<string, string>>();
             foreach (var manifest in clusterManifest.AllGrainManifests)
+            {
+                AddManifest(manifest);
+            }
+
+            AddManifest(localGrainManifest);
+            return new Cache(clusterManifest.Version, result.ToImmutableDictionary());
+
+            void AddManifest(GrainManifest manifest)
             {
                 foreach (var grainType in manifest.Grains)
                 {
@@ -162,8 +170,6 @@ namespace Orleans.Metadata
                     result.Add(id, new GrainBindings(id, builder.ToImmutable()));
                 }
             }
-
-            return new Cache(clusterManifest.Version, result.ToImmutableDictionary());
 
             bool TryExtractBindingProperty(KeyValuePair<string, string> property, out (string Index, string Key, string Value) result)
             {

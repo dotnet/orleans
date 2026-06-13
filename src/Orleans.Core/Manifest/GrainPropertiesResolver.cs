@@ -83,6 +83,11 @@ namespace Orleans.Metadata
                 }
             }
 
+            if (_clusterManifestProvider.LocalGrainManifest.Grains.TryGetValue(lookupKey, out properties))
+            {
+                return true;
+            }
+
             properties = default;
             return false;
         }
