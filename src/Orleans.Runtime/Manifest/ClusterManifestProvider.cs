@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Metadata
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
             LocalGrainManifest = siloManifestProvider.SiloManifest;
-            _current = new ClusterManifest(
+            _current = CreateClusterManifest(
                 MajorMinorVersion.MinValue,
                 ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
             _updates = new AsyncEnumerable<ClusterManifest>(
@@ -93,7 +93,7 @@ namespace Orleans.Runtime.Metadata
                 var version = current.Version.Major == membershipVersion
                     ? new MajorMinorVersion(membershipVersion, current.Version.Minor + 1)
                     : new MajorMinorVersion(membershipVersion, 0);
-                var updated = new ClusterManifest(version, synchronizedSilos);
+                var updated = CreateClusterManifest(version, synchronizedSilos);
                 TryPublishManifest(updated);
                 return _current;
             }
@@ -191,8 +191,7 @@ namespace Orleans.Runtime.Metadata
 
                 if (member.SiloAddress.Equals(_localSiloAddress))
                 {
-                    builder[_localSiloAddress] = LocalGrainManifest;
-                    modified = true;
+                    // Local membership changes are applied synchronously by EnsureCurrentManifestVersion.
                     continue;
                 }
 
@@ -241,12 +240,32 @@ namespace Orleans.Runtime.Metadata
             var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
             if (modified)
             {
-                var manifest = new ClusterManifest(version, builder.ToImmutable());
+                var manifest = CreateClusterManifest(version, builder.ToImmutable());
                 var publishSuccess = TryPublishManifest(manifest);
                 return publishSuccess && fetchSuccess && ContainsAllActiveSilos(manifest.Silos, clusterMembership);
             }
 
             return fetchSuccess && ContainsAllActiveSilos(existingManifest.Silos, clusterMembership);
+        }
+
+        private ClusterManifest CreateClusterManifest(
+            MajorMinorVersion version,
+            ImmutableDictionary<SiloAddress, GrainManifest> silos)
+        {
+            var builder = ImmutableArray.CreateBuilder<GrainManifest>(silos.Count + 1);
+            var containsLocalManifest = false;
+            foreach (var manifest in silos.Values)
+            {
+                builder.Add(manifest);
+                containsLocalManifest |= ReferenceEquals(manifest, LocalGrainManifest);
+            }
+
+            if (!containsLocalManifest)
+            {
+                builder.Add(LocalGrainManifest);
+            }
+
+            return new ClusterManifest(version, silos, builder.ToImmutable());
         }
 
         private bool TryPublishManifest(ClusterManifest manifest)

@@ -62,7 +62,7 @@ namespace Orleans.Metadata
         public GrainBindingsResolver(IClusterManifestProvider clusterManifestProvider)
         {
             _clusterManifestProvider = clusterManifestProvider;
-            _cache = BuildCache(_clusterManifestProvider.Current, _clusterManifestProvider.LocalGrainManifest);
+            _cache = BuildCache(_clusterManifestProvider.Current);
         }
 
         /// <summary>
@@ -124,11 +124,11 @@ namespace Orleans.Metadata
                     return cache;
                 }
 
-                return _cache = BuildCache(manifest, _clusterManifestProvider.LocalGrainManifest);
+                return _cache = BuildCache(manifest);
             }
         }
 
-        private static Cache BuildCache(ClusterManifest clusterManifest, GrainManifest localGrainManifest)
+        private static Cache BuildCache(ClusterManifest clusterManifest)
         {
             var result = new Dictionary<GrainType, GrainBindings>();
 
@@ -138,7 +138,6 @@ namespace Orleans.Metadata
                 AddManifest(manifest);
             }
 
-            AddManifest(localGrainManifest);
             return new Cache(clusterManifest.Version, result.ToImmutableDictionary());
 
             void AddManifest(GrainManifest manifest)

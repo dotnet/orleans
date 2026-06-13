@@ -190,7 +190,7 @@ namespace Orleans
                     return cache;
                 }
 
-                return _cache = BuildCache(manifest, _clusterManifestProvider.LocalGrainManifest);
+                return _cache = BuildCache(manifest);
             }
         }
 
@@ -199,7 +199,7 @@ namespace Orleans
         /// </summary>
         /// <param name="clusterManifest">The current cluster manifest.</param>
         /// <returns>The cache.</returns>
-        private static Cache BuildCache(ClusterManifest clusterManifest, GrainManifest localGrainManifest)
+        private static Cache BuildCache(ClusterManifest clusterManifest)
         {
             var result = new Dictionary<GrainInterfaceType, CacheEntry>();
 
@@ -208,7 +208,6 @@ namespace Orleans
                 AddManifest(result, manifest);
             }
 
-            AddManifest(result, localGrainManifest);
             return new Cache(clusterManifest.Version, result);
         }
 

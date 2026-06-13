@@ -50,6 +50,7 @@ public class ClusterManifestProviderTests
 
         Assert.Equal(new MajorMinorVersion(1, 0), current.Version);
         Assert.DoesNotContain(localSilo, current.Silos.Keys);
+        Assert.Contains(provider.LocalGrainManifest, current.AllGrainManifests);
         Assert.Equal(TestGrainType, typeResolver.GetGrainType(TestInterfaceType));
     }
 
