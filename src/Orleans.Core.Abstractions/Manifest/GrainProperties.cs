@@ -84,9 +84,18 @@ namespace Orleans.Metadata
                 return false;
             }
 
+            var rightProperties = new Dictionary<string, string>(right.Count, StringComparer.Ordinal);
+            foreach (var entry in right)
+            {
+                if (!rightProperties.TryAdd(entry.Key, entry.Value))
+                {
+                    return false;
+                }
+            }
+
             foreach (var entry in left)
             {
-                if (!right.TryGetValue(entry.Key, out var value)
+                if (!rightProperties.TryGetValue(entry.Key, out var value)
                     || !string.Equals(entry.Value, value, StringComparison.Ordinal))
                 {
                     return false;
