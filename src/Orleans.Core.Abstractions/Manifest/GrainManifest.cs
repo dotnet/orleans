@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -29,12 +30,16 @@ namespace Orleans.Metadata
         {
             ArgumentNullException.ThrowIfNull(grains);
             ArgumentNullException.ThrowIfNull(interfaces);
+            EnsureDefaultKeyComparer(grains, nameof(grains));
+            EnsureDefaultKeyComparer(interfaces, nameof(interfaces));
             this.Interfaces = interfaces.WithComparers(
                 EqualityComparer<GrainInterfaceType>.Default,
                 EqualityComparer<GrainInterfaceProperties>.Default);
             this.Grains = grains.WithComparers(
                 EqualityComparer<GrainType>.Default,
                 EqualityComparer<GrainProperties>.Default);
+            Debug.Assert(HasDefaultComparers(this.Interfaces));
+            Debug.Assert(HasDefaultComparers(this.Grains));
         }
 
         /// <summary>
@@ -67,6 +72,8 @@ namespace Orleans.Metadata
             ImmutableDictionary<TKey, TValue> right)
             where TKey : notnull
         {
+            Debug.Assert(HasDefaultComparers(left));
+            Debug.Assert(HasDefaultComparers(right));
             if (ReferenceEquals(left, right))
             {
                 return true;
@@ -88,6 +95,20 @@ namespace Orleans.Metadata
             }
 
             return true;
+        }
+
+        private static bool HasDefaultComparers<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary)
+            where TKey : notnull
+            => ReferenceEquals(dictionary.KeyComparer, EqualityComparer<TKey>.Default)
+                && ReferenceEquals(dictionary.ValueComparer, EqualityComparer<TValue>.Default);
+
+        private static void EnsureDefaultKeyComparer<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary, string paramName)
+            where TKey : notnull
+        {
+            if (!ReferenceEquals(dictionary.KeyComparer, EqualityComparer<TKey>.Default))
+            {
+                throw new ArgumentException("The dictionary must use the default key comparer.", paramName);
+            }
         }
 
         private static int ComputeHashCode<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary)

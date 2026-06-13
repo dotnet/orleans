@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using TestExtensions;
@@ -37,19 +38,25 @@ namespace UnitTests.Manifest
         }
 
         [Fact]
-        public void GrainProperties_DoesNotUseDictionaryComparerForKeyEquality()
+        public void GrainProperties_NormalizesValueComparer()
         {
             var properties = new GrainProperties(CreatePropertyDictionary(
                 StringComparer.Ordinal,
-                new KeyValuePair<string, string>("Name", "Value")));
-            var differentProperties = new GrainProperties(CreatePropertyDictionary(
                 StringComparer.OrdinalIgnoreCase,
-                new KeyValuePair<string, string>("name", "Value")));
+                new KeyValuePair<string, string>("Name", "Value")));
 
-            Assert.False(properties.Equals(differentProperties));
-            Assert.False(differentProperties.Equals(properties));
-            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.KeyComparer);
-            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.ValueComparer);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.KeyComparer);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.ValueComparer);
+        }
+
+        [Fact]
+        public void GrainProperties_RejectsNonOrdinalKeyComparer()
+        {
+            var exception = Assert.Throws<ArgumentException>(() => new GrainProperties(CreatePropertyDictionary(
+                StringComparer.OrdinalIgnoreCase,
+                new KeyValuePair<string, string>("Name", "Value"))));
+
+            Assert.Equal("values", exception.ParamName);
         }
 
         [Fact]
@@ -74,19 +81,25 @@ namespace UnitTests.Manifest
         }
 
         [Fact]
-        public void GrainInterfaceProperties_DoesNotUseDictionaryComparerForKeyEquality()
+        public void GrainInterfaceProperties_NormalizesValueComparer()
         {
             var properties = new GrainInterfaceProperties(CreatePropertyDictionary(
                 StringComparer.Ordinal,
-                new KeyValuePair<string, string>("Name", "Value")));
-            var differentProperties = new GrainInterfaceProperties(CreatePropertyDictionary(
                 StringComparer.OrdinalIgnoreCase,
-                new KeyValuePair<string, string>("name", "Value")));
+                new KeyValuePair<string, string>("Name", "Value")));
 
-            Assert.False(properties.Equals(differentProperties));
-            Assert.False(differentProperties.Equals(properties));
-            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.KeyComparer);
-            Assert.Same(StringComparer.Ordinal, differentProperties.Properties.ValueComparer);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.KeyComparer);
+            Assert.Same(StringComparer.Ordinal, properties.Properties.ValueComparer);
+        }
+
+        [Fact]
+        public void GrainInterfaceProperties_RejectsNonOrdinalKeyComparer()
+        {
+            var exception = Assert.Throws<ArgumentException>(() => new GrainInterfaceProperties(CreatePropertyDictionary(
+                StringComparer.OrdinalIgnoreCase,
+                new KeyValuePair<string, string>("Name", "Value"))));
+
+            Assert.Equal("values", exception.ParamName);
         }
 
         [Fact]
@@ -104,29 +117,59 @@ namespace UnitTests.Manifest
         }
 
         [Fact]
-        public void GrainManifest_DoesNotUseDictionaryComparerForKeyEquality()
+        public void GrainManifest_NormalizesValueComparers()
         {
-            var grainProperties = new GrainProperties(CreatePropertyDictionary(
-                new KeyValuePair<string, string>(WellKnownGrainTypeProperties.TypeName, "Test")));
-            var manifest = new GrainManifest(
-                ImmutableDictionary.CreateRange(
-                [
-                    new KeyValuePair<GrainType, GrainProperties>(GrainType.Create("Test"), grainProperties)
-                ]),
-                ImmutableDictionary.CreateRange(
-                [
-                    new KeyValuePair<GrainInterfaceType, GrainInterfaceProperties>(
-                        TestInterfaceType,
-                        new GrainInterfaceProperties(CreatePropertyDictionary(
-                            new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.TypeName, "ITest"))))
-                ]));
-            var caseInsensitiveGrains = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>(CaseInsensitiveGrainTypeComparer.Instance);
-            caseInsensitiveGrains.Add(GrainType.Create("test"), grainProperties);
-            var differentManifest = new GrainManifest(caseInsensitiveGrains.ToImmutable(), manifest.Interfaces);
+            var manifest = CreateGrainManifest();
+            var grains = manifest.Grains.WithComparers(EqualityComparer<GrainType>.Default, ReferenceComparer<GrainProperties>.Instance);
+            var interfaces = manifest.Interfaces.WithComparers(EqualityComparer<GrainInterfaceType>.Default, ReferenceComparer<GrainInterfaceProperties>.Instance);
 
-            Assert.False(manifest.Equals(differentManifest));
-            Assert.False(differentManifest.Equals(manifest));
-            Assert.Same(EqualityComparer<GrainType>.Default, differentManifest.Grains.KeyComparer);
+            var normalized = new GrainManifest(grains, interfaces);
+
+            Assert.Same(EqualityComparer<GrainType>.Default, normalized.Grains.KeyComparer);
+            Assert.Same(EqualityComparer<GrainProperties>.Default, normalized.Grains.ValueComparer);
+            Assert.Same(EqualityComparer<GrainInterfaceType>.Default, normalized.Interfaces.KeyComparer);
+            Assert.Same(EqualityComparer<GrainInterfaceProperties>.Default, normalized.Interfaces.ValueComparer);
+        }
+
+        [Fact]
+        public void GrainManifest_RejectsNonDefaultDictionaryComparers()
+        {
+            var manifest = CreateGrainManifest();
+            var caseInsensitiveGrains = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>(CaseInsensitiveGrainTypeComparer.Instance);
+            caseInsensitiveGrains.Add(TestGrainType, manifest.Grains[TestGrainType]);
+            var grainException = Assert.Throws<ArgumentException>(() => new GrainManifest(caseInsensitiveGrains.ToImmutable(), manifest.Interfaces));
+            var caseInsensitiveInterfaces = ImmutableDictionary.CreateBuilder<GrainInterfaceType, GrainInterfaceProperties>(CaseInsensitiveGrainInterfaceTypeComparer.Instance);
+            caseInsensitiveInterfaces.Add(TestInterfaceType, manifest.Interfaces[TestInterfaceType]);
+            var interfaceException = Assert.Throws<ArgumentException>(() => new GrainManifest(manifest.Grains, caseInsensitiveInterfaces.ToImmutable()));
+
+            Assert.Equal("grains", grainException.ParamName);
+            Assert.Equal("interfaces", interfaceException.ParamName);
+        }
+
+        [Fact]
+        public void ClusterManifest_NormalizesValueComparer()
+        {
+            var silo = CreateSiloAddress(11111, 1);
+            var silos = ImmutableDictionary
+                .CreateRange([new KeyValuePair<SiloAddress, GrainManifest>(silo, CreateGrainManifest())])
+                .WithComparers(EqualityComparer<SiloAddress>.Default, ReferenceComparer<GrainManifest>.Instance);
+
+            var manifest = new ClusterManifest(new MajorMinorVersion(1, 0), silos);
+
+            Assert.Same(EqualityComparer<SiloAddress>.Default, manifest.Silos.KeyComparer);
+            Assert.Same(EqualityComparer<GrainManifest>.Default, manifest.Silos.ValueComparer);
+        }
+
+        [Fact]
+        public void ClusterManifest_RejectsNonDefaultDictionaryComparers()
+        {
+            var silo = CreateSiloAddress(11111, 1);
+            var silos = ImmutableDictionary.CreateBuilder<SiloAddress, GrainManifest>(SiloAddressComparer.Instance);
+            silos.Add(silo, CreateGrainManifest());
+
+            var exception = Assert.Throws<ArgumentException>(() => new ClusterManifest(new MajorMinorVersion(1, 0), silos.ToImmutable()));
+
+            Assert.Equal("silos", exception.ParamName);
         }
 
         [Fact]
@@ -292,11 +335,17 @@ namespace UnitTests.Manifest
         }
 
         private static ImmutableDictionary<string, string> CreatePropertyDictionary(params KeyValuePair<string, string>[] properties)
-            => CreatePropertyDictionary(ConstantHashStringComparer.Instance, properties);
+            => CreatePropertyDictionary(StringComparer.Ordinal, StringComparer.Ordinal, properties);
 
         private static ImmutableDictionary<string, string> CreatePropertyDictionary(IEqualityComparer<string> comparer, params KeyValuePair<string, string>[] properties)
+            => CreatePropertyDictionary(comparer, StringComparer.Ordinal, properties);
+
+        private static ImmutableDictionary<string, string> CreatePropertyDictionary(
+            IEqualityComparer<string> keyComparer,
+            IEqualityComparer<string> valueComparer,
+            params KeyValuePair<string, string>[] properties)
         {
-            var builder = ImmutableDictionary.CreateBuilder<string, string>(comparer);
+            var builder = ImmutableDictionary.CreateBuilder<string, string>(keyComparer, valueComparer);
             foreach (var property in properties)
             {
                 builder.Add(property.Key, property.Value);
@@ -312,19 +361,6 @@ namespace UnitTests.Manifest
 
         private static string Copy(string value) => new(value.ToCharArray());
 
-        private sealed class ConstantHashStringComparer : IEqualityComparer<string>
-        {
-            public static readonly ConstantHashStringComparer Instance = new();
-
-            private ConstantHashStringComparer()
-            {
-            }
-
-            public bool Equals(string x, string y) => string.Equals(x, y, System.StringComparison.Ordinal);
-
-            public int GetHashCode(string obj) => 0;
-        }
-
         private sealed class CaseInsensitiveGrainTypeComparer : IEqualityComparer<GrainType>
         {
             public static readonly CaseInsensitiveGrainTypeComparer Instance = new();
@@ -336,6 +372,46 @@ namespace UnitTests.Manifest
             public bool Equals(GrainType x, GrainType y) => string.Equals(x.ToString(), y.ToString(), StringComparison.OrdinalIgnoreCase);
 
             public int GetHashCode(GrainType obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ToString());
+        }
+
+        private sealed class CaseInsensitiveGrainInterfaceTypeComparer : IEqualityComparer<GrainInterfaceType>
+        {
+            public static readonly CaseInsensitiveGrainInterfaceTypeComparer Instance = new();
+
+            private CaseInsensitiveGrainInterfaceTypeComparer()
+            {
+            }
+
+            public bool Equals(GrainInterfaceType x, GrainInterfaceType y) => string.Equals(x.ToString(), y.ToString(), StringComparison.OrdinalIgnoreCase);
+
+            public int GetHashCode(GrainInterfaceType obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ToString());
+        }
+
+        private sealed class ReferenceComparer<T> : IEqualityComparer<T>
+            where T : class
+        {
+            public static readonly ReferenceComparer<T> Instance = new();
+
+            private ReferenceComparer()
+            {
+            }
+
+            public bool Equals(T x, T y) => ReferenceEquals(x, y);
+
+            public int GetHashCode(T obj) => RuntimeHelpers.GetHashCode(obj);
+        }
+
+        private sealed class SiloAddressComparer : IEqualityComparer<SiloAddress>
+        {
+            public static readonly SiloAddressComparer Instance = new();
+
+            private SiloAddressComparer()
+            {
+            }
+
+            public bool Equals(SiloAddress x, SiloAddress y) => EqualityComparer<SiloAddress>.Default.Equals(x, y);
+
+            public int GetHashCode(SiloAddress obj) => EqualityComparer<SiloAddress>.Default.GetHashCode(obj);
         }
     }
 }

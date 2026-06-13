@@ -35,13 +35,13 @@ namespace Orleans.Runtime
             foreach (var grainInterface in grainTypeOptions.Value.Interfaces)
             {
                 var interfaceId = interfaceTypeResolver.GetGrainInterfaceType(grainInterface);
-                var properties = new Dictionary<string, string>();
+                var properties = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (var provider in propertyProviders)
                 {
                     provider.Populate(grainInterface, interfaceId, properties);
                 }
 
-                var result = new GrainInterfaceProperties(properties.ToImmutableDictionary());
+                var result = new GrainInterfaceProperties(ToImmutablePropertyDictionary(properties));
                 if (builder.TryGetValue(interfaceId, out var grainInterfaceProperty))
                 {
                     throw new InvalidOperationException($"An entry with the key {interfaceId} is already present."
@@ -50,6 +50,17 @@ namespace Orleans.Runtime
                 }
 
                 builder.Add(interfaceId, result);
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static ImmutableDictionary<string, string> ToImmutablePropertyDictionary(Dictionary<string, string> properties)
+        {
+            var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal, StringComparer.Ordinal);
+            foreach (var property in properties)
+            {
+                builder.Add(property.Key, property.Value);
             }
 
             return builder.ToImmutable();

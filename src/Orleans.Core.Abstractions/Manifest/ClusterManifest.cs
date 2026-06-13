@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -45,6 +46,10 @@ namespace Orleans.Metadata
             ImmutableArray<GrainManifest> allGrainManifests)
         {
             ArgumentNullException.ThrowIfNull(silos);
+            EnsureDefaultKeyComparer(silos, nameof(silos));
+            silos = silos.WithComparers(
+                EqualityComparer<SiloAddress>.Default,
+                EqualityComparer<GrainManifest>.Default);
             var deduplicated = Deduplicate(silos, allGrainManifests);
             Version = version;
             Silos = deduplicated.Silos;
@@ -73,6 +78,7 @@ namespace Orleans.Metadata
             ImmutableDictionary<SiloAddress, GrainManifest> silos,
             ImmutableArray<GrainManifest> allGrainManifests)
         {
+            Debug.Assert(HasDefaultComparers(silos));
             var canonicalGrainProperties = new Dictionary<GrainProperties, GrainProperties>();
             var canonicalInterfaceProperties = new Dictionary<GrainInterfaceProperties, GrainInterfaceProperties>();
             var canonicalManifests = new Dictionary<GrainManifest, GrainManifest>();
@@ -121,6 +127,7 @@ namespace Orleans.Metadata
                 where TKey : notnull
                 where TValue : class
             {
+                Debug.Assert(HasDefaultComparers(properties));
                 ImmutableDictionary<TKey, TValue>.Builder? builder = null;
                 modified = false;
                 foreach (var entry in properties)
@@ -144,6 +151,20 @@ namespace Orleans.Metadata
                 }
 
                 return modified ? builder!.ToImmutable() : properties;
+            }
+        }
+
+        private static bool HasDefaultComparers<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary)
+            where TKey : notnull
+            => ReferenceEquals(dictionary.KeyComparer, EqualityComparer<TKey>.Default)
+                && ReferenceEquals(dictionary.ValueComparer, EqualityComparer<TValue>.Default);
+
+        private static void EnsureDefaultKeyComparer<TKey, TValue>(ImmutableDictionary<TKey, TValue> dictionary, string paramName)
+            where TKey : notnull
+        {
+            if (!ReferenceEquals(dictionary.KeyComparer, EqualityComparer<TKey>.Default))
+            {
+                throw new ArgumentException("The dictionary must use the default key comparer.", paramName);
             }
         }
     }

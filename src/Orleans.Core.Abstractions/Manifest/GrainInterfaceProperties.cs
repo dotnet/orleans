@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Text;
 using Orleans.Runtime;
 
@@ -25,7 +26,9 @@ namespace Orleans.Metadata
         public GrainInterfaceProperties(ImmutableDictionary<string, string> values)
         {
             ArgumentNullException.ThrowIfNull(values);
+            EnsureOrdinalKeyComparer(values, nameof(values));
             this.Properties = values.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal);
+            Debug.Assert(HasOrdinalComparers(this.Properties));
         }
 
         /// <summary>
@@ -73,6 +76,8 @@ namespace Orleans.Metadata
 
         private static bool PropertiesEqual(ImmutableDictionary<string, string> left, ImmutableDictionary<string, string> right)
         {
+            Debug.Assert(HasOrdinalComparers(left));
+            Debug.Assert(HasOrdinalComparers(right));
             if (ReferenceEquals(left, right))
             {
                 return true;
@@ -93,6 +98,18 @@ namespace Orleans.Metadata
             }
 
             return true;
+        }
+
+        private static bool HasOrdinalComparers(ImmutableDictionary<string, string> properties)
+            => ReferenceEquals(properties.KeyComparer, StringComparer.Ordinal)
+                && ReferenceEquals(properties.ValueComparer, StringComparer.Ordinal);
+
+        private static void EnsureOrdinalKeyComparer(ImmutableDictionary<string, string> properties, string paramName)
+        {
+            if (!ReferenceEquals(properties.KeyComparer, StringComparer.Ordinal))
+            {
+                throw new ArgumentException("The dictionary must use StringComparer.Ordinal as its key comparer.", paramName);
+            }
         }
 
         private static int ComputeHashCode(ImmutableDictionary<string, string> properties)
