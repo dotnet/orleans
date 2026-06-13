@@ -47,8 +47,8 @@ namespace Orleans.Runtime.Metadata
             _fatalErrorHandler = fatalErrorHandler;
             LocalGrainManifest = siloManifestProvider.SiloManifest;
             _current = new ClusterManifest(
-                MajorMinorVersion.Zero,
-                ImmutableDictionary.CreateRange([new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, LocalGrainManifest)]));
+                MajorMinorVersion.MinValue,
+                ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
             _updates = new AsyncEnumerable<ClusterManifest>(
                 initialValue: _current,
                 updateValidator: (previous, proposed) => proposed.Version > previous.Version,
@@ -65,7 +65,13 @@ namespace Orleans.Runtime.Metadata
         {
             var current = _current;
             var membershipVersion = clusterMembership.Version.Value;
-            if (current.Version.Major >= membershipVersion)
+            if (current.Version.Major > membershipVersion)
+            {
+                return current;
+            }
+
+            var synchronizedSilos = ApplySynchronousMembershipChanges(current.Silos, clusterMembership, out var modified);
+            if (current.Version.Major == membershipVersion && !modified)
             {
                 return current;
             }
@@ -73,20 +79,22 @@ namespace Orleans.Runtime.Metadata
             lock (_currentLock)
             {
                 current = _current;
-                if (current.Version.Major >= membershipVersion)
+                if (current.Version.Major > membershipVersion)
                 {
                     return current;
                 }
 
-                var prunedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, _localSiloAddress, out _);
-                if (clusterMembership.GetSiloStatus(_localSiloAddress) == SiloStatus.Active
-                    && !prunedSilos.ContainsKey(_localSiloAddress))
+                synchronizedSilos = ApplySynchronousMembershipChanges(current.Silos, clusterMembership, out modified);
+                if (current.Version.Major == membershipVersion && !modified)
                 {
-                    prunedSilos = prunedSilos.Add(_localSiloAddress, LocalGrainManifest);
+                    return current;
                 }
 
-                var updated = new ClusterManifest(new MajorMinorVersion(membershipVersion, 0), prunedSilos);
-                _updates.TryPublish(updated);
+                var version = current.Version.Major == membershipVersion
+                    ? new MajorMinorVersion(membershipVersion, current.Version.Minor + 1)
+                    : new MajorMinorVersion(membershipVersion, 0);
+                var updated = new ClusterManifest(version, synchronizedSilos);
+                TryPublishManifest(updated);
                 return _current;
             }
         }
@@ -97,21 +105,45 @@ namespace Orleans.Runtime.Metadata
             {
                 LogDebugStartingToProcessMembershipUpdates();
 
-                var cancellation = _shutdownCts.Token;
-                await foreach (var _ in _clusterMembershipService.MembershipUpdates.WithCancellation(cancellation))
+                var cancellationToken = _shutdownCts.Token;
+                await using var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(cancellationToken);
+                var nextUpdateTask = membershipUpdates.MoveNextAsync().AsTask();
+                ClusterMembershipSnapshot? membershipSnapshot = null;
+
+                while (true)
                 {
-                    while (true)
+                    if (membershipSnapshot is null)
                     {
-                        var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-
-                        var success = await UpdateManifest(membershipSnapshot);
-
-                        if (success || cancellation.IsCancellationRequested)
+                        if (!await nextUpdateTask)
                         {
-                            break;
+                            return;
                         }
 
-                        await Task.Delay(TimeSpan.FromSeconds(5), cancellation);
+                        membershipSnapshot = membershipUpdates.Current;
+                        nextUpdateTask = membershipUpdates.MoveNextAsync().AsTask();
+                    }
+
+                    if (await UpdateManifest(membershipSnapshot))
+                    {
+                        membershipSnapshot = null;
+                        continue;
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var retryDelayTask = Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                    if (await Task.WhenAny(nextUpdateTask, retryDelayTask) == nextUpdateTask)
+                    {
+                        if (!await nextUpdateTask)
+                        {
+                            return;
+                        }
+
+                        membershipSnapshot = membershipUpdates.Current;
+                        nextUpdateTask = membershipUpdates.MoveNextAsync().AsTask();
+                    }
+                    else
+                    {
+                        await retryDelayTask;
                     }
                 }
             }
@@ -137,25 +169,17 @@ namespace Orleans.Runtime.Metadata
                 return true;
             }
 
-            var silos = RemoveNonActiveSilos(existingManifest.Silos, clusterMembership, _localSiloAddress, out var modified);
-            var builder = silos.ToBuilder();
-
-            if (clusterMembership.GetSiloStatus(_localSiloAddress) == SiloStatus.Active
-                && !builder.ContainsKey(_localSiloAddress))
-            {
-                builder[_localSiloAddress] = LocalGrainManifest;
-                modified = true;
-            }
+            var builder = existingManifest.Silos.ToBuilder();
+            var modified = false;
 
             // Fill missing entries.
             var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
             foreach (var entry in clusterMembership.Members)
             {
                 var member = entry.Value;
-
-                if (member.SiloAddress.Equals(_localSiloAddress))
+                if (member.Status != SiloStatus.Active)
                 {
-                    // The local manifest is available without a remote call.
+                    // If the member is not yet active, it may not be ready to process requests.
                     continue;
                 }
 
@@ -165,9 +189,10 @@ namespace Orleans.Runtime.Metadata
                     continue;
                 }
 
-                if (member.Status != SiloStatus.Active)
+                if (member.SiloAddress.Equals(_localSiloAddress))
                 {
-                    // If the member is not yet active, it may not be ready to process requests.
+                    builder[_localSiloAddress] = LocalGrainManifest;
+                    modified = true;
                     continue;
                 }
 
@@ -217,28 +242,48 @@ namespace Orleans.Runtime.Metadata
             if (modified)
             {
                 var manifest = new ClusterManifest(version, builder.ToImmutable());
-                var publishSuccess = _updates.TryPublish(manifest);
-                if (publishSuccess)
-                {
-                    ManifestEvents.EmitClusterManifestUpdated(this, manifest);
-                }
-
-                return publishSuccess && fetchSuccess;
+                var publishSuccess = TryPublishManifest(manifest);
+                return publishSuccess && fetchSuccess && ContainsAllActiveSilos(manifest.Silos, clusterMembership);
             }
 
-            return fetchSuccess;
+            return fetchSuccess && ContainsAllActiveSilos(existingManifest.Silos, clusterMembership);
+        }
+
+        private bool TryPublishManifest(ClusterManifest manifest)
+        {
+            var publishSuccess = _updates.TryPublish(manifest);
+            if (publishSuccess)
+            {
+                ManifestEvents.EmitClusterManifestUpdated(this, manifest);
+            }
+
+            return publishSuccess;
+        }
+
+        private ImmutableDictionary<SiloAddress, GrainManifest> ApplySynchronousMembershipChanges(
+            ImmutableDictionary<SiloAddress, GrainManifest> silos,
+            ClusterMembershipSnapshot clusterMembership,
+            out bool modified)
+        {
+            silos = RemoveNonActiveSilos(silos, clusterMembership, out modified);
+            if (clusterMembership.GetSiloStatus(_localSiloAddress) != SiloStatus.Active || silos.ContainsKey(_localSiloAddress))
+            {
+                return silos;
+            }
+
+            modified = true;
+            return silos.Add(_localSiloAddress, LocalGrainManifest);
         }
 
         private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
             ImmutableDictionary<SiloAddress, GrainManifest> silos,
             ClusterMembershipSnapshot clusterMembership,
-            SiloAddress preserveSiloAddress,
             out bool modified)
         {
             ImmutableDictionary<SiloAddress, GrainManifest>.Builder? builder = null;
             foreach (var entry in silos)
             {
-                if (entry.Key.Equals(preserveSiloAddress) || clusterMembership.GetSiloStatus(entry.Key) == SiloStatus.Active)
+                if (clusterMembership.GetSiloStatus(entry.Key) == SiloStatus.Active)
                 {
                     continue;
                 }
@@ -249,6 +294,22 @@ namespace Orleans.Runtime.Metadata
 
             modified = builder is not null;
             return builder?.ToImmutable() ?? silos;
+        }
+
+        private static bool ContainsAllActiveSilos(
+            ImmutableDictionary<SiloAddress, GrainManifest> silos,
+            ClusterMembershipSnapshot clusterMembership)
+        {
+            foreach (var entry in clusterMembership.Members)
+            {
+                var member = entry.Value;
+                if (member.Status == SiloStatus.Active && !silos.ContainsKey(member.SiloAddress))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         [MemberNotNull(nameof(_runTask))]

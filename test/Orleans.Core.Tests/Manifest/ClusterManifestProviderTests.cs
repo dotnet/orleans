@@ -36,7 +36,7 @@ public class ClusterManifestProviderTests
     private static readonly GrainInterfaceType TestInterfaceType = GrainInterfaceType.Create("test.interface");
 
     [Fact]
-    public void Current_WhenLocalSiloIsNotActive_PreservesLocalManifestForTypeResolution()
+    public void Current_WhenLocalSiloIsNotActive_ResolvesTypeFromLocalManifest()
     {
         var localSilo = CreateSiloAddress(11111, 1);
         using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
@@ -49,7 +49,7 @@ public class ClusterManifestProviderTests
         var typeResolver = new Orleans.GrainInterfaceTypeToGrainTypeResolver(provider);
 
         Assert.Equal(new MajorMinorVersion(1, 0), current.Version);
-        Assert.Contains(localSilo, current.Silos.Keys);
+        Assert.DoesNotContain(localSilo, current.Silos.Keys);
         Assert.Equal(TestGrainType, typeResolver.GetGrainType(TestInterfaceType));
     }
 

@@ -190,7 +190,7 @@ namespace Orleans
                     return cache;
                 }
 
-                return _cache = BuildCache(manifest);
+                return _cache = BuildCache(manifest, _clusterManifestProvider.LocalGrainManifest);
             }
         }
 
@@ -199,62 +199,69 @@ namespace Orleans
         /// </summary>
         /// <param name="clusterManifest">The current cluster manifest.</param>
         /// <returns>The cache.</returns>
-        private static Cache BuildCache(ClusterManifest clusterManifest)
+        private static Cache BuildCache(ClusterManifest clusterManifest, GrainManifest localGrainManifest)
         {
             var result = new Dictionary<GrainInterfaceType, CacheEntry>();
 
             foreach (var manifest in clusterManifest.AllGrainManifests)
             {
-                foreach (var grainType in manifest.Grains)
-                {
-                    var id = grainType.Key;
-                    grainType.Value.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out var typeName);
-                    grainType.Value.Properties.TryGetValue(WellKnownGrainTypeProperties.FullTypeName, out var fullTypeName);
-                    foreach (var property in grainType.Value.Properties)
-                    {
-                        if (!property.Key.StartsWith(WellKnownGrainTypeProperties.ImplementedInterfacePrefix, StringComparison.Ordinal)) continue;
-                        var implemented = GrainInterfaceType.Create(property.Value);
-                        string interfaceTypeName;
-                        if (manifest.Interfaces.TryGetValue(implemented, out var interfaceProperties))
-                        {
-                            interfaceProperties.Properties.TryGetValue(WellKnownGrainInterfaceProperties.TypeName, out interfaceTypeName);
-                        }
-                        else
-                        {
-                            interfaceTypeName = null;
-                        }
-
-                        // Try to work out the best primary implementation
-                        result.TryGetValue(implemented, out var entry);
-
-                        var implementations = entry.Implementations ?? new List<(string Prefix, GrainType GrainType)>();
-                        if (!implementations.Contains((fullTypeName, id))) implementations.Add((fullTypeName, id));
-
-                        GrainType primaryImplementation;
-                        if (!entry.PrimaryImplementation.IsDefault)
-                        {
-                            primaryImplementation = entry.PrimaryImplementation;
-                        }
-                        else if (interfaceProperties?.Properties is { } props && props.TryGetValue(WellKnownGrainInterfaceProperties.DefaultGrainType, out var defaultTypeString))
-                        {
-                            // A specified default grain type trumps others.
-                            primaryImplementation = GrainType.Create(defaultTypeString);
-                        }
-                        else if (string.Equals(interfaceTypeName?[1..], typeName, StringComparison.Ordinal))
-                        {
-                            // Otherwise, a substring match on the interface name, dropping the 'I', is used.
-                            primaryImplementation = id;
-                        }
-                        else
-                        {
-                            primaryImplementation = default;
-                        }
-                        result[implemented] = new CacheEntry(primaryImplementation, implementations);
-                    }
-                }
+                AddManifest(result, manifest);
             }
 
+            AddManifest(result, localGrainManifest);
             return new Cache(clusterManifest.Version, result);
+        }
+
+        private static void AddManifest(Dictionary<GrainInterfaceType, CacheEntry> result, GrainManifest manifest)
+        {
+            foreach (var grainType in manifest.Grains)
+            {
+                var id = grainType.Key;
+                grainType.Value.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out var typeName);
+                grainType.Value.Properties.TryGetValue(WellKnownGrainTypeProperties.FullTypeName, out var fullTypeName);
+                foreach (var property in grainType.Value.Properties)
+                {
+                    if (!property.Key.StartsWith(WellKnownGrainTypeProperties.ImplementedInterfacePrefix, StringComparison.Ordinal)) continue;
+                    var implemented = GrainInterfaceType.Create(property.Value);
+                    string interfaceTypeName;
+                    if (manifest.Interfaces.TryGetValue(implemented, out var interfaceProperties))
+                    {
+                        interfaceProperties.Properties.TryGetValue(WellKnownGrainInterfaceProperties.TypeName, out interfaceTypeName);
+                    }
+                    else
+                    {
+                        interfaceTypeName = null;
+                    }
+
+                    // Try to work out the best primary implementation
+                    result.TryGetValue(implemented, out var entry);
+
+                    var implementations = entry.Implementations ?? new List<(string Prefix, GrainType GrainType)>();
+                    if (!implementations.Contains((fullTypeName, id))) implementations.Add((fullTypeName, id));
+
+                    GrainType primaryImplementation;
+                    if (!entry.PrimaryImplementation.IsDefault)
+                    {
+                        primaryImplementation = entry.PrimaryImplementation;
+                    }
+                    else if (interfaceProperties?.Properties is { } props && props.TryGetValue(WellKnownGrainInterfaceProperties.DefaultGrainType, out var defaultTypeString))
+                    {
+                        // A specified default grain type trumps others.
+                        primaryImplementation = GrainType.Create(defaultTypeString);
+                    }
+                    else if (string.Equals(interfaceTypeName?[1..], typeName, StringComparison.Ordinal))
+                    {
+                        // Otherwise, a substring match on the interface name, dropping the 'I', is used.
+                        primaryImplementation = id;
+                    }
+                    else
+                    {
+                        primaryImplementation = default;
+                    }
+
+                    result[implemented] = new CacheEntry(primaryImplementation, implementations);
+                }
+            }
         }
 
         /// <summary>
