@@ -8,6 +8,7 @@ using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Reminders;
+using Orleans.Reminders.Concurrency;
 using Orleans.Reminders.Diagnostics;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
@@ -33,6 +34,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly SiloStatusListenerManager _siloStatusListenerManager;
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
+        private readonly IReminderDeliveryThrottle _deliveryThrottle;
+        private readonly ReminderThrottleInstruments _throttleInstruments;
         private long localTableSequence;
         // The test barrier reads this state off-scheduler so it remains observable while the service is busy.
         private readonly object _reconciliationLock = new();
@@ -56,6 +59,8 @@ namespace Orleans.Runtime.ReminderService
             SiloStatusListenerManager siloStatusListenerManager,
             [FromKeyedServices(ReminderTimeProviderNames.Reminders)] TimeProvider timeProvider,
             ReminderInstruments reminderInstruments,
+            IReminderDeliveryThrottle deliveryThrottle,
+            ReminderThrottleInstruments throttleInstruments,
             SystemTargetShared shared)
             : base(
                   SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null!, shared.SiloAddress),
@@ -70,6 +75,8 @@ namespace Orleans.Runtime.ReminderService
             _timeProvider = timeProvider;
             _reminderInstruments = reminderInstruments;
             _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
+            _deliveryThrottle = deliveryThrottle ?? NoOpReminderDeliveryThrottle.Instance;
+            _throttleInstruments = throttleInstruments;
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher", _timeProvider);
@@ -1332,6 +1339,45 @@ namespace Orleans.Runtime.ReminderService
                                 _shared._reminderInstruments.OnTardiness(tardiness);
                             }
 
+                            // Acquire a throttle lease (default no-op throttle admits immediately).
+                            var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, status);
+                            ReminderDeliveryLease lease;
+                            try
+                            {
+                                lease = await _shared._deliveryThrottle.AcquireAsync(context, _stopCancellation.Token).ConfigureAwait(true);
+                            }
+                            catch (OperationCanceledException) when (_stopCancellation.IsCancellationRequested)
+                            {
+                                continue;
+                            }
+
+                            _shared._throttleInstruments.RecordAcquireDuration(lease.TierName, lease.Outcome, lease.WaitedFor);
+
+                            if (lease.Outcome == ReminderAdmissionOutcome.Skipped)
+                            {
+                                _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
+                                ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, status, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
+                                lease.Dispose();
+                                continue;
+                            }
+
+                            _shared._throttleInstruments.OnLeaseAcquired(lease.TierName);
+                            using var activity = RemindersActivitySource.Source.HasListeners()
+                                ? RemindersActivitySource.Source.StartActivity("Reminder.Dispatch", System.Diagnostics.ActivityKind.Internal)
+                                : null;
+                            if (activity is not null)
+                            {
+                                activity.SetTag(ReminderActivityAttributes.ReminderName, entry.ReminderName);
+                                activity.SetTag(ReminderActivityAttributes.GrainId, entry.GrainId.ToString());
+                                activity.SetTag(ReminderActivityAttributes.GrainType, entry.GrainId.Type.ToString());
+                                activity.SetTag(ReminderActivityAttributes.Tardiness, CalculateTardiness(status).TotalSeconds);
+                                if (lease.TierName is not null)
+                                {
+                                    activity.SetTag(ReminderActivityAttributes.ThrottleTier, lease.TierName);
+                                    activity.SetTag(ReminderActivityAttributes.ThrottleOutcome, "admitted");
+                                }
+                            }
+
                             try
                             {
                                 var grainRef = _shared.GetGrain(entry.GrainId);
@@ -1347,6 +1393,7 @@ namespace Orleans.Runtime.ReminderService
 
                                 ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
                                 _shared._reminderInstruments.OnTickDelivered();
+                                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
                             }
                             catch (Exception exc)
                             {
@@ -1354,8 +1401,14 @@ namespace Orleans.Runtime.ReminderService
                                 var nextTick = CalculateFollowingTickTime(entry, scheduledTick.TickTime, after);
                                 LogErrorDeliveringReminderTick(_shared.logger, this, nextTick, exc);
                                 ReminderEvents.EmitTickFailed(entry.GrainId, entry.ReminderName, status, exc, _shared.Silo);
+                                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error);
 
                                 // What to do with repeated failures to deliver a reminder's ticks?
+                            }
+                            finally
+                            {
+                                _shared._throttleInstruments.OnLeaseReleased(lease.TierName);
+                                lease.Dispose();
                             }
                         }
                         catch (Exception exception)

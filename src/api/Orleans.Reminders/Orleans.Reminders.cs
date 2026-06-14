@@ -149,6 +149,11 @@ namespace Orleans.Hosting
         public System.TimeSpan ReminderLoadingWindow { get { throw null; } set { } }
     }
 
+    public static partial class SiloBuilderReminderConcurrencyExtensions
+    {
+        public static ISiloBuilder AddReminderConcurrencyControl(this ISiloBuilder builder, System.Action<Reminders.Concurrency.ReminderConcurrencyBuilder> configure) { throw null; }
+    }
+
     public static partial class SiloBuilderReminderExtensions
     {
         public static void AddReminders(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { }
@@ -206,6 +211,175 @@ namespace Orleans.Reminders
         RS_ServiceInitialLoadFailing = 102937,
         RS_ServiceInitialLoadFailed = 102938,
         RS_FastReminderInterval = 102939
+    }
+}
+
+namespace Orleans.Reminders.Concurrency
+{
+    public partial interface IReminderDeliveryThrottle
+    {
+        System.Threading.Tasks.ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public sealed partial class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, System.IDisposable
+    {
+        public LocalReminderDeliveryThrottle(ThrottleConfig config, System.TimeProvider timeProvider, string tierName) { }
+
+        public int AvailableConcurrencyPermits { get { throw null; } }
+
+        public int AvailableRateTokens { get { throw null; } }
+
+        public string TierName { get { throw null; } }
+
+        public System.Threading.Tasks.ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public void Dispose() { }
+    }
+
+    public sealed partial class NoOpReminderDeliveryThrottle : IReminderDeliveryThrottle
+    {
+        internal NoOpReminderDeliveryThrottle() { }
+
+        public static NoOpReminderDeliveryThrottle Instance { get { throw null; } }
+
+        public System.Threading.Tasks.ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public static partial class ReminderActivityAttributes
+    {
+        public const string GrainId = "orleans.grain.id";
+        public const string GrainType = "orleans.grain.type";
+        public const string ReminderName = "orleans.reminder.name";
+        public const string Tardiness = "orleans.reminder.tardiness";
+        public const string ThrottleFailureMode = "orleans.reminder.throttle.failure_mode";
+        public const string ThrottleOutcome = "orleans.reminder.throttle.outcome";
+        public const string ThrottleScopeKey = "orleans.reminder.throttle.scope_key";
+        public const string ThrottleSkipReason = "orleans.reminder.throttle.skip_reason";
+        public const string ThrottleTier = "orleans.reminder.throttle.tier";
+    }
+
+    public enum ReminderAdmissionOutcome
+    {
+        Admitted = 0,
+        Skipped = 1
+    }
+
+    public sealed partial class ReminderConcurrencyBuilder
+    {
+        internal ReminderConcurrencyBuilder() { }
+
+        public ReminderConcurrencyBuilder PerSilo(System.Action<ReminderThrottleConfigBuilder> configure) { throw null; }
+    }
+
+    public sealed partial class ReminderConcurrencyOptions
+    {
+        public bool HasAnyTier { get { throw null; } }
+
+        public ThrottleConfig? PerSilo { get { throw null; } set { } }
+    }
+
+    public readonly partial struct ReminderDeliveryContext
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public ReminderDeliveryContext(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, System.Collections.Immutable.ImmutableArray<Runtime.GrainInterfaceType> implementedInterfaces = default) { }
+
+        public System.DateTime DueTime { get { throw null; } }
+
+        public Runtime.GrainId GrainId { get { throw null; } }
+
+        public Runtime.GrainType GrainType { get { throw null; } }
+
+        public System.Collections.Immutable.ImmutableArray<Runtime.GrainInterfaceType> ImplementedInterfaces { get { throw null; } }
+
+        public string ReminderName { get { throw null; } }
+
+        public Runtime.TickStatus Status { get { throw null; } }
+    }
+
+    public abstract partial class ReminderDeliveryLease : System.IDisposable
+    {
+        public static ReminderDeliveryLease NoOpAdmitted { get { throw null; } }
+
+        public abstract ReminderAdmissionOutcome Outcome { get; }
+        public abstract ReminderSkipReason? SkipReason { get; }
+        public abstract string? TierName { get; }
+        public abstract System.TimeSpan WaitedFor { get; }
+
+        public static ReminderDeliveryLease Admitted(string? tierName, System.TimeSpan waitedFor, System.Action? releaseAction) { throw null; }
+
+        public abstract void Dispose();
+        public static ReminderDeliveryLease Skipped(string? tierName, System.TimeSpan waitedFor, ReminderSkipReason reason) { throw null; }
+    }
+
+    public static partial class RemindersActivitySource
+    {
+        public const string Name = "Microsoft.Orleans.Reminders";
+    }
+
+    public enum ReminderSkipReason
+    {
+        LocalLimiterFull = 0,
+        ClusterLimiterFull = 1,
+        AcquireTimeout = 2,
+        CoordinatorUnreachableFailClosed = 3,
+        SiloShutdown = 4
+    }
+
+    public sealed partial class ReminderThrottleConfigBuilder
+    {
+        public ReminderThrottleConfigBuilder BlockMode(ThrottleBlockMode mode) { throw null; }
+
+        public ThrottleConfig Build() { throw null; }
+
+        public ReminderThrottleConfigBuilder BurstSize(int value) { throw null; }
+
+        public ReminderThrottleConfigBuilder MaxConcurrent(int value) { throw null; }
+
+        public ReminderThrottleConfigBuilder PermitsPerSecond(double value) { throw null; }
+    }
+
+    public sealed partial class ReminderThrottleInstruments
+    {
+        public ReminderThrottleInstruments(Runtime.OrleansInstruments instruments) { }
+
+        public void OnCoordinatorOutage(string tier, ThrottleFailureMode failureMode) { }
+
+        public void OnLeaseAcquired(string? tier) { }
+
+        public void OnLeaseReleased(string? tier) { }
+
+        public void OnTickSkipped(string? tier, ReminderSkipReason reason) { }
+
+        public void RecordAcquireDuration(string? tier, ReminderAdmissionOutcome outcome, System.TimeSpan duration) { }
+    }
+
+    public abstract partial record ThrottleBlockMode()
+    {
+        public static ThrottleBlockMode SkipImmediately { get { throw null; } }
+
+        public static ThrottleBlockMode Wait { get { throw null; } }
+
+        public static ThrottleBlockMode WaitUpTo(System.TimeSpan timeout) { throw null; }
+    }
+
+    public sealed partial class ThrottleConfig
+    {
+        internal ThrottleConfig() { }
+
+        public ThrottleBlockMode BlockMode { get { throw null; } }
+
+        public int? BurstSize { get { throw null; } }
+
+        public int? MaxConcurrent { get { throw null; } }
+
+        public double? PermitsPerSecond { get { throw null; } }
+    }
+
+    public enum ThrottleFailureMode
+    {
+        Open = 0,
+        Closed = 1
     }
 }
 
@@ -297,6 +471,15 @@ namespace Orleans.Reminders.Diagnostics
         {
             public readonly Runtime.TickStatus Status;
             public TickFiring(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
+        }
+
+        public sealed partial class TickSkipped : ReminderEvent
+        {
+            public readonly Concurrency.ReminderSkipReason Reason;
+            public readonly Runtime.TickStatus Status;
+            public readonly string? TierName;
+            public readonly System.TimeSpan WaitedFor;
+            public TickSkipped(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, Concurrency.ReminderSkipReason reason, string? tierName, System.TimeSpan waitedFor, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
         }
 
         public sealed partial class Unregistered : ReminderEvent
