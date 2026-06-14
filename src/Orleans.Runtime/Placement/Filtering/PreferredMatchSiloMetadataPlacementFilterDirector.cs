@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
@@ -10,7 +11,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
     ISiloMetadataCache siloMetadataCache)
     : IPlacementFilterDirector
 {
-    public SiloAddress[] Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, SiloAddress[] silos)
+    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
     {
         var preferredMatchSiloMetadataPlacementFilterStrategy = filterStrategy as PreferredMatchSiloMetadataPlacementFilterStrategy;
         var minCandidates = preferredMatchSiloMetadataPlacementFilterStrategy?.MinCandidates ?? 1;
@@ -23,20 +24,21 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
             return silos;
         }
 
-        if (silos.Length <= minCandidates)
+        var siloList = silos.ToList();
+        if (siloList.Count <= minCandidates)
         {
-            return silos;
+            return siloList;
         }
 
         // return the list of silos that match the most metadata keys. The first key in the list is the least important.
         // This means that the last key in the list is the most important.
         // If no silos match any metadata keys, return the original list of silos.
         var maxScore = 0;
-        var siloScores = new int[silos.Length];
+        var siloScores = new int[siloList.Count];
         var scoreCounts = new int[orderedMetadataKeys.Length+1];
-        for (var i = 0; i < silos.Length; i++)
+        for (var i = 0; i < siloList.Count; i++)
         {
-            var siloMetadata = siloMetadataCache.GetSiloMetadata(silos[i]).Metadata;
+            var siloMetadata = siloMetadataCache.GetSiloMetadata(siloList[i]).Metadata;
             var siloScore = 0;
             for (var j = orderedMetadataKeys.Length - 1; j >= 0; --j)
             {
@@ -57,7 +59,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
 
         if (maxScore == 0)
         {
-            return silos;
+            return siloList;
         }
 
         var candidateCount = 0;
@@ -72,6 +74,6 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
             }
         }
 
-        return silos.Where((_, i) => siloScores[i] >= scoreCutOff).ToArray();
+        return siloList.Where((_, i) => siloScores[i] >= scoreCutOff);
     }
 }

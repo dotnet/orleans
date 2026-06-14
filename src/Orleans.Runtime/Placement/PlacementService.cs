@@ -571,7 +571,7 @@ namespace Orleans.Runtime.Placement
             filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, filter.GetType().Name);
             filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
 
-            var filteredSilos = director.Filter(filter, target, silos);
+            var filteredSilos = director.Filter(filter, target, silos).ToArray();
             foreach (var silo in filteredSilos)
             {
                 ThrowIfStopping();

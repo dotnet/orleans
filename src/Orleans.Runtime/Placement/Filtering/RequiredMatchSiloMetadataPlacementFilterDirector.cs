@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Placement.Filtering;
 internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetails localSiloDetails, ISiloMetadataCache siloMetadataCache)
     : IPlacementFilterDirector
 {
-    public SiloAddress[] Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, SiloAddress[] silos)
+    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
     {
         var metadataKeys = (filterStrategy as RequiredMatchSiloMetadataPlacementFilterStrategy)?.MetadataKeys ?? [];
 
@@ -25,7 +25,7 @@ internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetail
         {
             var remoteMetadata = siloMetadataCache.GetSiloMetadata(silo);
             return DoesMetadataMatch(localRequiredMetadata, remoteMetadata, metadataKeys);
-        }).ToArray();
+        });
     }
 
     private static bool DoesMetadataMatch(string?[] localMetadata, SiloMetadata siloMetadata, string[] metadataKeys)

@@ -1056,7 +1056,7 @@ namespace Orleans.Placement
 {
     public partial interface IPlacementFilterDirector
     {
-        Runtime.SiloAddress[] Filter(PlacementFilterStrategy filterStrategy, Runtime.Placement.PlacementTarget target, Runtime.SiloAddress[] silos);
+        System.Collections.Generic.IEnumerable<Runtime.SiloAddress> Filter(PlacementFilterStrategy filterStrategy, Runtime.Placement.PlacementTarget target, System.Collections.Generic.IEnumerable<Runtime.SiloAddress> silos);
     }
 
     public static partial class PlacementFilterExtensions
