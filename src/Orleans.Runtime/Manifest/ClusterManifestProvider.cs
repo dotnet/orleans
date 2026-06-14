@@ -207,10 +207,14 @@ namespace Orleans.Runtime.Metadata
                 }
                 else
                 {
-                    modified = true;
                     if (result.Value is not null)
                     {
+                        modified = true;
                         builder[result.Key] = result.Value;
+                    }
+                    else
+                    {
+                        fetchSuccess = false;
                     }
                 }
             }
@@ -221,10 +225,10 @@ namespace Orleans.Runtime.Metadata
             {
                 var manifest = CreateClusterManifest(version, builder.ToImmutable());
                 var publishSuccess = TryPublishManifest(manifest);
-                return publishSuccess && fetchSuccess && ContainsAllActiveSilos(manifest.Silos, clusterMembership);
+                return publishSuccess && fetchSuccess;
             }
 
-            return fetchSuccess && ContainsAllActiveSilos(existingManifest.Silos, clusterMembership);
+            return fetchSuccess;
         }
 
         private ClusterManifest CreateClusterManifest(
@@ -262,22 +266,6 @@ namespace Orleans.Runtime.Metadata
             }
 
             return builder?.ToImmutable() ?? silos;
-        }
-
-        private static bool ContainsAllActiveSilos(
-            ImmutableDictionary<SiloAddress, GrainManifest> silos,
-            ClusterMembershipSnapshot clusterMembership)
-        {
-            var activeSiloCount = 0;
-            foreach (var entry in clusterMembership.Members)
-            {
-                if (entry.Value.Status == SiloStatus.Active)
-                {
-                    activeSiloCount++;
-                }
-            }
-
-            return silos.Count == activeSiloCount;
         }
 
         [MemberNotNull(nameof(_runTask))]
