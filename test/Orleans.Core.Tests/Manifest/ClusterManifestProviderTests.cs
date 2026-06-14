@@ -280,7 +280,7 @@ public class ClusterManifestProviderTests
         [
             new KeyValuePair<GrainType, GrainProperties>(
                 TestGrainType,
-                new GrainProperties(ImmutableDictionary.CreateRange(
+                new GrainProperties(CreatePropertyDictionary(
                 [
                     new KeyValuePair<string, string>(WellKnownGrainTypeProperties.TypeName, "Test"),
                     new KeyValuePair<string, string>(WellKnownGrainTypeProperties.FullTypeName, "UnitTests.Grains.Test"),
@@ -291,7 +291,7 @@ public class ClusterManifestProviderTests
         [
             new KeyValuePair<GrainInterfaceType, GrainInterfaceProperties>(
                 TestInterfaceType,
-                new GrainInterfaceProperties(ImmutableDictionary.CreateRange(
+                new GrainInterfaceProperties(CreatePropertyDictionary(
                 [
                     new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.TypeName, "ITest"),
                     new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.Version, "1")
@@ -299,6 +299,17 @@ public class ClusterManifestProviderTests
         ]);
 
         return new GrainManifest(grains, interfaces);
+    }
+
+    private static ImmutableDictionary<string, string> CreatePropertyDictionary(params KeyValuePair<string, string>[] properties)
+    {
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal, StringComparer.Ordinal);
+        foreach (var property in properties)
+        {
+            builder.Add(property.Key, property.Value);
+        }
+
+        return builder.ToImmutable();
     }
 
     private static SiloManifestProvider CreateSiloManifestProvider()
