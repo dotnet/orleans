@@ -328,31 +328,62 @@ public sealed class LocalThrottleRateTests
     }
 
     /// <summary>
-    /// Regression for adversarial-review finding: the rate-acquire deadline math previously
-    /// mixed timestamp frequencies across TimeProvider instances. Verify WaitUpTo terminates
-    /// in a skip after the configured timeout when driven by FakeTimeProvider (whose
-    /// TimestampFrequency may differ from Stopwatch.Frequency).
+    /// Regression for adversarial-review finding: WaitUpTo's wait budget must be shared across
+    /// the concurrency and rate phases. Previously, the rate phase started a fresh budget after
+    /// the concurrency phase, allowing total wait to exceed the configured timeout.
     /// </summary>
     [Fact, TestCategory("BVT")]
-    public async Task WaitUpTo_OnRateLimitedPath_SkipsWhenWaitExceedsTimeout()
+    public async Task WaitUpTo_BudgetIsSharedAcrossConcurrencyAndRatePhases()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(1)
             .PermitsPerSecond(1)
             .BurstSize(1)
-            .BlockMode(ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(500)))
+            .BlockMode(ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(800)))
             .Build();
         await using var throttle = new TestThrottle(config, clock);
 
+        // First acquire consumes both the rate token and the only concurrency permit.
         var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
+
+        // Second acquire blocks on the semaphore. Advance 500ms (within budget) and then release.
+        var l2Task = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        Assert.False(l2Task.IsCompleted);
+
+        // Release the first lease — the semaphore is granted. With a shared budget, only ~300ms
+        // remain. The rate bucket needs ~500ms to refill its consumed token, so the rate phase
+        // must short-circuit to a skip rather than burning a fresh 800ms budget.
         l1.Dispose();
 
-        // Bucket is now empty; next refill is ~1 second out. Timeout is 500ms so the throttle
-        // must short-circuit to a skip BEFORE waiting, since the computed wait (1s) > timeout (500ms).
-        var l2 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var l2 = await l2Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(ReminderAdmissionOutcome.Skipped, l2.Outcome);
         Assert.Equal(ReminderSkipReason.AcquireTimeout, l2.SkipReason);
+        Assert.True(l2.WaitedFor <= TimeSpan.FromMilliseconds(800) + TimeSpan.FromMilliseconds(100),
+            $"Total wait exceeded the configured budget: {l2.WaitedFor}");
+    }
+
+    /// <summary>
+    /// Regression for adversarial-review finding: AcquireAsync must observe a cancellation token
+    /// that is already cancelled at entry. Previously the fast-path Wait(0) or bucket-consume
+    /// could succeed against a pre-cancelled token, producing an admitted lease the caller
+    /// expected to be cancelled.
+    /// </summary>
+    [Fact, TestCategory("BVT")]
+    public async Task AcquireAsync_ThrowsImmediately_WhenTokenAlreadyCancelled()
+    {
+        var config = new ReminderThrottleConfigBuilder().MaxConcurrent(1).Build();
+        await using var throttle = new TestThrottle(config);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => throttle.AcquireAsync(TestContext.Default(), cts.Token).AsTask());
+
+        Assert.Equal(1, throttle.AvailableConcurrencyPermits);
     }
 }
 

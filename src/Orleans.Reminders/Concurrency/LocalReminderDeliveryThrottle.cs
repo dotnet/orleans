@@ -62,14 +62,41 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
     public async ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, CancellationToken cancellationToken)
     {
         _ = context;
+        cancellationToken.ThrowIfCancellationRequested();
 
         var startTimestamp = _timeProvider.GetTimestamp();
 
-        // Acquire concurrency permit first (cheaper to release than a token bucket entry).
+        // The configured block mode determines the OVERALL acquire budget for this call. Any wait
+        // inside either the concurrency phase or the rate phase counts against the same budget so
+        // that ThrottleBlockMode.WaitUpTo(timeout) is honored as a single wall-clock cap on the
+        // acquire as a whole.
+        var budget = _config.BlockMode switch
+        {
+            ThrottleBlockMode.SkipImmediatelyMode => TimeSpan.Zero,
+            ThrottleBlockMode.WaitWithTimeout w => w.Timeout,
+            _ => Timeout.InfiniteTimeSpan,
+        };
+
+        TimeSpan RemainingBudget()
+        {
+            if (budget == Timeout.InfiniteTimeSpan)
+            {
+                return Timeout.InfiniteTimeSpan;
+            }
+
+            if (budget == TimeSpan.Zero)
+            {
+                return TimeSpan.Zero;
+            }
+
+            var remaining = budget - _timeProvider.GetElapsedTime(startTimestamp);
+            return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+        }
+
         var concurrencyAcquired = false;
         if (_concurrencySemaphore is not null)
         {
-            var concurrencyResult = await TryAcquireSemaphoreAsync(cancellationToken).ConfigureAwait(false);
+            var concurrencyResult = await TryAcquireSemaphoreAsync(RemainingBudget(), cancellationToken).ConfigureAwait(false);
             if (!concurrencyResult.Admitted)
             {
                 return ReminderDeliveryLease.Skipped(_tierName, ElapsedSince(startTimestamp), concurrencyResult.SkipReason);
@@ -83,7 +110,7 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
             AcquireResult rateResult;
             try
             {
-                rateResult = await TryAcquireRateAsync(cancellationToken).ConfigureAwait(false);
+                rateResult = await TryAcquireRateAsync(RemainingBudget(), cancellationToken).ConfigureAwait(false);
             }
             catch
             {
@@ -130,29 +157,26 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
 
     private TimeSpan ElapsedSince(long startTimestamp) => _timeProvider.GetElapsedTime(startTimestamp);
 
-    private async ValueTask<AcquireResult> TryAcquireSemaphoreAsync(CancellationToken cancellationToken)
+    private async ValueTask<AcquireResult> TryAcquireSemaphoreAsync(TimeSpan budget, CancellationToken cancellationToken)
     {
         if (_concurrencySemaphore!.Wait(0))
         {
             return AcquireResult.AdmittedResult;
         }
 
-        switch (_config.BlockMode)
+        if (budget == TimeSpan.Zero)
         {
-            case ThrottleBlockMode.SkipImmediatelyMode:
-                return AcquireResult.SkippedResult(ReminderSkipReason.LocalLimiterFull);
-
-            case ThrottleBlockMode.WaitWithTimeout w:
-                {
-                    var ok = await WaitSemaphoreWithTimeoutAsync(w.Timeout, cancellationToken).ConfigureAwait(false);
-                    return ok ? AcquireResult.AdmittedResult : AcquireResult.SkippedResult(ReminderSkipReason.AcquireTimeout);
-                }
-
-            case ThrottleBlockMode.WaitForever:
-            default:
-                await _concurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                return AcquireResult.AdmittedResult;
+            return AcquireResult.SkippedResult(ReminderSkipReason.LocalLimiterFull);
         }
+
+        if (budget == Timeout.InfiniteTimeSpan)
+        {
+            await _concurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return AcquireResult.AdmittedResult;
+        }
+
+        var ok = await WaitSemaphoreWithTimeoutAsync(budget, cancellationToken).ConfigureAwait(false);
+        return ok ? AcquireResult.AdmittedResult : AcquireResult.SkippedResult(ReminderSkipReason.AcquireTimeout);
     }
 
     private async ValueTask<bool> WaitSemaphoreWithTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken)
@@ -176,7 +200,7 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
         }
     }
 
-    private async ValueTask<AcquireResult> TryAcquireRateAsync(CancellationToken cancellationToken)
+    private async ValueTask<AcquireResult> TryAcquireRateAsync(TimeSpan budget, CancellationToken cancellationToken)
     {
         var waitFor = _rateBucket!.TryConsumeOrComputeWait();
         if (waitFor == TimeSpan.Zero)
@@ -184,16 +208,16 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
             return AcquireResult.AdmittedResult;
         }
 
-        switch (_config.BlockMode)
+        if (budget == TimeSpan.Zero)
         {
-            case ThrottleBlockMode.SkipImmediatelyMode:
-                return AcquireResult.SkippedResult(ReminderSkipReason.LocalLimiterFull);
-
-            case ThrottleBlockMode.WaitWithTimeout w when waitFor > w.Timeout:
-                return AcquireResult.SkippedResult(ReminderSkipReason.AcquireTimeout);
+            return AcquireResult.SkippedResult(ReminderSkipReason.LocalLimiterFull);
         }
 
-        var maxWait = _config.BlockMode is ThrottleBlockMode.WaitWithTimeout w2 ? w2.Timeout : Timeout.InfiniteTimeSpan;
+        if (budget != Timeout.InfiniteTimeSpan && waitFor > budget)
+        {
+            return AcquireResult.SkippedResult(ReminderSkipReason.AcquireTimeout);
+        }
+
         var startTimestamp = _timeProvider.GetTimestamp();
 
         while (true)
@@ -206,13 +230,13 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
                 return AcquireResult.AdmittedResult;
             }
 
-            if (maxWait != Timeout.InfiniteTimeSpan)
+            if (budget != Timeout.InfiniteTimeSpan)
             {
                 // Compare elapsed and remaining as TimeSpan values derived from the same TimeProvider
                 // to avoid mixing timestamp frequencies across instances (e.g., real Stopwatch vs
                 // FakeTimeProvider).
                 var elapsed = _timeProvider.GetElapsedTime(startTimestamp);
-                if (elapsed >= maxWait || elapsed + waitFor > maxWait)
+                if (elapsed >= budget || elapsed + waitFor > budget)
                 {
                     return AcquireResult.SkippedResult(ReminderSkipReason.AcquireTimeout);
                 }

@@ -269,6 +269,174 @@ public sealed class ReminderConcurrencyControlClusterTests
         }
     }
 
+    /// <summary>
+    /// Regression for adversarial-review finding: when a throttle with WaitMode is configured and
+    /// the silo is shut down while one or more reminder ticks are waiting in AcquireAsync, the
+    /// shutdown must complete promptly. The previous ordering of StopDeliveringReminders waited
+    /// for delivery quiescence BEFORE cancelling the per-reminder cancellation token that
+    /// AcquireAsync observes, producing a deadlock.
+    /// </summary>
+    [Fact]
+    public async Task SiloShutdown_CompletesPromptly_WhenThrottleWaitsAreInFlight()
+    {
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t
+                        .PermitsPerSecond(0.001) // 1 token per ~17 minutes — bucket will be empty for all practical purposes
+                        .BurstSize(1)
+                        .BlockMode(ThrottleBlockMode.Wait))); // wait forever
+        });
+
+        var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        foreach (var silo in cluster.Silos)
+        {
+            await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        }
+
+        // Register a couple of reminders that will saturate the throttle.
+        const string reminderName = "shutdown_test";
+        var grains = Enumerable.Range(0, 3)
+            .Select(_ => cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid()))
+            .ToArray();
+
+        var period = TimeSpan.FromMilliseconds(500);
+        foreach (var g in grains)
+        {
+            var reg = observer.WaitForReminderRegisteredAsync(g.GetGrainId(), reminderName, cts.Token);
+            await g.StartReminder(reminderName, period, validate: true).WaitAsync(cts.Token);
+            await reg;
+            await observer.WaitForLocalReminderScheduleAsync(g.GetGrainId(), reminderName, cts.Token);
+        }
+
+        // Drive past the first due-time so one reminder takes the only token and the others queue
+        // in the throttle's Wait path. After enough small advances the second-and-third reminders
+        // should be sitting inside _deliveryThrottle.AcquireAsync waiting on the token bucket.
+        for (var i = 0; i < 5; i++)
+        {
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cts.Token);
+            await Task.Delay(50, cts.Token);
+        }
+
+        // Now shut down the cluster. With the bug, this would deadlock because the queued
+        // dispatches are counted as active deliveries but their cancellation token is only
+        // signalled AFTER quiescence (which can never complete because they are waiting on it).
+        var shutdownTask = cluster.DisposeAsync().AsTask();
+        var completedFirst = await Task.WhenAny(shutdownTask, Task.Delay(TimeSpan.FromSeconds(30), cts.Token));
+        Assert.Same(shutdownTask, completedFirst);
+        await shutdownTask; // surface any shutdown exception
+    }
+
+    /// <summary>
+    /// Regression for adversarial-review finding: when a tick is skipped by the throttle, no
+    /// TickFiring event should be emitted (the grain never observes the tick) and the tardiness
+    /// metric should not be recorded for the skipped tick. Verifies the fix that moved
+    /// status-construction, TickFiring emission, and tardiness recording after the admit.
+    /// </summary>
+    [Fact]
+    public async Task NoTickFiringEvent_WhenTickIsSkippedByThrottle()
+    {
+        var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
+        var firings = new ConcurrentBag<ReminderEvents.TickFiring>();
+        using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
+        {
+            switch (evt)
+            {
+                case ReminderEvents.TickSkipped s:
+                    skipped.Add(s);
+                    break;
+                case ReminderEvents.TickFiring f:
+                    firings.Add(f);
+                    break;
+            }
+        });
+
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t
+                        .PermitsPerSecond(1)
+                        .BurstSize(1)
+                        .BlockMode(ThrottleBlockMode.SkipImmediately)));
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        foreach (var silo in cluster.Silos)
+        {
+            await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        }
+
+        const int reminderCount = 6;
+        const string reminderName = "burst2";
+        var period = TimeSpan.FromMilliseconds(500);
+
+        var grains = Enumerable.Range(0, reminderCount)
+            .Select(_ => cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid()))
+            .ToArray();
+
+        var handles = new IGrainReminder[reminderCount];
+        for (var i = 0; i < reminderCount; i++)
+        {
+            var g = grains[i];
+            var reg = observer.WaitForReminderRegisteredAsync(g.GetGrainId(), reminderName, cts.Token);
+            handles[i] = await g.StartReminder(reminderName, period, validate: true).WaitAsync(cts.Token);
+            await reg;
+            await observer.WaitForLocalReminderScheduleAsync(g.GetGrainId(), reminderName, cts.Token);
+        }
+
+        for (var i = 0; i < 30 && skipped.Count == 0; i++)
+        {
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cts.Token);
+            await Task.Delay(100, cts.Token);
+        }
+
+        try
+        {
+            Assert.True(skipped.Count >= 1, $"Expected at least one TickSkipped; got {skipped.Count}.");
+
+            // For every skipped tick (identified by (GrainId, ReminderName, DueTime)), no TickFiring
+            // event must have been emitted for the same identifying tuple. (We deliberately do not
+            // assert skipped.Count == firings.Count of the OPPOSITE polarity since admit events
+            // may also be present from successful dispatches.)
+            foreach (var s in skipped)
+            {
+                var matching = firings.Where(f =>
+                    f.GrainId == s.GrainId &&
+                    f.ReminderName == s.ReminderName).ToList();
+                Assert.Empty(matching);
+            }
+        }
+        finally
+        {
+            for (var i = 0; i < reminderCount; i++)
+            {
+                try { await grains[i].StopReminder(handles[i]).WaitAsync(cts.Token); } catch { /* best-effort */ }
+            }
+        }
+    }
+
     private static string FlattenMessages(Exception ex)
     {
         var sb = new System.Text.StringBuilder();
