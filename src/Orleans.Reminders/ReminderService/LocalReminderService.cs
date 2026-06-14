@@ -190,16 +190,22 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            if (deliveryQuiescedTask is not null)
-            {
-                await deliveryQuiescedTask;
-            }
-
-            // Stop all reminders.
+            // Stop all reminders FIRST so any throttle/timer waits that observe _stopCancellation
+            // unblock promptly. In-flight grain calls do not observe _stopCancellation, so they
+            // continue to drain naturally and the quiescence wait below correctly bounds shutdown
+            // on dispatches that have already entered the grain-call phase. The previous ordering
+            // (quiescence wait first, StopAsync second) deadlocked when a configured throttle was
+            // waiting on _stopCancellation.Token: the wait was counted as an active delivery, but
+            // the token would only be cancelled after the wait completed.
             var tasks = new List<Task>(localReminders.Count);
             foreach (var reminderData in localReminders.Values)
             {
                 tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
+            }
+
+            if (deliveryQuiescedTask is not null)
+            {
+                await deliveryQuiescedTask;
             }
 
             await Task.WhenAll(tasks);
@@ -1328,19 +1334,16 @@ namespace Orleans.Runtime.ReminderService
 
                         try
                         {
-                            var before = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                            var status = new TickStatus(entry.StartAt, entry.Period, before);
-
-                            LogTraceTriggeringTick(_shared.logger, this, status, before);
-                            ReminderEvents.EmitTickFiring(entry.GrainId, entry.ReminderName, status, _shared.Silo);
-                            if (_shared._reminderInstruments.TardinessSecondsEnabled)
-                            {
-                                var tardiness = CalculateTardiness(status);
-                                _shared._reminderInstruments.OnTardiness(tardiness);
-                            }
-
-                            // Acquire a throttle lease (default no-op throttle admits immediately).
-                            var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, status);
+                            // Acquire a throttle lease first so that the user-visible TickStatus
+                            // (and the TickFiring event + tardiness sample) reflect the actual
+                            // dispatch time, not a pre-wait timestamp. The throttle context carries
+                            // a provisional status with the pre-wait timestamp so the throttle has
+                            // accurate scheduling info; the grain-facing status is rebuilt after
+                            // admission. Skipped ticks emit TickSkipped (no TickFiring, no
+                            // tardiness sample) since the grain never observes them.
+                            var preThrottleNow = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                            var provisionalStatus = new TickStatus(entry.StartAt, entry.Period, preThrottleNow);
+                            var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus);
                             ReminderDeliveryLease lease;
                             try
                             {
@@ -1356,9 +1359,20 @@ namespace Orleans.Runtime.ReminderService
                             if (lease.Outcome == ReminderAdmissionOutcome.Skipped)
                             {
                                 _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
-                                ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, status, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
+                                ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, provisionalStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
                                 lease.Dispose();
                                 continue;
+                            }
+
+                            var before = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                            var status = new TickStatus(entry.StartAt, entry.Period, before);
+
+                            LogTraceTriggeringTick(_shared.logger, this, status, before);
+                            ReminderEvents.EmitTickFiring(entry.GrainId, entry.ReminderName, status, _shared.Silo);
+                            if (_shared._reminderInstruments.TardinessSecondsEnabled)
+                            {
+                                var tardiness = CalculateTardiness(status);
+                                _shared._reminderInstruments.OnTardiness(tardiness);
                             }
 
                             _shared._throttleInstruments.OnLeaseAcquired(lease.TierName);
