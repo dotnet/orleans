@@ -16,6 +16,7 @@ namespace Orleans.Runtime.Metadata
 {
     internal partial class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
+        private readonly SiloAddress _localSiloAddress;
         private readonly ILogger<ClusterManifestProvider> _logger;
         private readonly IServiceProvider _services;
         private readonly IClusterMembershipService _clusterMembershipService;
@@ -32,12 +33,14 @@ namespace Orleans.Runtime.Metadata
         private Task? _runTask;
 
         public ClusterManifestProvider(
+            ILocalSiloDetails localSiloDetails,
             SiloManifestProvider siloManifestProvider,
             IClusterMembershipService clusterMembershipService,
             IFatalErrorHandler fatalErrorHandler,
             ILogger<ClusterManifestProvider> logger,
             IServiceProvider services)
         {
+            _localSiloAddress = localSiloDetails.SiloAddress;
             _logger = logger;
             _services = services;
             _clusterMembershipService = clusterMembershipService;
@@ -52,13 +55,13 @@ namespace Orleans.Runtime.Metadata
                 onPublished: update => Interlocked.Exchange(ref _current, update));
         }
 
-        public ClusterManifest Current => EnsureCurrentManifestVersion(_clusterMembershipService.CurrentSnapshot);
+        public ClusterManifest Current => EnsureValidManifestForCurrentMembership(_clusterMembershipService.CurrentSnapshot);
 
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
         public GrainManifest LocalGrainManifest { get; }
 
-        private ClusterManifest EnsureCurrentManifestVersion(ClusterMembershipSnapshot clusterMembership)
+        private ClusterManifest EnsureValidManifestForCurrentMembership(ClusterMembershipSnapshot clusterMembership)
         {
             var current = _current;
             var membershipVersion = clusterMembership.Version.Value;
@@ -76,6 +79,12 @@ namespace Orleans.Runtime.Metadata
                 }
 
                 var synchronizedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership);
+                if (clusterMembership.GetSiloStatus(_localSiloAddress) == SiloStatus.Active
+                    && !synchronizedSilos.ContainsKey(_localSiloAddress))
+                {
+                    synchronizedSilos = synchronizedSilos.Add(_localSiloAddress, LocalGrainManifest);
+                }
+
                 var version = new MajorMinorVersion(membershipVersion, 0);
                 var updated = CreateClusterManifest(version, synchronizedSilos);
                 TryPublishManifest(updated);
@@ -147,7 +156,7 @@ namespace Orleans.Runtime.Metadata
 
         private async Task<bool> UpdateManifest(ClusterMembershipSnapshot clusterMembership)
         {
-            var existingManifest = EnsureCurrentManifestVersion(clusterMembership);
+            var existingManifest = EnsureValidManifestForCurrentMembership(clusterMembership);
             if (existingManifest.Version.Major > clusterMembership.Version.Value)
             {
                 return true;

@@ -54,6 +54,29 @@ public class ClusterManifestProviderTests
     }
 
     [Fact]
+    public void Current_WhenLocalSiloBecomesActive_IncludesLocalManifestSynchronously()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Created)));
+        var grainFactory = CreateGrainFactory(CreateSiloAddress(11112, 1), CreateGrainManifest());
+        var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
+
+        Assert.DoesNotContain(localSilo, provider.Current.Silos.Keys);
+
+        membership.Update(CreateMembershipSnapshot(
+            2,
+            (localSilo, SiloStatus.Active)));
+
+        var current = provider.Current;
+
+        Assert.Equal(new MajorMinorVersion(2, 0), current.Version);
+        Assert.Contains(localSilo, current.Silos.Keys);
+        Assert.Contains(provider.LocalGrainManifest, current.AllGrainManifests);
+    }
+
+    [Fact]
     public async Task Current_WhenMembershipVersionAdvances_PrunesNonActiveSilosAtFirstMinorVersion()
     {
         var localSilo = CreateSiloAddress(11111, 1);
@@ -91,7 +114,7 @@ public class ClusterManifestProviderTests
     }
 
     [Fact]
-    public async Task Current_WhenRemoteSiloBecomesActive_PublishesPrunedManifestBeforeRemoteFetch()
+    public async Task Current_WhenRemoteSiloBecomesActive_IncludesLocalManifestBeforeRemoteFetch()
     {
         var localSilo = CreateSiloAddress(11111, 1);
         var remoteSilo = CreateSiloAddress(11112, 1);
@@ -105,7 +128,7 @@ public class ClusterManifestProviderTests
 
         var current = provider.Current;
         Assert.Equal(new MajorMinorVersion(1, 0), current.Version);
-        Assert.DoesNotContain(localSilo, current.Silos.Keys);
+        Assert.Contains(localSilo, current.Silos.Keys);
         Assert.DoesNotContain(remoteSilo, current.Silos.Keys);
         Assert.Contains(provider.LocalGrainManifest, current.AllGrainManifests);
 
@@ -116,7 +139,7 @@ public class ClusterManifestProviderTests
 
         var pruned = provider.Current;
         Assert.Equal(new MajorMinorVersion(2, 0), pruned.Version);
-        Assert.DoesNotContain(localSilo, pruned.Silos.Keys);
+        Assert.Contains(localSilo, pruned.Silos.Keys);
         Assert.DoesNotContain(remoteSilo, pruned.Silos.Keys);
 
         var lifecycle = await StartAsync(provider);
@@ -183,7 +206,11 @@ public class ClusterManifestProviderTests
             .AddSingleton(grainFactory)
             .BuildServiceProvider();
 
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+
         return new ClusterManifestProvider(
+            localSiloDetails,
             siloManifestProvider,
             membership,
             Substitute.For<IFatalErrorHandler>(),
