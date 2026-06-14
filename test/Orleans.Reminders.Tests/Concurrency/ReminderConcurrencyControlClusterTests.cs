@@ -1,0 +1,289 @@
+#nullable enable
+
+using System;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Time.Testing;
+using Orleans.Hosting;
+using Orleans.Internal;
+using Orleans.Reminders.Concurrency;
+using Orleans.Runtime;
+using Orleans.Testing.Reminders;
+using Orleans.TestingHost;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
+using Xunit;
+using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
+
+namespace UnitTests.Concurrency;
+
+/// <summary>
+/// Cluster-based integration tests for opt-in reminder concurrency control. Uses
+/// <see cref="InProcessTestCluster"/> with <see cref="ReminderTestClock"/> so the throttle's
+/// token bucket and the reminder schedule share a single deterministic clock.
+/// </summary>
+[TestCategory("Functional"), TestCategory("Reminders")]
+public sealed class ReminderConcurrencyControlClusterTests
+{
+    /// <summary>
+    /// When AddReminderConcurrencyControl is not called, the default DI registration
+    /// resolves to the shared no-op throttle.
+    /// </summary>
+    [Fact]
+    public async Task DefaultThrottle_IsNoOp_WhenConcurrencyControlNotConfigured()
+    {
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        builder.AddReminderTestClock();
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService();
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        foreach (var silo in cluster.Silos)
+        {
+            var sp = cluster.GetSiloServiceProvider(silo.SiloAddress);
+            var throttle = sp.GetRequiredService<IReminderDeliveryThrottle>();
+            Assert.IsType<NoOpReminderDeliveryThrottle>(throttle);
+            Assert.Same(NoOpReminderDeliveryThrottle.Instance, throttle);
+        }
+    }
+
+    /// <summary>
+    /// When AddReminderConcurrencyControl is called with a PerSilo tier, the default no-op
+    /// throttle is replaced by a configured local throttle.
+    /// </summary>
+    [Fact]
+    public async Task ConfiguredPerSiloThrottle_ReplacesDefaultNoOp()
+    {
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        builder.AddReminderTestClock();
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t
+                        .MaxConcurrent(4)
+                        .BlockMode(ThrottleBlockMode.Wait)));
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        foreach (var silo in cluster.Silos)
+        {
+            var sp = cluster.GetSiloServiceProvider(silo.SiloAddress);
+            var throttle = sp.GetRequiredService<IReminderDeliveryThrottle>();
+            var local = Assert.IsType<LocalReminderDeliveryThrottle>(throttle);
+            Assert.Equal("per-silo", local.TierName);
+            Assert.Equal(4, local.AvailableConcurrencyPermits);
+        }
+    }
+
+    /// <summary>
+    /// AddReminderConcurrencyControl invoked with no tiers configured must fail startup
+    /// rather than silently install a no-op.
+    /// </summary>
+    [Fact]
+    public async Task EmptyConcurrencyControlConfiguration_FailsStartup()
+    {
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        builder.AddReminderTestClock();
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(_ => { /* no tiers configured */ });
+        });
+
+        await using var cluster = builder.Build();
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => cluster.DeployAsync());
+        Assert.Contains("AddReminderConcurrencyControl", FlattenMessages(ex));
+    }
+
+    /// <summary>
+    /// Reminders fire end-to-end with concurrency control enabled (regression guard).
+    /// A PerSilo tier with a permissive limit must not interfere with normal delivery.
+    /// </summary>
+    [Fact]
+    public async Task RemindersStillFire_WithPermissiveConcurrencyControl()
+    {
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t.MaxConcurrent(100).BlockMode(ThrottleBlockMode.Wait)));
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        foreach (var silo in cluster.Silos)
+        {
+            await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        }
+
+        var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        const string reminderName = "test_reminder";
+        var period = TimeSpan.FromMilliseconds(500);
+
+        var registered = observer.WaitForReminderRegisteredAsync(grainId, reminderName, cts.Token);
+        var handle = await grain.StartReminder(reminderName, period, validate: true).WaitAsync(cts.Token);
+        await registered;
+
+        // The reminder's first dueTime is computed inside the test grain and may be 1-2 seconds
+        // out from "now". Drive the FakeTimeProvider forward in small steps until the tick fires.
+        await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+        var tickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+
+        for (var i = 0; i < 30 && !tickTask.IsCompleted; i++)
+        {
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cts.Token);
+            await Task.Delay(50, cts.Token);
+        }
+
+        var tick = await tickTask;
+        Assert.Equal(reminderName, tick.ReminderName);
+
+        await grain.StopReminder(handle).WaitAsync(cts.Token);
+    }
+
+    /// <summary>
+    /// With a tight rate-limit and SkipImmediately block mode, a burst of simultaneously-due
+    /// reminders produces TickSkipped events for the dispatches that exceed the bucket
+    /// capacity. Verifies the end-to-end wiring of: throttle -&gt; LocalReminderService
+    /// dispatch loop -&gt; ReminderEvents diagnostic listener.
+    /// </summary>
+    [Fact]
+    public async Task TickSkipped_EventsFireWhenRateLimitIsExceeded()
+    {
+        var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
+        var completed = new ConcurrentBag<ReminderEvents.TickCompleted>();
+        using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
+        {
+            switch (evt)
+            {
+                case ReminderEvents.TickSkipped s:
+                    skipped.Add(s);
+                    break;
+                case ReminderEvents.TickCompleted c:
+                    completed.Add(c);
+                    break;
+            }
+        });
+
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t
+                        .PermitsPerSecond(1)
+                        .BurstSize(1)
+                        .BlockMode(ThrottleBlockMode.SkipImmediately)));
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        foreach (var silo in cluster.Silos)
+        {
+            await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        }
+
+        const int reminderCount = 6;
+        const string reminderName = "burst";
+        var period = TimeSpan.FromMilliseconds(500);
+
+        // Register all reminders.
+        var grains = Enumerable.Range(0, reminderCount)
+            .Select(_ => cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid()))
+            .ToArray();
+
+        var handles = new IGrainReminder[reminderCount];
+        for (var i = 0; i < reminderCount; i++)
+        {
+            var g = grains[i];
+            var reg = observer.WaitForReminderRegisteredAsync(g.GetGrainId(), reminderName, cts.Token);
+            handles[i] = await g.StartReminder(reminderName, period, validate: true).WaitAsync(cts.Token);
+            await reg;
+            await observer.WaitForLocalReminderScheduleAsync(g.GetGrainId(), reminderName, cts.Token);
+        }
+
+        // Drive the FakeTimeProvider forward until at least one tick has been processed (admitted
+        // or skipped). Reminders register with an initial due-time around 2s; once we cross that
+        // they all become due in the same advance, exhausting the 1-token bucket.
+        for (var i = 0; i < 30; i++)
+        {
+            if (completed.Count >= 1 && skipped.Count >= 1)
+            {
+                break;
+            }
+
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cts.Token);
+            await Task.Delay(100, cts.Token);
+        }
+
+        try
+        {
+            Assert.True(completed.Count >= 1, $"Expected at least one TickCompleted, observed {completed.Count}. Skipped={skipped.Count}.");
+            Assert.True(skipped.Count >= 1, $"Expected at least one TickSkipped, observed {skipped.Count}. Completed={completed.Count}.");
+            var skippedEvent = skipped.First();
+            Assert.Equal(ReminderSkipReason.LocalLimiterFull, skippedEvent.Reason);
+            Assert.Equal("per-silo", skippedEvent.TierName);
+            Assert.Equal(reminderName, skippedEvent.ReminderName);
+        }
+        finally
+        {
+            for (var i = 0; i < reminderCount; i++)
+            {
+                try { await grains[i].StopReminder(handles[i]).WaitAsync(cts.Token); } catch { /* best-effort */ }
+            }
+        }
+    }
+
+    private static string FlattenMessages(Exception ex)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            sb.AppendLine(e.Message);
+            if (e is AggregateException agg)
+            {
+                foreach (var inner in agg.Flatten().InnerExceptions)
+                {
+                    sb.AppendLine(inner.Message);
+                }
+            }
+        }
+
+        return sb.ToString();
+    }
+}
