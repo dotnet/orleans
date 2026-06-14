@@ -102,8 +102,13 @@ namespace Orleans.Metadata
 
             GrainManifest GetCanonicalManifest(GrainManifest manifest)
             {
-                manifest = DeduplicateManifest(manifest);
                 if (canonicalManifests.TryGetValue(manifest, out var canonicalManifest))
+                {
+                    return canonicalManifest;
+                }
+
+                manifest = DeduplicateManifest(manifest);
+                if (canonicalManifests.TryGetValue(manifest, out canonicalManifest))
                 {
                     return canonicalManifest;
                 }
