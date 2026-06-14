@@ -183,33 +183,34 @@ namespace Orleans.Runtime.Metadata
                     continue;
                 }
 
-                if (builder.ContainsKey(member.SiloAddress))
+                var siloAddress = member.SiloAddress;
+                if (builder.ContainsKey(siloAddress))
                 {
                     // Manifest has already been retrieved for the cluster member.
                     continue;
                 }
 
-                if (member.SiloAddress.Equals(_localSiloAddress))
+                if (siloAddress.Equals(_localSiloAddress))
                 {
                     // Local membership changes are applied synchronously by EnsureCurrentManifestVersion.
                     continue;
                 }
 
-                tasks.Add(GetManifest(member.SiloAddress));
+                tasks.Add(GetManifest(siloAddress));
+            }
 
-                async Task<(SiloAddress, GrainManifest?, Exception?)> GetManifest(SiloAddress siloAddress)
+            async Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)> GetManifest(SiloAddress siloAddress)
+            {
+                try
                 {
-                    try
-                    {
-                        // Get the manifest from the remote silo.
-                        var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
-                        var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
-                        return (siloAddress, manifest, null);
-                    }
-                    catch (Exception exception)
-                    {
-                        return (siloAddress, null, exception);
-                    }
+                    // Get the manifest from the remote silo.
+                    var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
+                    var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
+                    return (siloAddress, manifest, null);
+                }
+                catch (Exception exception)
+                {
+                    return (siloAddress, null, exception);
                 }
             }
 
