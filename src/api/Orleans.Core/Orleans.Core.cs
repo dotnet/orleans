@@ -1056,7 +1056,7 @@ namespace Orleans.Placement
 {
     public partial interface IPlacementFilterDirector
     {
-        System.Collections.Generic.IEnumerable<Runtime.SiloAddress> Filter(PlacementFilterStrategy filterStrategy, Runtime.Placement.PlacementTarget target, System.Collections.Generic.IEnumerable<Runtime.SiloAddress> silos);
+        Runtime.SiloAddress[] Filter(PlacementFilterStrategy filterStrategy, Runtime.Placement.PlacementTarget target, Runtime.SiloAddress[] silos);
     }
 
     public static partial class PlacementFilterExtensions
@@ -1631,7 +1631,7 @@ namespace Orleans.Runtime.Placement
 
         SiloStatus LocalSiloStatus { get; }
 
-        System.Collections.Immutable.ImmutableArray<SiloAddress> GetCompatibleSilos(PlacementTarget target);
+        SiloAddress[] GetCompatibleSilos(PlacementTarget target);
         System.Collections.Generic.IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target);
     }
 
@@ -1639,7 +1639,7 @@ namespace Orleans.Runtime.Placement
     {
         string PlacementHintKey { get; set; }
 
-        SiloAddress GetPlacementHint(System.Collections.Generic.Dictionary<string, object> requestContextData, System.Collections.Immutable.ImmutableArray<SiloAddress> compatibleSilos);
+        SiloAddress GetPlacementHint(System.Collections.Generic.Dictionary<string, object> requestContextData, SiloAddress[] compatibleSilos);
         System.Threading.Tasks.Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context);
     }
 

@@ -799,7 +799,7 @@ namespace Orleans.Runtime
 
         string SiloName { get; }
 
-        System.Collections.Immutable.ImmutableArray<SiloAddress> GetActiveSilos();
+        SiloAddress[] GetActiveSilos();
         SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress);
         System.Collections.Generic.Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
         bool IsDeadSilo(SiloAddress silo);

@@ -611,7 +611,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         }
     }
 
-    private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(List<IGrouping<GrainId, VertexEdge>> migrationCandidates, ImmutableArray<SiloAddress> silos)
+    private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(List<IGrouping<GrainId, VertexEdge>> migrationCandidates, SiloAddress[] silos)
     {
         List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> candidateSets = new(silos.Length - 1);
 

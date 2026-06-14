@@ -14,7 +14,6 @@ using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Metadata;
-using Orleans.Runtime.Placement;
 using Orleans.Runtime.Utilities;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
@@ -156,38 +155,14 @@ public class ClusterManifestProviderTests
         var selectorManager = CreateCachedVersionSelectorManager(manifest);
 
         var initial = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
-        ImmutableArray<SiloAddress> initialSilos = initial.SuitableSilos;
+        SiloAddress[] initialSilos = initial.SuitableSilos;
         Assert.Equal(new[] { localSilo, remoteSilo }, initialSilos.OrderBy(static silo => silo));
 
         clusterManifestProvider.Current = CreateClusterManifest(2, 0, localSilo);
 
         var updated = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
-        ImmutableArray<SiloAddress> updatedSilos = updated.SuitableSilos;
+        SiloAddress[] updatedSilos = updated.SuitableSilos;
         Assert.Equal(new[] { localSilo }, updatedSilos);
-    }
-
-    [Fact]
-    public void PlacementService_GetCompatibleSilosWithVersions_ReturnsActiveOnlyManifestResults()
-    {
-        var localSilo = CreateSiloAddress(11111, 1);
-        var remoteSilo = CreateSiloAddress(11112, 1);
-        var clusterManifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo, remoteSilo));
-        var manifest = new GrainVersionManifest(clusterManifestProvider);
-        var selectorManager = CreateCachedVersionSelectorManager(manifest);
-        var placementService = CreatePlacementService(localSilo, manifest, selectorManager);
-
-        _ = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
-
-        var target = new PlacementTarget(
-            GrainId.Create("test", "grain-1"),
-            new Dictionary<string, object>(),
-            TestInterfaceType,
-            interfaceVersion: 1);
-
-        var compatibleSilos = placementService.GetCompatibleSilosWithVersions(target);
-
-        Assert.True(compatibleSilos.TryGetValue(1, out var versionSilos));
-        Assert.Equal(new[] { localSilo }, versionSilos);
     }
 
     private static ClusterManifestProvider CreateClusterManifestProvider(
@@ -218,35 +193,6 @@ public class ClusterManifestProviderTests
             .GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
             .Returns(new TestSiloManifestSystemTarget(remoteManifest));
         return grainFactory;
-    }
-
-    private static PlacementService CreatePlacementService(
-        SiloAddress localSilo,
-        GrainVersionManifest manifest,
-        CachedVersionSelectorManager selectorManager)
-    {
-        var optionsMonitor = Substitute.For<IOptionsMonitor<SiloMessagingOptions>>();
-        optionsMonitor.CurrentValue.Returns(new SiloMessagingOptions());
-
-        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
-        localSiloDetails.SiloAddress.Returns(localSilo);
-
-        var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
-        siloStatusOracle.CurrentStatus.Returns(SiloStatus.Active);
-        siloStatusOracle.GetActiveSilos().Returns(ImmutableArray.Create(localSilo));
-
-        return new PlacementService(
-            optionsMonitor,
-            localSiloDetails,
-            siloStatusOracle,
-            NullLoggerFactory.Instance.CreateLogger<PlacementService>(),
-            grainLocator: null!,
-            grainInterfaceVersions: manifest,
-            versionSelectorManager: selectorManager,
-            directorResolver: null!,
-            strategyResolver: null!,
-            filterStrategyResolver: null!,
-            placementFilterDirectoryResolver: null!);
     }
 
     private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(GrainVersionManifest manifest)

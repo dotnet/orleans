@@ -135,13 +135,6 @@ namespace Orleans.Metadata
             var bindings = new Dictionary<string, Dictionary<string, string>>();
             foreach (var manifest in clusterManifest.AllGrainManifests)
             {
-                AddManifest(manifest);
-            }
-
-            return new Cache(clusterManifest.Version, result.ToImmutableDictionary());
-
-            void AddManifest(GrainManifest manifest)
-            {
                 foreach (var grainType in manifest.Grains)
                 {
                     var id = grainType.Key;
@@ -169,6 +162,8 @@ namespace Orleans.Metadata
                     result.Add(id, new GrainBindings(id, builder.ToImmutable()));
                 }
             }
+
+            return new Cache(clusterManifest.Version, result.ToImmutableDictionary());
 
             bool TryExtractBindingProperty(KeyValuePair<string, string> property, out (string Index, string Key, string Value) result)
             {

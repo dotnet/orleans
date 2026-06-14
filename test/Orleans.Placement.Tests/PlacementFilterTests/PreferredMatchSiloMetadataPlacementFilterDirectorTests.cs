@@ -42,7 +42,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, SiloMetadata.Empty}
             }));
         var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(), default,
-            new List<SiloAddress>() { testLocalSiloAddress }
+                new[] { testLocalSiloAddress }
         ).ToList();
         Assert.NotNull(result);
         Assert.NotEmpty(result);
@@ -65,7 +65,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, siloMetadata},
             }));
         var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 1, 0), default,
-            new List<SiloAddress>() { testOtherSiloAddress }).ToList();
+                new[] { testOtherSiloAddress }).ToList();
         Assert.NotEmpty(result);
     }
 
@@ -119,7 +119,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, localSiloMetadata},
             }));
         var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy([key], minCandidates, 0), default,
-            new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
+                new[] { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);
     }
@@ -173,7 +173,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, localSiloMetadata},
             }));
         var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(keys, minCandidates, 0), default,
-            new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
+                new[] { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);
     }

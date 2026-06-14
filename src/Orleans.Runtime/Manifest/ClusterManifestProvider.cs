@@ -202,7 +202,7 @@ namespace Orleans.Runtime.Metadata
                     try
                     {
                         // Get the manifest from the remote silo.
-                        var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, member.SiloAddress);
+                        var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
                         var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
                         return (siloAddress, manifest, null);
                     }
@@ -252,20 +252,7 @@ namespace Orleans.Runtime.Metadata
             MajorMinorVersion version,
             ImmutableDictionary<SiloAddress, GrainManifest> silos)
         {
-            var builder = ImmutableArray.CreateBuilder<GrainManifest>(silos.Count + 1);
-            var containsLocalManifest = false;
-            foreach (var manifest in silos.Values)
-            {
-                builder.Add(manifest);
-                containsLocalManifest |= ReferenceEquals(manifest, LocalGrainManifest);
-            }
-
-            if (!containsLocalManifest)
-            {
-                builder.Add(LocalGrainManifest);
-            }
-
-            return new ClusterManifest(version, silos, builder.ToImmutable());
+            return new ClusterManifest(version, silos, [.. silos.Values, LocalGrainManifest]);
         }
 
         private bool TryPublishManifest(ClusterManifest manifest)
@@ -319,16 +306,16 @@ namespace Orleans.Runtime.Metadata
             ImmutableDictionary<SiloAddress, GrainManifest> silos,
             ClusterMembershipSnapshot clusterMembership)
         {
+            var activeSiloCount = 0;
             foreach (var entry in clusterMembership.Members)
             {
-                var member = entry.Value;
-                if (member.Status == SiloStatus.Active && !silos.ContainsKey(member.SiloAddress))
+                if (entry.Value.Status == SiloStatus.Active)
                 {
-                    return false;
+                    activeSiloCount++;
                 }
             }
 
-            return true;
+            return silos.Count == activeSiloCount;
         }
 
         [MemberNotNull(nameof(_runTask))]

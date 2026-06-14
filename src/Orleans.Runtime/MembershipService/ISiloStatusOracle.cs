@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.Immutable;
 
 #nullable disable
 namespace Orleans.Runtime
@@ -27,7 +26,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the currently active silos.
         /// </summary>
-        ImmutableArray<SiloAddress> GetActiveSilos();
+        SiloAddress[] GetActiveSilos();
 
         /// <summary>
         /// Gets the status of a given silo. 

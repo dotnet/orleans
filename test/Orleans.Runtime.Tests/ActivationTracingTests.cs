@@ -841,7 +841,7 @@ namespace UnitTests.General
     /// </summary>
     public class TracingTestPlacementFilterDirector : IPlacementFilterDirector
     {
-        public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+        public SiloAddress[] Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, SiloAddress[] silos)
         {
             return silos;
         }
@@ -864,7 +864,7 @@ namespace UnitTests.General
     /// </summary>
     public class SecondTracingTestPlacementFilterDirector : IPlacementFilterDirector
     {
-        public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+        public SiloAddress[] Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, SiloAddress[] silos)
         {
             return silos;
         }

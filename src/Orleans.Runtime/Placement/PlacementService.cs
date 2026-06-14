@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -163,28 +162,21 @@ namespace Orleans.Runtime.Placement
             LogTraceAddressMessageSelectTarget(message);
         }
 
-        public ImmutableArray<SiloAddress> GetCompatibleSilos(PlacementTarget target)
+        public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
         {
             ThrowIfStopping();
 
             var grainType = target.GrainIdentity.Type;
-            var activeSilos = _siloStatusOracle.GetActiveSilos();
-            ImmutableArray<SiloAddress> compatibleSilos;
-
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
-            if (_assumeHomogeneousSilosForTesting)
-            {
-                compatibleSilos = activeSilos;
-            }
-            else
-            {
-                IEnumerable<SiloAddress> silos = target.InterfaceVersion > 0
+            var compatibleSilos = _assumeHomogeneousSilosForTesting
+                ? _siloStatusOracle.GetActiveSilos()
+                : target.InterfaceVersion > 0
                     ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
                     : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
 
-                compatibleSilos = silos.Intersect(activeSilos).ToImmutableArray();
-
+            if (!_assumeHomogeneousSilosForTesting)
+            {
                 ThrowIfStopping();
                 var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
                 if (filters.Length > 0)
@@ -194,24 +186,20 @@ namespace Orleans.Runtime.Placement
                     // be active during deferred enumeration.
                     var parentActivityContext = Activity.Current?.Context;
 
-                    IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
                     foreach (var placementFilter in filters)
                     {
                         ThrowIfStopping();
                         var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                        filteredSilos = InstrumentFilteredSilos(
-                            director.Filter(placementFilter, target, filteredSilos),
+                        compatibleSilos = FilterSilos(
+                            director,
                             placementFilter,
+                            target,
+                            compatibleSilos,
                             grainType,
                             parentActivityContext);
                     }
-
-                    ThrowIfStopping();
-                    compatibleSilos = filteredSilos.ToImmutableArray();
                 }
             }
-
-            compatibleSilos = compatibleSilos.Intersect(_siloStatusOracle.GetActiveSilos()).ToImmutableArray();
 
             if (compatibleSilos.Length == 0)
             {
@@ -246,10 +234,7 @@ namespace Orleans.Runtime.Placement
                 .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
                 .SuitableSilosByVersion;
 
-            var activeSilos = _siloStatusOracle.GetActiveSilos();
-            return silos.ToDictionary(
-                static entry => entry.Key,
-                entry => entry.Value.Intersect(activeSilos).ToArray());
+            return silos;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -569,13 +554,13 @@ namespace Orleans.Runtime.Placement
         }
 
         /// <summary>
-        /// Wraps a filter's output enumerable so that an Activity span is created when the
-        /// sequence is actually enumerated, not when the filter is composed. This avoids
-        /// per-filter array materialization while still giving accurate span timings.
+        /// Instruments a placement filter invocation.
         /// </summary>
-        private IEnumerable<SiloAddress> InstrumentFilteredSilos(
-            IEnumerable<SiloAddress> silos,
+        private SiloAddress[] FilterSilos(
+            IPlacementFilterDirector director,
             PlacementFilterStrategy filter,
+            PlacementTarget target,
+            SiloAddress[] silos,
             GrainType grainType,
             ActivityContext? parentActivityContext)
         {
@@ -586,11 +571,13 @@ namespace Orleans.Runtime.Placement
             filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, filter.GetType().Name);
             filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
 
-            foreach (var silo in silos)
+            var filteredSilos = director.Filter(filter, target, silos);
+            foreach (var silo in filteredSilos)
             {
                 ThrowIfStopping();
-                yield return silo;
             }
+
+            return filteredSilos;
         }
 
         /// <summary>
