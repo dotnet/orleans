@@ -35,6 +35,7 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
             Cluster = builder.Build();
             await Cluster.DeployAsync();
             await Cluster.WaitForLivenessToStabilizeAsync();
+            await Cluster.WaitForClusterManifestToStabilizeAsync();
         }
     }
 
