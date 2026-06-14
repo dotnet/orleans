@@ -214,6 +214,54 @@ public sealed class LocalThrottleConcurrencyTests
         lease.Dispose(); // idempotent
         Assert.Equal(1, throttle.AvailableConcurrencyPermits);
     }
+
+    /// <summary>
+    /// Regression for adversarial-review finding: if the rate-acquire phase throws (e.g., the
+    /// caller's cancellation token fires while the throttle is waiting on Task.Delay for the
+    /// next refill), the concurrency permit acquired in the preceding phase must be released
+    /// before the exception propagates. Otherwise the permit is leaked permanently.
+    /// </summary>
+    [Fact, TestCategory("BVT")]
+    public async Task Cancellation_DuringRateWait_ReleasesConcurrencyPermit()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(2)
+            .PermitsPerSecond(1)
+            .BurstSize(1)
+            .BlockMode(ThrottleBlockMode.Wait)
+            .Build();
+        await using var throttle = new TestThrottle(config, clock);
+
+        // First acquire takes both the rate token and one concurrency permit.
+        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
+        Assert.Equal(1, throttle.AvailableConcurrencyPermits);
+
+        // Second acquire reserves a concurrency permit but blocks on the empty rate bucket.
+        using var cts = new CancellationTokenSource();
+        var l2Task = throttle.AcquireAsync(TestContext.Default(), cts.Token).AsTask();
+
+        // Yield until the throttle has reserved the second concurrency permit and is waiting on
+        // the bucket refill. The acquire completes the semaphore wait synchronously and then awaits
+        // Task.Delay against the FakeTimeProvider, which never completes until the clock advances.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (throttle.AvailableConcurrencyPermits == 1 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+        Assert.Equal(0, throttle.AvailableConcurrencyPermits);
+        Assert.False(l2Task.IsCompleted);
+
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => l2Task);
+
+        // The cancelled second acquire MUST have released its concurrency permit before propagating.
+        Assert.Equal(1, throttle.AvailableConcurrencyPermits);
+
+        l1.Dispose();
+        Assert.Equal(2, throttle.AvailableConcurrencyPermits);
+    }
 }
 
 public sealed class LocalThrottleRateTests
@@ -277,6 +325,34 @@ public sealed class LocalThrottleRateTests
         var next = await nextTask.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Equal(ReminderAdmissionOutcome.Admitted, next.Outcome);
         next.Dispose();
+    }
+
+    /// <summary>
+    /// Regression for adversarial-review finding: the rate-acquire deadline math previously
+    /// mixed timestamp frequencies across TimeProvider instances. Verify WaitUpTo terminates
+    /// in a skip after the configured timeout when driven by FakeTimeProvider (whose
+    /// TimestampFrequency may differ from Stopwatch.Frequency).
+    /// </summary>
+    [Fact, TestCategory("BVT")]
+    public async Task WaitUpTo_OnRateLimitedPath_SkipsWhenWaitExceedsTimeout()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .PermitsPerSecond(1)
+            .BurstSize(1)
+            .BlockMode(ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(500)))
+            .Build();
+        await using var throttle = new TestThrottle(config, clock);
+
+        var l1 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, l1.Outcome);
+        l1.Dispose();
+
+        // Bucket is now empty; next refill is ~1 second out. Timeout is 500ms so the throttle
+        // must short-circuit to a skip BEFORE waiting, since the computed wait (1s) > timeout (500ms).
+        var l2 = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        Assert.Equal(ReminderAdmissionOutcome.Skipped, l2.Outcome);
+        Assert.Equal(ReminderSkipReason.AcquireTimeout, l2.SkipReason);
     }
 }
 
