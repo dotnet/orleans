@@ -186,24 +186,22 @@ namespace Orleans.Runtime.Placement
                     // be active during deferred enumeration.
                     var parentActivityContext = Activity.Current?.Context;
 
+                    IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
                     foreach (var placementFilter in filters)
                     {
                         ThrowIfStopping();
                         var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                        compatibleSilos = FilterSilos(
-                            director,
+                        filteredSilos = InstrumentFilteredSilos(
+                            director.Filter(placementFilter, target, filteredSilos),
                             placementFilter,
-                            target,
-                            compatibleSilos,
                             grainType,
                             parentActivityContext);
                     }
+
+                    ThrowIfStopping();
+                    compatibleSilos = filteredSilos.ToArray();
                 }
             }
-
-            var activeSilos = _siloStatusOracle.GetActiveSilos();
-            var localSiloIsTerminating = LocalSiloStatus.IsTerminating();
-            compatibleSilos = FilterActiveSilos(compatibleSilos, activeSilos, localSiloIsTerminating);
 
             if (compatibleSilos.Length == 0)
             {
@@ -238,20 +236,7 @@ namespace Orleans.Runtime.Placement
                 .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
                 .SuitableSilosByVersion;
 
-            var activeSilos = _siloStatusOracle.GetActiveSilos();
-            var localSiloIsTerminating = LocalSiloStatus.IsTerminating();
-            Dictionary<ushort, SiloAddress[]> filteredSilos = null;
-            foreach (var entry in silos)
-            {
-                var activeVersionSilos = FilterActiveSilos(entry.Value, activeSilos, localSiloIsTerminating);
-                if (!ReferenceEquals(activeVersionSilos, entry.Value))
-                {
-                    filteredSilos ??= new(silos);
-                    filteredSilos[entry.Key] = activeVersionSilos;
-                }
-            }
-
-            return filteredSilos ?? silos;
+            return silos;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -570,14 +555,9 @@ namespace Orleans.Runtime.Placement
             }
         }
 
-        /// <summary>
-        /// Instruments a placement filter invocation.
-        /// </summary>
-        private SiloAddress[] FilterSilos(
-            IPlacementFilterDirector director,
+        private IEnumerable<SiloAddress> InstrumentFilteredSilos(
+            IEnumerable<SiloAddress> silos,
             PlacementFilterStrategy filter,
-            PlacementTarget target,
-            SiloAddress[] silos,
             GrainType grainType,
             ActivityContext? parentActivityContext)
         {
@@ -588,41 +568,11 @@ namespace Orleans.Runtime.Placement
             filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, filter.GetType().Name);
             filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
 
-            var filteredSilos = new List<SiloAddress>();
-            foreach (var silo in director.Filter(filter, target, silos))
-            {
-                ThrowIfStopping();
-                filteredSilos.Add(silo);
-            }
-
-            return filteredSilos.ToArray();
-        }
-
-        private SiloAddress[] FilterActiveSilos(SiloAddress[] silos, SiloAddress[] activeSilos, bool localSiloIsTerminating)
-        {
-            SiloAddress[] filteredSilos = null;
-            var count = 0;
-
             foreach (var silo in silos)
             {
                 ThrowIfStopping();
-                if (activeSilos.Contains(silo) && (!localSiloIsTerminating || !silo.Equals(LocalSilo)))
-                {
-                    if (filteredSilos is not null)
-                    {
-                        filteredSilos[count] = silo;
-                    }
-
-                    ++count;
-                }
-                else if (filteredSilos is null)
-                {
-                    filteredSilos = new SiloAddress[silos.Length];
-                    Array.Copy(silos, filteredSilos, count);
-                }
+                yield return silo;
             }
-
-            return filteredSilos is null ? silos : count == 0 ? [] : filteredSilos.AsSpan(0, count).ToArray();
         }
 
         /// <summary>
