@@ -80,7 +80,24 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
 
         if (_rateBucket is not null)
         {
-            var rateResult = await TryAcquireRateAsync(cancellationToken).ConfigureAwait(false);
+            AcquireResult rateResult;
+            try
+            {
+                rateResult = await TryAcquireRateAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Any exception (including OperationCanceledException) escaping the rate-acquire path
+                // means we never received a rate token. The concurrency permit, if held, must be
+                // returned before propagating the exception — otherwise the permit is leaked.
+                if (concurrencyAcquired)
+                {
+                    _concurrencySemaphore!.Release();
+                }
+
+                throw;
+            }
+
             if (!rateResult.Admitted)
             {
                 if (concurrencyAcquired)
@@ -140,32 +157,20 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
 
     private async ValueTask<bool> WaitSemaphoreWithTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken)
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var delayTask = Task.Delay(timeout, _timeProvider, cts.Token);
-        var waitTask = _concurrencySemaphore!.WaitAsync(cts.Token).ContinueWith(_ => true, TaskScheduler.Default);
-        var winner = await Task.WhenAny(waitTask, delayTask).ConfigureAwait(false);
-
-        if (winner == delayTask)
-        {
-            cts.Cancel();
-            try { await waitTask.ConfigureAwait(false); }
-            catch (OperationCanceledException) { }
-            return false;
-        }
-
-        cts.Cancel();
-        try { await delayTask.ConfigureAwait(false); }
-        catch (OperationCanceledException) { }
-        // waitTask completed; consult its result.
+        // Use a timeout CTS linked with the caller's cancellation. SemaphoreSlim.WaitAsync's
+        // contract guarantees that if cancellation wins the race against grant, no permit is held;
+        // if grant wins, no OperationCanceledException is raised and the permit IS held. We
+        // distinguish "timeout cancelled us" from "caller cancelled us" by inspecting the caller's
+        // token explicitly: if only the timeout fired, swallow the OCE and return false; if the
+        // caller cancelled, rethrow.
+        using var timeoutCts = new CancellationTokenSource(timeout, _timeProvider);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
-            return await waitTask.ConfigureAwait(false);
+            await _concurrencySemaphore!.WaitAsync(linkedCts.Token).ConfigureAwait(false);
+            return true;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return false;
         }
@@ -188,20 +193,12 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
                 return AcquireResult.SkippedResult(ReminderSkipReason.AcquireTimeout);
         }
 
-        // Wait the bucket-computed delay (capped by timeout if WaitWithTimeout). Then retry.
         var maxWait = _config.BlockMode is ThrottleBlockMode.WaitWithTimeout w2 ? w2.Timeout : Timeout.InfiniteTimeSpan;
-        var deadline = maxWait == Timeout.InfiniteTimeSpan ? (long?)null : _timeProvider.GetTimestamp() + (long)(maxWait.TotalSeconds * TimeProvider.System.TimestampFrequency);
+        var startTimestamp = _timeProvider.GetTimestamp();
 
         while (true)
         {
-            try
-            {
-                await Task.Delay(waitFor, _timeProvider, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
+            await Task.Delay(waitFor, _timeProvider, cancellationToken).ConfigureAwait(false);
 
             waitFor = _rateBucket.TryConsumeOrComputeWait();
             if (waitFor == TimeSpan.Zero)
@@ -209,10 +206,13 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
                 return AcquireResult.AdmittedResult;
             }
 
-            if (deadline is { } d)
+            if (maxWait != Timeout.InfiniteTimeSpan)
             {
-                var remaining = d - _timeProvider.GetTimestamp();
-                if (remaining <= 0 || waitFor.TotalSeconds * TimeProvider.System.TimestampFrequency > remaining)
+                // Compare elapsed and remaining as TimeSpan values derived from the same TimeProvider
+                // to avoid mixing timestamp frequencies across instances (e.g., real Stopwatch vs
+                // FakeTimeProvider).
+                var elapsed = _timeProvider.GetElapsedTime(startTimestamp);
+                if (elapsed >= maxWait || elapsed + waitFor > maxWait)
                 {
                     return AcquireResult.SkippedResult(ReminderSkipReason.AcquireTimeout);
                 }
