@@ -62,13 +62,7 @@ namespace Orleans.Runtime.Metadata
         {
             var current = _current;
             var membershipVersion = clusterMembership.Version.Value;
-            if (current.Version.Major > membershipVersion)
-            {
-                return current;
-            }
-
-            var synchronizedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, out var modified);
-            if (current.Version.Major == membershipVersion && !modified)
+            if (current.Version.Major >= membershipVersion)
             {
                 return current;
             }
@@ -76,20 +70,13 @@ namespace Orleans.Runtime.Metadata
             lock (_currentLock)
             {
                 current = _current;
-                if (current.Version.Major > membershipVersion)
+                if (current.Version.Major >= membershipVersion)
                 {
                     return current;
                 }
 
-                synchronizedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, out modified);
-                if (current.Version.Major == membershipVersion && !modified)
-                {
-                    return current;
-                }
-
-                var version = current.Version.Major == membershipVersion
-                    ? new MajorMinorVersion(membershipVersion, current.Version.Minor + 1)
-                    : new MajorMinorVersion(membershipVersion, 0);
+                var synchronizedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership);
+                var version = new MajorMinorVersion(membershipVersion, 0);
                 var updated = CreateClusterManifest(version, synchronizedSilos);
                 TryPublishManifest(updated);
                 return _current;
@@ -260,8 +247,7 @@ namespace Orleans.Runtime.Metadata
 
         private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
             ImmutableDictionary<SiloAddress, GrainManifest> silos,
-            ClusterMembershipSnapshot clusterMembership,
-            out bool modified)
+            ClusterMembershipSnapshot clusterMembership)
         {
             ImmutableDictionary<SiloAddress, GrainManifest>.Builder? builder = null;
             foreach (var entry in silos)
@@ -275,7 +261,6 @@ namespace Orleans.Runtime.Metadata
                 builder.Remove(entry.Key);
             }
 
-            modified = builder is not null;
             return builder?.ToImmutable() ?? silos;
         }
 
