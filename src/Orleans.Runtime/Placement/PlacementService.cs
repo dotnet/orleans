@@ -555,6 +555,11 @@ namespace Orleans.Runtime.Placement
             }
         }
 
+        /// <summary>
+        /// Wraps a filter's output enumerable so that an Activity span is created when the
+        /// sequence is actually enumerated, not when the filter is composed. This avoids
+        /// per-filter array materialization while still giving accurate span timings.
+        /// </summary>
         private IEnumerable<SiloAddress> InstrumentFilteredSilos(
             IEnumerable<SiloAddress> silos,
             PlacementFilterStrategy filter,
