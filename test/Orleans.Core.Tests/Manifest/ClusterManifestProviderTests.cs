@@ -103,8 +103,11 @@ public class ClusterManifestProviderTests
         var grainFactory = CreateGrainFactory(remoteSilo, remoteManifest);
         var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
 
-        Assert.Equal(new MajorMinorVersion(1, 0), provider.Current.Version);
-        Assert.DoesNotContain(remoteSilo, provider.Current.Silos.Keys);
+        var current = provider.Current;
+        Assert.Equal(new MajorMinorVersion(1, 0), current.Version);
+        Assert.DoesNotContain(localSilo, current.Silos.Keys);
+        Assert.DoesNotContain(remoteSilo, current.Silos.Keys);
+        Assert.Contains(provider.LocalGrainManifest, current.AllGrainManifests);
 
         membership.Update(CreateMembershipSnapshot(
             2,
@@ -113,6 +116,7 @@ public class ClusterManifestProviderTests
 
         var pruned = provider.Current;
         Assert.Equal(new MajorMinorVersion(2, 0), pruned.Version);
+        Assert.DoesNotContain(localSilo, pruned.Silos.Keys);
         Assert.DoesNotContain(remoteSilo, pruned.Silos.Keys);
 
         var lifecycle = await StartAsync(provider);
@@ -170,16 +174,17 @@ public class ClusterManifestProviderTests
         TestClusterMembershipService membership,
         IInternalGrainFactory grainFactory)
     {
-        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
-        localSiloDetails.SiloAddress.Returns(localSilo);
+        var siloManifestProvider = CreateSiloManifestProvider();
+        grainFactory
+            .GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, localSilo)
+            .Returns(new TestSiloManifestSystemTarget(siloManifestProvider.SiloManifest));
 
         var services = new ServiceCollection()
             .AddSingleton(grainFactory)
             .BuildServiceProvider();
 
         return new ClusterManifestProvider(
-            localSiloDetails,
-            CreateSiloManifestProvider(),
+            siloManifestProvider,
             membership,
             Substitute.For<IFatalErrorHandler>(),
             NullLogger<ClusterManifestProvider>.Instance,

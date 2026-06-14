@@ -16,7 +16,6 @@ namespace Orleans.Runtime.Metadata
 {
     internal partial class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly SiloAddress _localSiloAddress;
         private readonly ILogger<ClusterManifestProvider> _logger;
         private readonly IServiceProvider _services;
         private readonly IClusterMembershipService _clusterMembershipService;
@@ -33,14 +32,12 @@ namespace Orleans.Runtime.Metadata
         private Task? _runTask;
 
         public ClusterManifestProvider(
-            ILocalSiloDetails localSiloDetails,
             SiloManifestProvider siloManifestProvider,
             IClusterMembershipService clusterMembershipService,
             IFatalErrorHandler fatalErrorHandler,
             ILogger<ClusterManifestProvider> logger,
             IServiceProvider services)
         {
-            _localSiloAddress = localSiloDetails.SiloAddress;
             _logger = logger;
             _services = services;
             _clusterMembershipService = clusterMembershipService;
@@ -70,7 +67,7 @@ namespace Orleans.Runtime.Metadata
                 return current;
             }
 
-            var synchronizedSilos = ApplySynchronousMembershipChanges(current.Silos, clusterMembership, out var modified);
+            var synchronizedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, out var modified);
             if (current.Version.Major == membershipVersion && !modified)
             {
                 return current;
@@ -84,7 +81,7 @@ namespace Orleans.Runtime.Metadata
                     return current;
                 }
 
-                synchronizedSilos = ApplySynchronousMembershipChanges(current.Silos, clusterMembership, out modified);
+                synchronizedSilos = RemoveNonActiveSilos(current.Silos, clusterMembership, out modified);
                 if (current.Version.Major == membershipVersion && !modified)
                 {
                     return current;
@@ -190,12 +187,6 @@ namespace Orleans.Runtime.Metadata
                     continue;
                 }
 
-                if (siloAddress.Equals(_localSiloAddress))
-                {
-                    // Local membership changes are applied synchronously by EnsureCurrentManifestVersion.
-                    continue;
-                }
-
                 tasks.Add(GetManifest(siloAddress));
             }
 
@@ -203,7 +194,7 @@ namespace Orleans.Runtime.Metadata
             {
                 try
                 {
-                    // Get the manifest from the remote silo.
+                    // Get the manifest from the silo.
                     var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
                     var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
                     return (siloAddress, manifest, null);
@@ -253,7 +244,7 @@ namespace Orleans.Runtime.Metadata
             MajorMinorVersion version,
             ImmutableDictionary<SiloAddress, GrainManifest> silos)
         {
-            return new ClusterManifest(version, silos, [.. silos.Values, LocalGrainManifest]);
+            return new ClusterManifest(version, silos, [LocalGrainManifest]);
         }
 
         private bool TryPublishManifest(ClusterManifest manifest)
@@ -265,21 +256,6 @@ namespace Orleans.Runtime.Metadata
             }
 
             return publishSuccess;
-        }
-
-        private ImmutableDictionary<SiloAddress, GrainManifest> ApplySynchronousMembershipChanges(
-            ImmutableDictionary<SiloAddress, GrainManifest> silos,
-            ClusterMembershipSnapshot clusterMembership,
-            out bool modified)
-        {
-            silos = RemoveNonActiveSilos(silos, clusterMembership, out modified);
-            if (clusterMembership.GetSiloStatus(_localSiloAddress) != SiloStatus.Active || silos.ContainsKey(_localSiloAddress))
-            {
-                return silos;
-            }
-
-            modified = true;
-            return silos.Add(_localSiloAddress, LocalGrainManifest);
         }
 
         private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
