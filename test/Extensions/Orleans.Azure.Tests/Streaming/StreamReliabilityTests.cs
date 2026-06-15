@@ -20,6 +20,8 @@ using Tester.AzureUtils;
 using Orleans.Serialization.TypeSystem;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
+using Orleans.Runtime.Messaging;
+using System.Diagnostics;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -33,6 +35,10 @@ namespace UnitTests.Streaming.Reliability
         public const string MEMORY_STREAM_PROVIDER_NAME = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const int QueueCount = 8;
+        private static readonly TimeSpan GrainReachabilityTimeout = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan GrainReachabilityPollInterval = TimeSpan.FromMilliseconds(250);
+        private static readonly TimeSpan ReceiveCountTimeout = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan ReceiveCountPollInterval = TimeSpan.FromMilliseconds(250);
         private Guid _streamId;
         private string _streamProviderName;
         private int _numExpectedSilos;
@@ -665,6 +671,7 @@ namespace UnitTests.Streaming.Reliability
 
             string when = "After restart all silos";
             CheckSilosRunning(when, _numExpectedSilos);
+            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             var producerGrain = GetGrain(producerGrainId);
@@ -700,6 +707,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart all silos";
             CheckSilosRunning(when, _numExpectedSilos);
+            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
             // Note: It is not guaranteed that the list of producers will not get modified / cleaned up during silo shutdown, so can't assume count will be 1 here.
             // Expected == -1 means don't care.
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, -1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
@@ -747,6 +755,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After kill one silo";
             CheckSilosRunning(when, _numExpectedSilos - 1);
+            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             await producerGrain.SendItem(1);
@@ -785,6 +794,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After kill one silo";
             CheckSilosRunning(when, _numExpectedSilos - 1);
+            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             await producerGrain.SendItem(1);
@@ -824,6 +834,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart one silo";
             CheckSilosRunning(when, _numExpectedSilos);
+            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             await producerGrain.SendItem(1);
@@ -862,6 +873,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart one silo";
             CheckSilosRunning(when, _numExpectedSilos);
+            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             await producerGrain.SendItem(1);
@@ -960,6 +972,9 @@ namespace UnitTests.Streaming.Reliability
                 await this.HostedCluster.RestartSiloAsync(silo);
             }
 
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync(didKill: false);
+            await this.HostedCluster.WaitForClusterManifestToStabilizeAsync(didKill: false);
+
             // Note: Needed to reinitialize client in this test case to connect to new silos
             // this.HostedCluster.InitializeClient();
 
@@ -1005,7 +1020,8 @@ namespace UnitTests.Streaming.Reliability
             }
 
             // WaitForLivenessToStabilize(!kill);
-            this.HostedCluster.WaitForLivenessToStabilizeAsync(kill).Wait();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync(kill);
+            await this.HostedCluster.WaitForClusterManifestToStabilizeAsync(kill);
         }
 
 #if USE_GENERICS
@@ -1100,6 +1116,36 @@ namespace UnitTests.Streaming.Reliability
             return sameSilo;
         }
 
+        private async Task WaitForGrainsReachableAsync(string when, params long[] grainIds)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            Exception lastException = null;
+
+            while (stopwatch.Elapsed < GrainReachabilityTimeout)
+            {
+                try
+                {
+                    await Task.WhenAll(grainIds.Select(id => GetGrain(id).Ping()));
+                    _output.WriteLine("{0}: grains reachable after {1}: {2}", when, stopwatch.Elapsed, string.Join(", ", grainIds));
+                    return;
+                }
+                catch (Exception exception) when (IsTransientLifecycleException(exception))
+                {
+                    lastException = exception;
+                }
+
+                await Task.Delay(GrainReachabilityPollInterval);
+            }
+
+            throw new TimeoutException($"Timed out after {GrainReachabilityTimeout} waiting for grains [{string.Join(", ", grainIds)}] to become reachable during '{when}'. Last transient exception: {lastException}");
+        }
+
+        private static bool IsTransientLifecycleException(Exception exception)
+        {
+            return exception is SiloUnavailableException or OrleansMessageRejectionException or ConnectionFailedException
+                || exception.InnerException is not null && IsTransientLifecycleException(exception.InnerException);
+        }
+
 #if USE_GENERICS
         protected async Task CheckReceivedCounts<T>(string when, IStreamReliabilityTestGrain<T> consumerGrain, int expectedReceivedCount, int expectedErrorsCount)
 #else
@@ -1108,22 +1154,21 @@ namespace UnitTests.Streaming.Reliability
         {
             long pk = consumerGrain.GetPrimaryKeyLong();
 
-            int receivedCount = 0;
-            for (int i = 0; i < 20; i++)
+            var stopwatch = Stopwatch.StartNew();
+            var receivedCount = await consumerGrain.GetReceivedCount();
+            _output.WriteLine("After {0} ReceivedCount={1} for grain {2}", stopwatch.Elapsed, receivedCount, pk);
+
+            while (receivedCount != expectedReceivedCount && stopwatch.Elapsed < ReceiveCountTimeout)
             {
+                await Task.Delay(ReceiveCountPollInterval);
                 receivedCount = await consumerGrain.GetReceivedCount();
-                _output.WriteLine("After {0}s ReceivedCount={1} for grain {2}", i, receivedCount, pk);
-
-                if (receivedCount == expectedReceivedCount)
-                    break;
-
-                Thread.Sleep(TimeSpan.FromSeconds(1));
+                _output.WriteLine("After {0} ReceivedCount={1} for grain {2}", stopwatch.Elapsed, receivedCount, pk);
             }
             StreamTestUtils.Assert_AreEqual(_output, expectedReceivedCount, receivedCount,
-                "ReceivedCount for stream {0} for grain {1} {2}", _streamId, pk, when);
+                "ReceivedCount for stream {0} for grain {1} {2} after {3}", _streamId, pk, when, stopwatch.Elapsed);
 
             int errorsCount = await consumerGrain.GetErrorsCount();
-            StreamTestUtils.Assert_AreEqual(_output, expectedErrorsCount, errorsCount, "ErrorsCount for stream {0} for grain {1} {2}", _streamId, pk, when);
+            StreamTestUtils.Assert_AreEqual(_output, expectedErrorsCount, errorsCount, "ErrorsCount for stream {0} for grain {1} {2} after {3}", _streamId, pk, when, stopwatch.Elapsed);
         }
 #if USE_GENERICS
         protected async Task CheckConsumerCounts<T>(string when, IStreamReliabilityTestGrain<T> consumerGrain, int expectedConsumerCount)
