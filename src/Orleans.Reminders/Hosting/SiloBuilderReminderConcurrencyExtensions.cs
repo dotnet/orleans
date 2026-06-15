@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Reminders.Concurrency;
 using Orleans.Runtime;
 
@@ -54,8 +55,21 @@ public static class SiloBuilderReminderConcurrencyExtensions
 
                 if (opts.PerSilo is { } perSilo)
                 {
-                    LogConfiguredTier(logger, "per-silo", perSilo.MaxConcurrent, perSilo.PermitsPerSecond, perSilo.BurstSize, perSilo.BlockMode.GetType().Name);
-                    return new LocalReminderDeliveryThrottle(perSilo, timeProvider, tierName: "per-silo");
+                    LogConfiguredTier(logger, "per-silo", perSilo);
+
+                    IOverloadDetector? overloadDetector = null;
+                    if (perSilo.Overload is not null)
+                    {
+                        overloadDetector = sp.GetService<IOverloadDetector>()
+                            ?? throw new OrleansConfigurationException(
+                                "Reminder concurrency control was configured with RespectOverload, " +
+                                "but no IOverloadDetector was found in the silo service collection. " +
+                                "Ensure that the silo is properly configured (IOverloadDetector is " +
+                                "registered by default in DefaultSiloServices), or remove the " +
+                                "RespectOverload configuration.");
+                    }
+
+                    return new LocalReminderDeliveryThrottle(perSilo, timeProvider, tierName: "per-silo", overloadDetector);
                 }
 
                 // The validator rejects zero-tier configurations, so this should be unreachable;
@@ -65,18 +79,22 @@ public static class SiloBuilderReminderConcurrencyExtensions
         });
     }
 
-    private static void LogConfiguredTier(ILogger logger, string tier, int? maxConcurrent, double? permitsPerSecond, int? burstSize, string blockMode)
+    private static void LogConfiguredTier(ILogger logger, string tier, ThrottleConfig config)
     {
-        if (logger.IsEnabled(LogLevel.Information))
+        if (!logger.IsEnabled(LogLevel.Information))
         {
-            logger.LogInformation(
-                "Reminder concurrency control configured: tier={Tier} maxConcurrent={MaxConcurrent} permitsPerSecond={PermitsPerSecond} burstSize={BurstSize} blockMode={BlockMode}",
-                tier,
-                maxConcurrent?.ToString() ?? "unlimited",
-                permitsPerSecond?.ToString("0.##") ?? "unlimited",
-                burstSize?.ToString() ?? "n/a",
-                blockMode);
+            return;
         }
+
+        logger.LogInformation(
+            "Reminder concurrency control configured: tier={Tier} maxConcurrent={MaxConcurrent} permitsPerSecond={PermitsPerSecond} burstSize={BurstSize} blockMode={BlockMode} respectOverload={RespectOverload} slowStart={SlowStart}",
+            tier,
+            config.MaxConcurrent?.ToString() ?? "unlimited",
+            config.PermitsPerSecond?.ToString("0.##") ?? "unlimited",
+            config.BurstSize?.ToString() ?? "n/a",
+            config.BlockMode.GetType().Name,
+            config.Overload is null ? "disabled" : $"{config.Overload.BlockMode.GetType().Name}/pollInterval={config.Overload.PollInterval}",
+            config.SlowStart is null ? "disabled" : $"initial={config.SlowStart.InitialCapacity}/interval={config.SlowStart.Interval}/{config.SlowStart.BlockMode.GetType().Name}");
     }
 }
 

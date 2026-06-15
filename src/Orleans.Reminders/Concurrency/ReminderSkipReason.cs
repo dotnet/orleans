@@ -33,6 +33,20 @@ public enum ReminderSkipReason
     CoordinatorUnreachableFailClosed,
 
     /// <summary>
+    /// The silo's <see cref="Orleans.Runtime.Messaging.IOverloadDetector"/> reported overload (CPU/memory
+    /// pressure exceeding the configured load-shedding thresholds) and the configured behavior
+    /// did not admit the tick before the overload cleared.
+    /// </summary>
+    SiloOverloaded,
+
+    /// <summary>
+    /// The throttle's slow-start ramp-up has not yet reached the capacity required to admit this
+    /// tick. The acquire either timed out waiting for capacity (<see cref="ThrottleBlockMode.WaitUpTo"/>)
+    /// or was rejected immediately (<see cref="ThrottleBlockMode.SkipImmediately"/>).
+    /// </summary>
+    SlowStartLimited,
+
+    /// <summary>
     /// The silo is shutting down. The reminder loop is unwinding and no further ticks will be
     /// dispatched until the reminder is reactivated.
     /// </summary>
