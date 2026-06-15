@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization.Configuration
@@ -77,6 +78,11 @@ namespace Orleans.Serialization.Configuration
         public HashSet<string> AllowedTypes { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
+        /// Gets the set of assembly names whose types are allowed.
+        /// </summary>
+        public HashSet<string> AllowedAssemblies { get; } = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>
         /// Gets the mapping from compound type aliases to types.
         /// </summary>
         public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
@@ -91,5 +97,40 @@ namespace Orleans.Serialization.Configuration
         /// Gets the set of type manifest providers which have configured this instance.
         /// </summary>
         internal HashSet<object> TypeManifestProviders { get; } = new();
+
+        /// <summary>
+        /// Adds the type name components for <paramref name="type"/> to <see cref="AllowedTypes"/>.
+        /// </summary>
+        /// <param name="type">The type to allow.</param>
+        public void AddAllowedType(Type type)
+        {
+            if (type is null)
+            {
+                throw new ArgumentNullException(nameof(type));
+            }
+
+            var formatted = RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false);
+            var parsed = RuntimeTypeNameParser.Parse(formatted);
+            var options = this;
+            _ = RuntimeTypeNameRewriter.Rewrite(parsed, static (in QualifiedType type, ref TypeManifestOptions options) =>
+            {
+                options.AllowedTypes.Add(type.Type);
+                return type;
+            }, ref options);
+        }
+
+        /// <summary>
+        /// Adds the assembly name for <paramref name="assembly"/> to <see cref="AllowedAssemblies"/>.
+        /// </summary>
+        /// <param name="assembly">The assembly to allow.</param>
+        public void AddAllowedAssembly(Assembly assembly)
+        {
+            if (assembly is null)
+            {
+                throw new ArgumentNullException(nameof(assembly));
+            }
+
+            AllowedAssemblies.Add(CachedTypeResolver.GetName(assembly));
+        }
     }
 }

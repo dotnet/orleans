@@ -44,6 +44,8 @@ public class MyClass
 }
 ```
 
+Enum types are always allowed by type validation. When fail-closed type validation is enabled, additional non-enum types can be allowed by configuring `TypeManifestOptions.AddAllowedType` or `TypeManifestOptions.AddAllowedAssembly`.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)

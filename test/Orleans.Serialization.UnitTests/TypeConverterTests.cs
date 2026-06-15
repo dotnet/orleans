@@ -82,9 +82,36 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void TypeConverter_AllowsConfiguredAllowedTypes()
         {
-            var converter = CreateConverter(configureOptions: options => options.AllowedTypes.Add(typeof(TypeConverterTestsUnconfiguredType).FullName!));
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedType(typeof(TypeConverterTestsUnconfiguredType)));
 
             AssertRoundTrips(converter, typeof(TypeConverterTestsUnconfiguredType));
+        }
+
+        [Fact]
+        public void TypeConverter_AddAllowedType_FormatsConstructedNestedGenericTypes()
+        {
+            var type = typeof(Dictionary<TypeConverterTestsUnconfiguredType, TypeConverterTestsNestedAllowedType.Nested>);
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedType(type));
+
+            AssertRoundTrips(converter, type);
+        }
+
+        [Fact]
+        public void TypeConverter_AllowsConfiguredAllowedAssemblies()
+        {
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsAssemblyAllowedType));
+            AssertRoundTrips(converter, typeof(List<TypeConverterTestsAssemblyAllowedType>));
+        }
+
+        [Fact]
+        public void TypeConverter_AllowsEnums()
+        {
+            var converter = CreateConverter();
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsUnconfiguredEnum));
+            AssertRoundTrips(converter, typeof(List<TypeConverterTestsUnconfiguredEnum>));
         }
 
         [Fact]
@@ -199,7 +226,7 @@ namespace Orleans.Serialization.UnitTests
             var converter = CreateConverter(
                 configureOptions: options =>
                 {
-                    options.AllowedTypes.Add(typeof(TypeConverterTestsCompoundAliasedWithComponentType).FullName!);
+                    options.AddAllowedType(typeof(TypeConverterTestsCompoundAliasedWithComponentType));
                     options.WellKnownTypeAliases[componentAlias] = typeof(TypeConverterTestsAliasComponentType);
                     options.CompoundTypeAliases
                         .Add("type_converter_compound_alias_with_component")
@@ -217,7 +244,7 @@ namespace Orleans.Serialization.UnitTests
             var converter = CreateConverter(
                 configureOptions: options =>
                 {
-                    options.AllowedTypes.Add(typeof(TypeConverterTestsCompoundAliasedType).FullName!);
+                    options.AddAllowedType(typeof(TypeConverterTestsCompoundAliasedType));
                     options.CompoundTypeAliases.Add("type_converter_compound_alias").Add("v1", typeof(TypeConverterTestsCompoundAliasedType));
                 });
 
@@ -271,6 +298,23 @@ namespace Orleans.Serialization.UnitTests
 
     internal sealed class TypeConverterTestsUnconfiguredType
     {
+    }
+
+    internal sealed class TypeConverterTestsAssemblyAllowedType
+    {
+    }
+
+    internal sealed class TypeConverterTestsNestedAllowedType
+    {
+        internal sealed class Nested
+        {
+        }
+    }
+
+    internal enum TypeConverterTestsUnconfiguredEnum
+    {
+        One,
+        Two
     }
 
     internal sealed class TypeConverterTestsGenericArgumentAllowedByTypeFilter

@@ -3275,9 +3275,15 @@ namespace Orleans.Serialization.Configuration
 
     public sealed partial class TypeManifestOptions
     {
+        public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
+
+        public void AddAllowedType(System.Type type) { }
+
         public System.Collections.Generic.HashSet<System.Type> Activators { get { throw null; } }
 
         public bool AllowAllTypes { get { throw null; } set { } }
+
+        public System.Collections.Generic.HashSet<string> AllowedAssemblies { get { throw null; } }
 
         public System.Collections.Generic.HashSet<string> AllowedTypes { get { throw null; } }
 
