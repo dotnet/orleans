@@ -37,10 +37,8 @@ namespace UnitTests.Streaming.Reliability
         public const string MEMORY_STREAM_PROVIDER_NAME = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const int QueueCount = 8;
+        private const int GrainReachabilityAttemptCount = 4;
         private static readonly TimeSpan GrainReachabilityTimeout = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan GrainReachabilityPollInterval = TimeSpan.FromMilliseconds(250);
-        private static readonly TimeSpan ReceiveCountTimeout = TimeSpan.FromSeconds(20);
-        private static readonly TimeSpan ReceiveCountPollInterval = TimeSpan.FromMilliseconds(250);
         private static readonly TimeSpan StreamingDiagnosticTimeout = TimeSpan.FromSeconds(30);
         private Guid _streamId;
         private Guid _subscriptionId;
@@ -395,11 +393,7 @@ namespace UnitTests.Streaming.Reliability
             return producerGrain;
         }
 
-#if USE_GENERICS
-        private async Task<IStreamReliabilityTestGrain<int>[]> Do_AddConsumerGrains(long baseId, int numGrains)
-#else
-        private async Task<IStreamReliabilityTestGrain[]> Do_AddConsumerGrains(long baseId, int numGrains)
-#endif
+        private async Task<ConsumerSubscription[]> Do_AddConsumerGrains(long baseId, int numGrains)
         {
             logger.LogInformation("Initializing: BaseId={BaseId} NumGrains={NumGrains}", baseId, numGrains);
 
@@ -421,9 +415,13 @@ namespace UnitTests.Streaming.Reliability
             await Task.WhenAll(promises);
 
             logger.LogInformation("AddConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
-            await Task.WhenAll(grains.Select(g => g.AddConsumer(_streamId, _streamProviderName)));
+            var handles = await Task.WhenAll(grains.Select(g => g.AddConsumer(_streamId, _streamProviderName)));
+            var subscriptions = grains
+                .Zip(handles, static (grain, handle) => new ConsumerSubscription(grain, handle.HandleId))
+                .ToArray();
+            await WaitForSubscriptionsRegisteredAsync("After AddConsumerGrains", subscriptions.Select(static subscription => subscription.SubscriptionId));
 
-            return grains;
+            return subscriptions;
         }
 
         private static int _baseConsumerId = 0;
@@ -453,36 +451,44 @@ namespace UnitTests.Streaming.Reliability
 
             int baseId = 10000 * ++_baseConsumerId;
 
-            var grains1 = await Do_AddConsumerGrains(baseId, numGrains);
+            var consumers1 = await Do_AddConsumerGrains(baseId, numGrains);
+            var subscriptions1 = consumers1.Select(static consumer => consumer.SubscriptionId).Prepend(_subscriptionId).ToArray();
+            var deliverySnapshots1 = await CaptureStreamingDeliverySnapshotsAsync(subscriptions1);
             for (int i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(2);
             }
             string when1 = "AddConsumers-Send-2";
+            await WaitForItemDeliveriesAsync(when1, _subscriptionId, numLoops, deliverySnapshots1[_subscriptionId]);
+            await Task.WhenAll(consumers1.Select(consumer => WaitForItemDeliveriesAsync(when1, consumer.SubscriptionId, numLoops, deliverySnapshots1[consumer.SubscriptionId])));
             // Messages received by original consumer grain
             await CheckReceivedCounts(when1, consumerGrain, numLoops + 1, 0);
             // Messages received by new consumer grains
             // ReSharper disable once AccessToModifiedClosure
-            await Task.WhenAll(grains1.Select(async g =>
+            await Task.WhenAll(consumers1.Select(async consumer =>
             {
-                await CheckReceivedCounts(when1, g, numLoops, 0);
+                await CheckReceivedCounts(when1, consumer.Grain, numLoops, 0);
 #if DELETE_AFTER_TEST
-                _usedGrains.Add(g);
+                _usedGrains.Add(consumer.Grain);
 #endif
             }));
 
             string when2 = "AddConsumers-Send-3";
             baseId = 10000 * ++_baseConsumerId;
-            var grains2 = await Do_AddConsumerGrains(baseId, numGrains);
+            var consumers2 = await Do_AddConsumerGrains(baseId, numGrains);
+            var subscriptions2 = consumers2.Select(static consumer => consumer.SubscriptionId).Prepend(_subscriptionId).ToArray();
+            var deliverySnapshots2 = await CaptureStreamingDeliverySnapshotsAsync(subscriptions2);
             for (int i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(3);
             }
             ////Thread.Sleep(TimeSpan.FromSeconds(2));
             // Messages received by original consumer grain
+            await WaitForItemDeliveriesAsync(when2, _subscriptionId, numLoops, deliverySnapshots2[_subscriptionId]);
+            await Task.WhenAll(consumers2.Select(consumer => WaitForItemDeliveriesAsync(when2, consumer.SubscriptionId, numLoops, deliverySnapshots2[consumer.SubscriptionId])));
             await CheckReceivedCounts(when2, consumerGrain, numLoops*2 + 1, 0);
             // Messages received by new consumer grains
-            await Task.WhenAll(grains2.Select(g => CheckReceivedCounts(when2, g, numLoops, 0)));
+            await Task.WhenAll(consumers2.Select(consumer => CheckReceivedCounts(when2, consumer.Grain, numLoops, 0)));
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -510,15 +516,18 @@ namespace UnitTests.Streaming.Reliability
             when = "After BecomeProducer";
             // Note: Only semantics guarenteed for producer is that they will have been registered by time that first msg is sent.
             await producerGrain.SendItem(0);
+            await WaitForStreamRegistrationAsync(when);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
-            await consumerGrain.AddConsumer(_streamId, _streamProviderName);
+            var c1 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
+            await WaitForSubscriptionRegisteredAsync(when, c1.HandleId);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
-            await consumerGrain.AddConsumer(_streamId, _streamProviderName);
+            var c2 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After second AddConsumer";
+            await WaitForSubscriptionRegisteredAsync(when, c2.HandleId);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             StreamTestUtils.LogEndTest(testName, logger);
@@ -546,20 +555,24 @@ namespace UnitTests.Streaming.Reliability
             when = "After first BecomeProducer";
             // Note: Only semantics guarenteed for producer is that they will have been registered by time that first msg is sent.
             await producerGrain.SendItem(0);
+            await WaitForStreamRegistrationAsync(when);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             await producerGrain.BecomeProducer(_streamId, _streamProviderName);
             when = "After second BecomeProducer";
             await producerGrain.SendItem(0);
+            await WaitForStreamRegistrationAsync(when);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
-            await consumerGrain.AddConsumer(_streamId, _streamProviderName);
+            var c1 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
+            await WaitForSubscriptionRegisteredAsync(when, c1.HandleId);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
-            await consumerGrain.AddConsumer(_streamId, _streamProviderName);
+            var c2 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After second AddConsumer";
+            await WaitForSubscriptionRegisteredAsync(when, c2.HandleId);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             StreamTestUtils.LogEndTest(testName, logger);
@@ -589,15 +602,18 @@ namespace UnitTests.Streaming.Reliability
             when = "After BecomeProducer";
             // Note: Only semantics guarenteed are that producer will have been registered by time that first msg is sent.
             await producerGrain.SendItem(0);
+            await WaitForStreamRegistrationAsync(when);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             logger.LogInformation("AddConsumer x 2 : StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
             var c1 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
+            await WaitForSubscriptionRegisteredAsync(when, c1.HandleId);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
             await CheckConsumerCounts(when, consumerGrain, 1);
             var c2 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After second AddConsumer";
+            await WaitForSubscriptionRegisteredAsync(when, c2.HandleId);
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
             await CheckConsumerCounts(when, consumerGrain, 2);
 
@@ -647,23 +663,8 @@ namespace UnitTests.Streaming.Reliability
             string when = "After restart all silos";
             CheckSilosRunning(when, _numExpectedSilos);
 
-            // Since we restart all silos, the client might not haave had enough
-            // time to reconnect to the new gateways. Let's retry the call if it
-            // is the case
-            for (int i = 0; i < 3; i++)
-            {
-                try
-                {
-                    await consumerGrain.UnSubscribeFromAllStreams();
-                    break;
-                }
-                catch (OrleansMessageRejectionException ex)
-                {
-                    if (!ex.Message.Contains("No gateways available"))
-                        throw;
-                }
-                await Task.Delay(100);
-            }
+            await WaitForLifecycleAndStreamingReadinessAsync(when, didKill: false);
+            await consumerGrain.UnSubscribeFromAllStreams();
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -685,7 +686,7 @@ namespace UnitTests.Streaming.Reliability
 
             string when = "After restart all silos";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(when, false, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             var producerGrain = GetGrain(producerGrainId);
@@ -725,7 +726,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart all silos";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(when, false, producerGrainId, consumerGrainId);
             // Note: It is not guaranteed that the list of producers will not get modified / cleaned up during silo shutdown, so can't assume count will be 1 here.
             // Expected == -1 means don't care.
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, -1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
@@ -777,7 +778,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After kill one silo";
             CheckSilosRunning(when, _numExpectedSilos - 1);
-            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             var deliverySnapshot = await CaptureStreamingDeliverySnapshotAsync(_subscriptionId);
@@ -820,7 +821,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After kill one silo";
             CheckSilosRunning(when, _numExpectedSilos - 1);
-            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             var deliverySnapshot = await CaptureStreamingDeliverySnapshotAsync(_subscriptionId);
@@ -864,7 +865,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart one silo";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             var deliverySnapshot = await CaptureStreamingDeliverySnapshotAsync(_subscriptionId);
@@ -907,7 +908,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart one silo";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
 
             when = "SendItem";
             var deliverySnapshot = await CaptureStreamingDeliverySnapshotAsync(_subscriptionId);
@@ -945,11 +946,13 @@ namespace UnitTests.Streaming.Reliability
             int expectedReceived = 1;
 
             string when = "SendItem-2";
+            var deliverySnapshot = await CaptureStreamingDeliverySnapshotAsync(_subscriptionId);
             for (int i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(2);
             }
             expectedReceived += numLoops;
+            await WaitForItemDeliveriesAsync(when, _subscriptionId, numLoops, deliverySnapshot);
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, true, true);
             await CheckReceivedCounts(when, consumerGrain, expectedReceived, 0);
 
@@ -958,11 +961,13 @@ namespace UnitTests.Streaming.Reliability
             //WaitForLivenessToStabilize();
             SiloHandle newSilo = await this.HostedCluster.StartAdditionalSiloAsync();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await this.HostedCluster.WaitForClusterManifestToStabilizeAsync();
 
 
             when = "After starting additional silo " + newSilo;
             _output.WriteLine(when);
             CheckSilosRunning(when, _numExpectedSilos + 1);
+            await WaitForStreamingProviderReadyAsync(when);
 
             //when = "SendItem-3";
             //output.WriteLine(when);
@@ -976,18 +981,22 @@ namespace UnitTests.Streaming.Reliability
 
             // Find a Consumer Grain on the new silo
             IStreamReliabilityTestGrain newConsumer = CreateGrainOnSilo(newSilo.SiloAddress);
-            await newConsumer.AddConsumer(_streamId, _streamProviderName);
+            var newConsumerSubscription = await newConsumer.AddConsumer(_streamId, _streamProviderName);
+            await WaitForSubscriptionRegisteredAsync("After new consumer AddConsumer", newConsumerSubscription.HandleId);
             _output.WriteLine("Grain silo locations: Producer={0} OldConsumer={1} NewConsumer={2}", producerLocation, consumerLocation, newSilo.SiloAddress);
 
             ////Thread.Sleep(TimeSpan.FromSeconds(2));
 
             when = "SendItem-4";
             _output.WriteLine(when);
+            var deliverySnapshots = await CaptureStreamingDeliverySnapshotsAsync(new[] { _subscriptionId, newConsumerSubscription.HandleId });
             for (int i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(4);
             }
             expectedReceived += numLoops;
+            await WaitForItemDeliveriesAsync(when + "-Old", _subscriptionId, numLoops, deliverySnapshots[_subscriptionId]);
+            await WaitForItemDeliveriesAsync(when + "-New", newConsumerSubscription.HandleId, numLoops, deliverySnapshots[newConsumerSubscription.HandleId]);
             // Old consumer received the newly published messages
             await CheckReceivedCounts(when+"-Old", consumerGrain, expectedReceived, 0);
             // New consumer received the newly published messages
@@ -1156,12 +1165,52 @@ namespace UnitTests.Streaming.Reliability
 
         private StreamId CurrentStreamId => StreamId.Create(StreamTestsConstants.StreamReliabilityNamespace, _streamId);
 
-        private async Task WaitForSubscriptionRegisteredAsync(string when, Guid subscriptionId)
+        private async Task WaitForLifecycleAndStreamingReadinessAsync(string when, bool didKill)
         {
-            await WaitForAnyStreamingProbeAsync(
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
+            await this.HostedCluster.WaitForClusterManifestToStabilizeAsync(didKill);
+            await WaitForStreamingProviderReadyAsync(when);
+        }
+
+        private async Task WaitForStreamingProviderReadyAsync(string when)
+        {
+            var probes = await GetStreamingDiagnosticsProbesAsync();
+            if (probes.Length == 0)
+            {
+                throw new TimeoutException($"{when}: no active streaming diagnostics probes were available for provider '{_streamProviderName}'.");
+            }
+
+            var waits = probes
+                .Select(probe => probe.WaitForProviderReady(_streamProviderName, expectedQueueCount: 1, StreamingDiagnosticTimeout))
+                .ToArray();
+            await WaitForAllStreamingSignalsAsync(
                 when,
-                $"subscription {subscriptionId} registered",
-                probe => probe.WaitForSubscriptionRegistered(_streamProviderName, CurrentStreamId, subscriptionId, StreamingDiagnosticTimeout));
+                $"provider '{_streamProviderName}' ready on each active silo",
+                probes,
+                waits);
+        }
+
+        private Task WaitForSubscriptionRegisteredAsync(string when, Guid subscriptionId)
+            => WaitForSubscriptionsRegisteredAsync(when, new[] { subscriptionId });
+
+        private async Task WaitForSubscriptionsRegisteredAsync(string when, IEnumerable<Guid> subscriptionIds)
+        {
+            var ids = subscriptionIds.ToArray();
+            if (ids.Length == 0)
+            {
+                return;
+            }
+
+            var probes = await GetStreamingDiagnosticsProbesAsync();
+            var streamId = CurrentStreamId;
+            foreach (var subscriptionId in ids)
+            {
+                await WaitForAnyStreamingSignalAsync(
+                    when,
+                    $"subscription {subscriptionId} registered",
+                    probes,
+                    probes.Select(probe => probe.WaitForSubscriptionRegistered(_streamProviderName, streamId, subscriptionId, StreamingDiagnosticTimeout)).ToArray());
+            }
         }
 
         private async Task WaitForSubscriptionAttachedAsync(string when, Guid subscriptionId)
@@ -1187,20 +1236,36 @@ namespace UnitTests.Streaming.Reliability
 
         private async Task<StreamingDeliverySnapshot[]> CaptureStreamingDeliverySnapshotAsync(Guid subscriptionId)
         {
+            var snapshots = await CaptureStreamingDeliverySnapshotsAsync(new[] { subscriptionId });
+            return snapshots[subscriptionId];
+        }
+
+        private async Task<Dictionary<Guid, StreamingDeliverySnapshot[]>> CaptureStreamingDeliverySnapshotsAsync(IEnumerable<Guid> subscriptionIds)
+        {
             var probes = await GetStreamingDiagnosticsProbesAsync();
             var streamId = CurrentStreamId;
-            var snapshots = new StreamingDeliverySnapshot[probes.Length];
-            for (var i = 0; i < probes.Length; i++)
+            var result = new Dictionary<Guid, StreamingDeliverySnapshot[]>();
+
+            foreach (var subscriptionId in subscriptionIds.Distinct())
             {
-                snapshots[i] = new StreamingDeliverySnapshot(
-                    probes[i],
-                    await probes[i].GetItemDeliveredCount(_streamProviderName, streamId, subscriptionId));
+                var snapshots = new StreamingDeliverySnapshot[probes.Length];
+                for (var i = 0; i < probes.Length; i++)
+                {
+                    snapshots[i] = new StreamingDeliverySnapshot(
+                        probes[i],
+                        await probes[i].GetItemDeliveredCount(_streamProviderName, streamId, subscriptionId));
+                }
+
+                result.Add(subscriptionId, snapshots);
             }
 
-            return snapshots;
+            return result;
         }
 
         private async Task WaitForNewItemDeliveredAsync(string when, Guid subscriptionId, StreamingDeliverySnapshot[] beforeSend)
+            => await WaitForItemDeliveriesAsync(when, subscriptionId, expectedNewItemCount: 1, beforeSend);
+
+        private async Task WaitForItemDeliveriesAsync(string when, Guid subscriptionId, int expectedNewItemCount, StreamingDeliverySnapshot[] beforeSend)
         {
             var streamId = CurrentStreamId;
             var waits = beforeSend
@@ -1208,13 +1273,13 @@ namespace UnitTests.Streaming.Reliability
                     _streamProviderName,
                     streamId,
                     subscriptionId,
-                    snapshot.ItemDeliveredCount + 1,
+                    snapshot.ItemDeliveredCount + expectedNewItemCount,
                     StreamingDiagnosticTimeout))
                 .ToArray();
 
             await WaitForAnyStreamingSignalAsync(
                 when,
-                $"new item delivered to subscription {subscriptionId}",
+                $"{expectedNewItemCount} new item(s) delivered to subscription {subscriptionId}",
                 beforeSend.Select(static snapshot => snapshot.Probe).ToArray(),
                 waits);
         }
@@ -1255,6 +1320,37 @@ namespace UnitTests.Streaming.Reliability
             throw new TimeoutException(
                 $"{when}: timed out waiting for streaming diagnostic signal '{signal}'. Probe summaries: {string.Join(" || ", summaries)}",
                 errors.LastOrDefault());
+        }
+
+        private async Task WaitForAllStreamingSignalsAsync(string when, string signal, IStreamingDiagnosticsProbeGrain[] probes, Task[] waits)
+        {
+            var errors = (await Task.WhenAll(waits.Select(CaptureStreamingSignalFailureAsync)))
+                .Where(static error => error is not null)
+                .ToArray();
+
+            if (errors.Length == 0)
+            {
+                _output.WriteLine("{0}: observed streaming diagnostic signal '{1}' on all active silos", when, signal);
+                return;
+            }
+
+            var summaries = await Task.WhenAll(probes.Select(static probe => probe.GetRecentStreamingDiagnostics()));
+            throw new TimeoutException(
+                $"{when}: timed out waiting for streaming diagnostic signal '{signal}' on all active silos. Probe summaries: {string.Join(" || ", summaries)}",
+                errors.LastOrDefault());
+        }
+
+        private static async Task<Exception> CaptureStreamingSignalFailureAsync(Task task)
+        {
+            try
+            {
+                await task;
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
         }
 
         private static void ObserveFailures(IEnumerable<Task> tasks)
@@ -1298,12 +1394,18 @@ namespace UnitTests.Streaming.Reliability
 
         private readonly record struct StreamingDeliverySnapshot(IStreamingDiagnosticsProbeGrain Probe, int ItemDeliveredCount);
 
-        private async Task WaitForGrainsReachableAsync(string when, params long[] grainIds)
+#if USE_GENERICS
+        private readonly record struct ConsumerSubscription(IStreamReliabilityTestGrain<int> Grain, Guid SubscriptionId);
+#else
+        private readonly record struct ConsumerSubscription(IStreamReliabilityTestGrain Grain, Guid SubscriptionId);
+#endif
+
+        private async Task WaitForGrainsReachableAsync(string when, bool didKill, params long[] grainIds)
         {
             var stopwatch = Stopwatch.StartNew();
             Exception lastException = null;
 
-            while (stopwatch.Elapsed < GrainReachabilityTimeout)
+            for (var attempt = 1; attempt <= GrainReachabilityAttemptCount && stopwatch.Elapsed < GrainReachabilityTimeout; attempt++)
             {
                 try
                 {
@@ -1316,7 +1418,25 @@ namespace UnitTests.Streaming.Reliability
                     lastException = exception;
                 }
 
-                await Task.Delay(GrainReachabilityPollInterval);
+                if (attempt == GrainReachabilityAttemptCount)
+                {
+                    break;
+                }
+
+                var remaining = GrainReachabilityTimeout - stopwatch.Elapsed;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    break;
+                }
+
+                try
+                {
+                    await WaitForLifecycleAndStreamingReadinessAsync($"{when} after transient grain reachability failure", didKill).WaitAsync(remaining);
+                }
+                catch (Exception exception) when (exception is TimeoutException || IsTransientLifecycleException(exception))
+                {
+                    lastException = exception;
+                }
             }
 
             throw new TimeoutException($"Timed out after {GrainReachabilityTimeout} waiting for grains [{string.Join(", ", grainIds)}] to become reachable during '{when}'. Last transient exception: {lastException}");
@@ -1336,21 +1456,13 @@ namespace UnitTests.Streaming.Reliability
         {
             long pk = consumerGrain.GetPrimaryKeyLong();
 
-            var stopwatch = Stopwatch.StartNew();
             var receivedCount = await consumerGrain.GetReceivedCount();
-            _output.WriteLine("After {0} ReceivedCount={1} for grain {2}", stopwatch.Elapsed, receivedCount, pk);
-
-            while (receivedCount != expectedReceivedCount && stopwatch.Elapsed < ReceiveCountTimeout)
-            {
-                await Task.Delay(ReceiveCountPollInterval);
-                receivedCount = await consumerGrain.GetReceivedCount();
-                _output.WriteLine("After {0} ReceivedCount={1} for grain {2}", stopwatch.Elapsed, receivedCount, pk);
-            }
+            _output.WriteLine("{0}: ReceivedCount={1} for grain {2}", when, receivedCount, pk);
             StreamTestUtils.Assert_AreEqual(_output, expectedReceivedCount, receivedCount,
-                "ReceivedCount for stream {0} for grain {1} {2} after {3}", _streamId, pk, when, stopwatch.Elapsed);
+                "ReceivedCount for stream {0} for grain {1} {2}", _streamId, pk, when);
 
             int errorsCount = await consumerGrain.GetErrorsCount();
-            StreamTestUtils.Assert_AreEqual(_output, expectedErrorsCount, errorsCount, "ErrorsCount for stream {0} for grain {1} {2} after {3}", _streamId, pk, when, stopwatch.Elapsed);
+            StreamTestUtils.Assert_AreEqual(_output, expectedErrorsCount, errorsCount, "ErrorsCount for stream {0} for grain {1} {2}", _streamId, pk, when);
         }
 #if USE_GENERICS
         protected async Task CheckConsumerCounts<T>(string when, IStreamReliabilityTestGrain<T> consumerGrain, int expectedConsumerCount)
