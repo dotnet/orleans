@@ -391,12 +391,13 @@ internal sealed class TestThrottle : IAsyncDisposable
 {
     private readonly LocalReminderDeliveryThrottle _inner;
 
-    public TestThrottle(ThrottleConfig config, TimeProvider? timeProvider = null)
+    public TestThrottle(ThrottleConfig config, TimeProvider? timeProvider = null, Orleans.Runtime.Messaging.IOverloadDetector? overloadDetector = null)
     {
-        _inner = new LocalReminderDeliveryThrottle(config, timeProvider ?? TimeProvider.System, tierName: "test");
+        _inner = new LocalReminderDeliveryThrottle(config, timeProvider ?? TimeProvider.System, tierName: "test", overloadDetector);
     }
 
     public int AvailableConcurrencyPermits => _inner.AvailableConcurrencyPermits;
+    public int SlowStartCurrentCapacity => _inner.SlowStartCurrentCapacity;
 
     public ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext ctx, CancellationToken ct)
         => _inner.AcquireAsync(ctx, ct);

@@ -437,6 +437,167 @@ public sealed class ReminderConcurrencyControlClusterTests
         }
     }
 
+    /// <summary>
+    /// Regression for Phase 1.5: when a tier opts in to RespectOverload and the silo's
+    /// IOverloadDetector reports overload, reminder ticks are skipped (or delayed) per the
+    /// configured block mode. Verifies end-to-end wiring through the silo's DI graph using
+    /// a replaced IOverloadDetector service.
+    /// </summary>
+    [Fact]
+    public async Task RespectOverload_SkipsTicks_WhenOverloadDetectorReportsOverload()
+    {
+        var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
+        using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
+        {
+            if (evt is ReminderEvents.TickSkipped s)
+            {
+                skipped.Add(s);
+            }
+        });
+
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+
+        var fakeDetector = new FakeClusterOverloadDetector { IsOverloaded = true };
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.Services.Replace(ServiceDescriptor.Singleton<Orleans.Runtime.Messaging.IOverloadDetector>(fakeDetector));
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t
+                        .MaxConcurrent(100)
+                        .RespectOverload(ThrottleBlockMode.SkipImmediately)));
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        foreach (var silo in cluster.Silos)
+        {
+            await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        }
+
+        var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        const string reminderName = "overload_test";
+
+        var registered = observer.WaitForReminderRegisteredAsync(grainId, reminderName, cts.Token);
+        var handle = await grain.StartReminder(reminderName, TimeSpan.FromMilliseconds(500), validate: true).WaitAsync(cts.Token);
+        await registered;
+        await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+        // Drive past the first due-time so the reminder fires. With overload reported, the tick
+        // must be skipped with reason=SiloOverloaded.
+        for (var i = 0; i < 10 && skipped.Count == 0; i++)
+        {
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cts.Token);
+            await Task.Delay(100, cts.Token);
+        }
+
+        try
+        {
+            Assert.True(skipped.Count >= 1, $"Expected at least one TickSkipped(SiloOverloaded); got {skipped.Count}.");
+            var skip = skipped.First();
+            Assert.Equal(ReminderSkipReason.SiloOverloaded, skip.Reason);
+            Assert.Equal("per-silo", skip.TierName);
+            Assert.Equal(reminderName, skip.ReminderName);
+        }
+        finally
+        {
+            try { await grain.StopReminder(handle).WaitAsync(cts.Token); } catch { /* best-effort */ }
+        }
+    }
+
+    /// <summary>
+    /// Regression for Phase 1.5: slow-start ramp-up reduces the effective concurrency at silo
+    /// startup. Verifies that with a tightly constrained slow-start initial capacity, only the
+    /// initial capacity admits successfully on the first burst; subsequent ticks are skipped
+    /// with SlowStartLimited until the ramp opens up.
+    /// </summary>
+    [Fact]
+    public async Task SlowStart_LimitsInitialFanOut()
+    {
+        var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
+        using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
+        {
+            if (evt is ReminderEvents.TickSkipped s)
+            {
+                skipped.Add(s);
+            }
+        });
+
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t
+                        .MaxConcurrent(100)
+                        .SlowStart(
+                            initialCapacity: 1,
+                            interval: TimeSpan.FromHours(1), // effectively never grows during the test
+                            onCapacityExceeded: ThrottleBlockMode.SkipImmediately)));
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        foreach (var silo in cluster.Silos)
+        {
+            await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        }
+
+        const int reminderCount = 5;
+        const string reminderName = "slow_start_test";
+
+        var grains = Enumerable.Range(0, reminderCount)
+            .Select(_ => cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid()))
+            .ToArray();
+
+        var handles = new IGrainReminder[reminderCount];
+        for (var i = 0; i < reminderCount; i++)
+        {
+            var g = grains[i];
+            var reg = observer.WaitForReminderRegisteredAsync(g.GetGrainId(), reminderName, cts.Token);
+            handles[i] = await g.StartReminder(reminderName, TimeSpan.FromMilliseconds(500), validate: true).WaitAsync(cts.Token);
+            await reg;
+            await observer.WaitForLocalReminderScheduleAsync(g.GetGrainId(), reminderName, cts.Token);
+        }
+
+        for (var i = 0; i < 10 && skipped.Count == 0; i++)
+        {
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cts.Token);
+            await Task.Delay(100, cts.Token);
+        }
+
+        try
+        {
+            Assert.True(skipped.Count >= 1, $"Expected at least one TickSkipped(SlowStartLimited); got {skipped.Count}.");
+            var skip = skipped.First(s => s.Reason == ReminderSkipReason.SlowStartLimited);
+            Assert.Equal("per-silo", skip.TierName);
+            Assert.Equal(reminderName, skip.ReminderName);
+        }
+        finally
+        {
+            for (var i = 0; i < reminderCount; i++)
+            {
+                try { await grains[i].StopReminder(handles[i]).WaitAsync(cts.Token); } catch { /* best-effort */ }
+            }
+        }
+    }
+
     private static string FlattenMessages(Exception ex)
     {
         var sb = new System.Text.StringBuilder();
@@ -454,4 +615,9 @@ public sealed class ReminderConcurrencyControlClusterTests
 
         return sb.ToString();
     }
+}
+
+internal sealed class FakeClusterOverloadDetector : Orleans.Runtime.Messaging.IOverloadDetector
+{
+    public bool IsOverloaded { get; set; }
 }
