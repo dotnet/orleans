@@ -465,6 +465,298 @@ public static class StreamingEvents
         public readonly IStreamQueueBalancer QueueBalancer = queueBalancer;
     }
 
+    /// <summary>
+    /// Event payload for when a persistent stream pulling agent starts for a queue.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo.</param>
+    /// <param name="queueId">The queue handled by the pulling agent.</param>
+    /// <param name="dueTime">The initial due time for the queue pump timer.</param>
+    /// <param name="period">The queue pump timer period.</param>
+    public sealed class PullingAgentStarted(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        QueueId queueId,
+        TimeSpan dueTime,
+        TimeSpan period) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The queue handled by the pulling agent.
+        /// </summary>
+        public readonly QueueId QueueId = queueId;
+
+        /// <summary>
+        /// The initial due time for the queue pump timer.
+        /// </summary>
+        public readonly TimeSpan DueTime = dueTime;
+
+        /// <summary>
+        /// The queue pump timer period.
+        /// </summary>
+        public readonly TimeSpan Period = period;
+    }
+
+    /// <summary>
+    /// Event payload for when a persistent stream pulling agent stops for a queue.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo.</param>
+    /// <param name="queueId">The queue handled by the pulling agent.</param>
+    public sealed class PullingAgentStopped(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        QueueId queueId) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The queue handled by the pulling agent.
+        /// </summary>
+        public readonly QueueId QueueId = queueId;
+    }
+
+    /// <summary>
+    /// Event payload for when a persistent stream pulling agent queue receiver initializes.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo.</param>
+    /// <param name="queueId">The initialized queue.</param>
+    public sealed class QueueReceiverInitialized(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        QueueId queueId) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The initialized queue.
+        /// </summary>
+        public readonly QueueId QueueId = queueId;
+    }
+
+    /// <summary>
+    /// Event payload for when a persistent stream pulling agent queue receiver fails to initialize.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo.</param>
+    /// <param name="queueId">The queue which failed to initialize.</param>
+    /// <param name="exception">The initialization exception.</param>
+    public sealed class QueueReceiverInitializationFailed(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        QueueId queueId,
+        Exception exception) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The queue which failed to initialize.
+        /// </summary>
+        public readonly QueueId QueueId = queueId;
+
+        /// <summary>
+        /// The initialization exception.
+        /// </summary>
+        public readonly Exception Exception = exception;
+    }
+
+    /// <summary>
+    /// Event payload for when a persistent stream pulling agent registers a local stream entry.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo.</param>
+    /// <param name="queueId">The queue handled by the pulling agent.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="producerGrainId">The pulling agent grain ID registered as producer in pubsub.</param>
+    /// <param name="subscriberCount">The number of non-faulted subscribers returned by pubsub.</param>
+    public sealed class PullingAgentStreamRegistered(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        QueueId queueId,
+        StreamId streamId,
+        GrainId producerGrainId,
+        int subscriberCount) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The queue handled by the pulling agent.
+        /// </summary>
+        public readonly QueueId QueueId = queueId;
+
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The pulling agent grain ID registered as producer in pubsub.
+        /// </summary>
+        public readonly GrainId ProducerGrainId = producerGrainId;
+
+        /// <summary>
+        /// The number of non-faulted subscribers returned by pubsub.
+        /// </summary>
+        public readonly int SubscriberCount = subscriberCount;
+    }
+
+    /// <summary>
+    /// Event payload for when a persistent stream pulling agent fails to register a local stream entry.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo.</param>
+    /// <param name="queueId">The queue handled by the pulling agent.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="exception">The registration exception.</param>
+    public sealed class PullingAgentStreamRegistrationFailed(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        QueueId queueId,
+        StreamId streamId,
+        Exception exception) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The queue handled by the pulling agent.
+        /// </summary>
+        public readonly QueueId QueueId = queueId;
+
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The registration exception.
+        /// </summary>
+        public readonly Exception Exception = exception;
+    }
+
+    internal static bool IsPullingAgentStartedEnabled() => Listener.IsEnabled(nameof(PullingAgentStarted));
+
+    internal static void EmitPullingAgentStarted(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, TimeSpan dueTime, TimeSpan period)
+    {
+        if (!IsPullingAgentStartedEnabled())
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, queueId, dueTime, period);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, TimeSpan dueTime, TimeSpan period)
+        {
+            Listener.Write(nameof(PullingAgentStarted), new PullingAgentStarted(
+                streamProviderName,
+                siloAddress,
+                queueId,
+                dueTime,
+                period));
+        }
+    }
+
+    internal static bool IsPullingAgentStoppedEnabled() => Listener.IsEnabled(nameof(PullingAgentStopped));
+
+    internal static void EmitPullingAgentStopped(string streamProviderName, SiloAddress? siloAddress, QueueId queueId)
+    {
+        if (!IsPullingAgentStoppedEnabled())
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, queueId);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, SiloAddress? siloAddress, QueueId queueId)
+        {
+            Listener.Write(nameof(PullingAgentStopped), new PullingAgentStopped(
+                streamProviderName,
+                siloAddress,
+                queueId));
+        }
+    }
+
+    internal static bool IsQueueReceiverInitializedEnabled() => Listener.IsEnabled(nameof(QueueReceiverInitialized));
+
+    internal static void EmitQueueReceiverInitialized(string streamProviderName, SiloAddress? siloAddress, QueueId queueId)
+    {
+        if (!IsQueueReceiverInitializedEnabled())
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, queueId);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, SiloAddress? siloAddress, QueueId queueId)
+        {
+            Listener.Write(nameof(QueueReceiverInitialized), new QueueReceiverInitialized(
+                streamProviderName,
+                siloAddress,
+                queueId));
+        }
+    }
+
+    internal static bool IsQueueReceiverInitializationFailedEnabled() => Listener.IsEnabled(nameof(QueueReceiverInitializationFailed));
+
+    internal static void EmitQueueReceiverInitializationFailed(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, Exception exception)
+    {
+        if (!IsQueueReceiverInitializationFailedEnabled())
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, queueId, exception);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, Exception exception)
+        {
+            Listener.Write(nameof(QueueReceiverInitializationFailed), new QueueReceiverInitializationFailed(
+                streamProviderName,
+                siloAddress,
+                queueId,
+                exception));
+        }
+    }
+
+    internal static bool IsPullingAgentStreamRegisteredEnabled() => Listener.IsEnabled(nameof(PullingAgentStreamRegistered));
+
+    internal static void EmitPullingAgentStreamRegistered(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, StreamId streamId, GrainId producerGrainId, int subscriberCount)
+    {
+        if (!IsPullingAgentStreamRegisteredEnabled())
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, queueId, streamId, producerGrainId, subscriberCount);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, StreamId streamId, GrainId producerGrainId, int subscriberCount)
+        {
+            Listener.Write(nameof(PullingAgentStreamRegistered), new PullingAgentStreamRegistered(
+                streamProviderName,
+                siloAddress,
+                queueId,
+                streamId,
+                producerGrainId,
+                subscriberCount));
+        }
+    }
+
+    internal static bool IsPullingAgentStreamRegistrationFailedEnabled() => Listener.IsEnabled(nameof(PullingAgentStreamRegistrationFailed));
+
+    internal static void EmitPullingAgentStreamRegistrationFailed(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, StreamId streamId, Exception exception)
+    {
+        if (!IsPullingAgentStreamRegistrationFailedEnabled())
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, queueId, streamId, exception);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, SiloAddress? siloAddress, QueueId queueId, StreamId streamId, Exception exception)
+        {
+            Listener.Write(nameof(PullingAgentStreamRegistrationFailed), new PullingAgentStreamRegistrationFailed(
+                streamProviderName,
+                siloAddress,
+                queueId,
+                streamId,
+                exception));
+        }
+    }
+
     internal static void EmitMessageDelivered(string streamProviderName, StreamConsumerData consumerData, IBatchContainer batch, SiloAddress? siloAddress)
     {
         if (!Listener.IsEnabled(nameof(MessageDelivered)))

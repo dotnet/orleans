@@ -1194,6 +1194,50 @@ namespace Orleans.Streaming.Diagnostics
             public QueueBalancerMaturityCompleted(string streamProvider, Runtime.SiloAddress? siloAddress, Runtime.SiloAddress maturedSiloAddress, bool isLocalSilo, Streams.IStreamQueueBalancer queueBalancer) : base(default!, default) { }
         }
 
+        public sealed partial class PullingAgentStarted : StreamingEvent
+        {
+            public readonly System.TimeSpan DueTime;
+            public readonly System.TimeSpan Period;
+            public readonly Streams.QueueId QueueId;
+            public PullingAgentStarted(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId, System.TimeSpan dueTime, System.TimeSpan period) : base(default!, default) { }
+        }
+
+        public sealed partial class PullingAgentStopped : StreamingEvent
+        {
+            public readonly Streams.QueueId QueueId;
+            public PullingAgentStopped(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId) : base(default!, default) { }
+        }
+
+        public sealed partial class PullingAgentStreamRegistered : StreamingEvent
+        {
+            public readonly Runtime.GrainId ProducerGrainId;
+            public readonly Streams.QueueId QueueId;
+            public readonly Runtime.StreamId StreamId;
+            public readonly int SubscriberCount;
+            public PullingAgentStreamRegistered(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId, Runtime.StreamId streamId, Runtime.GrainId producerGrainId, int subscriberCount) : base(default!, default) { }
+        }
+
+        public sealed partial class PullingAgentStreamRegistrationFailed : StreamingEvent
+        {
+            public readonly System.Exception Exception;
+            public readonly Streams.QueueId QueueId;
+            public readonly Runtime.StreamId StreamId;
+            public PullingAgentStreamRegistrationFailed(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId, Runtime.StreamId streamId, System.Exception exception) : base(default!, default) { }
+        }
+
+        public sealed partial class QueueReceiverInitializationFailed : StreamingEvent
+        {
+            public readonly System.Exception Exception;
+            public readonly Streams.QueueId QueueId;
+            public QueueReceiverInitializationFailed(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId, System.Exception exception) : base(default!, default) { }
+        }
+
+        public sealed partial class QueueReceiverInitialized : StreamingEvent
+        {
+            public readonly Streams.QueueId QueueId;
+            public QueueReceiverInitialized(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId) : base(default!, default) {             }
+        }
+
         public sealed partial class StreamInactive : StreamingEvent
         {
             public readonly System.TimeSpan InactivityPeriod;

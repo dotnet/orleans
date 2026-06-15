@@ -1,6 +1,7 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reactive.Threading.Tasks;
+using Orleans.Runtime;
 using Orleans.Streams;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
@@ -28,6 +29,118 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     {
         _events = StreamingEvents.AllEvents.Replay();
         _connection = _events.Connect();
+    }
+
+    /// <summary>
+    /// Waits for queue ownership to change for a provider.
+    /// </summary>
+    public async Task<StreamingEvents.BalancerChanged> WaitForBalancerChangedAsync(string? streamProvider, SiloAddress? siloAddress, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.BalancerChanged>()
+            .FirstAsync(e => MatchesProviderAndSilo(e.StreamProvider, e.SiloAddress, streamProvider, siloAddress))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a pulling agent to start for a queue.
+    /// </summary>
+    public async Task<StreamingEvents.PullingAgentStarted> WaitForPullingAgentStartedAsync(string? streamProvider, SiloAddress? siloAddress, QueueId? queueId, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.PullingAgentStarted>()
+            .FirstAsync(e => MatchesProviderSiloAndQueue(e.StreamProvider, e.SiloAddress, e.QueueId, streamProvider, siloAddress, queueId))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of pulling agent starts for a provider.
+    /// </summary>
+    public async Task WaitForPullingAgentStartedCountAsync(string? streamProvider, int expectedCount, CancellationToken cancellationToken)
+    {
+        await _events
+            .OfType<StreamingEvents.PullingAgentStarted>()
+            .Where(e => MatchesProvider(e.StreamProvider, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a pulling agent to stop for a queue.
+    /// </summary>
+    public async Task<StreamingEvents.PullingAgentStopped> WaitForPullingAgentStoppedAsync(string? streamProvider, SiloAddress? siloAddress, QueueId? queueId, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.PullingAgentStopped>()
+            .FirstAsync(e => MatchesProviderSiloAndQueue(e.StreamProvider, e.SiloAddress, e.QueueId, streamProvider, siloAddress, queueId))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a queue receiver to initialize.
+    /// </summary>
+    public async Task<StreamingEvents.QueueReceiverInitialized> WaitForQueueReceiverInitializedAsync(string? streamProvider, SiloAddress? siloAddress, QueueId? queueId, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.QueueReceiverInitialized>()
+            .FirstAsync(e => MatchesProviderSiloAndQueue(e.StreamProvider, e.SiloAddress, e.QueueId, streamProvider, siloAddress, queueId))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of queue receivers to initialize for a provider.
+    /// </summary>
+    public async Task WaitForQueueReceiverInitializedCountAsync(string? streamProvider, int expectedCount, CancellationToken cancellationToken)
+    {
+        await _events
+            .OfType<StreamingEvents.QueueReceiverInitialized>()
+            .Where(e => MatchesProvider(e.StreamProvider, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a queue receiver initialization failure.
+    /// </summary>
+    public async Task<StreamingEvents.QueueReceiverInitializationFailed> WaitForQueueReceiverInitializationFailedAsync(string? streamProvider, SiloAddress? siloAddress, QueueId? queueId, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.QueueReceiverInitializationFailed>()
+            .FirstAsync(e => MatchesProviderSiloAndQueue(e.StreamProvider, e.SiloAddress, e.QueueId, streamProvider, siloAddress, queueId))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a pulling agent to register a local stream entry.
+    /// </summary>
+    public async Task<StreamingEvents.PullingAgentStreamRegistered> WaitForPullingAgentStreamRegisteredAsync(StreamId streamId, string? streamProvider, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.PullingAgentStreamRegistered>()
+            .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a pulling agent stream registration failure.
+    /// </summary>
+    public async Task<StreamingEvents.PullingAgentStreamRegistrationFailed> WaitForPullingAgentStreamRegistrationFailedAsync(StreamId streamId, string? streamProvider, CancellationToken cancellationToken)
+    {
+        return await _events
+            .OfType<StreamingEvents.PullingAgentStreamRegistrationFailed>()
+            .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -371,14 +484,31 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     private static bool MatchesStream(StreamId eventStreamId, string eventStreamProvider, StreamId streamId, string? streamProvider)
     {
         return eventStreamId == streamId
-            && (streamProvider is null || eventStreamProvider == streamProvider);
+            && MatchesProvider(eventStreamProvider, streamProvider);
     }
 
     private static bool MatchesSubscription(StreamId eventStreamId, Guid eventSubscriptionId, string eventStreamProvider, StreamId streamId, Guid subscriptionId, string? streamProvider)
     {
         return eventStreamId == streamId
             && eventSubscriptionId == subscriptionId
-            && (streamProvider is null || eventStreamProvider == streamProvider);
+            && MatchesProvider(eventStreamProvider, streamProvider);
+    }
+
+    private static bool MatchesProviderSiloAndQueue(string eventStreamProvider, SiloAddress? eventSiloAddress, QueueId eventQueueId, string? streamProvider, SiloAddress? siloAddress, QueueId? queueId)
+    {
+        return MatchesProviderAndSilo(eventStreamProvider, eventSiloAddress, streamProvider, siloAddress)
+            && (queueId is null || eventQueueId.Equals(queueId.Value));
+    }
+
+    private static bool MatchesProviderAndSilo(string eventStreamProvider, SiloAddress? eventSiloAddress, string? streamProvider, SiloAddress? siloAddress)
+    {
+        return MatchesProvider(eventStreamProvider, streamProvider)
+            && (siloAddress is null || eventSiloAddress?.Equals(siloAddress) == true);
+    }
+
+    private static bool MatchesProvider(string eventStreamProvider, string? streamProvider)
+    {
+        return streamProvider is null || eventStreamProvider == streamProvider;
     }
 
     /// <inheritdoc/>
