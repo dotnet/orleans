@@ -126,6 +126,8 @@ public sealed class ReminderThrottleInstruments
         ReminderSkipReason.ClusterLimiterFull => "cluster_limiter_full",
         ReminderSkipReason.AcquireTimeout => "acquire_timeout",
         ReminderSkipReason.CoordinatorUnreachableFailClosed => "coordinator_unreachable_fail_closed",
+        ReminderSkipReason.SiloOverloaded => "silo_overloaded",
+        ReminderSkipReason.SlowStartLimited => "slow_start_limited",
         ReminderSkipReason.SiloShutdown => "silo_shutdown",
         _ => "unknown",
     };
