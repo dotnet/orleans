@@ -5,7 +5,6 @@ using Xunit;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using System.Diagnostics;
 
 namespace UnitTests.StreamingTests
 {
@@ -51,17 +50,16 @@ namespace UnitTests.StreamingTests
             return runtime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit)!;
         }
 
-        internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamIdGuid, string streamProviderName, string streamNamespace, TimeSpan? timeout = null)
+        internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamIdGuid, string streamProviderName, string streamNamespace)
         {
             var pubSub = GetStreamPubSub(client);
             var streamId = new QualifiedStreamId(streamProviderName, StreamId.Create(streamNamespace, streamIdGuid));
-            var waitTimeout = timeout ?? TimeSpan.FromSeconds(15);
 
-            await WaitForPubSubCount(output, when, "ConsumerCount", streamId, streamProviderName, streamNamespace, expectedConsumerCount, () => pubSub.ConsumerCount(streamId), waitTimeout);
-            await WaitForPubSubCount(output, when, "PublisherCount", streamId, streamProviderName, streamNamespace, expectedPublisherCount, () => pubSub.ProducerCount(streamId), waitTimeout);
+            await CheckPubSubCount(output, when, "ConsumerCount", streamId, streamProviderName, streamNamespace, expectedConsumerCount, () => pubSub.ConsumerCount(streamId));
+            await CheckPubSubCount(output, when, "PublisherCount", streamId, streamProviderName, streamNamespace, expectedPublisherCount, () => pubSub.ProducerCount(streamId));
         }
 
-        private static async Task<int> WaitForPubSubCount(
+        private static async Task<int> CheckPubSubCount(
             ITestOutputHelper output,
             string when,
             string countName,
@@ -69,31 +67,19 @@ namespace UnitTests.StreamingTests
             string streamProviderName,
             string streamNamespace,
             int expectedCount,
-            Func<Task<int>> getCount,
-            TimeSpan timeout)
+            Func<Task<int>> getCount)
         {
-            var stopwatch = Stopwatch.StartNew();
             var count = await getCount();
 
-            if (expectedCount != -1)
-            {
-                while (count != expectedCount && stopwatch.Elapsed < timeout)
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(250));
-                    count = await getCount();
-                }
-            }
-
             var message = string.Format(
-                "{0} - {1} for stream {2} = {3}; expected {4}; provider={5}; namespace={6}; elapsed={7}",
+                "{0} - {1} for stream {2} = {3}; expected {4}; provider={5}; namespace={6}",
                 when,
                 countName,
                 streamId,
                 count,
                 expectedCount == -1 ? "not checked" : expectedCount,
                 streamProviderName,
-                streamNamespace,
-                stopwatch.Elapsed);
+                streamNamespace);
             var prefix = expectedCount == -1 ? "Not-checked" : count == expectedCount ? "True" : "FALSE";
             output.WriteLine("--> {0}: {1}", prefix, message);
 
