@@ -173,11 +173,13 @@ namespace Orleans.Reminders.Concurrency
 
     public sealed partial class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, System.IDisposable
     {
-        public LocalReminderDeliveryThrottle(ThrottleConfig config, System.TimeProvider timeProvider, string tierName) { }
+        public LocalReminderDeliveryThrottle(ThrottleConfig config, System.TimeProvider timeProvider, string tierName, Runtime.Messaging.IOverloadDetector? overloadDetector = null) { }
 
         public int AvailableConcurrencyPermits { get { throw null; } }
 
         public int AvailableRateTokens { get { throw null; } }
+
+        public int SlowStartCurrentCapacity { get { throw null; } }
 
         public string TierName { get { throw null; } }
 
@@ -193,6 +195,15 @@ namespace Orleans.Reminders.Concurrency
         public static NoOpReminderDeliveryThrottle Instance { get { throw null; } }
 
         public System.Threading.Tasks.ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public sealed partial class OverloadConfig
+    {
+        internal OverloadConfig() { }
+
+        public ThrottleBlockMode BlockMode { get { throw null; } }
+
+        public System.TimeSpan PollInterval { get { throw null; } }
     }
 
     public static partial class ReminderActivityAttributes
@@ -273,7 +284,9 @@ namespace Orleans.Reminders.Concurrency
         ClusterLimiterFull = 1,
         AcquireTimeout = 2,
         CoordinatorUnreachableFailClosed = 3,
-        SiloShutdown = 4
+        SiloOverloaded = 4,
+        SlowStartLimited = 5,
+        SiloShutdown = 6
     }
 
     public sealed partial class ReminderThrottleConfigBuilder
@@ -287,6 +300,10 @@ namespace Orleans.Reminders.Concurrency
         public ReminderThrottleConfigBuilder MaxConcurrent(int value) { throw null; }
 
         public ReminderThrottleConfigBuilder PermitsPerSecond(double value) { throw null; }
+
+        public ReminderThrottleConfigBuilder RespectOverload(ThrottleBlockMode onOverload, System.TimeSpan? pollInterval = null) { throw null; }
+
+        public ReminderThrottleConfigBuilder SlowStart(int initialCapacity, System.TimeSpan interval, ThrottleBlockMode onCapacityExceeded) { throw null; }
     }
 
     public sealed partial class ReminderThrottleInstruments
@@ -302,6 +319,17 @@ namespace Orleans.Reminders.Concurrency
         public void OnTickSkipped(string? tier, ReminderSkipReason reason) { }
 
         public void RecordAcquireDuration(string? tier, ReminderAdmissionOutcome outcome, System.TimeSpan duration) { }
+    }
+
+    public sealed partial class SlowStartConfig
+    {
+        internal SlowStartConfig() { }
+
+        public ThrottleBlockMode BlockMode { get { throw null; } }
+
+        public int InitialCapacity { get { throw null; } }
+
+        public System.TimeSpan Interval { get { throw null; } }
     }
 
     public abstract partial record ThrottleBlockMode()
@@ -323,7 +351,11 @@ namespace Orleans.Reminders.Concurrency
 
         public int? MaxConcurrent { get { throw null; } }
 
+        public OverloadConfig? Overload { get { throw null; } }
+
         public double? PermitsPerSecond { get { throw null; } }
+
+        public SlowStartConfig? SlowStart { get { throw null; } }
     }
 
     public enum ThrottleFailureMode
