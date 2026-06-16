@@ -24,7 +24,9 @@ namespace Orleans.Journaling
 
         public bool DeleteOldCheckpoints { get { throw null; } set { } }
 
-        public System.Func<JournalId, string> GetBlobName { get { throw null; } set { } }
+        public System.Func<JournalId, string, string> GetCheckpointBlobName { get { throw null; } set { } }
+
+        public System.Func<JournalId, string> GetWalBlobName { get { throw null; } set { } }
 
         public int MaxMetadataOnlyConflictRetries { get { throw null; } set { } }
 

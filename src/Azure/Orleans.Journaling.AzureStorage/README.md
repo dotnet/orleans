@@ -3,7 +3,21 @@
 ## Introduction
 Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows journaling and tracking of grain operations using Azure Storage as a backing store.
 
-Blob names are derived from the configured grain storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type.
+Blob names are derived from the configured journal storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type. The WAL blob name and checkpoint blob name can be customized using `AzureBlobJournalStorageOptions.GetWalBlobName` and `GetCheckpointBlobName`.
+
+## Using an existing blob layout
+
+Orleans 10.1 stored Azure journaling data in one append blob per grain using the Orleans binary journal format. To read that layout directly, configure the WAL blob name delegate to point at the existing append blob and configure journaling to use the Orleans binary format.
+
+```csharp
+siloBuilder.AddAzureBlobJournalStorage(options =>
+{
+    // Orleans 10.1 default: the single append blob was named "<grainId>.bin".
+    options.GetWalBlobName = static journalId => $"{journalId.Value}.bin";
+});
+siloBuilder.Services.Configure<JournaledStateManagerOptions>(
+    options => options.JournalFormatKey = "orleans-binary");
+```
 
 ## Getting Started
 To use this package, install it via NuGet:
