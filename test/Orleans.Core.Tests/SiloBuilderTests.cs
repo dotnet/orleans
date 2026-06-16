@@ -140,6 +140,16 @@ namespace NonSilo.Tests
                         .Configure<ClusterMembershipOptions>(options => { options.NumVotesForDeathDeclaration = 0; });
                 }).RunConsoleAsync();
             });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => options.MaxDefunctSiloEntries = -1);
+                }).RunConsoleAsync();
+            });
         }
 
         /// <summary>
