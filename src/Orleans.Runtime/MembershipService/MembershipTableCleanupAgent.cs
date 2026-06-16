@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -13,7 +12,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for cleaning up dead membership table entries.
     /// </summary>
-    internal partial class MembershipTableCleanupAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal partial class MembershipTableCleanupAgent : ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IMembershipTable _membershipTableProvider;
@@ -131,15 +130,16 @@ namespace Orleans.Runtime.MembershipService
                         }
 
                         defunctSiloEntryCount++;
+                        var entryPriority = new DefunctSiloEntryPriority(entry);
                         if (newestDefunctEntries.Count < trackedEntryCount)
                         {
-                            newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
+                            newestDefunctEntries.Enqueue(entry, entryPriority);
                         }
-                        else if (newestDefunctEntries.TryPeek(out var oldestTrackedEntry, out _)
-                            && CompareDefunctSiloEntries(entry, oldestTrackedEntry) > 0)
+                        else if (newestDefunctEntries.TryPeek(out _, out var oldestTrackedEntryPriority)
+                            && entryPriority > oldestTrackedEntryPriority)
                         {
                             newestDefunctEntries.Dequeue();
-                            newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
+                            newestDefunctEntries.Enqueue(entry, entryPriority);
                         }
                     }
 
@@ -202,12 +202,6 @@ namespace Orleans.Runtime.MembershipService
             return localSiloIsActive;
         }
 
-        private static int CompareDefunctSiloEntries(MembershipEntry left, MembershipEntry right)
-        {
-            var result = left.EffectiveIAmAliveTime.CompareTo(right.EffectiveIAmAliveTime);
-            return result != 0 ? result : left.SiloAddress.CompareTo(right.SiloAddress);
-        }
-
         private static DateTimeOffset GetDefunctSiloCleanupCutoff(DateTime effectiveIAmAliveTime)
         {
             var effectiveIAmAliveTimeUtc = DateTime.SpecifyKind(effectiveIAmAliveTime, DateTimeKind.Utc);
@@ -220,7 +214,17 @@ namespace Orleans.Runtime.MembershipService
         {
             private readonly MembershipEntry _entry = entry;
 
-            public int CompareTo(DefunctSiloEntryPriority other) => CompareDefunctSiloEntries(_entry, other._entry);
+            public static bool operator >(DefunctSiloEntryPriority left, DefunctSiloEntryPriority right) => Compare(left, right) > 0;
+
+            public static bool operator <(DefunctSiloEntryPriority left, DefunctSiloEntryPriority right) => Compare(left, right) < 0;
+
+            public int CompareTo(DefunctSiloEntryPriority other) => Compare(this, other);
+
+            private static int Compare(DefunctSiloEntryPriority left, DefunctSiloEntryPriority right)
+            {
+                var result = left._entry.EffectiveIAmAliveTime.CompareTo(right._entry.EffectiveIAmAliveTime);
+                return result != 0 ? result : left._entry.SiloAddress.CompareTo(right._entry.SiloAddress);
+            }
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -242,12 +246,6 @@ namespace Orleans.Runtime.MembershipService
                     await task.WaitAsync(ct).SuppressThrowing();
                 }
             }
-        }
-
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [NotNullWhen(false)] out string? reason)
-        {
-            reason = default;
-            return true;
         }
 
         [LoggerMessage(
