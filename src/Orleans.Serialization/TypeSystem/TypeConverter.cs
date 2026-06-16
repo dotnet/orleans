@@ -96,7 +96,7 @@ public class TypeConverter
 
             foreach (var t in options.Value.AllowedTypes)
             {
-                _allowedTypesConfiguration.Add(t);
+                AddConfiguredAllowedType(t);
             }
 
             ConsumeMetadata(options.Value);
@@ -131,6 +131,19 @@ public class TypeConverter
                 }
             }
         }
+    }
+
+    private void AddConfiguredAllowedType(string typeName)
+    {
+        _allowedTypesConfiguration.Add(typeName);
+
+        var parsed = RuntimeTypeNameParser.Parse(typeName);
+        var converter = this;
+        _ = RuntimeTypeNameRewriter.Rewrite(parsed, static (in QualifiedType type, ref TypeConverter converter) =>
+        {
+            converter._allowedTypes[type] = true;
+            return type;
+        }, ref converter);
     }
 
     private void ConsumeMetadata(TypeManifestOptions metadata)

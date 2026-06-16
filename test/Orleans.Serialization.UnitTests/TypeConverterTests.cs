@@ -91,6 +91,11 @@ namespace Orleans.Serialization.UnitTests
         public void TypeConverter_AddAllowedType_FormatsConstructedNestedGenericTypes()
         {
             var type = typeof(Dictionary<TypeConverterTestsUnconfiguredType, TypeConverterTestsNestedAllowedType.Nested>);
+            var options = new TypeManifestOptions();
+            options.AddAllowedType(type);
+
+            Assert.Contains(RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false), options.AllowedTypes);
+
             var converter = CreateConverter(configureOptions: options => options.AddAllowedType(type));
 
             AssertRoundTrips(converter, type);

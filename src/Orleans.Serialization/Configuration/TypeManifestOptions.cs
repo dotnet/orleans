@@ -99,7 +99,7 @@ namespace Orleans.Serialization.Configuration
         internal HashSet<object> TypeManifestProviders { get; } = new();
 
         /// <summary>
-        /// Adds the type name components for <paramref name="type"/> to <see cref="AllowedTypes"/>.
+        /// Adds the formatted type name for <paramref name="type"/> to <see cref="AllowedTypes"/>.
         /// </summary>
         /// <param name="type">The type to allow.</param>
         public void AddAllowedType(Type type)
@@ -109,14 +109,7 @@ namespace Orleans.Serialization.Configuration
                 throw new ArgumentNullException(nameof(type));
             }
 
-            var formatted = RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false);
-            var parsed = RuntimeTypeNameParser.Parse(formatted);
-            var options = this;
-            _ = RuntimeTypeNameRewriter.Rewrite(parsed, static (in QualifiedType type, ref TypeManifestOptions options) =>
-            {
-                options.AllowedTypes.Add(type.Type);
-                return type;
-            }, ref options);
+            AllowedTypes.Add(RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false));
         }
 
         /// <summary>
