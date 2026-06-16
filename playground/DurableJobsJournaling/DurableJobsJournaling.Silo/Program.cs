@@ -25,9 +25,10 @@ builder.UseOrleans(siloBuilder =>
             options =>
             {
                 options.ContainerName = storageContainer;
-                options.GetBlobName = journalId => $"{storagePrefix}/{journalId.Value}";
+                options.GetWalBlobName = journalId => $"{storagePrefix}/{journalId.Value}/wal";
+                options.GetCheckpointBlobName = (journalId, snapshotId) => $"{storagePrefix}/{journalId.Value}/chk.{snapshotId}";
             })
-        .Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJournalingJsonContext.Default))
+        .UseJsonJournalFormat(DurableJobsJournalingJsonContext.Default)
         .Configure<DurableJobsOptions>(options =>
         {
             options.ShardDuration = TimeSpan.FromMinutes(2);
