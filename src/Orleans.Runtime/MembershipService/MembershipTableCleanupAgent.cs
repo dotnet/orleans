@@ -204,7 +204,7 @@ namespace Orleans.Runtime.MembershipService
             foreach (var tuple in table.Members)
             {
                 var entry = tuple.Item1;
-                if (!IsDefunctSiloEntry(entry))
+                if (entry.Status != SiloStatus.Dead)
                 {
                     continue;
                 }
@@ -239,8 +239,6 @@ namespace Orleans.Runtime.MembershipService
             return result != 0 ? result : left.SiloAddress.CompareTo(right.SiloAddress);
         }
 
-        private static bool IsDefunctSiloEntry(MembershipEntry entry) => entry.Status == SiloStatus.Dead;
-
         private static DateTimeOffset GetDefunctSiloCleanupCutoff(DateTime effectiveIAmAliveTime)
         {
             var effectiveIAmAliveTimeUtc = DateTime.SpecifyKind(effectiveIAmAliveTime, DateTimeKind.Utc);
@@ -251,14 +249,9 @@ namespace Orleans.Runtime.MembershipService
 
         private readonly struct DefunctSiloEntryPriority(MembershipEntry entry) : IComparable<DefunctSiloEntryPriority>
         {
-            private readonly DateTime _effectiveIAmAliveTime = entry.EffectiveIAmAliveTime;
-            private readonly SiloAddress _siloAddress = entry.SiloAddress;
+            private readonly MembershipEntry _entry = entry;
 
-            public int CompareTo(DefunctSiloEntryPriority other)
-            {
-                var result = _effectiveIAmAliveTime.CompareTo(other._effectiveIAmAliveTime);
-                return result != 0 ? result : _siloAddress.CompareTo(other._siloAddress);
-            }
+            public int CompareTo(DefunctSiloEntryPriority other) => CompareDefunctSiloEntries(_entry, other._entry);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
