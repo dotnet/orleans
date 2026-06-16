@@ -7,43 +7,57 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains;
 
-public sealed class StreamingDiagnosticsProbeGrain(
-    StreamingDiagnosticEventRecorder recorder,
-    IGrainContext grainContext) : Grain, IStreamingDiagnosticsProbeGrain
+internal sealed class StreamingDiagnosticsProbeSystemTarget : SystemTarget, IStreamingDiagnosticsProbe, ILifecycleParticipant<ISiloLifecycle>
 {
+    private readonly StreamingDiagnosticEventRecorder _recorder;
+
+    public StreamingDiagnosticsProbeSystemTarget(
+        StreamingDiagnosticEventRecorder recorder,
+        SystemTargetShared shared)
+        : base(StreamingDiagnosticsProbeConstants.SystemTargetType, shared)
+    {
+        _recorder = recorder;
+        shared.ActivationDirectory.RecordNewTarget(this);
+    }
+
+    void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+    {
+    }
+
     public Task<SiloAddress> GetLocation()
-        => Task.FromResult(grainContext.Address.SiloAddress ?? throw new InvalidOperationException("Streaming diagnostics probe is not hosted on a silo."));
+        => Task.FromResult(Silo);
 
     public Task WaitForProviderReady(string providerName, int expectedQueueCount, TimeSpan timeout)
-        => recorder.WaitForProviderReady(providerName, expectedQueueCount, timeout);
+        => _recorder.WaitForProviderReady(providerName, expectedQueueCount, timeout);
 
     public Task WaitForProducerRegistered(string providerName, StreamId streamId, TimeSpan timeout)
-        => recorder.WaitForProducerRegistered(providerName, streamId, timeout);
+        => _recorder.WaitForProducerRegistered(providerName, streamId, timeout);
 
     public Task WaitForPullingAgentStreamRegistered(string providerName, StreamId streamId, TimeSpan timeout)
-        => recorder.WaitForPullingAgentStreamRegistered(providerName, streamId, timeout);
+        => _recorder.WaitForPullingAgentStreamRegistered(providerName, streamId, timeout);
 
     public Task WaitForSubscriptionRegistered(string providerName, StreamId streamId, Guid subscriptionId, TimeSpan timeout)
-        => recorder.WaitForSubscriptionRegistered(providerName, streamId, subscriptionId, timeout);
+        => _recorder.WaitForSubscriptionRegistered(providerName, streamId, subscriptionId, timeout);
 
     public Task WaitForSubscriptionAttached(string providerName, StreamId streamId, Guid subscriptionId, TimeSpan timeout)
-        => recorder.WaitForSubscriptionAttached(providerName, streamId, subscriptionId, timeout);
+        => _recorder.WaitForSubscriptionAttached(providerName, streamId, subscriptionId, timeout);
 
     public Task<int> GetItemDeliveredCount(string providerName, StreamId streamId, Guid subscriptionId)
-        => Task.FromResult(recorder.GetItemDeliveredCount(providerName, streamId, subscriptionId));
+        => Task.FromResult(_recorder.GetItemDeliveredCount(providerName, streamId, subscriptionId));
 
     public Task WaitForItemDelivered(string providerName, StreamId streamId, Guid subscriptionId, int expectedCount, TimeSpan timeout)
-        => recorder.WaitForItemDelivered(providerName, streamId, subscriptionId, expectedCount, timeout);
+        => _recorder.WaitForItemDelivered(providerName, streamId, subscriptionId, expectedCount, timeout);
 
     public Task WaitForConsumerCursorDrained(string providerName, StreamId streamId, Guid subscriptionId, TimeSpan timeout)
-        => recorder.WaitForConsumerCursorDrained(providerName, streamId, subscriptionId, timeout);
+        => _recorder.WaitForConsumerCursorDrained(providerName, streamId, subscriptionId, timeout);
 
-    public Task<string> GetRecentStreamingDiagnostics() => Task.FromResult(recorder.GetSummary());
+    public Task<string> GetRecentStreamingDiagnostics() => Task.FromResult(_recorder.GetSummary());
 }
 
 public sealed class StreamingDiagnosticEventRecorder : IStartupTask, IDisposable
 {
     private const int MaxRecentEvents = 64;
+    private const int MaxSummaryItems = 8;
 
     private readonly object _lock = new();
     private readonly Dictionary<string, HashSet<QueueId>> _startedQueues = new(StringComparer.Ordinal);
@@ -247,7 +261,15 @@ public sealed class StreamingDiagnosticEventRecorder : IStartupTask, IDisposable
         var started = string.Join(", ", _startedQueues.Select(kvp => $"{kvp.Key}:{kvp.Value.Count}"));
         var initialized = string.Join(", ", _initializedQueues.Select(kvp => $"{kvp.Key}:{kvp.Value.Count}"));
         var recent = string.Join(" | ", _recentEvents);
-        return $"StartedQueues=[{started}] InitializedQueues=[{initialized}] RecentEvents=[{recent}]";
+        return $"StartedQueues=[{started}] "
+            + $"InitializedQueues=[{initialized}] "
+            + $"ProducerRegistrations=[{FormatCollection(_producerRegistrations)}] "
+            + $"PullingAgentStreamRegistrations=[{FormatCollection(_pullingAgentStreamRegistrations)}] "
+            + $"SubscriptionRegistrations=[{FormatCollection(_subscriptionRegistrations)}] "
+            + $"SubscriptionAttachments=[{FormatCollection(_subscriptionAttachments)}] "
+            + $"ItemDeliveries=[{FormatDictionary(_itemDeliveries)}] "
+            + $"CursorDrains=[{FormatCollection(_cursorDrains)}] "
+            + $"RecentEvents=[{recent}]";
     }
 
     private void AddRecent(string message)
@@ -286,6 +308,22 @@ public sealed class StreamingDiagnosticEventRecorder : IStartupTask, IDisposable
     private static void SetQueues(Dictionary<string, HashSet<QueueId>> queuesByProvider, string providerName, IEnumerable<QueueId> queues)
     {
         queuesByProvider[providerName] = [.. queues];
+    }
+
+    private static string FormatCollection<T>(IReadOnlyCollection<T> values)
+    {
+        var suffix = values.Count > MaxSummaryItems ? ", ..." : string.Empty;
+        return $"Count={values.Count}; Items=[{string.Join(", ", values.Take(MaxSummaryItems))}{suffix}]";
+    }
+
+    private static string FormatDictionary<TKey>(IReadOnlyDictionary<TKey, int> values)
+        where TKey : notnull
+    {
+        var suffix = values.Count > MaxSummaryItems ? ", ..." : string.Empty;
+        var entries = values
+            .Take(MaxSummaryItems)
+            .Select(static kvp => $"{kvp.Key}:{kvp.Value}");
+        return $"Count={values.Count}; Items=[{string.Join(", ", entries)}{suffix}]";
     }
 
     private sealed class Waiter(Func<bool> condition, string description)

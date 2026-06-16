@@ -3,7 +3,12 @@ using Orleans.Streams;
 
 namespace UnitTests.GrainInterfaces;
 
-public interface IStreamingDiagnosticsProbeGrain : IGrainWithIntegerKey
+public static class StreamingDiagnosticsProbeConstants
+{
+    public static readonly GrainType SystemTargetType = SystemTargetGrainId.CreateGrainType("streaming-diagnostics-probe");
+}
+
+public interface IStreamingDiagnosticsProbe : ISystemTarget
 {
     Task<SiloAddress> GetLocation();
     Task WaitForProviderReady(string providerName, int expectedQueueCount, TimeSpan timeout);
