@@ -79,13 +79,14 @@ namespace Orleans.Runtime.MembershipService
             LogDebugStartingMembershipTableCleanupAgent(_logger);
             try
             {
-                await foreach (var membership in _membershipManager.MembershipUpdates.WithCancellation(cancellationToken))
+                await foreach (var _ in _membershipManager.MembershipUpdates.WithCancellation(cancellationToken))
                 {
                     if (_cleanupDefunctSiloEntriesUnsupported)
                     {
                         return;
                     }
 
+                    var membership = _membershipManager.CurrentSnapshot;
                     if (!IsFirstActiveSilo(membership))
                     {
                         continue;
