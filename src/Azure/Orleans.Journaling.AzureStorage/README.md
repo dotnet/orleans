@@ -5,18 +5,16 @@ Microsoft Orleans Journaling for Azure Storage provides an Azure Storage impleme
 
 Blob names are derived from the configured journal storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type. The WAL blob name and checkpoint blob name can be customized using `AzureBlobJournalStorageOptions.GetWalBlobName` and `GetCheckpointBlobName`.
 
-## Using an existing blob layout
+## Using an alternative blob layout
 
-Orleans 10.1 stored Azure journaling data in one append blob per grain using the Orleans binary journal format. To read that layout directly, configure the WAL blob name delegate to point at the existing append blob and configure journaling to use the Orleans binary format.
+By default, WAL blobs are named `<journalId>/wal` and checkpoint blobs are named `<journalId>/chk.<snapshotId>`. Configure the blob name delegates to use an alternative layout, such as a shared prefix, file extensions, tenant-specific paths, or names which match an existing storage convention. Each delegate returns a container-relative blob name, and checkpoint names should include the supplied snapshot id to avoid collisions.
 
 ```csharp
 siloBuilder.AddAzureBlobJournalStorage(options =>
 {
-    // Orleans 10.1 default: the single append blob was named "<grainId>.bin".
-    options.GetWalBlobName = static journalId => $"{journalId.Value}.bin";
+    options.GetWalBlobName = static journalId => $"journals/{journalId.Value}.wal";
+    options.GetCheckpointBlobName = static (journalId, snapshotId) => $"journals/{journalId.Value}.{snapshotId}.chk";
 });
-siloBuilder.Services.Configure<JournaledStateManagerOptions>(
-    options => options.JournalFormatKey = "orleans-binary");
 ```
 
 ## Getting Started
