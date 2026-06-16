@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private void CancelShutdown()
+        private void SignalShutdown()
         {
             lock (_shutdownLock)
             {
@@ -110,8 +110,6 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 DateTimeOffset? beforeDate = default;
-                var defunctSiloEntryCount = 0;
-                var defunctSiloEntriesToRemove = 0;
 
                 if (_clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
                 {
@@ -120,16 +118,44 @@ namespace Orleans.Runtime.MembershipService
 
                 if (_clusterMembershipOptions.MaxDefunctSiloEntries is { } maxDefunctSiloEntries)
                 {
-                    var table = await _membershipTableProvider.ReadAll().WaitAsync(cancellationToken);
-                    if (TryGetDefunctSiloCleanupInfo(
-                        table,
-                        maxDefunctSiloEntries,
-                        out var excessBeforeDate,
-                        out defunctSiloEntryCount,
-                        out defunctSiloEntriesToRemove)
-                        && (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value))
+                    ArgumentOutOfRangeException.ThrowIfNegative(maxDefunctSiloEntries, nameof(ClusterMembershipOptions.MaxDefunctSiloEntries));
+
+                    if (maxDefunctSiloEntries != int.MaxValue)
                     {
-                        beforeDate = excessBeforeDate;
+                        var table = await _membershipTableProvider.ReadAll().WaitAsync(cancellationToken);
+                        var defunctSiloEntryCount = 0;
+                        var trackedEntryCount = maxDefunctSiloEntries + 1;
+                        var newestDefunctEntries = new PriorityQueue<MembershipEntry, DefunctSiloEntryPriority>();
+                        foreach (var tuple in table.Members)
+                        {
+                            var entry = tuple.Item1;
+                            if (entry.Status != SiloStatus.Dead)
+                            {
+                                continue;
+                            }
+
+                            defunctSiloEntryCount++;
+                            if (newestDefunctEntries.Count < trackedEntryCount)
+                            {
+                                newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
+                            }
+                            else if (newestDefunctEntries.TryPeek(out var oldestTrackedEntry, out _)
+                                && CompareDefunctSiloEntries(entry, oldestTrackedEntry) > 0)
+                            {
+                                newestDefunctEntries.Dequeue();
+                                newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
+                            }
+                        }
+
+                        if (defunctSiloEntryCount > maxDefunctSiloEntries)
+                        {
+                            var newestEntryToRemove = newestDefunctEntries.Peek();
+                            var excessBeforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveIAmAliveTime);
+                            if (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value)
+                            {
+                                beforeDate = excessBeforeDate;
+                            }
+                        }
                     }
                 }
 
@@ -138,7 +164,7 @@ namespace Orleans.Runtime.MembershipService
                     return;
                 }
 
-                LogDebugCleaningUpDefunctMembershipTableEntries(_logger, defunctSiloEntriesToRemove, defunctSiloEntryCount, _clusterMembershipOptions.MaxDefunctSiloEntries, beforeDate.Value);
+                LogDebugCleaningUpDefunctMembershipTableEntries(_logger, beforeDate.Value);
                 await _membershipTableProvider.CleanupDefunctSiloEntries(beforeDate.Value).WaitAsync(cancellationToken);
             }
             catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
@@ -181,58 +207,6 @@ namespace Orleans.Runtime.MembershipService
             return localSiloIsActive;
         }
 
-        private static bool TryGetDefunctSiloCleanupInfo(
-            MembershipTableData table,
-            int maxDefunctSiloEntries,
-            out DateTimeOffset beforeDate,
-            out int defunctSiloEntryCount,
-            out int defunctSiloEntriesToRemove)
-        {
-            ArgumentOutOfRangeException.ThrowIfNegative(maxDefunctSiloEntries, nameof(ClusterMembershipOptions.MaxDefunctSiloEntries));
-
-            beforeDate = default;
-            defunctSiloEntryCount = 0;
-            defunctSiloEntriesToRemove = 0;
-
-            if (maxDefunctSiloEntries == int.MaxValue)
-            {
-                return false;
-            }
-
-            var trackedEntryCount = maxDefunctSiloEntries + 1;
-            var newestDefunctEntries = new PriorityQueue<MembershipEntry, DefunctSiloEntryPriority>();
-            foreach (var tuple in table.Members)
-            {
-                var entry = tuple.Item1;
-                if (entry.Status != SiloStatus.Dead)
-                {
-                    continue;
-                }
-
-                defunctSiloEntryCount++;
-                if (newestDefunctEntries.Count < trackedEntryCount)
-                {
-                    newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
-                }
-                else if (newestDefunctEntries.TryPeek(out var oldestTrackedEntry, out _)
-                    && CompareDefunctSiloEntries(entry, oldestTrackedEntry) > 0)
-                {
-                    newestDefunctEntries.Dequeue();
-                    newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
-                }
-            }
-
-            if (defunctSiloEntryCount <= maxDefunctSiloEntries)
-            {
-                return false;
-            }
-
-            var newestEntryToRemove = newestDefunctEntries.Peek();
-            beforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveIAmAliveTime);
-            defunctSiloEntriesToRemove = defunctSiloEntryCount - maxDefunctSiloEntries;
-            return true;
-        }
-
         private static int CompareDefunctSiloEntries(MembershipEntry left, MembershipEntry right)
         {
             var result = left.EffectiveIAmAliveTime.CompareTo(right.EffectiveIAmAliveTime);
@@ -267,7 +241,7 @@ namespace Orleans.Runtime.MembershipService
 
             async Task OnStop(CancellationToken ct)
             {
-                CancelShutdown();
+                SignalShutdown();
                 if (task is { })
                 {
                     await task.WaitAsync(ct).SuppressThrowing();
@@ -295,9 +269,9 @@ namespace Orleans.Runtime.MembershipService
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "Cleaning up {DefunctSiloEntriesToRemove} excess defunct membership table entries out of {DefunctSiloEntryCount} total defunct entries with configured maximum {MaxDefunctSiloEntries}. Removing entries older than {BeforeDate}"
+            Message = "Cleaning up defunct membership table entries older than {BeforeDate}"
         )]
-        private static partial void LogDebugCleaningUpDefunctMembershipTableEntries(ILogger logger, int defunctSiloEntriesToRemove, int defunctSiloEntryCount, int? maxDefunctSiloEntries, DateTimeOffset beforeDate);
+        private static partial void LogDebugCleaningUpDefunctMembershipTableEntries(ILogger logger, DateTimeOffset beforeDate);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
