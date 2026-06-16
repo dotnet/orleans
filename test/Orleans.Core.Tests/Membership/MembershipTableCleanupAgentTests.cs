@@ -82,11 +82,14 @@ namespace NonSilo.Tests.Membership
             var retainedDefunctSilo = Silo("127.0.0.1:700@100");
             var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = null, MaxDefunctSiloEntries = 1 };
             var membershipManager = new TestMembershipManager();
+            var oldestDefunctEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddMinutes(-3));
+            var removedDefunctEntry = Entry(Silo("127.0.0.1:600@100"), SiloStatus.Dead, now.AddMinutes(-2));
+            var retainedDefunctEntry = Entry(retainedDefunctSilo, SiloStatus.Dead, now.AddMinutes(-1));
             var table = new InMemoryMembershipTable(
                 new TableVersion(123, "123"),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddMinutes(-3)),
-                Entry(Silo("127.0.0.1:600@100"), SiloStatus.Dead, now.AddMinutes(-2)),
-                Entry(retainedDefunctSilo, SiloStatus.Dead, now.AddMinutes(-1)));
+                oldestDefunctEntry,
+                removedDefunctEntry,
+                retainedDefunctEntry);
             var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
@@ -94,8 +97,12 @@ namespace NonSilo.Tests.Membership
             await lifecycle.OnStart();
             membershipManager.Publish(Snapshot(
                 Entry(this.localSilo, SiloStatus.Active, now),
-                Entry(Silo("127.0.0.1:200@200"), SiloStatus.Active, now)));
+                Entry(Silo("127.0.0.1:200@200"), SiloStatus.Active, now),
+                oldestDefunctEntry,
+                removedDefunctEntry,
+                retainedDefunctEntry));
             await Until(() => table.Calls.Any(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntries)));
+            Assert.DoesNotContain(table.Calls, call => call.Method == nameof(IMembershipTable.ReadAll));
 
             var updatedTable = await table.ReadAll();
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);

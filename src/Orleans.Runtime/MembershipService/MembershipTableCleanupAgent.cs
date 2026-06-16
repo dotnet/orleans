@@ -92,7 +92,7 @@ namespace Orleans.Runtime.MembershipService
                         continue;
                     }
 
-                    await CleanupDefunctSilos(cancellationToken);
+                    await CleanupDefunctSilos(membership, cancellationToken);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -105,7 +105,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task CleanupDefunctSilos(CancellationToken cancellationToken)
+        private async Task CleanupDefunctSilos(MembershipTableSnapshot membership, CancellationToken cancellationToken)
         {
             try
             {
@@ -120,41 +120,36 @@ namespace Orleans.Runtime.MembershipService
                 {
                     ArgumentOutOfRangeException.ThrowIfNegative(maxDefunctSiloEntries, nameof(ClusterMembershipOptions.MaxDefunctSiloEntries));
 
-                    if (maxDefunctSiloEntries != int.MaxValue)
+                    var defunctSiloEntryCount = 0;
+                    var trackedEntryCount = (long)maxDefunctSiloEntries + 1;
+                    var newestDefunctEntries = new PriorityQueue<MembershipEntry, DefunctSiloEntryPriority>();
+                    foreach (var entry in membership.Entries.Values)
                     {
-                        var table = await _membershipTableProvider.ReadAll().WaitAsync(cancellationToken);
-                        var defunctSiloEntryCount = 0;
-                        var trackedEntryCount = maxDefunctSiloEntries + 1;
-                        var newestDefunctEntries = new PriorityQueue<MembershipEntry, DefunctSiloEntryPriority>();
-                        foreach (var tuple in table.Members)
+                        if (entry.Status != SiloStatus.Dead)
                         {
-                            var entry = tuple.Item1;
-                            if (entry.Status != SiloStatus.Dead)
-                            {
-                                continue;
-                            }
-
-                            defunctSiloEntryCount++;
-                            if (newestDefunctEntries.Count < trackedEntryCount)
-                            {
-                                newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
-                            }
-                            else if (newestDefunctEntries.TryPeek(out var oldestTrackedEntry, out _)
-                                && CompareDefunctSiloEntries(entry, oldestTrackedEntry) > 0)
-                            {
-                                newestDefunctEntries.Dequeue();
-                                newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
-                            }
+                            continue;
                         }
 
-                        if (defunctSiloEntryCount > maxDefunctSiloEntries)
+                        defunctSiloEntryCount++;
+                        if (newestDefunctEntries.Count < trackedEntryCount)
                         {
-                            var newestEntryToRemove = newestDefunctEntries.Peek();
-                            var excessBeforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveIAmAliveTime);
-                            if (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value)
-                            {
-                                beforeDate = excessBeforeDate;
-                            }
+                            newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
+                        }
+                        else if (newestDefunctEntries.TryPeek(out var oldestTrackedEntry, out _)
+                            && CompareDefunctSiloEntries(entry, oldestTrackedEntry) > 0)
+                        {
+                            newestDefunctEntries.Dequeue();
+                            newestDefunctEntries.Enqueue(entry, new DefunctSiloEntryPriority(entry));
+                        }
+                    }
+
+                    if (defunctSiloEntryCount > maxDefunctSiloEntries)
+                    {
+                        var newestEntryToRemove = newestDefunctEntries.Peek();
+                        var excessBeforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveIAmAliveTime);
+                        if (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value)
+                        {
+                            beforeDate = excessBeforeDate;
                         }
                     }
                 }
