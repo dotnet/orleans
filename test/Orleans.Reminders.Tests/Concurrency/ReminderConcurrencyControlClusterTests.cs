@@ -73,8 +73,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .MaxConcurrent(4)
-                        .BlockMode(ThrottleBlockMode.Wait)));
+                        .MaxConcurrent(4, ThrottleBlockMode.Wait)));
         });
 
         await using var cluster = builder.Build();
@@ -130,7 +129,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .AddReminders()
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
-                    .PerSilo(t => t.MaxConcurrent(100).BlockMode(ThrottleBlockMode.Wait)));
+                .PerSilo(t => t.MaxConcurrent(100, ThrottleBlockMode.Wait)));
         });
 
         await using var cluster = builder.Build();
@@ -204,8 +203,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .PermitsPerSecond(1, 1)
-                        .BlockMode(ThrottleBlockMode.SkipImmediately)));
+                        .PermitsPerSecond(1, 1, ThrottleBlockMode.SkipImmediately)));
         });
 
         await using var cluster = builder.Build();
@@ -290,8 +288,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .PermitsPerSecond(0.001, 1) // 1 token per ~17 minutes — bucket will be empty for all practical purposes
-                        .BlockMode(ThrottleBlockMode.Wait))); // wait forever
+                        .PermitsPerSecond(0.001, 1, ThrottleBlockMode.Wait))); // 1 token per ~17 minutes — bucket will be empty for all practical purposes; wait forever
         });
 
         var cluster = builder.Build();
@@ -372,8 +369,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .PermitsPerSecond(1, 1)
-                        .BlockMode(ThrottleBlockMode.SkipImmediately)));
+                        .PermitsPerSecond(1, 1, ThrottleBlockMode.SkipImmediately)));
         });
 
         await using var cluster = builder.Build();
@@ -466,7 +462,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .MaxConcurrent(100)
+                        .MaxConcurrent(100, ThrottleBlockMode.Wait)
                         .RespectOverload(ThrottleBlockMode.SkipImmediately)));
         });
 
@@ -540,7 +536,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .MaxConcurrent(100)
+                        .MaxConcurrent(100, ThrottleBlockMode.Wait)
                         .SlowStart(
                             initialCapacity: 1,
                             interval: TimeSpan.FromHours(1), // effectively never grows during the test

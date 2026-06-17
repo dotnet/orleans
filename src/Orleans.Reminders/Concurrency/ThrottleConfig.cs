@@ -16,7 +16,6 @@ public sealed class ThrottleConfig
     internal ThrottleConfig(
         LocalConcurrencyLimiterConfig? concurrency,
         LocalRateLimiterConfig? rate,
-        ThrottleBlockMode blockMode,
         OverloadConfig? overload,
         SlowStartConfig? slowStart)
     {
@@ -40,7 +39,6 @@ public sealed class ThrottleConfig
 
         Concurrency = concurrency;
         Rate = rate;
-        BlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
         Overload = overload;
         SlowStart = slowStart;
     }
@@ -61,12 +59,6 @@ public sealed class ThrottleConfig
     /// <see cref="MaxConcurrent"/> is configured.
     /// </summary>
     public int? BurstSize => Rate?.BurstSize;
-
-    /// <summary>
-    /// The default block mode applied to local concurrency/rate limiters when they are configured
-    /// without an explicit per-limiter block mode.
-    /// </summary>
-    public ThrottleBlockMode BlockMode { get; }
 
     /// <summary>Optional silo-overload backoff configuration, or <c>null</c> if disabled.</summary>
     public OverloadConfig? Overload { get; }
@@ -131,21 +123,11 @@ public sealed class ReminderThrottleConfigBuilder
     private double? _permitsPerSecond;
     private ThrottleBlockMode? _permitsPerSecondBlockMode;
     private int? _burstSize;
-    private ThrottleBlockMode _blockMode = ThrottleBlockMode.Wait;
     private OverloadConfig? _overload;
     private SlowStartConfig? _slowStart;
 
-    /// <summary>Caps the in-flight dispatches admitted by this tier.</summary>
-    /// <param name="value">A positive concurrency limit.</param>
-    public ReminderThrottleConfigBuilder MaxConcurrent(int value)
-    {
-        _maxConcurrent = value;
-        _maxConcurrentBlockMode = null;
-        return this;
-    }
-
     /// <summary>
-    /// Caps the in-flight dispatches admitted by this tier and assigns an explicit block mode to
+    /// Caps the in-flight dispatches admitted by this tier and requires an explicit block mode for
     /// the concurrency limiter.
     /// </summary>
     /// <param name="value">A positive concurrency limit.</param>
@@ -157,47 +139,9 @@ public sealed class ReminderThrottleConfigBuilder
         return this;
     }
 
-    /// <summary>Caps the sustained rate of dispatches admitted by this tier.</summary>
-    /// <param name="value">A positive, finite permits-per-second rate.</param>
-    public ReminderThrottleConfigBuilder PermitsPerSecond(double value)
-    {
-        _permitsPerSecond = value;
-        _burstSize = null;
-        _permitsPerSecondBlockMode = null;
-        return this;
-    }
-
-    /// <summary>
-    /// Caps the sustained rate of dispatches admitted by this tier and overrides the token
-    /// bucket's burst size.
-    /// </summary>
-    /// <param name="value">A positive, finite permits-per-second rate.</param>
-    /// <param name="burstSize">A positive burst capacity.</param>
-    public ReminderThrottleConfigBuilder PermitsPerSecond(double value, int burstSize)
-    {
-        _permitsPerSecond = value;
-        _burstSize = burstSize;
-        _permitsPerSecondBlockMode = null;
-        return this;
-    }
-
-    /// <summary>
-    /// Caps the sustained rate of dispatches admitted by this tier and assigns an explicit block
-    /// mode to the rate limiter.
-    /// </summary>
-    /// <param name="value">A positive, finite permits-per-second rate.</param>
-    /// <param name="blockMode">The block mode for the rate limiter.</param>
-    public ReminderThrottleConfigBuilder PermitsPerSecond(double value, ThrottleBlockMode blockMode)
-    {
-        _permitsPerSecond = value;
-        _burstSize = null;
-        _permitsPerSecondBlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
-        return this;
-    }
-
     /// <summary>
     /// Caps the sustained rate of dispatches admitted by this tier, overrides the token bucket's
-    /// burst size, and assigns an explicit block mode to the rate limiter.
+    /// burst size, and requires an explicit block mode for the rate limiter.
     /// </summary>
     /// <param name="value">A positive, finite permits-per-second rate.</param>
     /// <param name="burstSize">A positive burst capacity.</param>
@@ -207,17 +151,6 @@ public sealed class ReminderThrottleConfigBuilder
         _permitsPerSecond = value;
         _burstSize = burstSize;
         _permitsPerSecondBlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
-        return this;
-    }
-
-    /// <summary>
-    /// Selects the default behavior used when local concurrency/rate limiters are configured
-    /// without their own explicit block mode. Defaults to <see cref="ThrottleBlockMode.Wait"/>.
-    /// </summary>
-    /// <param name="mode">The default block mode.</param>
-    public ReminderThrottleConfigBuilder BlockMode(ThrottleBlockMode mode)
-    {
-        _blockMode = mode;
         return this;
     }
 
@@ -259,15 +192,20 @@ public sealed class ReminderThrottleConfigBuilder
         LocalConcurrencyLimiterConfig? concurrency = null;
         if (_maxConcurrent is { } maxConcurrent)
         {
-            concurrency = new LocalConcurrencyLimiterConfig(maxConcurrent, _maxConcurrentBlockMode ?? _blockMode);
+            concurrency = new LocalConcurrencyLimiterConfig(
+                maxConcurrent,
+                _maxConcurrentBlockMode ?? throw new InvalidOperationException("MaxConcurrent requires an explicit block mode."));
         }
 
         LocalRateLimiterConfig? rate = null;
         if (_permitsPerSecond is { } permitsPerSecond)
         {
-            rate = new LocalRateLimiterConfig(permitsPerSecond, _burstSize, _permitsPerSecondBlockMode ?? _blockMode);
+            rate = new LocalRateLimiterConfig(
+                permitsPerSecond,
+                _burstSize ?? throw new InvalidOperationException("PermitsPerSecond requires an explicit burst size."),
+                _permitsPerSecondBlockMode ?? throw new InvalidOperationException("PermitsPerSecond requires an explicit block mode."));
         }
 
-        return new ThrottleConfig(concurrency, rate, _blockMode, _overload, _slowStart);
+        return new ThrottleConfig(concurrency, rate, _overload, _slowStart);
     }
 }
