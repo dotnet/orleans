@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Immutable;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -12,7 +14,27 @@ internal sealed class OrleansDisseminationTransport(
 {
     public SiloAddress LocalSilo => localSiloDetails.SiloAddress;
 
-    public IReadOnlyList<SiloAddress> GetActivePeers() => siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
+    public DisseminationMembership GetMembership()
+    {
+        var allMembers = ImmutableArray.CreateBuilder<SiloAddress>();
+        var activeMembers = ImmutableArray.CreateBuilder<SiloAddress>();
+        foreach (var (siloAddress, status) in siloStatusOracle.GetApproximateSiloStatuses(onlyActive: false))
+        {
+            if (IsDisseminationParticipant(status))
+            {
+                allMembers.Add(siloAddress);
+            }
+
+            if (status == SiloStatus.Active)
+            {
+                activeMembers.Add(siloAddress);
+            }
+        }
+
+        allMembers.Sort(static (left, right) => left.CompareTo(right));
+        activeMembers.Sort(static (left, right) => left.CompareTo(right));
+        return new DisseminationMembership(allMembers.ToImmutable(), activeMembers.ToImmutable());
+    }
 
     public async ValueTask<DisseminationCapabilityResponse> GetCapabilities(
         SiloAddress peer,
@@ -37,4 +59,7 @@ internal sealed class OrleansDisseminationTransport(
         var target = grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, peer);
         return await target.ExchangeAntiEntropy(request).WaitAsync(cancellationToken);
     }
+
+    private static bool IsDisseminationParticipant(SiloStatus status) =>
+        status is SiloStatus.Joining or SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
 }

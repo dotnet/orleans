@@ -44,58 +44,21 @@ internal sealed class DisseminationCapabilityResponse
 }
 
 [GenerateSerializer, Immutable]
-internal readonly struct DisseminationValueKey : IEquatable<DisseminationValueKey>
+internal readonly struct DisseminationDigest : IEquatable<DisseminationDigest>
 {
-    public DisseminationValueKey(string value, SiloAddress? siloAddress = null)
+    public DisseminationDigest(string topic, string key, long version, string payloadKind)
     {
-        Value = value ?? string.Empty;
-        SiloAddress = siloAddress;
-    }
-
-    [Id(0)]
-    public string Value { get; }
-
-    [Id(1)]
-    public SiloAddress? SiloAddress { get; }
-
-    public static DisseminationValueKey FromString(string value) => new(value);
-
-    public static DisseminationValueKey FromSiloAddress(SiloAddress siloAddress) =>
-        new(siloAddress?.ToParsableString() ?? string.Empty, siloAddress);
-
-    public bool Equals(DisseminationValueKey other) =>
-        string.Equals(Value, other.Value, StringComparison.Ordinal)
-        && Equals(SiloAddress, other.SiloAddress);
-
-    public override bool Equals(object? obj) => obj is DisseminationValueKey other && Equals(other);
-
-    public override int GetHashCode() => HashCode.Combine(
-        StringComparer.Ordinal.GetHashCode(Value ?? string.Empty),
-        SiloAddress);
-
-    public override string ToString() => SiloAddress?.ToParsableString() ?? Value ?? string.Empty;
-
-    public static bool operator ==(DisseminationValueKey left, DisseminationValueKey right) => left.Equals(right);
-
-    public static bool operator !=(DisseminationValueKey left, DisseminationValueKey right) => !left.Equals(right);
-}
-
-[GenerateSerializer, Immutable]
-internal readonly struct DisseminationItemId : IEquatable<DisseminationItemId>
-{
-    public DisseminationItemId(string topic, DisseminationValueKey key, long version, string payloadKind)
-    {
-        Topic = topic;
-        Key = key;
+        Topic = topic ?? string.Empty;
+        Key = key ?? string.Empty;
         Version = version;
-        PayloadKind = payloadKind;
+        PayloadKind = payloadKind ?? string.Empty;
     }
 
     [Id(0)]
     public string Topic { get; }
 
     [Id(1)]
-    public DisseminationValueKey Key { get; }
+    public string Key { get; }
 
     [Id(2)]
     public long Version { get; }
@@ -103,32 +66,32 @@ internal readonly struct DisseminationItemId : IEquatable<DisseminationItemId>
     [Id(3)]
     public string PayloadKind { get; }
 
-    public bool Equals(DisseminationItemId other) =>
+    public bool Equals(DisseminationDigest other) =>
         string.Equals(Topic, other.Topic, StringComparison.Ordinal)
-        && Key.Equals(other.Key)
+        && string.Equals(Key, other.Key, StringComparison.Ordinal)
         && Version == other.Version
         && string.Equals(PayloadKind, other.PayloadKind, StringComparison.Ordinal);
 
-    public override bool Equals(object? obj) => obj is DisseminationItemId other && Equals(other);
+    public override bool Equals(object? obj) => obj is DisseminationDigest other && Equals(other);
 
     public override int GetHashCode() => HashCode.Combine(
         StringComparer.Ordinal.GetHashCode(Topic ?? string.Empty),
-        Key,
+        StringComparer.Ordinal.GetHashCode(Key ?? string.Empty),
         Version,
         StringComparer.Ordinal.GetHashCode(PayloadKind ?? string.Empty));
 
     public override string ToString() => $"{Topic}/{Key}/{Version}/{PayloadKind}";
 
-    public static bool operator ==(DisseminationItemId left, DisseminationItemId right) => left.Equals(right);
+    public static bool operator ==(DisseminationDigest left, DisseminationDigest right) => left.Equals(right);
 
-    public static bool operator !=(DisseminationItemId left, DisseminationItemId right) => !left.Equals(right);
+    public static bool operator !=(DisseminationDigest left, DisseminationDigest right) => !left.Equals(right);
 }
 
 [GenerateSerializer]
-internal sealed class DisseminationItem
+internal sealed class DisseminationValue
 {
     [Id(0)]
-    public DisseminationItemId Id { get; init; }
+    public DisseminationDigest Digest { get; init; }
 
     [Id(1)]
     public SiloAddress Root { get; init; } = default!;
@@ -147,7 +110,7 @@ internal sealed class DisseminationGossipBatch
     public SiloAddress Sender { get; init; } = default!;
 
     [Id(1)]
-    public DisseminationItem[] Items { get; init; } = Array.Empty<DisseminationItem>();
+    public DisseminationValue[] Values { get; init; } = Array.Empty<DisseminationValue>();
 }
 
 [GenerateSerializer]
@@ -160,7 +123,7 @@ internal sealed class DisseminationAntiEntropyRequest
     public DisseminationCapabilityRequest[] Topics { get; init; } = Array.Empty<DisseminationCapabilityRequest>();
 
     [Id(2)]
-    public DisseminationItemId[] Digests { get; init; } = Array.Empty<DisseminationItemId>();
+    public DisseminationDigest[] Digests { get; init; } = Array.Empty<DisseminationDigest>();
 }
 
 [GenerateSerializer]
@@ -170,7 +133,7 @@ internal sealed class DisseminationAntiEntropyResponse
     public SiloAddress Sender { get; init; } = default!;
 
     [Id(1)]
-    public DisseminationItem[] Items { get; init; } = Array.Empty<DisseminationItem>();
+    public DisseminationValue[] Values { get; init; } = Array.Empty<DisseminationValue>();
 
     [Id(2)]
     public bool Truncated { get; init; }

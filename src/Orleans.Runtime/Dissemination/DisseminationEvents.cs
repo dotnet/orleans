@@ -9,18 +9,18 @@ internal static class DisseminationEvents
     public const string ListenerName = "Microsoft.Orleans.Dissemination";
     public static readonly DiagnosticListener Listener = new(ListenerName);
 
-    public static void EmitItem(DisseminationItemId id, SiloAddress localSilo, SiloAddress? peer, string result, int payloadBytes)
+    public static void EmitValue(DisseminationDigest digest, SiloAddress localSilo, SiloAddress? peer, string result, int payloadBytes)
     {
-        if (Listener.IsEnabled("Dissemination.ItemApply"))
+        if (Listener.IsEnabled("Dissemination.ValueApply"))
         {
-            Listener.Write("Dissemination.ItemApply", new DisseminationItemEvent
+            Listener.Write("Dissemination.ValueApply", new DisseminationValueEvent
             {
-                Topic = id.Topic,
+                Topic = digest.Topic,
                 LocalSilo = localSilo,
                 Peer = peer,
-                Key = id.Key.ToString(),
-                Version = id.Version,
-                PayloadKind = id.PayloadKind,
+                Key = digest.Key,
+                Version = digest.Version,
+                PayloadKind = digest.PayloadKind,
                 Result = result,
                 PayloadBytes = payloadBytes,
                 Timestamp = DateTimeOffset.UtcNow,
@@ -28,17 +28,17 @@ internal static class DisseminationEvents
         }
     }
 
-    public static void EmitPayloadDrop(DisseminationItemId id, SiloAddress localSilo, string reason, int payloadBytes)
+    public static void EmitPayloadDrop(DisseminationDigest digest, SiloAddress localSilo, string reason, int payloadBytes)
     {
         if (Listener.IsEnabled("Dissemination.PayloadDrop"))
         {
-            Listener.Write("Dissemination.PayloadDrop", new DisseminationItemEvent
+            Listener.Write("Dissemination.PayloadDrop", new DisseminationValueEvent
             {
-                Topic = id.Topic,
+                Topic = digest.Topic,
                 LocalSilo = localSilo,
-                Key = id.Key.ToString(),
-                Version = id.Version,
-                PayloadKind = id.PayloadKind,
+                Key = digest.Key,
+                Version = digest.Version,
+                PayloadKind = digest.PayloadKind,
                 Result = reason,
                 PayloadBytes = payloadBytes,
                 Timestamp = DateTimeOffset.UtcNow,
@@ -62,7 +62,7 @@ internal static class DisseminationEvents
     }
 }
 
-internal sealed class DisseminationItemEvent
+internal sealed class DisseminationValueEvent
 {
     public string Topic { get; init; } = string.Empty;
 
