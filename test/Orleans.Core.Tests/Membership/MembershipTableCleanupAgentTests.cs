@@ -177,16 +177,15 @@ namespace NonSilo.Tests.Membership
             Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
 
             membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
-            var completed = await Task.WhenAny(cleanupCalled.Task, Task.Delay(TimeSpan.FromMilliseconds(200)));
-
             if (enabled)
             {
-                Assert.Same(cleanupCalled.Task, completed);
+                await Until(() => cleanupCalled.Task.IsCompleted);
                 Assert.Equal(now - options.DefunctSiloExpiration, cleanupCalled.Task.Result);
                 Assert.Contains(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
             }
             else
             {
+                var completed = await Task.WhenAny(cleanupCalled.Task, Task.Delay(TimeSpan.FromMilliseconds(200)));
                 Assert.NotSame(cleanupCalled.Task, completed);
                 Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
             }
