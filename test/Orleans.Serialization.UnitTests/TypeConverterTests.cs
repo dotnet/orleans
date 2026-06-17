@@ -111,12 +111,37 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_RejectsAllowedAssemblyType_WhenTypeNameFilterDeniesIt()
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly),
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) => typeName == typeof(TypeConverterTestsAssemblyAllowedType).FullName ? false : null)
+                ]);
+
+            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsAssemblyAllowedType));
+        }
+
+        [Fact]
         public void TypeConverter_AllowsEnums()
         {
             var converter = CreateConverter();
 
             AssertRoundTrips(converter, typeof(TypeConverterTestsUnconfiguredEnum));
             AssertRoundTrips(converter, typeof(List<TypeConverterTestsUnconfiguredEnum>));
+        }
+
+        [Fact]
+        public void TypeConverter_RejectsEnums_WhenTypeNameFilterDeniesThem()
+        {
+            var converter = CreateConverter(
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) => typeName == typeof(TypeConverterTestsUnconfiguredEnum).FullName ? false : null)
+                ]);
+
+            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsUnconfiguredEnum));
         }
 
         [Fact]

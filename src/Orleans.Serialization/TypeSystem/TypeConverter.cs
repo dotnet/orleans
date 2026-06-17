@@ -374,6 +374,17 @@ public class TypeConverter
             return true;
         }
 
+        if (_allowedTypes.TryGetValue(type, out var cachedAllowed) && !cachedAllowed)
+        {
+            return false;
+        }
+
+        var filterResult = InspectTypeNameFilters(type);
+        if (filterResult == false)
+        {
+            return false;
+        }
+
         if (_allowedTypes.TryGetValue(type, out var allowed))
         {
             return allowed;
@@ -397,14 +408,9 @@ public class TypeConverter
             return true;
         }
 
-        foreach (var filter in _typeNameFilters)
+        if (filterResult == true)
         {
-            var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly ?? string.Empty);
-            if (isAllowed.HasValue)
-            {
-                allowed = _allowedTypes[type] = isAllowed.Value;
-                return allowed;
-            }
+            return _allowedTypes[type] = true;
         }
 
         if (_wellKnownAliasToType.TryGetValue(type, out var runtimeType))
@@ -413,6 +419,27 @@ public class TypeConverter
         }
 
         return null;
+    }
+
+    private bool? InspectTypeNameFilters(in QualifiedType type)
+    {
+        bool? result = null;
+        foreach (var filter in _typeNameFilters)
+        {
+            var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly ?? string.Empty);
+            if (isAllowed == false)
+            {
+                _allowedTypes[type] = false;
+                return false;
+            }
+
+            if (isAllowed == true)
+            {
+                result = true;
+            }
+        }
+
+        return result;
     }
 
     private QualifiedType ConvertToDisplayName(in QualifiedType input, ref ValidationResult state)
