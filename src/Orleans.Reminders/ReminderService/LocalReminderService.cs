@@ -473,7 +473,7 @@ namespace Orleans.Runtime.ReminderService
                 else
                 {
                     LogErrorInitialLoadFailed(ex, initialReadCallCount);
-                    startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.", ex));
+                    startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo. Please check the logs for details."));
                 }
             }
         }
@@ -895,6 +895,7 @@ namespace Orleans.Runtime.ReminderService
                     if (_stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown)
                     {
                         _stopReason = (int)reason;
+                        _scheduleVersion++;
                     }
 
                     timerToDispose = _timer;
@@ -917,8 +918,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     while (await WaitForNextTick())
                     {
-                        var entry = PrepareTick();
-                        if (entry is null || !_shared.TryBeginSingleReminderDelivery())
+                        if (!TryPrepareTick(out var entry, out var preparedScheduleVersion) || !_shared.TryBeginSingleReminderDelivery())
                         {
                             continue;
                         }
@@ -951,6 +951,12 @@ namespace Orleans.Runtime.ReminderService
                             {
                                 _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
                                 ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, provisionalStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
+                                lease.Dispose();
+                                continue;
+                            }
+
+                            if (!IsTickStillValid(preparedScheduleVersion, entry))
+                            {
                                 lease.Dispose();
                                 continue;
                             }
@@ -1134,21 +1140,53 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            private ReminderEntry? PrepareTick()
+            private bool TryPrepareTick(out ReminderEntry entry, out long scheduleVersion)
+            {
+                lock (_lock)
+                {
+                    scheduleVersion = _scheduleVersion;
+
+                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
+                    {
+                        entry = default!;
+                        return false;
+                    }
+
+                    if (_isFirstTickPending)
+                    {
+                        entry = default!;
+                        return false;
+                    }
+
+                    entry = _entry;
+                    return true;
+                }
+            }
+
+            private bool IsTickStillValid(long scheduleVersion, ReminderEntry entry)
             {
                 lock (_lock)
                 {
                     if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
                     {
-                        return null;
+                        return false;
                     }
 
                     if (_isFirstTickPending)
                     {
-                        return null;
+                        return false;
                     }
 
-                    return _entry;
+                    if (_scheduleVersion != scheduleVersion)
+                    {
+                        return false;
+                    }
+
+                    return _entry.GrainId == entry.GrainId
+                        && StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName)
+                        && _entry.StartAt == entry.StartAt
+                        && _entry.Period == entry.Period
+                        && StringComparer.Ordinal.Equals(_entry.ETag, entry.ETag);
                 }
             }
 
@@ -1334,7 +1372,7 @@ namespace Orleans.Runtime.ReminderService
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {RangeSerialNumberCopy}."
+            Message = "My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {RangeSerialNumberCopy}"
         )]
         private partial void LogDebugRangeChangedWhileFromTable(int rangeSerialNumber, int rangeSerialNumberCopy);
 
