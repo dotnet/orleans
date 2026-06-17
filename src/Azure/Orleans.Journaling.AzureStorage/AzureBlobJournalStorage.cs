@@ -1179,11 +1179,13 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         AzureBlobJournalStorageOptions options) : BlobClientProvider
     {
         public override AppendBlobClient GetWalClient(JournalId journalId)
-            => containerFactory.GetBlobContainerClient(journalId).GetAppendBlobClient(
-                AzureBlobJournalStorageOptions.GetWalBlobNameForJournal(journalId, options.GetBlobNameForJournal(journalId)));
+        {
+            var container = containerFactory.GetBlobContainerClient(journalId);
+            return container.GetAppendBlobClient(options.GetWalBlobNameForJournal(journalId));
+        }
 
         public override string GetCheckpointName(JournalId journalId, string snapshotId)
-            => AzureBlobJournalStorageOptions.GetCheckpointBlobNameForJournal(journalId, options.GetBlobNameForJournal(journalId), snapshotId);
+            => options.GetCheckpointBlobNameForJournal(journalId, snapshotId);
 
         public override BlockBlobClient GetCheckpointClient(JournalId journalId, string checkpointName)
             => containerFactory.GetBlobContainerClient(journalId).GetBlockBlobClient(checkpointName);

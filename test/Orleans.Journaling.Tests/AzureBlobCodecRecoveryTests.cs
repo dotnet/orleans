@@ -233,7 +233,8 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         services.Configure<AzureBlobJournalStorageOptions>(options =>
         {
             JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options);
-            options.GetBlobName = _ => blobName;
+            options.GetWalBlobName = _ => $"{blobName}/wal";
+            options.GetCheckpointBlobName = (_, snapshotId) => $"{blobName}/chk.{snapshotId}";
         });
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
         services.AddSerializer();

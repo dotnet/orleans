@@ -95,11 +95,22 @@ namespace Orleans.Configuration
         public TimeSpan DefunctSiloExpiration { get; set; } = TimeSpan.FromDays(7);
 
         /// <summary>
-        /// Gets or sets the duration between membership table cleanup operations. When this period elapses, all defunct silo
-        /// entries older than <see cref="DefunctSiloExpiration" /> are removed. This value is per-silo.
+        /// Gets or sets a value indicating whether defunct silo entries older than <see cref="DefunctSiloExpiration" /> are removed.
+        /// Cleanup is attempted when membership changes are observed and the current membership snapshot contains expired
+        /// non-active entries, or when this period has elapsed since the last cleanup call.
+        /// Set this value to <see langword="null"/> to disable expiration-based cleanup.
         /// </summary>
-        /// <value>Membership is cleared of expired, defunct silos every hour, by default.</value>
+        /// <value>Expiration-based cleanup is enabled by default.</value>
         public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = TimeSpan.FromHours(1);
+
+        /// <summary>
+        /// Gets or sets the maximum number of defunct silo entries to retain in the membership table.
+        /// When this limit is exceeded, the first active silo, selected by natural <see cref="Orleans.Runtime.SiloAddress"/>
+        /// sort order, asynchronously removes the oldest excess defunct entries from the membership table.
+        /// Set this value to <see langword="null"/> to retain all defunct entries and disable threshold-based cleanup.
+        /// </summary>
+        /// <value>Membership retains up to 25 defunct silo entries by default.</value>
+        public int? MaxDefunctSiloEntries { get; set; } = 25;
 
         /// <summary>
         /// Gets the period after which a silo's membership entry is considered stale if it has not updated its heartbeat in the membership table.

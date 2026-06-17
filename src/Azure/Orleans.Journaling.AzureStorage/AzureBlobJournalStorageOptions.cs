@@ -17,11 +17,26 @@ public sealed class AzureBlobJournalStorageOptions
     public const string DEFAULT_CONTAINER_NAME = "state";
 
     /// <summary>
-    /// Gets or sets the delegate used to generate the blob name for a journal.
+    /// Gets or sets the delegate used to generate the write-ahead log blob name for a journal.
     /// </summary>
-    public Func<JournalId, string> GetBlobName { get; set; } = DefaultGetBlobName;
+    public Func<JournalId, string> GetWalBlobName { get; set; } = DefaultGetWalBlobName;
 
-    private static readonly Func<JournalId, string> DefaultGetBlobName = static journalId => journalId.Value;
+    private static readonly Func<JournalId, string> DefaultGetWalBlobName =
+        static journalId => GetDefaultWalBlobName(journalId);
+
+    /// <summary>
+    /// Gets or sets the delegate used to generate the checkpoint blob name for a journal snapshot.
+    /// </summary>
+    /// <remarks>
+    /// The delegate receives the journal id and an opaque snapshot id generated for the checkpoint.
+    /// The snapshot id is currently formatted as a 32-character hexadecimal string using <c>Guid.ToString("N")</c>.
+    /// The returned value must be a container-relative blob name. The default value is
+    /// <c>{journalId.Value}/chk.{snapshotId}</c>.
+    /// </remarks>
+    public Func<JournalId, string, string> GetCheckpointBlobName { get; set; } = DefaultGetCheckpointBlobName;
+
+    private static readonly Func<JournalId, string, string> DefaultGetCheckpointBlobName =
+        static (journalId, snapshotId) => GetDefaultCheckpointBlobName(journalId, snapshotId);
 
     /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
@@ -79,36 +94,51 @@ public sealed class AzureBlobJournalStorageOptions
     /// </summary>
     internal Func<CancellationToken, Task<BlobServiceClient>>? CreateClient { get; private set; }
 
-    internal string GetBlobNameForJournal(JournalId journalId)
+    internal string GetWalBlobNameForJournal(JournalId journalId)
     {
         if (journalId.IsDefault)
         {
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        var blobName = GetBlobName(journalId);
+        var blobName = GetWalBlobName(journalId);
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
 
-    internal static string GetWalBlobNameForJournal(JournalId journalId, string journalBlobName)
+    internal string GetCheckpointBlobNameForJournal(JournalId journalId, string snapshotId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
-        return GetDefaultWalBlobName(journalBlobName);
-    }
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
 
-    internal static string GetCheckpointBlobNameForJournal(JournalId journalId, string journalBlobName, string snapshotId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
         ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
-        return GetDefaultCheckpointBlobName(journalBlobName, snapshotId);
+        var blobName = GetCheckpointBlobName(journalId, snapshotId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
+        return blobName;
     }
 
-    internal static string GetDefaultWalBlobName(string journalBlobName)
-        => $"{journalBlobName}/wal";
+    internal static string GetDefaultWalBlobName(JournalId journalId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
 
-    internal static string GetDefaultCheckpointBlobName(string journalBlobName, string snapshotId)
-        => $"{journalBlobName}/chk.{snapshotId}";
+        return $"{journalId.Value}/wal";
+    }
+
+    internal static string GetDefaultCheckpointBlobName(JournalId journalId, string snapshotId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
+        return $"{journalId.Value}/chk.{snapshotId}";
+    }
 
     /// <summary>
     /// A function for building container factory instances.

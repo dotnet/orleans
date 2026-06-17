@@ -441,6 +441,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan LocalHealthDegradationMonitoringPeriod { get { throw null; } set { } }
 
+        public int? MaxDefunctSiloEntries { get { throw null; } set { } }
+
         public System.TimeSpan MaxJoinAttemptTime { get { throw null; } set { } }
 
         public int NumMissedProbesLimit { get { throw null; } set { } }

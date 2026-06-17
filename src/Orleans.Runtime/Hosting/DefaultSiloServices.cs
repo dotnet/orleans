@@ -194,7 +194,6 @@ namespace Orleans.Hosting
             services.AddFromExisting<IHealthCheckParticipant, MembershipAgent>();
             services.AddSingleton<MembershipTableCleanupAgent>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
-            services.AddFromExisting<IHealthCheckParticipant, MembershipTableCleanupAgent>();
             services.AddSingleton<SiloStatusListenerManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
             services.AddSingleton<ClusterMembershipService>();

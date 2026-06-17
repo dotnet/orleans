@@ -46,6 +46,11 @@ namespace Orleans.Runtime.Configuration
             }
 
             var clusterMembershipOptions = this.serviceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+            if (clusterMembershipOptions.MaxDefunctSiloEntries < 0)
+            {
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MaxDefunctSiloEntries)} ({clusterMembershipOptions.MaxDefunctSiloEntries}) must be greater than or equal to 0, or null.");
+            }
+
             if (clusterMembershipOptions.LivenessEnabled)
             {
                 if (clusterMembershipOptions.NumVotesForDeathDeclaration > clusterMembershipOptions.NumProbedSilos)
