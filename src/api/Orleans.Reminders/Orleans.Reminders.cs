@@ -299,7 +299,11 @@ namespace Orleans.Reminders.Concurrency
 
         public ReminderThrottleConfigBuilder MaxConcurrent(int value) { throw null; }
 
+        public ReminderThrottleConfigBuilder MaxConcurrent(int value, ThrottleBlockMode blockMode) { throw null; }
+
         public ReminderThrottleConfigBuilder PermitsPerSecond(double value) { throw null; }
+
+        public ReminderThrottleConfigBuilder PermitsPerSecond(double value, ThrottleBlockMode blockMode) { throw null; }
 
         public ReminderThrottleConfigBuilder RespectOverload(ThrottleBlockMode onOverload, System.TimeSpan? pollInterval = null) { throw null; }
 
