@@ -1379,7 +1379,7 @@ namespace Orleans.Runtime.ReminderService
                             using var activity = RemindersActivitySource.Source.HasListeners()
                                 ? RemindersActivitySource.Source.StartActivity("Reminder.Dispatch", System.Diagnostics.ActivityKind.Internal)
                                 : null;
-                            if (activity is not null)
+                            if (activity is { IsAllDataRequested: true })
                             {
                                 activity.SetTag(ReminderActivityAttributes.ReminderName, entry.ReminderName);
                                 activity.SetTag(ReminderActivityAttributes.GrainId, entry.GrainId.ToString());

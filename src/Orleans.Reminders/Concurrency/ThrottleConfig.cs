@@ -6,82 +6,66 @@ namespace Orleans.Reminders.Concurrency;
 /// Static, immutable configuration for a single throttle tier.
 /// </summary>
 /// <remarks>
-/// <para>A configuration must specify at least one of <see cref="MaxConcurrent"/> or
-/// <see cref="PermitsPerSecond"/>. The startup validator rejects empty configurations
-/// rather than silently installing a no-op.</para>
+/// <para>A configuration must specify at least one active limiter or overload gate. The startup
+/// validator rejects empty configurations rather than silently installing a no-op.</para>
 /// <para>Construct via <see cref="ReminderThrottleConfigBuilder"/> for compile-time-friendly
 /// chaining; direct construction is supported for advanced scenarios.</para>
 /// </remarks>
 public sealed class ThrottleConfig
 {
     internal ThrottleConfig(
-        int? maxConcurrent,
-        double? permitsPerSecond,
-        int? burstSize,
+        LocalConcurrencyLimiterConfig? concurrency,
+        LocalRateLimiterConfig? rate,
         ThrottleBlockMode blockMode,
         OverloadConfig? overload,
         SlowStartConfig? slowStart)
     {
-        if (maxConcurrent is null && permitsPerSecond is null && overload is null)
+        if (concurrency is null && rate is null && overload is null)
         {
             throw new ArgumentException("At least one of MaxConcurrent, PermitsPerSecond, or RespectOverload must be specified.");
         }
 
-        if (maxConcurrent is { } mc && mc <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxConcurrent), mc, "MaxConcurrent must be greater than zero.");
-        }
-
-        if (permitsPerSecond is { } pps && !(pps > 0 && double.IsFinite(pps)))
-        {
-            throw new ArgumentOutOfRangeException(nameof(permitsPerSecond), pps, "PermitsPerSecond must be greater than zero and finite.");
-        }
-
-        if (burstSize is { } bs && bs <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(burstSize), bs, "BurstSize must be greater than zero.");
-        }
-
-        if (permitsPerSecond is null && burstSize is not null)
-        {
-            throw new ArgumentException("BurstSize requires PermitsPerSecond to be specified.");
-        }
-
         if (slowStart is not null)
         {
-            if (maxConcurrent is null)
+            if (concurrency is null)
             {
                 throw new ArgumentException("SlowStart requires MaxConcurrent to be specified (slow-start ramps from its initial capacity up to MaxConcurrent).");
             }
 
-            if (slowStart.InitialCapacity > maxConcurrent.Value)
+            if (slowStart.InitialCapacity > concurrency.MaxConcurrent)
             {
-                throw new ArgumentException($"SlowStart.InitialCapacity ({slowStart.InitialCapacity}) cannot exceed MaxConcurrent ({maxConcurrent.Value}).");
+                throw new ArgumentException($"SlowStart.InitialCapacity ({slowStart.InitialCapacity}) cannot exceed MaxConcurrent ({concurrency.MaxConcurrent}).");
             }
         }
 
-        MaxConcurrent = maxConcurrent;
-        PermitsPerSecond = permitsPerSecond;
-        BurstSize = burstSize ?? (permitsPerSecond is { } p ? Math.Max(1, (int)Math.Ceiling(p)) : null);
+        Concurrency = concurrency;
+        Rate = rate;
         BlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
         Overload = overload;
         SlowStart = slowStart;
     }
 
+    internal LocalConcurrencyLimiterConfig? Concurrency { get; }
+
+    internal LocalRateLimiterConfig? Rate { get; }
+
     /// <summary>The maximum number of in-flight dispatches permitted by this tier, or <c>null</c> for unbounded.</summary>
-    public int? MaxConcurrent { get; }
+    public int? MaxConcurrent => Concurrency?.MaxConcurrent;
 
     /// <summary>The sustained rate of dispatches permitted by this tier, or <c>null</c> for no rate cap.</summary>
-    public double? PermitsPerSecond { get; }
+    public double? PermitsPerSecond => Rate?.PermitsPerSecond;
 
     /// <summary>
     /// The maximum burst size for the token bucket. Auto-derived to roughly one second of
     /// <see cref="PermitsPerSecond"/> when not explicitly set; <c>null</c> when only
     /// <see cref="MaxConcurrent"/> is configured.
     /// </summary>
-    public int? BurstSize { get; }
+    public int? BurstSize => Rate?.BurstSize;
 
-    /// <summary>How the tier behaves when an acquire cannot be admitted immediately.</summary>
+    /// <summary>
+    /// The default block mode applied to local concurrency/rate limiters when they are configured
+    /// without an explicit per-limiter block mode.
+    /// </summary>
     public ThrottleBlockMode BlockMode { get; }
 
     /// <summary>Optional silo-overload backoff configuration, or <c>null</c> if disabled.</summary>
@@ -89,6 +73,50 @@ public sealed class ThrottleConfig
 
     /// <summary>Optional slow-start ramp-up configuration, or <c>null</c> if disabled.</summary>
     public SlowStartConfig? SlowStart { get; }
+}
+
+internal sealed class LocalConcurrencyLimiterConfig
+{
+    public LocalConcurrencyLimiterConfig(int maxConcurrent, ThrottleBlockMode blockMode)
+    {
+        if (maxConcurrent <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxConcurrent), maxConcurrent, "MaxConcurrent must be greater than zero.");
+        }
+
+        MaxConcurrent = maxConcurrent;
+        BlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
+    }
+
+    public int MaxConcurrent { get; }
+
+    public ThrottleBlockMode BlockMode { get; }
+}
+
+internal sealed class LocalRateLimiterConfig
+{
+    public LocalRateLimiterConfig(double permitsPerSecond, int? burstSize, ThrottleBlockMode blockMode)
+    {
+        if (!(permitsPerSecond > 0 && double.IsFinite(permitsPerSecond)))
+        {
+            throw new ArgumentOutOfRangeException(nameof(permitsPerSecond), permitsPerSecond, "PermitsPerSecond must be greater than zero and finite.");
+        }
+
+        if (burstSize is { } bs && bs <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(burstSize), bs, "BurstSize must be greater than zero.");
+        }
+
+        PermitsPerSecond = permitsPerSecond;
+        BurstSize = burstSize ?? Math.Max(1, (int)Math.Ceiling(permitsPerSecond));
+        BlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
+    }
+
+    public double PermitsPerSecond { get; }
+
+    public int BurstSize { get; }
+
+    public ThrottleBlockMode BlockMode { get; }
 }
 
 /// <summary>
@@ -99,7 +127,9 @@ public sealed class ThrottleConfig
 public sealed class ReminderThrottleConfigBuilder
 {
     private int? _maxConcurrent;
+    private ThrottleBlockMode? _maxConcurrentBlockMode;
     private double? _permitsPerSecond;
+    private ThrottleBlockMode? _permitsPerSecondBlockMode;
     private int? _burstSize;
     private ThrottleBlockMode _blockMode = ThrottleBlockMode.Wait;
     private OverloadConfig? _overload;
@@ -113,11 +143,37 @@ public sealed class ReminderThrottleConfigBuilder
         return this;
     }
 
+    /// <summary>
+    /// Caps the in-flight dispatches admitted by this tier and assigns an explicit block mode to
+    /// the concurrency limiter.
+    /// </summary>
+    /// <param name="value">A positive concurrency limit.</param>
+    /// <param name="blockMode">The block mode for the concurrency limiter.</param>
+    public ReminderThrottleConfigBuilder MaxConcurrent(int value, ThrottleBlockMode blockMode)
+    {
+        _maxConcurrent = value;
+        _maxConcurrentBlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
+        return this;
+    }
+
     /// <summary>Caps the sustained rate of dispatches admitted by this tier.</summary>
     /// <param name="value">A positive, finite permits-per-second rate.</param>
     public ReminderThrottleConfigBuilder PermitsPerSecond(double value)
     {
         _permitsPerSecond = value;
+        return this;
+    }
+
+    /// <summary>
+    /// Caps the sustained rate of dispatches admitted by this tier and assigns an explicit block
+    /// mode to the rate limiter.
+    /// </summary>
+    /// <param name="value">A positive, finite permits-per-second rate.</param>
+    /// <param name="blockMode">The block mode for the rate limiter.</param>
+    public ReminderThrottleConfigBuilder PermitsPerSecond(double value, ThrottleBlockMode blockMode)
+    {
+        _permitsPerSecond = value;
+        _permitsPerSecondBlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
         return this;
     }
 
@@ -133,10 +189,10 @@ public sealed class ReminderThrottleConfigBuilder
     }
 
     /// <summary>
-    /// Selects the behavior used when an acquire cannot be admitted immediately. Defaults
-    /// to <see cref="ThrottleBlockMode.Wait"/>.
+    /// Selects the default behavior used when local concurrency/rate limiters are configured
+    /// without their own explicit block mode. Defaults to <see cref="ThrottleBlockMode.Wait"/>.
     /// </summary>
-    /// <param name="mode">The block mode.</param>
+    /// <param name="mode">The default block mode.</param>
     public ReminderThrottleConfigBuilder BlockMode(ThrottleBlockMode mode)
     {
         _blockMode = mode;
@@ -176,5 +232,24 @@ public sealed class ReminderThrottleConfigBuilder
 
     /// <summary>Builds the configured <see cref="ThrottleConfig"/>.</summary>
     /// <exception cref="ArgumentException">Required combinations of options are not met.</exception>
-    public ThrottleConfig Build() => new(_maxConcurrent, _permitsPerSecond, _burstSize, _blockMode, _overload, _slowStart);
+    public ThrottleConfig Build()
+    {
+        LocalConcurrencyLimiterConfig? concurrency = null;
+        if (_maxConcurrent is { } maxConcurrent)
+        {
+            concurrency = new LocalConcurrencyLimiterConfig(maxConcurrent, _maxConcurrentBlockMode ?? _blockMode);
+        }
+
+        LocalRateLimiterConfig? rate = null;
+        if (_permitsPerSecond is { } permitsPerSecond)
+        {
+            rate = new LocalRateLimiterConfig(permitsPerSecond, _burstSize, _permitsPerSecondBlockMode ?? _blockMode);
+        }
+        else if (_burstSize is not null)
+        {
+            throw new ArgumentException("BurstSize requires PermitsPerSecond to be specified.");
+        }
+
+        return new ThrottleConfig(concurrency, rate, _blockMode, _overload, _slowStart);
+    }
 }
