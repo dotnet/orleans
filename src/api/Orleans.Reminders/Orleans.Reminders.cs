@@ -298,19 +298,9 @@ namespace Orleans.Reminders.Concurrency
 
     public sealed partial class ReminderThrottleConfigBuilder
     {
-        public ReminderThrottleConfigBuilder BlockMode(ThrottleBlockMode mode) { throw null; }
-
         public ThrottleConfig Build() { throw null; }
 
-        public ReminderThrottleConfigBuilder MaxConcurrent(int value) { throw null; }
-
         public ReminderThrottleConfigBuilder MaxConcurrent(int value, ThrottleBlockMode blockMode) { throw null; }
-
-        public ReminderThrottleConfigBuilder PermitsPerSecond(double value) { throw null; }
-
-        public ReminderThrottleConfigBuilder PermitsPerSecond(double value, int burstSize) { throw null; }
-
-        public ReminderThrottleConfigBuilder PermitsPerSecond(double value, ThrottleBlockMode blockMode) { throw null; }
 
         public ReminderThrottleConfigBuilder PermitsPerSecond(double value, int burstSize, ThrottleBlockMode blockMode) { throw null; }
 
@@ -357,8 +347,6 @@ namespace Orleans.Reminders.Concurrency
     public sealed partial class ThrottleConfig
     {
         internal ThrottleConfig() { }
-
-        public ThrottleBlockMode BlockMode { get { throw null; } }
 
         public int? BurstSize { get { throw null; } }
 

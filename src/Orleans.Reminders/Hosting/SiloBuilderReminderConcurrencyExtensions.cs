@@ -87,9 +87,8 @@ public static class SiloBuilderReminderConcurrencyExtensions
         }
 
         logger.LogInformation(
-            "Reminder concurrency control configured: tier={Tier} defaultBlockMode={DefaultBlockMode} localConcurrency={LocalConcurrency} localRate={LocalRate} respectOverload={RespectOverload} slowStart={SlowStart}",
+            "Reminder concurrency control configured: tier={Tier} localConcurrency={LocalConcurrency} localRate={LocalRate} respectOverload={RespectOverload} slowStart={SlowStart}",
             tier,
-            config.BlockMode.GetType().Name,
             config.Concurrency is null ? "disabled" : $"maxConcurrent={config.Concurrency.MaxConcurrent}/{config.Concurrency.BlockMode.GetType().Name}",
             config.Rate is null ? "disabled" : $"permitsPerSecond={config.Rate.PermitsPerSecond:0.##}/burstSize={config.Rate.BurstSize}/{config.Rate.BlockMode.GetType().Name}",
             config.Overload is null ? "disabled" : $"{config.Overload.BlockMode.GetType().Name}/pollInterval={config.Overload.PollInterval}",
@@ -116,7 +115,7 @@ internal sealed class ReminderConcurrencyOptionsValidator : IConfigurationValida
         {
             throw new OrleansConfigurationException(
                 "AddReminderConcurrencyControl was called but no tiers were configured. " +
-                "Configure at least one tier (for example, .PerSilo(t => t.MaxConcurrent(50))), " +
+                "Configure at least one tier (for example, .PerSilo(t => t.MaxConcurrent(50, ThrottleBlockMode.Wait))), " +
                 "or remove the AddReminderConcurrencyControl call.");
         }
     }

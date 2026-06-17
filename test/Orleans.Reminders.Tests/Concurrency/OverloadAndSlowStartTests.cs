@@ -21,7 +21,7 @@ public sealed class OverloadBackoffTests
     {
         var detector = new FakeOverloadDetector { IsOverloaded = true };
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .RespectOverload(ThrottleBlockMode.SkipImmediately)
             .Build();
         await using var throttle = new TestThrottle(config, overloadDetector: detector);
@@ -38,7 +38,7 @@ public sealed class OverloadBackoffTests
     {
         var detector = new FakeOverloadDetector { IsOverloaded = true };
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .Build();
         await using var throttle = new TestThrottle(config, overloadDetector: detector);
 
@@ -54,7 +54,7 @@ public sealed class OverloadBackoffTests
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var detector = new FakeOverloadDetector { IsOverloaded = true };
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .RespectOverload(ThrottleBlockMode.Wait, pollInterval: TimeSpan.FromMilliseconds(100))
             .Build();
         await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
@@ -77,7 +77,7 @@ public sealed class OverloadBackoffTests
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var detector = new FakeOverloadDetector { IsOverloaded = true };
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .RespectOverload(ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(500)), pollInterval: TimeSpan.FromMilliseconds(100))
             .Build();
         await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
@@ -100,7 +100,7 @@ public sealed class OverloadBackoffTests
     public void RespectOverload_RequiresOverloadDetector_OrThrowsAtConstruction()
     {
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .RespectOverload(ThrottleBlockMode.Wait)
             .Build();
 
@@ -171,7 +171,7 @@ public sealed class SlowStartTests
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .SlowStart(initialCapacity: 2, interval: TimeSpan.FromSeconds(10), onCapacityExceeded: ThrottleBlockMode.SkipImmediately)
             .Build();
         await using var throttle = new TestThrottle(config, clock);
@@ -196,7 +196,7 @@ public sealed class SlowStartTests
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(16)
+            .MaxConcurrent(16, ThrottleBlockMode.Wait)
             .SlowStart(initialCapacity: 2, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.SkipImmediately)
             .Build();
         await using var throttle = new TestThrottle(config, clock);
@@ -226,7 +226,7 @@ public sealed class SlowStartTests
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .SlowStart(initialCapacity: 1, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.Wait)
             .Build();
         await using var throttle = new TestThrottle(config, clock);
@@ -253,7 +253,7 @@ public sealed class SlowStartTests
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var config = new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .SlowStart(
                 initialCapacity: 1,
                 interval: TimeSpan.FromSeconds(10),
@@ -277,7 +277,7 @@ public sealed class SlowStartTests
     public void SlowStart_RejectedWithoutMaxConcurrent()
     {
         var ex = Assert.Throws<ArgumentException>(() => new ReminderThrottleConfigBuilder()
-            .PermitsPerSecond(10)
+            .PermitsPerSecond(10, 10, ThrottleBlockMode.Wait)
             .SlowStart(1, TimeSpan.FromSeconds(1), ThrottleBlockMode.Wait)
             .Build());
         Assert.Contains("SlowStart requires MaxConcurrent", ex.Message);
@@ -287,7 +287,7 @@ public sealed class SlowStartTests
     public void SlowStart_RejectedWhenInitialExceedsMaxConcurrent()
     {
         var ex = Assert.Throws<ArgumentException>(() => new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(5)
+            .MaxConcurrent(5, ThrottleBlockMode.Wait)
             .SlowStart(initialCapacity: 10, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.Wait)
             .Build());
         Assert.Contains("InitialCapacity", ex.Message);
@@ -297,7 +297,7 @@ public sealed class SlowStartTests
     public void SlowStart_RejectsZeroInitialCapacity()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .SlowStart(initialCapacity: 0, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.Wait)
             .Build());
     }
@@ -306,7 +306,7 @@ public sealed class SlowStartTests
     public void SlowStart_RejectsZeroInterval()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ReminderThrottleConfigBuilder()
-            .MaxConcurrent(10)
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
             .SlowStart(initialCapacity: 1, interval: TimeSpan.Zero, onCapacityExceeded: ThrottleBlockMode.Wait)
             .Build());
     }

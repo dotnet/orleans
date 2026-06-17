@@ -20,9 +20,8 @@ siloBuilder
     .UseAzureTableReminderService(/* ... */)
     .AddReminderConcurrencyControl(c => c
         .PerSilo(t => t
-            .MaxConcurrent(50)
-            .PermitsPerSecond(200)
-            .BlockMode(ThrottleBlockMode.Wait)));
+            .MaxConcurrent(50, ThrottleBlockMode.Wait)
+            .PermitsPerSecond(200, 200, ThrottleBlockMode.Wait)));
 ```
 
 That configuration says: on this silo, never deliver more than 50 reminder ticks at once, never exceed a sustained rate of 200 ticks/second (with an automatically-derived burst of 200), and if a tick can't be admitted right away, **wait** for capacity rather than skipping the tick.
@@ -32,9 +31,8 @@ A configuration that also wants to honor silo overload and ramp up gradually aft
 ```csharp
 .AddReminderConcurrencyControl(c => c
     .PerSilo(t => t
-        .MaxConcurrent(100)
-        .PermitsPerSecond(500)
-        .BlockMode(ThrottleBlockMode.Wait)
+        .MaxConcurrent(100, ThrottleBlockMode.Wait)
+        .PermitsPerSecond(500, 500, ThrottleBlockMode.Wait)
 
         // While the silo's IOverloadDetector reports overload (CPU / memory pressure
         // exceeding the configured load-shedding thresholds), wait up to 30 seconds for
@@ -70,11 +68,11 @@ Turn it on when:
 
 You must specify at least one of `MaxConcurrent`, `PermitsPerSecond`, or `RespectOverload`. A configuration with none of them is rejected at startup rather than silently turning into a no-op.
 
-The token bucket's burst size defaults to `ceil(PermitsPerSecond)` (roughly one second of headroom). If your workload genuinely needs a different burst — for example, you tolerate brief spikes of 5× the sustained rate — pass it as `PermitsPerSecond(rate, burstSize: N)`. Most users should leave it alone.
+`PermitsPerSecond` requires an explicit `burstSize` and `ThrottleBlockMode`. That makes the token-bucket shape and the backpressure behavior a deliberate choice at the call site instead of relying on hidden defaults.
 
 ### 3. What happens when the limit binds?
 
-Choose by calling `BlockMode(...)` with one of:
+Choose the limiter behavior by passing one of these block modes when you configure each limiter:
 
 | Block mode | Behavior when no permit is available | Trade-off |
 |---|---|---|
