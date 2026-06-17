@@ -25,6 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IInternalGrainFactory grainFactory;
         private readonly ActivationDirectory localActivations;
         private readonly IServiceProvider _serviceProvider;
+        private readonly DirectoryInstruments _directoryInstruments;
         private readonly CancellationTokenSource _membershipUpdatesCancellation = new();
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
         private ClusterMembershipSnapshot appliedClusterMembershipSnapshot = ClusterMembershipSnapshot.Default;
@@ -49,6 +50,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal ImmutableArray<LocalGrainDirectoryPartitionCompatibility> DistributedGrainDirectoryPartitionCompatibilities { get; }
 
         internal GrainDirectoryHandoffManager HandoffManager { get; }
+        internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
 
         public LocalGrainDirectory(
             IServiceProvider serviceProvider,
@@ -60,9 +62,11 @@ namespace Orleans.Runtime.GrainDirectory
             IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory,
+            DirectoryInstruments directoryInstruments,
             SystemTargetShared systemTargetShared)
         {
             this.log = loggerFactory.CreateLogger<LocalGrainDirectory>();
+            _directoryInstruments = directoryInstruments;
 
             MyAddress = siloDetails.SiloAddress;
 
@@ -71,7 +75,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainFactory = grainFactory;
             this.localActivations = systemTargetShared.ActivationDirectory;
 
-            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeDirectoryCache);
+            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeDirectoryCache, _directoryInstruments);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
@@ -104,15 +108,15 @@ namespace Orleans.Runtime.GrainDirectory
 
             this.directoryMembership = DirectoryMembership.Create([MyAddress]);
 
-            DirectoryInstruments.RegisterDirectoryPartitionSizeObserve(() => DirectoryPartition.Count);
-            DirectoryInstruments.RegisterMyPortionRingDistanceObserve(() => RingDistanceToSuccessor());
-            DirectoryInstruments.RegisterMyPortionRingPercentageObserve(() => this.RingDistanceToSuccessor() / (float)(int.MaxValue * 2L) * 100);
-            DirectoryInstruments.RegisterMyPortionAverageRingPercentageObserve(() =>
+            _directoryInstruments.RegisterDirectoryPartitionSizeObserve(() => DirectoryPartition.Count);
+            _directoryInstruments.RegisterMyPortionRingDistanceObserve(() => RingDistanceToSuccessor());
+            _directoryInstruments.RegisterMyPortionRingPercentageObserve(() => this.RingDistanceToSuccessor() / (float)(int.MaxValue * 2L) * 100);
+            _directoryInstruments.RegisterMyPortionAverageRingPercentageObserve(() =>
             {
                 var ring = this.directoryMembership.MembershipRingList;
                 return ring.Count == 0 ? 0 : (100 / (float)ring.Count);
             });
-            DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
+            _directoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
             _serviceProvider = serviceProvider;
         }
 
@@ -589,11 +593,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (hopCount > 0)
             {
-                DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
+                _directoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
             }
             else
             {
-                DirectoryInstruments.RegistrationsSingleActIssued.Add(1);
+                _directoryInstruments.RegistrationsSingleActIssued.Add(1);
             }
 
             await RefreshMembershipIfNewer(address.MembershipVersion);
@@ -620,7 +624,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (forwardAddress == null)
             {
-                DirectoryInstruments.RegistrationsSingleActLocal.Add(1);
+                _directoryInstruments.RegistrationsSingleActLocal.Add(1);
 
                 var result = DirectoryPartition.AddSingleActivation(address, previousAddress);
 
@@ -630,7 +634,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else
             {
-                DirectoryInstruments.RegistrationsSingleActRemoteSent.Add(1);
+                _directoryInstruments.RegistrationsSingleActRemoteSent.Add(1);
 
                 // otherwise, notify the owner
                 AddressAndTag result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, previousAddress, hopCount + 1);
@@ -672,11 +676,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (hopCount > 0)
             {
-                DirectoryInstruments.UnregistrationsRemoteReceived.Add(1);
+                _directoryInstruments.UnregistrationsRemoteReceived.Add(1);
             }
             else
             {
-                DirectoryInstruments.UnregistrationsIssued.Add(1);
+                _directoryInstruments.UnregistrationsIssued.Add(1);
             }
 
             if (hopCount == 0)
@@ -702,12 +706,12 @@ namespace Orleans.Runtime.GrainDirectory
             if (forwardAddress == null)
             {
                 // we are the owner
-                DirectoryInstruments.UnregistrationsLocal.Add(1);
+                _directoryInstruments.UnregistrationsLocal.Add(1);
                 DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, cause);
             }
             else
             {
-                DirectoryInstruments.UnregistrationsRemoteSent.Add(1);
+                _directoryInstruments.UnregistrationsRemoteSent.Add(1);
                 // otherwise, notify the owner
                 await GetDirectoryReference(forwardAddress).UnregisterAsync(address, cause, hopCount + 1);
             }
@@ -732,7 +736,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     // we are the owner
-                    DirectoryInstruments.UnregistrationsLocal.Add(1);
+                    _directoryInstruments.UnregistrationsLocal.Add(1);
 
                     DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, cause);
                 }
@@ -743,11 +747,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (hopCount > 0)
             {
-                DirectoryInstruments.UnregistrationsManyRemoteReceived.Add(1);
+                _directoryInstruments.UnregistrationsManyRemoteReceived.Add(1);
             }
             else
             {
-                DirectoryInstruments.UnregistrationsManyIssued.Add(1);
+                _directoryInstruments.UnregistrationsManyIssued.Add(1);
             }
 
             await RefreshMembershipIfNewer(addresses);
@@ -778,7 +782,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var tasks = new List<Task>();
                 foreach (var kvp in forwardlist)
                 {
-                    DirectoryInstruments.UnregistrationsManyRemoteSent.Add(1);
+                    _directoryInstruments.UnregistrationsManyRemoteSent.Add(1);
                     tasks.Add(GetDirectoryReference(kvp.Key).UnregisterManyAsync(kvp.Value, cause, hopCount + 1));
                 }
 
@@ -789,6 +793,36 @@ namespace Orleans.Runtime.GrainDirectory
 
 
         public AddressAndTag GetLocalDirectoryData(GrainId grain) => DirectoryPartition.LookUpActivation(grain);
+
+        public bool TryLocalLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
+        {
+            _directoryInstruments.LookupsLocalIssued.Add(1);
+            if (TryCachedLookup(grainId, out address))
+            {
+                _directoryInstruments.LookupsLocalSuccesses.Add(1);
+                return true;
+            }
+
+            var owner = CalculateGrainDirectoryPartition(grainId, this.directoryMembership);
+            if (!MyAddress.Equals(owner))
+            {
+                address = null;
+                return false;
+            }
+
+            _directoryInstruments.LookupsLocalDirectoryIssued.Add(1);
+            var localResult = DirectoryPartition.LookUpActivation(grainId);
+            if (localResult.Address is null)
+            {
+                address = null;
+                return false;
+            }
+
+            address = localResult.Address;
+            _directoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
+            _directoryInstruments.LookupsLocalSuccesses.Add(1);
+            return true;
+        }
 
         public GrainAddress? GetLocalCacheData(GrainId grain)
         {
@@ -804,11 +838,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (hopCount > 0)
             {
-                DirectoryInstruments.LookupsRemoteReceived.Add(1);
+                _directoryInstruments.LookupsRemoteReceived.Add(1);
             }
             else
             {
-                DirectoryInstruments.LookupsFullIssued.Add(1);
+                _directoryInstruments.LookupsFullIssued.Add(1);
             }
 
             // see if the owner is somewhere else (returns null if we are owner)
@@ -834,7 +868,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (forwardAddress == null)
             {
                 // we are the owner
-                DirectoryInstruments.LookupsLocalDirectoryIssued.Add(1);
+                _directoryInstruments.LookupsLocalDirectoryIssued.Add(1);
                 var localResult = DirectoryPartition.LookUpActivation(grainId);
                 if (localResult.Address == null)
                 {
@@ -845,7 +879,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 LogTraceFullLookupMine(grainId, localResult.Address);
-                DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
+                _directoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
                 return localResult;
             }
             else
@@ -856,7 +890,7 @@ namespace Orleans.Runtime.GrainDirectory
                     throw new OrleansException($"Current directory at {MyAddress} is not stable to perform the lookup for grainId {grainId} (it maps to {forwardAddress}, which is not a valid silo). Retry later.");
                 }
 
-                DirectoryInstruments.LookupsRemoteSent.Add(1);
+                _directoryInstruments.LookupsRemoteSent.Add(1);
                 var result = await GetDirectoryReference(forwardAddress).LookupAsync(grainId, hopCount + 1);
 
                 // update the cache
@@ -953,18 +987,21 @@ namespace Orleans.Runtime.GrainDirectory
         public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
         {
-            DirectoryInstruments.LookupsCacheIssued.Add(1);
+            _directoryInstruments.LookupsCacheIssued.Add(1);
             if ((address = GetLocalCacheData(grainId)) is null)
             {
                 return false;
             }
 
-            DirectoryInstruments.LookupsCacheSuccesses.Add(1);
+            _directoryInstruments.LookupsCacheSuccesses.Add(1);
             return true;
         }
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => Start()), (ct) => Task.Run(() => StopAsync()));
+            lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, RunStart, RunStop);
+
+            Task RunStart(CancellationToken ct) => Task.Run(() => Start());
+            Task RunStop(CancellationToken ct) => Task.Run(() => StopAsync());
         }
 
         private readonly struct SiloAddressLogValue(SiloAddress silo)

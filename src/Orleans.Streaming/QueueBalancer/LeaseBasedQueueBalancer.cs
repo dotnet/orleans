@@ -391,7 +391,7 @@ public partial class LeaseBasedQueueBalancer(
         // If queue changed, notify listeners.
         if (!oldQueues.SetEquals(newQueues))
         {
-            StreamingEvents.EmitQueueChange(_name, SiloAddress, oldQueues, newQueues, this);
+            StreamingEvents.EmitQueueChange(_name, SiloAddress, [.. oldQueues], [.. newQueues], this);
             return NotifyListeners();
         }
 

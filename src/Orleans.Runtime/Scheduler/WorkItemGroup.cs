@@ -30,6 +30,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 #endif
     private readonly Queue<Task> _workItems = new();
     private readonly SchedulingOptions _schedulingOptions;
+    private readonly SchedulerInstruments _schedulerInstruments;
 
     private long _totalItemsEnqueued;
     private long _totalItemsProcessed;
@@ -57,11 +58,13 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
     public WorkItemGroup(
         IGrainContext grainContext,
-        IOptions<SchedulingOptions> schedulingOptions)
+        IOptions<SchedulingOptions> schedulingOptions,
+        SchedulerInstruments schedulerInstruments)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         GrainContext = grainContext;
         _schedulingOptions = schedulingOptions.Value;
+        _schedulerInstruments = schedulerInstruments;
         _state = WorkGroupStatus.Waiting;
         TaskScheduler = new ActivationTaskScheduler(this);
     }
@@ -182,7 +185,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
                     taskStart = taskEnd;
                     if (taskDurationMs > turnWarningDurationMs)
                     {
-                        SchedulerInstruments.LongRunningTurnsCounter.Add(1);
+                        _schedulerInstruments.OnLongRunningTurn();
                         LogLongRunningTurn(task, taskDurationMs);
                     }
 

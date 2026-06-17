@@ -34,9 +34,12 @@ namespace Orleans.Persistence
         public ConfigurationOptions? ConfigurationOptions { get; set; }
 
         /// <summary>
-        /// The delegate used to create a Redis connection multiplexer.
+        /// The delegate used to create a Redis connection multiplexer and indicate whether it is shared.
         /// </summary>
-        public Func<RedisStorageOptions, Task<IConnectionMultiplexer>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
+        /// <remarks>
+        /// When <c>IsShared</c> is <see langword="true"/>, the provider will not dispose the returned multiplexer.
+        /// </remarks>
+        public Func<RedisStorageOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
 
         /// <summary>
         /// Entry expiry, null by default. A value should be set only for ephemeral environments, such as testing environments.
@@ -52,7 +55,8 @@ namespace Orleans.Persistence
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
-        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisStorageOptions options) => await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!);
+        public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisStorageOptions options)
+            => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
     }
 
     /// <summary>

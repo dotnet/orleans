@@ -166,6 +166,15 @@ namespace Orleans.Reminders.Diagnostics
         public const string ListenerName = "Orleans.Reminders";
         public static System.IObservable<ReminderEvent> AllEvents { get { throw null; } }
 
+        public static System.IObservable<ReminderServiceEvent> ServiceEvents { get { throw null; } }
+
+        public sealed partial class LocalReminderScheduleChanged : ReminderEvent
+        {
+            public readonly object Identity;
+            public readonly long ScheduleVersion;
+            public LocalReminderScheduleChanged(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
+        }
+
         public sealed partial class LocalReminderStarted : ReminderEvent
         {
             public readonly object Identity;
@@ -189,6 +198,13 @@ namespace Orleans.Reminders.Diagnostics
             ServiceStopped = 5
         }
 
+        public sealed partial class LocalReminderTickWaitArmed : ReminderEvent
+        {
+            public readonly object Identity;
+            public readonly long ScheduleVersion;
+            public LocalReminderTickWaitArmed(Runtime.GrainId grainId, string reminderName, object identity, long scheduleVersion, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
+        }
+
         public sealed partial class Registered : ReminderEvent
         {
             public Registered(Runtime.GrainId grainId, string reminderName, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
@@ -200,6 +216,17 @@ namespace Orleans.Reminders.Diagnostics
             public readonly string ReminderName;
             public readonly Runtime.SiloAddress? SiloAddress;
             protected ReminderEvent(Runtime.GrainId grainId, string reminderName, Runtime.SiloAddress? siloAddress) { }
+        }
+
+        public abstract partial class ReminderServiceEvent
+        {
+            public readonly Runtime.SiloAddress? SiloAddress;
+            protected ReminderServiceEvent(Runtime.SiloAddress? siloAddress) { }
+        }
+
+        public sealed partial class ReminderServiceStarted : ReminderServiceEvent
+        {
+            public ReminderServiceStarted(Runtime.SiloAddress? siloAddress) : base(default) { }
         }
 
         public sealed partial class TickCompleted : ReminderEvent

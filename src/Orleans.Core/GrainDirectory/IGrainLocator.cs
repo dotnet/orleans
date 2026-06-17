@@ -55,7 +55,8 @@ namespace Orleans.GrainDirectory
         void InvalidateCache(GrainAddress address);
 
         /// <summary>
-        /// Attempts to find the grain address for the provided grain id in the local lookup cache.
+        /// Attempts to find the grain address for the provided grain id without performing asynchronous work.
+        /// Implementations may consult local caches or authoritative local directory partitions.
         /// </summary>
         /// <param name="grainId">The grain id to find.</param>
         /// <param name="address">The resulting grain address, if found, or <see langword="null"/> if not found.</param>

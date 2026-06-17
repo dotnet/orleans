@@ -40,7 +40,7 @@ namespace Tester.StreamingTests
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
                         StreamProviderName,
                         b => b.ConfigurePartitioning(partitionCount))
-                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
+                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(1));
             }
         }
 

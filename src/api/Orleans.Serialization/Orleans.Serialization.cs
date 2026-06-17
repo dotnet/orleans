@@ -1979,6 +1979,8 @@ namespace Orleans.Serialization.Codecs
     {
         [Id(0)]
         public System.Collections.Generic.Dictionary<TKey, TValue> Values;
+        [Id(1)]
+        public System.Collections.Generic.IEqualityComparer<TValue> ValueComparer;
     }
 
     [RegisterSerializer]

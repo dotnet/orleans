@@ -30,13 +30,15 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             Type = FaultInjectionType.ExceptionAfterStore
         };
 
-        await RunFaultedDepositManagerTransfer(
+        await RunFaultedTransfer(
             commitFault,
             100,
             0,
             expectedFrom: 99,
             expectedTo: 1,
-            "the transaction manager committed its durable state before the storage exception was surfaced");
+            "the transaction manager committed its durable state before the storage exception was surfaced",
+            // Run the deposit first so the deposit account joins first and deterministically becomes the transaction manager.
+            useDepositAsManager: true);
     }
 
     [SkippableFact]
@@ -48,36 +50,43 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             Type = FaultInjectionType.GenericExceptionAfterStore
         };
 
-        await RunFaultedDepositManagerTransfer(
+        await RunFaultedTransfer(
             commitFault,
             100,
             0,
             expectedFrom: 99,
             expectedTo: 1,
-            "a generic exception surfaced after the underlying storage write must recover the durable commit instead of partially aborting it");
+            "a generic exception surfaced after the underlying storage write must recover the durable commit instead of partially aborting it",
+            // Run the deposit first so the deposit account joins first and deterministically becomes the transaction manager.
+            useDepositAsManager: true);
     }
 
     [SkippableFact]
     public async Task ExceptionAfterStorageWriteCompleted_CommitsDurableFullBankTransfer()
     {
-        await RunFaultedDepositManagerTransfer(
+        await RunFaultedTransfer(
             commitFault: null,
             100,
             0,
             expectedFrom: 99,
             expectedTo: 1,
             "the storage write returned successfully before a post-store queue step faulted, so recovery must reload and complete the durable commit",
-            to => BankTransferDiagnosticFaults.ThrowOnStorageWriteCompleted(to));
+            (from, to) =>
+            [
+                BankTransferDiagnosticFaults.ThrowOnStorageWriteCompleted(from),
+                BankTransferDiagnosticFaults.ThrowOnStorageWriteCompleted(to)
+            ]);
     }
 
-    private async Task RunFaultedDepositManagerTransfer(
+    private async Task RunFaultedTransfer(
         BankTransferFault commitFault,
         long initialFrom,
         long initialTo,
         long expectedFrom,
         long expectedTo,
         string because,
-        Func<IBankTransferFaultInjectionAccountGrain, StorageWriteCompletedFaultScope> createDiagnosticFault = null)
+        Func<IBankTransferFaultInjectionAccountGrain, IBankTransferFaultInjectionAccountGrain, IReadOnlyList<StorageWriteCompletedFaultScope>> createDiagnosticFaults = null,
+        bool useDepositAsManager = false)
     {
         BankTransferTrace.Clear();
 
@@ -88,23 +97,35 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         await from.SetBalance(initialFrom);
         await to.SetBalance(initialTo);
 
-        StorageWriteCompletedFaultScope diagnosticFault = null;
+        IReadOnlyList<StorageWriteCompletedFaultScope> diagnosticFaults = null;
         OrleansTransactionException exception;
         try
         {
-            diagnosticFault = createDiagnosticFault?.Invoke(to);
+            diagnosticFaults = createDiagnosticFaults?.Invoke(from, to);
             exception = await Assert.ThrowsAnyAsync<OrleansTransactionException>(
-                () => teller.TransferReturnBalancesWithDepositAsManager(from, to, 1, commitFault));
+                () => useDepositAsManager
+                    ? teller.TransferReturnBalancesWithDepositAsManager(from, to, 1, commitFault)
+                    : teller.TransferReturnBalances(from, to, 1, commitFault, commitFault));
         }
         finally
         {
-            diagnosticFault?.Dispose();
+            if (diagnosticFaults is not null)
+            {
+                foreach (var diagnosticFault in diagnosticFaults)
+                {
+                    diagnosticFault.Dispose();
+                }
+            }
         }
 
-        if (diagnosticFault is not null)
+        if (diagnosticFaults is not null)
         {
-            diagnosticFault.FaultInjected.Should().BeTrue("the diagnostic fault should be injected exactly once for the target transaction manager");
-            diagnosticFault.ObservedCount.Should().BeGreaterThan(0, "the diagnostic event should be emitted after the target storage write completes");
+            diagnosticFaults.Should().Contain(
+                diagnosticFault => diagnosticFault.FaultInjected,
+                "the diagnostic fault should be injected exactly once for the selected transaction manager");
+            diagnosticFaults.Sum(diagnosticFault => diagnosticFault.ObservedCount).Should().BeGreaterThan(
+                0,
+                "the diagnostic event should be emitted after the selected transaction manager storage write completes");
         }
 
         var committed = await teller.GetBalances(from, to);

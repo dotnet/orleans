@@ -364,7 +364,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var services = new ServiceCollection();
         services.AddSerializer();
         services.AddLogging();
-        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
+        services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),
@@ -389,7 +389,7 @@ public class CodecRecoveryTests : JournalingTestBase
             typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
 
         var jsonOptions = CreateJsonOptions();
-        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
+        services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),
@@ -475,8 +475,8 @@ public class CodecRecoveryTests : JournalingTestBase
             ArgumentNullException.ThrowIfNull(consumer);
 
             var metadata = storedJournalFormatKey is null
-                ? JournalFileMetadata.Empty
-                : new JournalFileMetadata(storedJournalFormatKey);
+                ? JournalMetadata.Empty
+                : new JournalMetadata(storedJournalFormatKey);
             if (inner.Segments.Count == 0)
             {
                 consumer.Complete(metadata);

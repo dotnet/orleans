@@ -21,7 +21,7 @@ namespace Orleans.Persistence
     /// <summary>
     /// Redis-based grain storage provider
     /// </summary>
-    public partial class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public partial class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>, IDisposable, IAsyncDisposable
     {
         private readonly string _serviceId;
         private readonly RedisValue _ttl;
@@ -34,6 +34,7 @@ namespace Orleans.Persistence
         private readonly Func<string, GrainId, RedisKey> _getKeyFunc;
         private IConnectionMultiplexer _connection;
         private IDatabase _db;
+        private bool _connectionIsShared;
 
         /// <summary>
         /// Creates a new instance of the <see cref="RedisGrainStorage"/> type.
@@ -61,7 +62,7 @@ namespace Orleans.Persistence
         public void Participate(ISiloLifecycle lifecycle)
         {
             var name = OptionFormattingUtilities.Name<RedisGrainStorage>(_name);
-            lifecycle.Subscribe(name, _options.InitStage, Init, Close);
+            lifecycle.Subscribe(name, _options.InitStage, Init);
         }
 
         private async Task Init(CancellationToken cancellationToken)
@@ -72,7 +73,7 @@ namespace Orleans.Persistence
             {
                 LogDebugInitializing(_name, _serviceId, _options.DeleteStateOnClear);
 
-                _connection = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
+                (_connection, _connectionIsShared) = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
                 _db = _connection.GetDatabase();
 
                 var elapsed = Stopwatch.GetElapsedTime(startTime);
@@ -252,12 +253,42 @@ namespace Orleans.Persistence
             }
         }
 
-        private async Task Close(CancellationToken cancellationToken)
+        public void Dispose()
         {
-            if (_connection is null) return;
+            var connection = _connection;
+            if (connection is null)
+            {
+                return;
+            }
 
-            await _connection.CloseAsync().ConfigureAwait(false);
-            _connection.Dispose();
+            var connectionIsShared = _connectionIsShared;
+            _connection = null;
+            _db = null;
+            _connectionIsShared = false;
+
+            if (!connectionIsShared)
+            {
+                connection.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            var connection = _connection;
+            if (connection is null)
+            {
+                return;
+            }
+
+            var connectionIsShared = _connectionIsShared;
+            _connection = null;
+            _db = null;
+            _connectionIsShared = false;
+
+            if (!connectionIsShared)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
         private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();

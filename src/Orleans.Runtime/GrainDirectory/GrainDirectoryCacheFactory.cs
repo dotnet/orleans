@@ -21,7 +21,7 @@ namespace Orleans.Runtime.GrainDirectory
         public static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
             => CreateGrainDirectoryCache(services, options, out _);
 
-        internal static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache)
+        internal static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments directoryInstruments = null)
         {
             if (options.CacheSize <= 0)
             {
@@ -39,7 +39,7 @@ namespace Orleans.Runtime.GrainDirectory
                 case GrainDirectoryOptions.CachingStrategyType.Adaptive:
 #pragma warning restore CS0618 // Type or member is obsolete
                     disposeCache = true;
-                    return CreateLruGrainDirectoryCache(services, options);
+                    return CreateLruGrainDirectoryCache(services, options, directoryInstruments);
                 case GrainDirectoryOptions.CachingStrategyType.Custom:
                 default:
                     disposeCache = false;
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
             => CreateCustomGrainDirectoryCache(services, options, out _);
 
-        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache)
+        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments directoryInstruments = null)
         {
             var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
             if (grainDirectoryCache is not null)
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             disposeCache = true;
-            return CreateLruGrainDirectoryCache(services, options);
+            return CreateLruGrainDirectoryCache(services, options, directoryInstruments);
         }
 
         internal static ValueTask DisposeGrainDirectoryCacheAsync(IGrainDirectoryCache cache)
@@ -77,10 +77,11 @@ namespace Orleans.Runtime.GrainDirectory
             return default;
         }
 
-        private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+        private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, DirectoryInstruments directoryInstruments)
         {
             var timeProvider = services?.GetService<TimeProvider>() ?? TimeProvider.System;
-            return new LruGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL, timeProvider);
+            directoryInstruments ??= services?.GetService<DirectoryInstruments>();
+            return new LruGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL, timeProvider, directoryInstruments);
         }
     }
 
@@ -111,4 +112,3 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 }
-

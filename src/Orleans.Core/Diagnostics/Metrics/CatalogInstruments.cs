@@ -2,15 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
-#nullable disable
 namespace Orleans.Runtime;
 
-internal static class CatalogInstruments
+internal sealed class CatalogInstruments(OrleansInstruments instruments)
 {
-    internal const string ActivationOutcomeCanceled = "canceled";
-    internal const string ActivationOutcomeDuplicate = "duplicate";
-    internal const string ActivationOutcomeFailure = "failure";
-    internal const string ActivationOutcomeSuccess = "success";
+    private const string MillisecondsUnit = "ms";
+    private const string StatusTagName = "status";
+    private const string DirectoryTagName = "directory";
+    private const string ViaTagName = "via";
+    private const string DirectoryEnabled = "enabled";
+    private const string DirectoryDisabled = "disabled";
+
+    internal const string ActivationStatusSuccess = "success";
+    internal const string ActivationStatusCanceled = "canceled";
+    internal const string ActivationStatusDirectoryError = "directory_error";
+    internal const string ActivationStatusDuplicate = "duplicate";
+    internal const string ActivationStatusError = "error";
 
     internal const string DeactivationViaCollection = "collection";
     internal const string DeactivationViaDeactivateOnIdle = "deactivateOnIdle";
@@ -18,53 +25,213 @@ internal static class CatalogInstruments
     internal const string DeactivationViaMigration = "migration";
     internal const string DeactivationViaUnknown = "unknown";
 
-    internal static Counter<int> ActivationFailedToActivate = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
-
-    internal static Counter<int> ActivationCollections = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
-
-    internal static Counter<int> ActivationShutdown = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN);
-
-    internal static void ActivationShutdownViaCollection() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", DeactivationViaCollection));
-    internal static void ActivationShutdownViaDeactivateOnIdle() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", DeactivationViaDeactivateOnIdle));
-    internal static void ActivationShutdownViaMigration() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", DeactivationViaMigration));
-    internal static void ActivationShutdownViaDeactivateStuckActivation() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", DeactivationViaDeactivateStuckActivation));
-
-    internal static Histogram<double> ActivationLatency = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_ACTIVATION_LATENCY, "ms");
-    internal static Histogram<double> DeactivationLatency = Instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_DEACTIVATION_LATENCY, "ms");
-
-    internal static void OnActivationCompleted(TimeSpan latency, string outcome)
+    internal struct ActivationMetricTracker
     {
-        if (ActivationLatency.Enabled)
+        private readonly CatalogInstruments _instruments;
+        private readonly ValueStopwatch _stopwatch;
+        private readonly bool _usesDirectory;
+        private string? _status;
+
+        private ActivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, bool usesDirectory, string status)
         {
-            ActivationLatency.Record(latency.TotalMilliseconds, new KeyValuePair<string, object>("outcome", outcome));
+            _instruments = instruments;
+            _stopwatch = stopwatch;
+            _usesDirectory = usesDirectory;
+            _status = status;
+        }
+
+        public static ActivationMetricTracker Start(CatalogInstruments instruments, bool usesDirectory)
+        {
+            return instruments.ActivationLatencyEnabled
+                ? new(instruments, ValueStopwatch.StartNew(), usesDirectory, ActivationStatusError)
+                : default;
+        }
+
+        public void Succeeded() => SetStatus(ActivationStatusSuccess);
+
+        public void Failed(bool cancellationRequested) => SetStatus(cancellationRequested
+            ? ActivationStatusCanceled
+            : ActivationStatusError);
+
+        public void DirectoryRegistrationFailed(Exception? exception, bool cancellationRequested) => SetStatus(exception is null
+            ? ActivationStatusDuplicate
+            : cancellationRequested
+                ? ActivationStatusCanceled
+                : ActivationStatusDirectoryError);
+
+        public void Canceled() => SetStatus(ActivationStatusCanceled);
+
+        public void Record()
+        {
+            if (_status is null || _instruments is null)
+            {
+                return;
+            }
+
+            _instruments.OnActivationCompleted(_stopwatch.Elapsed, _status, _usesDirectory);
+        }
+
+        private void SetStatus(string status)
+        {
+            if (_status is not null)
+            {
+                _status = status;
+            }
         }
     }
 
-    internal static void OnDeactivationCompleted(TimeSpan latency, string via)
+    internal readonly struct DeactivationMetricTracker
     {
-        if (DeactivationLatency.Enabled)
+        private readonly CatalogInstruments _instruments;
+        private readonly ValueStopwatch _stopwatch;
+        private readonly string? _via;
+        private readonly bool _recorded;
+
+        private DeactivationMetricTracker(CatalogInstruments instruments, ValueStopwatch stopwatch, string via, bool recorded)
         {
-            DeactivationLatency.Record(latency.TotalMilliseconds, new KeyValuePair<string, object>("via", via));
+            _instruments = instruments;
+            _stopwatch = stopwatch;
+            _via = via;
+            _recorded = recorded;
+        }
+
+        public static DeactivationMetricTracker Start(CatalogInstruments instruments)
+        {
+            return instruments.DeactivationLatencyEnabled
+                ? new(instruments, ValueStopwatch.StartNew(), DeactivationViaUnknown, recorded: false)
+                : default;
+        }
+
+        public DeactivationMetricTracker Collection() => WithVia(DeactivationViaCollection);
+
+        public DeactivationMetricTracker DeactivateOnIdle() => WithVia(DeactivationViaDeactivateOnIdle);
+
+        public DeactivationMetricTracker DeactivateStuckActivation() => WithVia(DeactivationViaDeactivateStuckActivation);
+
+        public DeactivationMetricTracker Migration() => WithVia(DeactivationViaMigration);
+
+        public DeactivationMetricTracker Record()
+        {
+            if (_via is null || _recorded || _instruments is null)
+            {
+                return this;
+            }
+
+            _instruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
+            return new(_instruments, _stopwatch, _via, recorded: true);
+        }
+
+        public void RecordIfNeeded()
+        {
+            if (_via is null || _recorded || _instruments is null)
+            {
+                return;
+            }
+
+            _instruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
+        }
+
+        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_instruments, _stopwatch, via, _recorded);
+    }
+
+    private readonly Counter<int> _activationFailedToActivate = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
+
+    private readonly Counter<int> _activationCollections = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
+
+    private readonly Counter<int> _activationShutdown = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN);
+
+    internal void ActivationShutdownViaCollection() => OnActivationShutdown(DeactivationViaCollection);
+    internal void ActivationShutdownViaDeactivateOnIdle() => OnActivationShutdown(DeactivationViaDeactivateOnIdle);
+    internal void ActivationShutdownViaMigration() => OnActivationShutdown(DeactivationViaMigration);
+    internal void ActivationShutdownViaDeactivateStuckActivation() => OnActivationShutdown(DeactivationViaDeactivateStuckActivation);
+
+    private readonly Histogram<double> _deactivationLatency = instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_DEACTIVATION_LATENCY, MillisecondsUnit);
+    internal bool DeactivationLatencyEnabled => _deactivationLatency.Enabled;
+
+    internal void OnDeactivationCompleted(TimeSpan latency, string via)
+    {
+        if (_deactivationLatency.Enabled)
+        {
+            _deactivationLatency.Record(latency.TotalMilliseconds, new KeyValuePair<string, object?>(ViaTagName, via));
         }
     }
 
-    internal static Counter<int> NonExistentActivations = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS);
+    private readonly Counter<int> _nonExistentActivations = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS);
 
-    internal static Counter<int> ActivationConcurrentRegistrationAttempts = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS);
+    private readonly Counter<int> _activationConcurrentRegistrationAttempts = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS);
 
-    internal static readonly Counter<int> ActivationsCreated = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CREATED);
-    internal static readonly Counter<int> ActivationsDestroyed = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
+    private readonly Counter<int> _activationsCreated = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_CREATED);
+    private readonly Counter<int> _activationsDestroyed = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
+    private readonly Histogram<double> _activationLatency = instruments.Meter.CreateHistogram<double>(InstrumentNames.CATALOG_ACTIVATION_LATENCY, MillisecondsUnit);
+    internal bool ActivationLatencyEnabled => _activationLatency.Enabled;
 
-    internal static ObservableGauge<int> ActivationCount;
-    
-    internal static void RegisterActivationCountObserve(Func<int> observeValue)
+    private ObservableGauge<int>? _activationCount;
+
+    internal void RegisterActivationCountObserve(Func<int> observeValue)
     {
-        ActivationCount = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_COUNT, observeValue);
+        _activationCount = instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_COUNT, observeValue);
     }
 
-    internal static ObservableGauge<int> ActivationWorkingSet;
-    internal static void RegisterActivationWorkingSetObserve(Func<int> observeValue)
+    private ObservableGauge<int>? _activationWorkingSet;
+    internal void RegisterActivationWorkingSetObserve(Func<int> observeValue)
     {
-        ActivationWorkingSet = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, observeValue);
+        _activationWorkingSet = instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, observeValue);
+    }
+
+    internal void OnActivationCompleted(TimeSpan latency, string status, bool usesDirectory)
+    {
+        if (_activationLatency.Enabled)
+        {
+            _activationLatency.Record(
+                Math.Max(0, latency.TotalMilliseconds),
+                [
+                    new KeyValuePair<string, object?>(StatusTagName, status),
+                    new KeyValuePair<string, object?>(DirectoryTagName, usesDirectory ? DirectoryEnabled : DirectoryDisabled)
+                ]);
+        }
+    }
+
+    internal void OnActivationFailedToActivate()
+    {
+        if (_activationFailedToActivate.Enabled)
+        {
+            _activationFailedToActivate.Add(1);
+        }
+    }
+
+    internal void OnActivationConcurrentRegistrationAttempt()
+    {
+        if (_activationConcurrentRegistrationAttempts.Enabled)
+        {
+            _activationConcurrentRegistrationAttempts.Add(1);
+        }
+    }
+
+    internal void OnActivationCollected()
+    {
+        _activationCollections.Add(1);
+    }
+
+    internal void OnActivationCreated()
+    {
+        _activationsCreated.Add(1);
+    }
+
+    internal void OnActivationDestroyed()
+    {
+        _activationsDestroyed.Add(1);
+    }
+
+    internal void OnNonExistentActivation()
+    {
+        _nonExistentActivations.Add(1);
+    }
+
+    private void OnActivationShutdown(string via)
+    {
+        if (_activationShutdown.Enabled)
+        {
+            _activationShutdown.Add(1, new KeyValuePair<string, object?>(ViaTagName, via));
+        }
     }
 }

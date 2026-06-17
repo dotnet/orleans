@@ -72,6 +72,8 @@ internal static class InstrumentNames
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL = "orleans-directory-registrations-single-act-local";
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_SENT = "orleans-directory-registrations-single-act-remote-sent";
     public const string DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_RECEIVED = "orleans-directory-registrations-single-act-remote-received";
+    public const string DIRECTORY_REGISTRATIONS = "orleans-directory-registrations";
+    public const string DIRECTORY_REGISTRATION_DURATION = "orleans-directory-registration-duration";
     public const string DIRECTORY_UNREGISTRATIONS_ISSUED = "orleans-directory-unregistrations-issued";
     public const string DIRECTORY_UNREGISTRATIONS_LOCAL = "orleans-directory-unregistrations-local";
     public const string DIRECTORY_UNREGISTRATIONS_REMOTE_SENT = "orleans-directory-unregistrations-remote-sent";

@@ -6,6 +6,7 @@ using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Configuration;
+using Orleans.Runtime;
 using Orleans.Statistics;
 
 namespace ServiceBus.Tests.TestStreamProviders
@@ -43,7 +44,7 @@ namespace ServiceBus.Tests.TestStreamProviders
         {
             var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions,this.staticticOptions, base.dataAdapter, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
+            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions, this.staticticOptions, base.dataAdapter, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>(), this.serviceProvider.GetRequiredService<OrleansInstruments>());
         }
 
         private class CacheFactoryForTesting : EventHubQueueCacheFactory
@@ -54,9 +55,10 @@ namespace ServiceBus.Tests.TestStreamProviders
             public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
                 IEventHubDataAdapter dataAdapter, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
+                OrleansInstruments instruments,
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                : base(cacheOptions, evictionOptions, statisticOptions, dataAdapter, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
+                : base(cacheOptions, evictionOptions, statisticOptions, dataAdapter, sharedDimensions, instruments, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.name = name;
                 this.caches = caches;

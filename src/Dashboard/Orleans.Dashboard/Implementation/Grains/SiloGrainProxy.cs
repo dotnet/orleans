@@ -37,4 +37,6 @@ internal sealed class SiloGrainProxy : Grain, ISiloGrainProxy
     public Task<Immutable<SiloRuntimeStatistics[]>> GetRuntimeStatistics() => _siloGrainService.GetRuntimeStatistics();
 
     public Task<Immutable<StatCounter[]>> GetCounters() => _siloGrainService.GetCounters();
+
+    public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages() => _siloGrainService.GetLifecycleStages();
 }

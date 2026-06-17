@@ -62,7 +62,8 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions,
                 this.messageCenter,
                 this.connectionShared,
-                this.connectionPreambleHelper);
+                this.connectionPreambleHelper,
+                this.gateway.GatewayInstruments);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
@@ -77,7 +78,9 @@ namespace Orleans.Runtime.Messaging
             if (this.Endpoint is null) return;
 
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
-            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, _ => Task.Run(Start));
+            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, RunStart);
+
+            Task RunStart(CancellationToken ct) => Task.Run(Start);
         }
 
         Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(BindAsync);

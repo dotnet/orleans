@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
@@ -71,8 +72,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(string connectionString)
         {
-            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
-            TableServiceClient = new TableServiceClient(connectionString, ClientOptions);
+            SetTableServiceClient(connectionString);
         }
 
         /// <summary>
@@ -81,8 +81,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            TableServiceClient = new TableServiceClient(serviceUri, ClientOptions);
+            SetTableServiceClient(serviceUri);
         }
 
         /// <summary>
@@ -100,7 +99,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)
         {
-            TableServiceClient = new TableServiceClient(serviceUri, tokenCredential, ClientOptions);
+            SetTableServiceClient(serviceUri, tokenCredential);
         }
 
         /// <summary>
@@ -109,7 +108,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
         {
-            TableServiceClient = new TableServiceClient(serviceUri, azureSasCredential, ClientOptions);
+            SetTableServiceClient(serviceUri, azureSasCredential);
         }
 
         /// <summary>
@@ -118,7 +117,69 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
         {
-            TableServiceClient = new TableServiceClient(serviceUri, sharedKeyCredential, ClientOptions);
+            SetTableServiceClient(serviceUri, sharedKeyCredential);
+        }
+
+        internal void SetTableServiceClient(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(connectionString, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, tokenCredential, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, azureSasCredential, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, sharedKeyCredential, GetTableClientOptions()));
+        }
+
+        internal TableClientOptions GetTableClientOptions()
+        {
+            var clientOptions = ClientOptions ??= new TableClientOptions();
+            ConfigureRetryOptions(clientOptions.Retry, StoragePolicyOptions);
+            return clientOptions;
+        }
+
+        private static void ConfigureRetryOptions(RetryOptions retryOptions, AzureStoragePolicyOptions storagePolicyOptions)
+        {
+            // Keep this aligned with AzureStoragePolicyOptions defaults, which mirror Azure Storage SDK retry settings.
+            var delay = storagePolicyOptions.PauseBetweenOperationRetries > TimeSpan.Zero
+                ? storagePolicyOptions.PauseBetweenOperationRetries
+                : TimeSpan.FromSeconds(0.8);
+
+            var maxDelay = storagePolicyOptions.MaxPauseBetweenOperationRetries == Timeout.InfiniteTimeSpan
+                ? TimeSpan.FromMinutes(1)
+                : storagePolicyOptions.MaxPauseBetweenOperationRetries;
+
+            retryOptions.Mode = RetryMode.Exponential;
+            retryOptions.Delay = delay;
+            retryOptions.MaxDelay = maxDelay >= delay ? maxDelay : delay;
+            retryOptions.MaxRetries = Math.Max(0, storagePolicyOptions.MaxOperationRetries);
         }
 
         internal void Validate(string name)

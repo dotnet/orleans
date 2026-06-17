@@ -91,5 +91,12 @@ public class NatsStreamOptionsValidator(NatsOptions options, string? name = null
             throw new OrleansConfigurationException(
                 $"The {nameof(NatsOptions.NumReplicas)} must be at least 1 for the NATS stream provider '{name}'.");
         }
+
+        if (!Enum.IsDefined(typeof(StreamConfigStorage), options.StorageType))
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.StorageType)} value '{options.StorageType}' is not valid for the NATS stream provider '{name}'. " +
+                $"Valid values are {nameof(StreamConfigStorage.File)} and {nameof(StreamConfigStorage.Memory)}.");
+        }
     }
 }

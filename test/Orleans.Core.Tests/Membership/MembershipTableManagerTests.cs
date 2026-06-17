@@ -1,15 +1,17 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Runtime.MembershipService;
-using Xunit;
-using NSubstitute;
-using Orleans.Runtime;
-using Orleans;
-using Xunit.Abstractions;
-using TestExtensions;
-using System.Collections.Concurrent;
 using NonSilo.Tests.Utilities;
+using NSubstitute;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
+using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
+using Orleans.TestingHost.Diagnostics;
+using TestExtensions;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {
@@ -450,6 +452,7 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             // Mark the silo as dead
             while (true)
@@ -461,8 +464,10 @@ namespace NonSilo.Tests.Membership
             }
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
-            await manager.TryToSuspectOrKill(otherSilos.First().SiloAddress);
-            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+            var victim = otherSilos.First().SiloAddress;
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
+            await manager.TryToSuspectOrKill(victim);
+            Assert.True((await completion).Success);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
         }
 
@@ -524,10 +529,12 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             var victim = otherSilos.First().SiloAddress;
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+            Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
         }
 
@@ -639,13 +646,15 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             // Multiple votes from the same node should not result in the node being declared dead.
             var victim = otherSilos.First().SiloAddress;
+            var completions = WaitForSuspectOrKillCompletions(membershipEvents, victim, expectedCount: 3);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+            Assert.All(await completions, completion => Assert.True(completion.Success));
             Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
 
             // Manually remove our vote and add another silo's vote so we can be the one to kill the silo.
@@ -659,8 +668,9 @@ namespace NonSilo.Tests.Membership
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+            Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
 
             // One down, one to go. Now overshoot votes and kill ourselves instead (due to internal error).
@@ -678,8 +688,9 @@ namespace NonSilo.Tests.Membership
             }
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+            Assert.False((await completion).Success);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // We killed ourselves and should not have marked the other silo as dead.
@@ -756,6 +767,38 @@ namespace NonSilo.Tests.Membership
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
+
+        private static async Task<MembershipEvents.SuspectOrKillRequestCompleted> WaitForSuspectOrKillCompletion(DiagnosticEventCollector membershipEvents, SiloAddress silo)
+        {
+            var completions = await WaitForSuspectOrKillCompletions(membershipEvents, silo, expectedCount: 1);
+            return completions[0];
+        }
+
+        private static async Task<List<MembershipEvents.SuspectOrKillRequestCompleted>> WaitForSuspectOrKillCompletions(
+            DiagnosticEventCollector membershipEvents,
+            SiloAddress silo,
+            int expectedCount)
+        {
+            Assert.True(expectedCount > 0);
+
+            membershipEvents.Clear();
+            var completions = new List<MembershipEvents.SuspectOrKillRequestCompleted>(expectedCount);
+
+            while (completions.Count < expectedCount)
+            {
+                var diagnosticEvent = await membershipEvents.WaitForEventAsync(
+                    nameof(MembershipEvents.SuspectOrKillRequestCompleted),
+                    evt => evt.Payload is MembershipEvents.SuspectOrKillRequestCompleted completed
+                        && completed.RequestType == MembershipEvents.SuspectOrKillRequestType.SuspectOrKill
+                        && completed.SiloAddress.Equals(silo)
+                        && !completions.Contains(completed),
+                    TimeSpan.FromSeconds(40));
+
+                completions.Add(Assert.IsType<MembershipEvents.SuspectOrKillRequestCompleted>(diagnosticEvent.Payload));
+            }
+
+            return completions;
+        }
 
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime)
         {

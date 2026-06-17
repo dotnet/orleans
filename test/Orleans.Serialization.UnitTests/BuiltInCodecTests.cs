@@ -2948,6 +2948,52 @@ namespace Orleans.Serialization.UnitTests
 
         protected override ImmutableDictionary<string, int>[] TestValues => [null, ImmutableDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(ImmutableDictionary<string, int> left, ImmutableDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
+
+        [Fact]
+        public void PreservesValueComparer()
+        {
+            var builder = ImmutableDictionary.CreateBuilder<string, int>(
+                StringComparer.OrdinalIgnoreCase,
+                ModuloValueComparer.Instance);
+            builder["one"] = 1;
+            var original = builder.ToImmutable();
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(original, result);
+            Assert.Same(StringComparer.OrdinalIgnoreCase, result.KeyComparer);
+            Assert.IsType<ModuloValueComparer>(result.ValueComparer);
+            Assert.True(result.ValueComparer.Equals(1, 11));
+        }
+
+        [Fact]
+        public void ConvertFromSurrogate_DefaultsMissingValueComparer()
+        {
+            var surrogate = new ImmutableDictionarySurrogate<string, int>
+            {
+                Values = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["one"] = 1
+                }
+            };
+            var codec = new ImmutableDictionaryCodec<string, int>(null);
+
+            var result = codec.ConvertFromSurrogate(ref surrogate);
+
+            Assert.Same(StringComparer.OrdinalIgnoreCase, result.KeyComparer);
+            Assert.Same(EqualityComparer<int>.Default, result.ValueComparer);
+            Assert.Equal(1, result["ONE"]);
+        }
+
+        [GenerateSerializer]
+        public sealed class ModuloValueComparer : IEqualityComparer<int>
+        {
+            public static readonly ModuloValueComparer Instance = new();
+
+            public bool Equals(int x, int y) => x % 10 == y % 10;
+
+            public int GetHashCode(int obj) => obj % 10;
+        }
     }
 
     public class ImmutableDictionaryCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ImmutableDictionary<string, int>, ImmutableDictionaryCopier<string, int>>(output, fixture), IClassFixture<SerializationTesterFixture>

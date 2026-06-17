@@ -127,6 +127,7 @@ namespace NonSilo.Tests.Membership
             foreach (var l in new[] {
                 ServiceLifecycleStage.RuntimeInitialize,
                 ServiceLifecycleStage.AfterRuntimeGrainServices,
+                ServiceLifecycleStage.ValidateInitialConnectivity,
                 ServiceLifecycleStage.BecomeActive})
             {
                 // After start
@@ -147,11 +148,13 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart();
             Assert.Equal(SiloStatus.Created, levels[ServiceLifecycleStage.RuntimeInitialize + 1]);
             Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.AfterRuntimeGrainServices + 1]);
+            Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.ValidateInitialConnectivity + 1]);
             Assert.Equal(SiloStatus.Active, levels[ServiceLifecycleStage.BecomeActive + 1]);
 
             await StopLifecycle();
 
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.BecomeActive - 1]);
+            Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
         }
@@ -169,6 +172,7 @@ namespace NonSilo.Tests.Membership
             foreach (var l in new[] {
                 ServiceLifecycleStage.RuntimeInitialize,
                 ServiceLifecycleStage.AfterRuntimeGrainServices,
+                ServiceLifecycleStage.ValidateInitialConnectivity,
                 ServiceLifecycleStage.BecomeActive})
             {
                 // After start
@@ -189,6 +193,7 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart();
             Assert.Equal(SiloStatus.Created, levels[ServiceLifecycleStage.RuntimeInitialize + 1]);
             Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.AfterRuntimeGrainServices + 1]);
+            Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.ValidateInitialConnectivity + 1]);
             Assert.Equal(SiloStatus.Active, levels[ServiceLifecycleStage.BecomeActive + 1]);
 
             using var cancellation = new CancellationTokenSource();
@@ -196,6 +201,7 @@ namespace NonSilo.Tests.Membership
             await StopLifecycle(cancellation.Token);
 
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.BecomeActive - 1]);
+            Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
         }
@@ -290,6 +296,53 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipAgent_LifecycleStages_ValidateInitialConnectivity_WaitsForStaleSilosToBeEvicted()
+        {
+            this.clusterMembershipOptions.Value.NumMissedProbesLimit = 1;
+            this.clusterMembershipOptions.Value.NumVotesForDeathDeclaration = 1;
+            this.clusterMembershipOptions.Value.ProbeTimeout = TimeSpan.FromMilliseconds(20);
+            this.remoteSiloProber.Probe(default, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
+
+            var staleSilo = Silo("127.0.0.200:100@100");
+            var staleEntry = Entry(staleSilo, SiloStatus.Active, DateTime.UtcNow.Subtract(TimeSpan.FromHours(1)));
+            var table = await this.membershipTable.ReadAll();
+            Assert.True(await this.membershipTable.InsertRow(staleEntry, table.Version.Next()));
+
+            var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
+            clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(
+                silo,
+                clusterHealthMonitorTestAccessor.OnProbeResult,
+                this.optionsMonitor,
+                this.loggerFactory,
+                this.remoteSiloProber,
+                this.timerFactory,
+                this.localSiloHealthMonitor,
+                manager,
+                this.localSiloDetails);
+
+            var started = this.lifecycle.OnStart();
+            await Until(() => this.timerCalls.ContainsKey(nameof(SiloHealthMonitor)));
+
+            while (!started.IsCompleted)
+            {
+                if (this.timerCalls[nameof(SiloHealthMonitor)].TryDequeue(out var timer))
+                {
+                    timer.Completion.TrySetResult(true);
+                }
+
+                await Task.Delay(1);
+            }
+
+            await started;
+
+            table = await this.membershipTable.ReadAll();
+            Assert.Equal(SiloStatus.Dead, table.Members.Single(member => member.Item1.SiloAddress.Equals(staleSilo)).Item1.Status);
+            Assert.Equal(SiloStatus.Active, this.manager.CurrentStatus);
+
+            await StopLifecycle();
+        }
+
+        [Fact]
         public async Task MembershipAgent_LifecycleStages_ValidateInitialConnectivity_Failure()
         {
             this.timerFactory.CreateDelegate = (period, name) => new DelegateAsyncTimer(_ => Task.FromResult(false));
@@ -344,7 +397,12 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static MembershipEntry Entry(SiloAddress address, SiloStatus status) => new MembershipEntry { SiloAddress = address, Status = status, StartTime = DateTime.UtcNow, IAmAliveTime = DateTime.UtcNow };
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTime? iAmAliveTime = null)
+        {
+            var now = DateTime.UtcNow;
+            var entryTime = iAmAliveTime ?? now;
+            return new MembershipEntry { SiloAddress = address, Status = status, StartTime = entryTime, IAmAliveTime = entryTime };
+        }
 
         private static async Task Until(Func<bool> condition)
         {

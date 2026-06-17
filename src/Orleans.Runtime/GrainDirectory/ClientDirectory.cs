@@ -523,26 +523,30 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         lifecycle.Subscribe(
             nameof(ClientDirectory),
             ServiceLifecycleStage.RuntimeGrainServices,
-            ct =>
-            {
-                this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
-                return Task.CompletedTask;
-            },
-            async ct =>
-            {
-                _shutdownCts.Cancel();
-                _refreshTimer?.Dispose();
+            StartPublishingRoutingTable,
+            StopPublishingRoutingTable);
 
-                if (_runTask is Task task)
-                {
-                    await task.WaitAsync(ct).SuppressThrowing();
-                }
+        Task StartPublishingRoutingTable(CancellationToken ct)
+        {
+            this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
+            return Task.CompletedTask;
+        }
 
-                if (_nextPublishTask is Task publishTask)
-                {
-                    await publishTask.WaitAsync(ct).SuppressThrowing();
-                }
-            });
+        async Task StopPublishingRoutingTable(CancellationToken ct)
+        {
+            _shutdownCts.Cancel();
+            _refreshTimer?.Dispose();
+
+            if (_runTask is Task task)
+            {
+                await task.WaitAsync(ct).SuppressThrowing();
+            }
+
+            if (_nextPublishTask is Task publishTask)
+            {
+                await publishTask.WaitAsync(ct).SuppressThrowing();
+            }
+        }
     }
 
     internal class TestAccessor(ClientDirectory instance)

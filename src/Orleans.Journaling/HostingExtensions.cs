@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling.Json;
+using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
@@ -9,12 +10,16 @@ public static class HostingExtensions
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<JournaledStateManagerOptions>();
-        builder.Services.TryAddScoped<JournaledStateManagerShared>();
+        builder.Services.TryAddSingleton(static serviceProvider =>
+            serviceProvider.GetService<OrleansInstruments>() is { } instruments
+                ? new JournalingInstruments(instruments)
+                : JournalingInstruments.CreateForDirectConstruction());
+        builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager, JournaledStateManager>();
-        builder.Services.TryAddScoped<IJournaledStateManagerFactory, JournaledStateManagerFactory>();
+        builder.Services.TryAddSingleton<IJournaledStateManagerFactory, JournaledStateManagerFactory>();
 
         // Register JSON as the default format family and keep Orleans binary available for existing data.
-        builder.Services.AddJsonJournalFormat(new JsonJournalOptions().SerializerOptions, tryAdd: true);
+        builder.Services.AddJsonJournalFormat(tryAdd: true);
         TryAddOrleansBinaryJournalingFormat(builder.Services);
 
         builder.Services.TryAddKeyedScoped(typeof(IDurableDictionary<,>), KeyedService.AnyKey, typeof(DurableDictionary<,>));

@@ -160,13 +160,14 @@ public sealed class NatsOptionsTests
             NumReplicas = 1,
             PartitionCount = 2,
             ProducerCount = 1,
-            StorageType = storageType
+            StorageType = storageType,
+            NatsClientOptions = NatsTestConstants.NatsClientOptions
         };
 
         var connectionManager = new NatsConnectionManager(providerName, NullLoggerFactory.Instance, options);
         await connectionManager.Initialize();
 
-        await using var natsConnection = new NatsConnection();
+        await using var natsConnection = new NatsConnection(NatsTestConstants.NatsClientOptions);
         var natsContext = new NatsJSContext(natsConnection);
         await natsConnection.ConnectAsync();
 

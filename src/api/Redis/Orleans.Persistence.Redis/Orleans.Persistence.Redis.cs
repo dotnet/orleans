@@ -37,11 +37,15 @@ namespace Orleans.Hosting
 
 namespace Orleans.Persistence
 {
-    public partial class RedisGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>
+    public partial class RedisGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>, System.IDisposable, System.IAsyncDisposable
     {
         public RedisGrainStorage(string name, RedisStorageOptions options, Storage.IGrainStorageSerializer grainStorageSerializer, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<RedisGrainStorage> logger) { }
 
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public void Dispose() { }
+
+        public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
@@ -59,7 +63,7 @@ namespace Orleans.Persistence
     {
         public StackExchange.Redis.ConfigurationOptions? ConfigurationOptions { get { throw null; } set { } }
 
-        public System.Func<RedisStorageOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>> CreateMultiplexer { get { throw null; } set { } }
+        public System.Func<RedisStorageOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get { throw null; } set { } }
 
         public bool DeleteStateOnClear { get { throw null; } set { } }
 
@@ -71,7 +75,7 @@ namespace Orleans.Persistence
 
         public int InitStage { get { throw null; } set { } }
 
-        public static System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer> DefaultCreateMultiplexer(RedisStorageOptions options) { throw null; }
+        public static System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisStorageOptions options) { throw null; }
     }
 
     public static partial class RedisStorageOptionsExtensions

@@ -117,6 +117,7 @@ namespace UnitTests.Directory
 
         public void InvalidateCacheEntry(GrainId grainId) => throw new NotImplementedException();
         public bool TryCachedLookup(GrainId grainId, out GrainAddress address) => throw new NotImplementedException();
+        public bool TryLocalLookup(GrainId grainId, out GrainAddress address) => throw new NotImplementedException();
         #endregion
     }
 }

@@ -238,6 +238,8 @@ namespace Orleans.Streaming.EventHubs
 
         public int MaxOperationRetries { get { throw null; } set { } }
 
+        public System.TimeSpan MaxPauseBetweenOperationRetries { get { throw null; } set { } }
+
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
 
         public System.TimeSpan PauseBetweenCreationRetries { get { throw null; } set { } }
@@ -247,7 +249,7 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class DefaultEventHubReceiverMonitor : Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor
     {
-        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!) { }
+        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!, default!) { }
     }
 
     public static partial class EventDataExtensions
@@ -351,6 +353,8 @@ namespace Orleans.Streaming.EventHubs
         public bool CheckpointExists { get { throw null; } }
 
         public static System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { throw null; }
+
+        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<string> Load() { throw null; }
 
@@ -467,7 +471,7 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
-        public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor> cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> blockPoolMonitorFactory = null) { }
+        public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, Runtime.OrleansInstruments instruments, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor> cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> blockPoolMonitorFactory = null) { }
 
         public System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> BlockPoolMonitorFactory { get { throw null; } set { } }
 
@@ -585,12 +589,12 @@ namespace Orleans.Streaming.EventHubs.StatisticMonitors
 {
     public partial class DefaultEventHubBlockPoolMonitor : Providers.Streams.Common.DefaultBlockPoolMonitor
     {
-        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!) { }
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(Providers.Streams.Common.BlockPoolMonitorDimensions)!, default!) { }
     }
 
     public partial class DefaultEventHubCacheMonitor : Providers.Streams.Common.DefaultCacheMonitor
     {
-        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions) : base(default(System.Collections.Generic.KeyValuePair<string, object>[])!) { }
+        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) : base(default(Providers.Streams.Common.CacheMonitorDimensions)!, default!) { }
     }
 }
 

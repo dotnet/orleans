@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
@@ -37,7 +38,7 @@ namespace Orleans.Metadata
             if (!TryGetGrainProperties(grainType, out var result))
             {
                 //ThrowNotFoundException(grainType);
-                result = new GrainProperties(ImmutableDictionary<string, string>.Empty);
+                result = new GrainProperties(ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal));
             }
 
             return result;

@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Providers;
@@ -30,6 +31,7 @@ namespace Orleans.Hosting
                 return;
             }
 
+            services.TryAddSingleton<StreamInstruments>();
             services.AddSingleton<PubSubGrainStateStorageFactory>();
             services.AddSingleton<SiloStreamProviderRuntime>();
             services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();

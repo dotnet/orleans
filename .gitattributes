@@ -20,3 +20,6 @@
 *.verified.cs text eol=lf working-tree-encoding=UTF-8
 *.verified.txt text eol=lf working-tree-encoding=UTF-8
 *.verified.jsonl text eol=lf working-tree-encoding=UTF-8
+
+# GitHub Actions helper scripts run under Bash on Linux.
+.github/scripts/*.sh text eol=lf

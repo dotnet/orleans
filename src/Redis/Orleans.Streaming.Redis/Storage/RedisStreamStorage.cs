@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Orleans.Configuration;
 using Orleans.Streams;
@@ -143,14 +145,45 @@ internal sealed class RedisStreamStorage
         _multiplexer = null;
         _isSharedMultiplexer = false;
 
-        if (checkpointer is not null)
+        var shutdownExceptions = new List<Exception>();
+
+        try
         {
-            await checkpointer.FlushAsync();
+            if (checkpointer is not null)
+            {
+                await checkpointer.FlushAsync(CancellationToken.None);
+            }
+        }
+        catch (Exception ex)
+        {
+            shutdownExceptions.Add(ex);
         }
 
-        if (multiplexer is not null && !isSharedMultiplexer)
+        try
         {
-            await DisposeMultiplexerAsync(multiplexer);
+            if (multiplexer is not null && !isSharedMultiplexer)
+            {
+                await DisposeMultiplexerAsync(multiplexer);
+            }
+        }
+        catch (Exception ex)
+        {
+            shutdownExceptions.Add(ex);
+        }
+
+        ThrowIfAny(shutdownExceptions);
+
+        static void ThrowIfAny(List<Exception> exceptions)
+        {
+            if (exceptions.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+            }
+
+            if (exceptions.Count > 1)
+            {
+                throw new AggregateException(exceptions);
+            }
         }
     }
 

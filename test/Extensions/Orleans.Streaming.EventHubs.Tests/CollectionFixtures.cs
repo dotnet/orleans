@@ -1,3 +1,6 @@
+using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Orleans.Runtime;
 using Tester;
 using TestExtensions;
@@ -37,10 +40,26 @@ namespace ServiceBus.Tests
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            var collector = new Microsoft.Extensions.Diagnostics.Metrics.Testing.MetricCollector<long>(Instruments.Meter, "orleans-streams-queue-read-duration");
+            var collectors = HostedCluster.Silos
+                .Select(silo => HostedCluster.GetSiloServiceProvider(silo.SiloAddress).GetRequiredService<IMeterFactory>())
+                .Select(meterFactory => new MetricCollector<long>(meterFactory, "Microsoft.Orleans", "orleans-streams-queue-read-duration"))
+                .ToArray();
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            // Wait for 10 queue read
-            await collector.WaitForMeasurementsAsync(10, cts.Token);
+            try
+            {
+                // Wait for 10 queue reads across the cluster.
+                while (collectors.Sum(collector => collector.GetMeasurementSnapshot().Count) < 10)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token);
+                }
+            }
+            finally
+            {
+                foreach (var collector in collectors)
+                {
+                    collector.Dispose();
+                }
+            }
         }
     }
 }

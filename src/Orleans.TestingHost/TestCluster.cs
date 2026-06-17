@@ -20,6 +20,8 @@ using Orleans.TestingHost.InMemoryTransport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
 using Orleans.Statistics;
+using Orleans.Runtime.TestHooks;
+using Orleans.Messaging;
 
 #nullable disable
 namespace Orleans.TestingHost
@@ -420,9 +422,50 @@ namespace Orleans.TestingHost
         {
             var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-            await Task.Delay(stabilizationTime);
-            WriteLog("WaitForLivenessToStabilize is done sleeping");
+            var activeSilos = GetActiveSilos().ToArray();
+            var testHooks = activeSilos.Select(GetTestHooks).ToArray();
+            var gatewayManager = this.InternalClient.ServiceProvider.GetRequiredService<GatewayManager>();
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
+            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(activeSilos, testHooks, gatewayManager, stabilizationTime))
+            {
+                WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
+            }
+            else
+            {
+                WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
+            }
+        }
+
+        private ITestHooks GetTestHooks(SiloHandle silo)
+        {
+            if (silo is InProcessSiloHandle inProcessSilo)
+            {
+                return inProcessSilo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>();
+            }
+
+            return this.InternalClient.GetTestHooks(silo);
+        }
+
+        /// <summary>
+        /// Wait for active silos to observe cluster manifest updates for all active silos.
+        /// </summary>
+        /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
+        public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
+        {
+            var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+            var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
+            var activeSilos = GetActiveSilos().ToArray();
+            var testHooks = activeSilos.Select(GetTestHooks).ToArray();
+
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForClusterManifestToStabilize is waiting up to {0} for {1} active silo manifest(s)", stabilizationTime, activeSilos.Length);
+            if (await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(activeSilos, testHooks, stabilizationTime))
+            {
+                WriteLog("WaitForClusterManifestToStabilize observed stable cluster manifests");
+            }
+            else
+            {
+                WriteLog("WaitForClusterManifestToStabilize reached the fallback wait of {0}", stabilizationTime);
+            }
         }
 
         /// <summary>

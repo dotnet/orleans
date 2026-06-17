@@ -33,15 +33,29 @@ namespace Orleans.Runtime
         public ActivationWorkingSet(
             IAsyncTimerFactory asyncTimerFactory,
             ILogger<ActivationWorkingSet> logger,
-            IEnumerable<IActivationWorkingSetObserver> observers)
+            IEnumerable<IActivationWorkingSetObserver> observers,
+            CatalogInstruments catalogInstruments)
         {
             _logger = logger;
             _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(5_000), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet));
             _observers = observers.ToList();
-            CatalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
+            catalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
         }
 
         public int Count => _activeCount;
+
+        internal IEnumerable<IActivationWorkingSetMember> Members => EnumerateActiveMembers();
+
+        private IEnumerable<IActivationWorkingSetMember> EnumerateActiveMembers()
+        {
+            foreach (var pair in _members)
+            {
+                if (!pair.Value.IsIdle)
+                {
+                    yield return pair.Key;
+                }
+            }
+        }
 
         public void OnActivated(IActivationWorkingSetMember member)
         {
@@ -158,20 +172,24 @@ namespace Orleans.Runtime
             lifecycle.Subscribe(
                 nameof(ActivationWorkingSet),
                 ServiceLifecycleStage.BecomeActive,
-                ct =>
+                StartMonitoring,
+                StopMonitoring);
+
+            Task StartMonitoring(CancellationToken ct)
+            {
+                using var _ = new ExecutionContextSuppressor();
+                _runTask = Task.Run(MonitorWorkingSet);
+                return Task.CompletedTask;
+            }
+
+            async Task StopMonitoring(CancellationToken ct)
+            {
+                _scanPeriodTimer.Dispose();
+                if (_runTask is Task task)
                 {
-                    using var _ = new ExecutionContextSuppressor();
-                    _runTask = Task.Run(MonitorWorkingSet);
-                    return Task.CompletedTask;
-                },
-                async ct =>
-                {
-                    _scanPeriodTimer.Dispose();
-                    if (_runTask is Task task)
-                    {
-                        await task.WaitAsync(ct).SuppressThrowing();
-                    }
-                });
+                    await task.WaitAsync(ct).SuppressThrowing();
+                }
+            }
         }
 
         [LoggerMessage(

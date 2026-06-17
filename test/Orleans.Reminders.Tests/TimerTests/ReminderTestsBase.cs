@@ -37,7 +37,6 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
     protected const long failAfter = 2; // NOTE: match this sleep with 'failCheckAfter' used in PerGrainFailureTest() so you dont try to get counter immediately after failure as new activation may not have the reminder statistics
     protected const long failCheckAfter = 6; // safe value: 9
-
     protected ILogger log;
     protected ReminderDiagnosticObserver observer;
     private ReminderTestClock ReminderClock { get; }
@@ -216,6 +215,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), firstTickCount + 1, cts.Token);
 
             Assert.Contains(recorder.Events, evt => evt is ReminderEvents.Registered registered && registered.GrainId == grainId && registered.ReminderName == DR);
+            Assert.Contains(recorder.Events, evt => evt is ReminderEvents.LocalReminderScheduleChanged { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
+            Assert.Contains(recorder.Events, evt => evt is ReminderEvents.LocalReminderTickWaitArmed { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
             Assert.DoesNotContain(recorder.Events, evt => evt is ReminderEvents.LocalReminderStarted { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
             Assert.DoesNotContain(recorder.Events, evt => evt is ReminderEvents.LocalReminderStopped { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
         }
@@ -345,6 +346,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         ArgumentNullException.ThrowIfNull(getCounter);
         ArgumentOutOfRangeException.ThrowIfNegative(minimumCount);
 
+        var grainId = grain.GetGrainId();
         long result = 0;
         async Task<bool> Condition(CancellationToken ct)
         {
@@ -367,9 +369,11 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                 return result;
             }
 
-            var nextTickTarget = observer.GetTickCount(grain.GetGrainId(), reminderName) + 1;
-            var waitTask = observer.WaitForTickCountAsync(grain, nextTickTarget, cancellationToken, reminderName);
-            await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grain, reminderName), cancellationToken);
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cancellationToken);
+            var nextTickTarget = observer.GetTickCount(grainId, reminderName) + 1;
+            var waitTask = observer.WaitForTickCountAsync(grainId, nextTickTarget, cancellationToken, reminderName);
+            var reminderPeriod = await GetReminderPeriodAsync(grain, reminderName);
+            await AdvanceReminderTimeAsync(reminderPeriod, cancellationToken);
             await waitTask;
         }
     }
@@ -594,7 +598,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         if (ex is ReminderException)
         {
             this.log.LogInformation(ex, "Retryable operation failed on attempt {Attempt}", i);
-            await Task.Delay(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
+            await AdvanceReminderTimeAsync(TimeSpan.FromMilliseconds(10));
             return true;
         }
 

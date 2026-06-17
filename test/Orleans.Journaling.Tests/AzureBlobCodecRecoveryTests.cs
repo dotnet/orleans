@@ -218,7 +218,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
 
         var jsonOptions = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = JournalingTestsJsonContext.Default };
-        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
+        services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),
@@ -233,7 +233,8 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         services.Configure<AzureBlobJournalStorageOptions>(options =>
         {
             JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options);
-            options.GetBlobName = _ => blobName;
+            options.GetWalBlobName = _ => $"{blobName}/wal";
+            options.GetCheckpointBlobName = (_, snapshotId) => $"{blobName}/chk.{snapshotId}";
         });
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
         services.AddSerializer();
@@ -296,7 +297,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
         public bool IsCompleted { get; private set; }
 
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
             if (buffer.Length > 0)
             {

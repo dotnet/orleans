@@ -166,6 +166,8 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.IAddressable grain) { throw null; }
 
+        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
+
         public System.Threading.Tasks.Task WaitForLivenessToStabilizeAsync(bool didKill = false) { throw null; }
     }
 
@@ -429,6 +431,8 @@ namespace Orleans.TestingHost
         public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.GrainId grainId) { throw null; }
 
         public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.IAddressable grain) { throw null; }
+
+        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
 
         public System.Threading.Tasks.Task WaitForLivenessToStabilizeAsync(bool didKill = false) { throw null; }
     }

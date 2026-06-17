@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime.Internal;
 
 #nullable disable
@@ -23,12 +24,14 @@ namespace Orleans.Runtime.Messaging
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
         private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
+        private readonly SiloAddress siloAddress;
         private readonly SiloAddress gatewayAddress;
         private readonly IAsyncTimer gatewayMaintenanceTimer;
         private readonly Task gatewayMaintenanceTask;
 
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private readonly MessageCenter messageCenter;
+        private readonly MessagingInstruments _messagingInstruments;
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -41,18 +44,25 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options,
-            IAsyncTimerFactory timerFactory)
+            IAsyncTimerFactory timerFactory,
+            OrleansInstruments orleansInstruments,
+            MessagingInstruments messagingInstruments)
         {
             this.messageCenter = messageCenter;
+            _messagingInstruments = messagingInstruments;
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             this.clientDropTimeout = messagingOptions.ClientDropTimeout;
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
+            this.siloAddress = siloDetails.SiloAddress;
             this.gatewayAddress = siloDetails.GatewayAddress;
+            this.GatewayInstruments = new(orleansInstruments);
             this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance));
             this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
         }
+
+        internal GatewayInstruments GatewayInstruments { get; }
 
         public static GrainAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
         {
@@ -139,7 +149,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     clientState = new ClientState(this, clientId);
                     clients[clientId] = clientState;
-                    MessagingInstruments.ConnectedClient.Add(1);
+                    _messagingInstruments.ConnectedClient.Add(1);
                 }
                 clientState.RecordConnection(connection);
                 clientConnections[connection] = clientState;
@@ -219,6 +229,8 @@ namespace Orleans.Runtime.Messaging
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.
         internal void DropDisconnectedClients()
         {
+            var trackDroppedClients = GatewayEvents.IsClientDroppedEnabled();
+            List<(GrainId ClientId, TimeSpan DisconnectedDuration)> droppedClients = null;
             foreach (var kv in clients)
             {
                 if (kv.Value.ReadyToDrop())
@@ -227,18 +239,32 @@ namespace Orleans.Runtime.Messaging
                     {
                         if (clients.TryGetValue(kv.Key, out var client) && client.ReadyToDrop())
                         {
-                            LogInformationGatewayDroppingClient(logger, kv.Key, client.DisconnectedSince);
+                            var disconnectedDuration = client.DisconnectedSince;
+                            LogInformationGatewayDroppingClient(logger, kv.Key, disconnectedDuration);
 
                             if (clients.TryRemove(kv.Key, out _))
                             {
                                 // Reject all pending messages from the client.
                                 client.Drop();
+                                if (trackDroppedClients)
+                                {
+                                    droppedClients ??= [];
+                                    droppedClients.Add((kv.Key.GrainId, disconnectedDuration));
+                                }
                             }
 
                             clientsCollectionVersion++;
-                            MessagingInstruments.ConnectedClient.Add(-1);
+                            _messagingInstruments.ConnectedClient.Add(-1);
                         }
                     }
+                }
+            }
+
+            if (droppedClients is not null)
+            {
+                foreach (var droppedClient in droppedClients)
+                {
+                    GatewayEvents.EmitClientDropped(siloAddress, droppedClient.ClientId, droppedClient.DisconnectedDuration);
                 }
             }
         }
@@ -449,7 +475,7 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     connection.Send(message);
-                    GatewayInstruments.GatewaySent.Add(1);
+                    _gateway.GatewayInstruments.OnGatewaySent();
                     return true;
                 }
                 catch (Exception exception)

@@ -81,7 +81,7 @@ namespace UnitTests.Grains
             return r;
         }
 
-        public Task ReceiveReminder(string reminderName, TickStatus status)
+        public async Task ReceiveReminder(string reminderName, TickStatus status)
         {
             // it can happen that due to failure, when a new activation is created,
             // it doesn't know which reminders were registered against the grain
@@ -90,6 +90,15 @@ namespace UnitTests.Grains
             if (!this.sequence.ContainsKey(reminderName))
             {
                 this.sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
+            }
+
+            if (!this.allReminders.ContainsKey(reminderName))
+            {
+                await GetMissingReminders();
+                if (!this.allReminders.ContainsKey(reminderName))
+                {
+                    throw new OrleansException($"Could not find reminder {reminderName} in grain {this.IdentityString}");
+                }
             }
 
             allReminders[reminderName].Fired.Add(status.CurrentTickTime);
@@ -111,7 +120,7 @@ namespace UnitTests.Grains
             if (sequenceNumber < this.sequence[reminderName])
             {
                 this.logger.LogInformation("ReceiveReminder: {Reminder} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], sequenceNumber, status);
-                return Task.CompletedTask;
+                return;
             }
             this.sequence[reminderName] = sequenceNumber;
             this.logger.LogInformation("ReceiveReminder: {ReminderNAme} Sequence # {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], status);
@@ -120,7 +129,7 @@ namespace UnitTests.Grains
             string counterValue = this.sequence[reminderName].ToString(CultureInfo.InvariantCulture);
             File.WriteAllText(fileName, counterValue);
 
-            return Task.CompletedTask;
+            return;
         }
 
         public async Task StopReminder(string reminderName)
@@ -295,7 +304,7 @@ namespace UnitTests.Grains
             return r;
         }
 
-        public Task ReceiveReminder(string reminderName, TickStatus status)
+        public async Task ReceiveReminder(string reminderName, TickStatus status)
         {
             // it can happen that due to failure, when a new activation is created,
             // it doesn't know which reminders were registered against the grain
@@ -306,6 +315,15 @@ namespace UnitTests.Grains
                 // allReminders.Add(reminderName, r); // not using allReminders at the moment
                 //counters.Add(reminderName, 0);
                 this.sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
+            }
+
+            if (!this.allReminders.ContainsKey(reminderName))
+            {
+                await GetMissingReminders();
+                if (!this.allReminders.ContainsKey(reminderName))
+                {
+                    throw new OrleansException($"Could not find reminder {reminderName} in grain {this.IdentityString}");
+                }
             }
 
             // calculating tick sequence number
@@ -325,7 +343,7 @@ namespace UnitTests.Grains
             if (sequenceNumber < this.sequence[reminderName])
             {
                 this.logger.LogInformation("{ReminderName} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], sequenceNumber, status);
-                return Task.CompletedTask;
+                return;
             }
 
             this.sequence[reminderName] = sequenceNumber;
@@ -333,7 +351,7 @@ namespace UnitTests.Grains
 
             File.WriteAllText(GetFileName(reminderName), this.sequence[reminderName].ToString());
 
-            return Task.CompletedTask;
+            return;
         }
 
         public async Task StopReminder(string reminderName)

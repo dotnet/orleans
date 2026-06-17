@@ -23,25 +23,24 @@ namespace Orleans.Providers.Streams.Common
         private long _releasedMemory;
         private long _allocatedMemory;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
-        /// </summary>
-        protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions)
+        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, OrleansInstruments instruments)
+            : this(new KeyValuePair<string, object>[] { new("BlockPoolId", dimensions.BlockPoolId) }, instruments.Meter)
         {
-            _dimensions = dimensions;
-            _totalMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_TOTAL_MEMORY, GetTotalMemory, unit: "bytes");
-            _availableMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_AVAILABLE_MEMORY, GetAvailableMemory, unit: "bytes");
-            _claimedMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_CLAIMED_MEMORY, GetClaimedMemory, unit: "bytes");
-            _releasedMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_RELEASED_MEMORY, GetReleasedMemory, unit: "bytes");
-            _allocatedMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_ALLOCATED_MEMORY, GetAllocatedMemory, unit: "bytes");
         }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
-        /// </summary>
-        /// <param name="dimensions">The dimensions.</param>
-        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new ("BlockPoolId", dimensions.BlockPoolId) })
+        protected DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
+            : this(dimensions, instruments.Meter)
         {
+        }
+
+        private DefaultBlockPoolMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)
+        {
+            _dimensions = dimensions;
+            _totalMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_TOTAL_MEMORY, GetTotalMemory, unit: "bytes");
+            _availableMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_AVAILABLE_MEMORY, GetAvailableMemory, unit: "bytes");
+            _claimedMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_CLAIMED_MEMORY, GetClaimedMemory, unit: "bytes");
+            _releasedMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_RELEASED_MEMORY, GetReleasedMemory, unit: "bytes");
+            _allocatedMemoryCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_BLOCK_POOL_ALLOCATED_MEMORY, GetAllocatedMemory, unit: "bytes");
         }
 
         private Measurement<long> GetTotalMemory() => new(_totalMemory, _dimensions);

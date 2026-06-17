@@ -21,6 +21,10 @@ public static class ActivitySources
     /// </summary>
     public const string StorageActivitySourceName = "Microsoft.Orleans.Storage";
     /// <summary>
+    /// Spans tied to durable job scheduling and execution.
+    /// </summary>
+    public const string DurableJobsActivitySourceName = "Microsoft.Orleans.DurableJobs";
+    /// <summary>
     /// A wildcard name to match all Orleans activity sources.
     /// </summary>
     public const string AllActivitySourceName = "Microsoft.Orleans.*";
@@ -29,4 +33,5 @@ public static class ActivitySources
     internal static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "2.0.0");
     internal static readonly ActivitySource LifecycleGrainSource = new(LifecycleActivitySourceName, "1.0.0");
     internal static readonly ActivitySource StorageGrainSource = new(StorageActivitySourceName, "1.0.0");
+    internal static readonly ActivitySource DurableJobsSource = new(DurableJobsActivitySourceName, "1.0.0");
 }

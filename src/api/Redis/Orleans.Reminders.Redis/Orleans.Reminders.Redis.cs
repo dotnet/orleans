@@ -12,11 +12,11 @@ namespace Orleans.Configuration
     {
         public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
 
-        public System.Func<RedisReminderTableOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>> CreateMultiplexer { get { throw null; } set { } }
+        public System.Func<RedisReminderTableOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get { throw null; } set { } }
 
         public System.TimeSpan? EntryExpiry { get { throw null; } set { } }
 
-        public static System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer> DefaultCreateMultiplexer(RedisReminderTableOptions options) { throw null; }
+        public static System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisReminderTableOptions options) { throw null; }
     }
 
     public partial class RedisReminderTableOptionsValidator : IConfigurationValidator

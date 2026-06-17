@@ -253,11 +253,13 @@ namespace Orleans.Runtime
                 nameof(DeploymentLoadPublisher),
                 ServiceLifecycleStage.RuntimeGrainServices,
                 StartAsync,
-                ct =>
+                DisposePublishTimer);
+
+            Task DisposePublishTimer(CancellationToken ct)
             {
                 _publishTimer.Dispose();
                 return Task.CompletedTask;
-            });
+            }
         }
 
         [LoggerMessage(

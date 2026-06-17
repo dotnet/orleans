@@ -12,15 +12,22 @@ namespace Orleans.DurableJobs;
 /// </summary>
 internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 {
+    private readonly TimeProvider _timeProvider;
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
+    private TaskCompletionSource _queueChanged = CreateQueueChangedSource();
     private bool _isComplete;
 #if NET9_0_OR_GREATER
     private readonly Lock _syncLock = new();
 #else
     private readonly object _syncLock = new();
 #endif
+
+    public InMemoryJobQueue(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
@@ -37,6 +44,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     public void Enqueue(DurableJob job, int dequeueCount)
     {
         ArgumentNullException.ThrowIfNull(job);
+        if (dequeueCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dequeueCount));
+        }
 
         lock (_syncLock)
         {
@@ -46,6 +57,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             var bucket = GetJobBucket(job.DueTime);
             bucket.AddJob(job, dequeueCount);
             _jobsIdToBucket[job.Id] = bucket;
+            SignalQueueChanged();
         }
     }
 
@@ -58,6 +70,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         lock (_syncLock)
         {
             _isComplete = true;
+            SignalQueueChanged();
         }
     }
 
@@ -79,6 +92,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 bucket.RemoveJob(jobId);
                 _jobsIdToBucket.Remove(jobId);
                 // Note: The bucket remains in the priority queue until processed
+                SignalQueueChanged();
                 return true;
             }
 
@@ -97,27 +111,85 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// </remarks>
     public void RetryJobLater(IJobRunContext jobContext, DateTimeOffset newDueTime)
     {
-        var jobId = jobContext.Job.Id;
-        var newJob = new DurableJob
+        ArgumentNullException.ThrowIfNull(jobContext);
+        _ = RetryJobLater(jobContext.Job.Id, newDueTime, jobContext.DequeueCount);
+    }
+
+    /// <summary>
+    /// Reschedules a job for retry with a new due time.
+    /// </summary>
+    /// <param name="jobId">The unique identifier of the job to retry.</param>
+    /// <param name="newDueTime">The new due time for the job.</param>
+    /// <param name="dequeueCount">The persisted dequeue count to associate with the retried job.</param>
+    /// <returns>True if the job was found and rescheduled; false if the job was not found.</returns>
+    public bool RetryJobLater(string jobId, DateTimeOffset newDueTime, int dequeueCount)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        if (dequeueCount < 0)
         {
-            Id = jobContext.Job.Id,
-            Name = jobContext.Job.Name,
-            DueTime = newDueTime,
-            TargetGrainId = jobContext.Job.TargetGrainId,
-            ShardId = jobContext.Job.ShardId,
-            Metadata = jobContext.Job.Metadata
-        };
+            throw new ArgumentOutOfRangeException(nameof(dequeueCount));
+        }
 
         lock (_syncLock)
         {
-            if (_jobsIdToBucket.TryGetValue(jobId, out var oldBucket))
+            if (!_jobsIdToBucket.TryGetValue(jobId, out var oldBucket) || !oldBucket.TryGetJob(jobId, out var existing))
             {
-                oldBucket.RemoveJob(jobId);
-                _jobsIdToBucket.Remove(jobId);
-                var newBucket = GetJobBucket(newDueTime);
-                newBucket.AddJob(newJob, jobContext.DequeueCount);
-                _jobsIdToBucket[jobId] = newBucket;
+                return false;
             }
+
+            var newJob = new DurableJob
+            {
+                Id = existing.Job.Id,
+                Name = existing.Job.Name,
+                DueTime = newDueTime,
+                TargetGrainId = existing.Job.TargetGrainId,
+                ShardId = existing.Job.ShardId,
+                Metadata = existing.Job.Metadata
+            };
+
+            oldBucket.RemoveJob(jobId);
+            _jobsIdToBucket.Remove(jobId);
+            var newBucket = GetJobBucket(newDueTime);
+            newBucket.AddJob(newJob, dequeueCount);
+            _jobsIdToBucket[jobId] = newBucket;
+            SignalQueueChanged();
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Gets a point-in-time snapshot of live jobs and their persisted dequeue counts.
+    /// </summary>
+    /// <returns>The current live jobs and dequeue counts.</returns>
+    public IReadOnlyList<(DurableJob Job, int DequeueCount)> GetSnapshot()
+    {
+        lock (_syncLock)
+        {
+            var result = new List<(DurableJob Job, int DequeueCount)>(_jobsIdToBucket.Count);
+            foreach (var (jobId, bucket) in _jobsIdToBucket)
+            {
+                if (bucket.TryGetJob(jobId, out var item))
+                {
+                    result.Add(item);
+                }
+            }
+
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Clears all queue state.
+    /// </summary>
+    public void Clear()
+    {
+        lock (_syncLock)
+        {
+            _queue.Clear();
+            _jobsIdToBucket.Clear();
+            _buckets.Clear();
+            _isComplete = false;
+            SignalQueueChanged();
         }
     }
 
@@ -127,41 +199,62 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>
     /// An async enumerator that returns <see cref="IJobRunContext"/> instances for jobs that are due.
-    /// The enumerator checks for due jobs every second and terminates when the queue is marked complete and empty.
+    /// The enumerator wakes when the queue changes or the next job becomes due, and terminates when the queue is marked complete and empty.
     /// </returns>
     public async IAsyncEnumerator<IJobRunContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (true)
         {
-            JobBucket? bucketToProcess = null;
-            DateTimeOffset bucketKey = default;
+            List<(DurableJob Job, int DequeueCount)>? jobsToYield = null;
+            Task? queueChanged = null;
+            TimeSpan? delay = null;
 
             lock (_syncLock)
             {
+                RemoveEmptyBuckets();
+
                 if (Count == 0)
                 {
                     if (_isComplete)
                     {
                         yield break; // Exit if the queue is frozen and empty
                     }
+
+                    queueChanged = _queueChanged.Task;
                 }
                 else if (_queue.Count > 0)
                 {
                     var nextBucket = _queue.Peek();
-                    if (nextBucket.DueTime < DateTimeOffset.UtcNow)
+                    var now = _timeProvider.GetUtcNow();
+                    if (nextBucket.DueTime <= now)
                     {
-                        // Dequeue the entire bucket to process outside the lock
-                        bucketToProcess = _queue.Dequeue();
-                        bucketKey = bucketToProcess.DueTime;
+                        // Dequeue the bucket and remove it from _buckets atomically so a concurrent
+                        // Enqueue for the same DueTime cannot reuse this bucket. Without this,
+                        // GetJobBucket would find the bucket still in _buckets and add to it,
+                        // but the bucket is no longer in _queue, so the new job would be stranded.
+                        var bucketToProcess = _queue.Dequeue();
+                        _buckets.Remove(bucketToProcess.DueTime);
+
+                        // Snapshot the jobs under the lock so concurrent Cancel/Retry mutations
+                        // do not race the enumeration.
+                        jobsToYield = new List<(DurableJob Job, int DequeueCount)>(bucketToProcess.Jobs);
                     }
+                    else
+                    {
+                        queueChanged = _queueChanged.Task;
+                        delay = nextBucket.DueTime - now;
+                    }
+                }
+                else
+                {
+                    queueChanged = _queueChanged.Task;
                 }
             }
 
-            if (bucketToProcess is not null)
+            if (jobsToYield is not null)
             {
                 // Process all jobs in the bucket outside the lock for better concurrency
-                foreach (var (job, dequeueCount) in bucketToProcess.Jobs.ToList())
+                foreach (var (job, dequeueCount) in jobsToYield)
                 {
                     // Verify job hasn't been cancelled while we were processing
                     bool shouldYield;
@@ -176,34 +269,64 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                         yield return new JobRunContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
                     }
                 }
-
-                // Clean up the bucket from dictionary after processing all jobs
-                lock (_syncLock)
-                {
-                    _buckets.Remove(bucketKey);
-                }
             }
             else
             {
-                await timer.WaitForNextTickAsync(cancellationToken);
+                await WaitForQueueChangeOrDelayAsync(queueChanged!, delay, cancellationToken);
             }
         }
     }
 
     private JobBucket GetJobBucket(DateTimeOffset dueTime)
     {
-        // Truncate to second precision and add 1 second to normalize bucket key
-        // This ensures all jobs within the same second (e.g., 12:00:00.000-12:00:00.999) share the same bucket (12:00:01)
-        var key = new DateTimeOffset(dueTime.Year, dueTime.Month, dueTime.Day, dueTime.Hour, dueTime.Minute, dueTime.Second, dueTime.Offset);
-        key = key.AddSeconds(1);
-        if (!_buckets.TryGetValue(key, out var bucket))
+        if (!_buckets.TryGetValue(dueTime, out var bucket))
         {
-            bucket = new JobBucket(key);
-            _buckets[key] = bucket;
-            _queue.Enqueue(bucket, key);
+            bucket = new JobBucket(dueTime);
+            _buckets[dueTime] = bucket;
+            _queue.Enqueue(bucket, dueTime);
         }
+
         return bucket;
-    }   
+    }
+
+    private void RemoveEmptyBuckets()
+    {
+        while (_queue.Count > 0 && _queue.Peek().Count == 0)
+        {
+            var bucket = _queue.Dequeue();
+            _buckets.Remove(bucket.DueTime);
+        }
+    }
+
+    private void SignalQueueChanged()
+    {
+        var previous = _queueChanged;
+        _queueChanged = CreateQueueChangedSource();
+        previous.TrySetResult();
+    }
+
+    private async Task WaitForQueueChangeOrDelayAsync(Task queueChanged, TimeSpan? delay, CancellationToken cancellationToken)
+    {
+        if (delay is null)
+        {
+            await queueChanged.WaitAsync(cancellationToken);
+            return;
+        }
+
+        if (delay <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var queueChangedTask = queueChanged.WaitAsync(waitCancellation.Token);
+        var delayTask = Task.Delay(delay.Value, _timeProvider, waitCancellation.Token);
+        var completedTask = await Task.WhenAny(queueChangedTask, delayTask);
+        waitCancellation.Cancel();
+        await completedTask;
+    }
+
+    private static TaskCompletionSource CreateQueueChangedSource() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
 internal sealed class JobBucket
@@ -229,5 +352,10 @@ internal sealed class JobBucket
     public bool RemoveJob(string jobId)
     {
         return _jobs.Remove(jobId);
+    }
+
+    public bool TryGetJob(string jobId, out (DurableJob Job, int DequeueCount) job)
+    {
+        return _jobs.TryGetValue(jobId, out job);
     }
 }

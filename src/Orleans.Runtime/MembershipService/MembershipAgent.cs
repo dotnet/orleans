@@ -16,9 +16,9 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal partial class MembershipAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable, MembershipAgent.ITestAccessor
     {
-        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(200);
-        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromMinutes(2);
-        private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromSeconds(64);
+        private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromSeconds(2);
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly IMembershipManager membershipManager;
         private readonly ILocalSiloDetails localSilo;
@@ -63,9 +63,7 @@ namespace Orleans.Runtime.MembershipService
             LogDebugStartingPeriodicMembershipLivenessTimestampUpdates();
             try
             {
-                // jitter for initial
                 TimeSpan? overrideDelayPeriod = RandomTimeSpan.Next(this.clusterMembershipOptions.IAmAliveTablePublishTimeout);
-                var exponentialBackoff = new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP);
                 var runningFailures = 0;
                 while (await this.iAmAliveTimer.NextTick(overrideDelayPeriod) && !this.membershipManager.LocalSiloStatus.IsTerminating())
                 {
@@ -82,8 +80,12 @@ namespace Orleans.Runtime.MembershipService
                     {
                         runningFailures += 1;
                         LogWarningFailedToUpdateTableEntryForThisSilo(exception);
-                        // Retry quickly and then exponentially back off
-                        overrideDelayPeriod = exponentialBackoff.Next(runningFailures);
+
+                        overrideDelayPeriod = BackoffComputation.ComputeBackoffDelay(
+                            runningFailures,
+                            baseMin: EXP_BACKOFF_CONTENTION_MIN,
+                            baseMax: EXP_BACKOFF_CONTENTION_MIN + EXP_BACKOFF_STEP,
+                            cap: EXP_BACKOFF_CONTENTION_MAX);
                     }
                 }
             }
@@ -101,7 +103,6 @@ namespace Orleans.Runtime.MembershipService
         private async Task BecomeActive()
         {
             LogInformationBecomeActive();
-            await this.ValidateInitialConnectivity();
 
             try
             {
@@ -115,10 +116,14 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task ValidateInitialConnectivity()
+        private async Task ValidateInitialConnectivity(CancellationToken cancellationToken)
         {
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.cancellation.Token);
+            var ct = linkedCancellation.Token;
+
             // Continue attempting to validate connectivity until some reasonable timeout.
             var maxAttemptTime = this.clusterMembershipOptions.MaxJoinAttemptTime;
+            var retryDelay = this.clusterMembershipOptions.ProbeTimeout;
             var attemptNumber = 1;
             var now = this.getUtcDateTime();
             var attemptUntil = now + maxAttemptTime;
@@ -134,12 +139,11 @@ namespace Orleans.Runtime.MembershipService
                         var entry = item.Value;
                         if (entry.Status != SiloStatus.Active) continue;
                         if (entry.SiloAddress.IsSameLogicalSilo(this.localSilo.SiloAddress)) continue;
-                        if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now) != default) continue;
 
                         activeSilos.Add(entry.SiloAddress);
                     }
 
-                    var failedSilos = await CheckClusterConnectivity(activeSilos.ToArray());
+                    var failedSilos = await CheckClusterConnectivity(activeSilos.ToArray(), ct);
                     var successfulSilos = activeSilos.Where(s => !failedSilos.Contains(s)).ToList();
 
                     // If there were no failures, terminate the loop and return without error.
@@ -147,30 +151,40 @@ namespace Orleans.Runtime.MembershipService
 
                     LogErrorFailedToGetPingResponses(failedSilos.Count, activeSilos.Count, new(successfulSilos), new(failedSilos), attemptUntil, attemptNumber);
 
-                    if (now + TimeSpan.FromSeconds(5) > attemptUntil)
+                    if (now + retryDelay > attemptUntil)
                     {
                         canContinue = false;
                         var msg = $"Failed to get ping responses from {failedSilos.Count} of {activeSilos.Count} active silos. "
-                            + "Newly joining silos validate connectivity with all active silos that have recently updated their 'I Am Alive' value before joining the cluster. "
+                            + "Newly joining silos validate connectivity with all active silos before joining the cluster. "
                             + $"Successfully contacted: {Utils.EnumerableToString(successfulSilos)}. Failed to get response from: {Utils.EnumerableToString(failedSilos)}";
                         throw new OrleansClusterConnectivityCheckFailedException(msg);
                     }
 
                     // Refresh membership after some delay and retry.
-                    await Task.Delay(TimeSpan.FromSeconds(5));
-                    await this.membershipManager.Refresh(null, this.cancellation.Token);
+                    await Task.Delay(retryDelay, ct);
+                    await this.membershipManager.Refresh(null, ct);
                 }
-                catch (Exception exception) when (canContinue)
+                catch (Exception exception)
                 {
+                    if (!canContinue)
+                    {
+                        throw;
+                    }
+
+                    if (exception is OperationCanceledException && ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+
                     LogErrorFailedToValidateInitialClusterConnectivity(exception);
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
                 }
 
                 ++attemptNumber;
                 now = this.getUtcDateTime();
             }
 
-            async Task<List<SiloAddress>> CheckClusterConnectivity(SiloAddress[] members)
+            async Task<List<SiloAddress>> CheckClusterConnectivity(SiloAddress[] members, CancellationToken cancellationToken)
             {
                 if (members.Length == 0) return new List<SiloAddress>();
 
@@ -181,7 +195,7 @@ namespace Orleans.Runtime.MembershipService
                 var timeout = this.clusterMembershipOptions.ProbeTimeout;
                 foreach (var silo in members)
                 {
-                    tasks.Add(ProbeSilo(this.siloProber, silo, timeout, this.log));
+                    tasks.Add(ProbeSilo(this.siloProber, silo, timeout, this.log, cancellationToken));
                 }
 
                 try
@@ -205,13 +219,17 @@ namespace Orleans.Runtime.MembershipService
                 return failed;
             }
 
-            static async Task<bool> ProbeSilo(IRemoteSiloProber siloProber, SiloAddress silo, TimeSpan timeout, ILogger log)
+            static async Task<bool> ProbeSilo(IRemoteSiloProber siloProber, SiloAddress silo, TimeSpan timeout, ILogger log, CancellationToken cancellationToken)
             {
                 Exception exception;
                 try
                 {
-                    await siloProber.Probe(silo, 0).WaitAsync(timeout);
+                    await siloProber.Probe(silo, 0).WaitAsync(timeout, cancellationToken);
                     return true;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -321,6 +339,21 @@ namespace Orleans.Runtime.MembershipService
                     ServiceLifecycleStage.AfterRuntimeGrainServices,
                     AfterRuntimeGrainServicesStart,
                     AfterRuntimeGrainServicesStop);
+            }
+
+            {
+                async Task OnValidateInitialConnectivityStart(CancellationToken ct)
+                {
+                    await Task.Run(() => this.ValidateInitialConnectivity(ct));
+                }
+
+                Task OnValidateInitialConnectivityStop(CancellationToken ct) => Task.CompletedTask;
+
+                lifecycle.Subscribe(
+                    nameof(MembershipAgent),
+                    ServiceLifecycleStage.ValidateInitialConnectivity,
+                    OnValidateInitialConnectivityStart,
+                    OnValidateInitialConnectivityStop);
             }
 
             {
@@ -435,7 +468,7 @@ namespace Orleans.Runtime.MembershipService
             EventId = (int)ErrorCode.MembershipJoiningPreconditionFailure,
             Level = LogLevel.Error,
             Message = "Failed to get ping responses from {FailedCount} of {ActiveCount} active silos. " +
-                      "Newly joining silos validate connectivity with all active silos that have recently updated their 'I Am Alive' value before joining the cluster. " +
+                      "Newly joining silos validate connectivity with all active silos before joining the cluster. " +
                       "Successfully contacted: {SuccessfulSilos}. Silos which did not respond successfully are: {FailedSilos}. " +
                       "Will continue attempting to validate connectivity until {Timeout}. Attempt #{Attempt}"
         )]

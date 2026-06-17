@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -26,7 +27,7 @@ namespace UnitTests.Runtime
             var logger = NullLogger<ActivationCollector>.Instance;
 
             this.timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
-            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, new EnvironmentStatisticsProvider());
+            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, new EnvironmentStatisticsProvider(), CreateCatalogInstruments());
         }
 
         [Theory, TestCategory("Activation")]
@@ -146,7 +147,8 @@ namespace UnitTests.Runtime
                 timeProvider,
                 grainCollectionOptions,
                 logger,
-                statsProvider
+                statsProvider,
+                CreateCatalogInstruments()
             );
 
             collector._activationCount = activationCount;
@@ -170,7 +172,7 @@ namespace UnitTests.Runtime
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             var logger = NullLogger<ActivationCollector>.Instance;
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
-            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider, CreateCatalogInstruments());
 
             collector._activationCount = 0;
             var overloaded = collector.IsMemoryOverloaded(out var surplusActivations);
@@ -189,14 +191,14 @@ namespace UnitTests.Runtime
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
 
-            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider, CreateCatalogInstruments());
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
             timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
 
             var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
-            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector });
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments());
 
             var activation1 = PrepareActivation(1, collector);
             var activation2 = PrepareActivation(1, collector);
@@ -224,14 +226,14 @@ namespace UnitTests.Runtime
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
 
-            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider, CreateCatalogInstruments());
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
             timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
 
             var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
-            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector });
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments());
 
             var totalActivations = 500;
             var activations = new List<IActivationWorkingSetMember>();
@@ -335,14 +337,14 @@ namespace UnitTests.Runtime
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
 
-            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider, CreateCatalogInstruments());
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
             timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
 
             var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
-            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector });
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments());
 
             var inactiveActivation1 = PrepareActivation(1, collector);
             var activeActivation = PrepareActivation(1, collector);
@@ -373,6 +375,15 @@ namespace UnitTests.Runtime
 
         private IActivationWorkingSetMember PrepareActivation(int collectionAgeLimitMinutes, ActivationCollector collector)
             => PrepareActivation(TimeSpan.FromMinutes(collectionAgeLimitMinutes), collector);
+
+        private static CatalogInstruments CreateCatalogInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<CatalogInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
+        }
 
         private IActivationWorkingSetMember PrepareActivation(TimeSpan collectionAgeLimit, ActivationCollector collector)
         {

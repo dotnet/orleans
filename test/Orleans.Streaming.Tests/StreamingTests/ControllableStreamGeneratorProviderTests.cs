@@ -74,14 +74,14 @@ namespace UnitTests.StreamingTests
 
         private async Task ValidateControllableGeneratedStreams()
         {
+            var generatorConfig = new SimpleGeneratorOptions
+            {
+                StreamNamespace = Fixture.StreamNamespace,
+                EventsInStream = 100
+            };
+
             try
             {
-                var generatorConfig = new SimpleGeneratorOptions
-                {
-                    StreamNamespace = Fixture.StreamNamespace,
-                    EventsInStream = 100
-                };
-
                 var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
                 object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
                 Assert.Equal(2, results.Length);
@@ -96,8 +96,7 @@ namespace UnitTests.StreamingTests
             }
             finally
             {
-                var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
-                reporter.Reset().Ignore();
+                await ResetReporter(generatorConfig.StreamNamespace);
             }
         }
 
@@ -105,7 +104,7 @@ namespace UnitTests.StreamingTests
         {
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, GeneratedEventCollectorGrain.StreamNamespace);
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, generatorConfig.StreamNamespace);
             if (assertIsTrue)
             {
                 // one stream per queue
@@ -121,6 +120,24 @@ namespace UnitTests.StreamingTests
                 return false;
             }
             return true;
+        }
+
+        private async Task ResetReporter(string streamNamespace)
+        {
+            var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            await reporter.Reset();
+            await TestingUtils.WaitUntilAsync(assertIsTrue => CheckReporterIsEmpty(reporter, streamNamespace, assertIsTrue), Timeout);
+        }
+
+        private static async Task<bool> CheckReporterIsEmpty(IGeneratedEventReporterGrain reporter, string streamNamespace, bool assertIsTrue)
+        {
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, streamNamespace);
+            if (assertIsTrue)
+            {
+                Assert.Empty(report);
+            }
+
+            return report.Count == 0;
         }
     }
 }

@@ -35,4 +35,3 @@
     <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Tests" />
   </ItemGroup>
 </Project>
-

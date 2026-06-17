@@ -56,6 +56,7 @@ namespace UnitTests.Directory
                 services,
                 this.grainDirectoryResolver, 
                 this.mockMembershipService.Target,
+                CreateDirectoryInstruments(),
                 grainDirectoryOptions);
 
             this.grainLocator.Participate(this.lifecycle);
@@ -117,6 +118,7 @@ namespace UnitTests.Directory
                 services,
                 grainDirectoryResolver,
                 membershipService.Target,
+                CreateDirectoryInstruments(),
                 Options.Create(new GrainDirectoryOptions()));
 
             grainLocator.Participate(lifecycle);
@@ -156,7 +158,11 @@ namespace UnitTests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory());
+                activations: new ActivationDirectory(CreateCatalogInstruments()),
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments(),
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -167,6 +173,7 @@ namespace UnitTests.Directory
                 developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
                 grainDirectoryOptions: Options.Create(new GrainDirectoryOptions { CachingStrategy = GrainDirectoryOptions.CachingStrategyType.Custom }),
                 loggerFactory: this.loggerFactory,
+                directoryInstruments: CreateDirectoryInstruments(),
                 systemTargetShared: systemTargetShared);
 
             await localGrainDirectory.StopAsync();
@@ -207,7 +214,11 @@ namespace UnitTests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory());
+                activations: new ActivationDirectory(CreateCatalogInstruments()),
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments(),
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
             var localGrainDirectory = new LocalGrainDirectory(
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
@@ -218,6 +229,7 @@ namespace UnitTests.Directory
                 developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
                 grainDirectoryOptions: Options.Create(new GrainDirectoryOptions()),
                 loggerFactory: this.loggerFactory,
+                directoryInstruments: CreateDirectoryInstruments(),
                 systemTargetShared: systemTargetShared)
             {
                 Running = true
@@ -235,6 +247,74 @@ namespace UnitTests.Directory
                 Assert.Equal(0, membershipService.RefreshCallCount);
                 await remoteDirectory.Received(1).RegisterAsync(address, null, 1);
                 Assert.Null(localGrainDirectory.GetLocalDirectoryData(address.GrainId).Address);
+            }
+            finally
+            {
+                await localGrainDirectory.StopAsync();
+            }
+        }
+
+        [Fact]
+        public async Task LocalGrainDirectoryTryLocalLookupFindsLocalPartitionEntryOnCacheMiss()
+        {
+            var localSilo = GenerateSiloAddress();
+            var membershipService = new MockClusterMembershipService(new()
+            {
+                [localSilo] = (SiloStatus.Active, "local")
+            });
+            var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+            localSiloDetails.SiloAddress.Returns(localSilo);
+            localSiloDetails.GatewayAddress.Returns(localSilo);
+            localSiloDetails.DnsHostName.Returns("localhost");
+            localSiloDetails.Name.Returns("TestSilo");
+            localSiloDetails.ClusterId.Returns("TestCluster");
+            var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
+            var grainFactory = Substitute.For<IInternalGrainFactory>();
+            var services = new ServiceCollection().BuildServiceProvider();
+            Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
+                membershipService.Target,
+                Options.Create(new GrainDirectoryOptions()),
+                this.loggerFactory);
+            var systemTargetShared = new SystemTargetShared(
+                runtimeClient: null!,
+                localSiloDetails: localSiloDetails,
+                loggerFactory: this.loggerFactory,
+                schedulingOptions: Options.Create(new SchedulingOptions()),
+                grainReferenceActivator: null,
+                timerRegistry: null,
+                activations: new ActivationDirectory(CreateCatalogInstruments()),
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments(),
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
+            var localGrainDirectory = new LocalGrainDirectory(
+                serviceProvider: services,
+                siloDetails: localSiloDetails,
+                siloStatusOracle: siloStatusOracle,
+                clusterMembershipService: membershipService.Target,
+                grainFactory: grainFactory,
+                grainDirectoryPartitionFactory: partitionFactory,
+                developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
+                grainDirectoryOptions: Options.Create(new GrainDirectoryOptions()),
+                loggerFactory: this.loggerFactory,
+                directoryInstruments: CreateDirectoryInstruments(),
+                systemTargetShared: systemTargetShared)
+            {
+                Running = true
+            };
+
+            var address = GenerateGrainAddress(localSilo, membershipService.CurrentVersion);
+
+            try
+            {
+                var registered = await localGrainDirectory.RegisterAsync(address, hopCount: 0);
+                Assert.Equal(address, registered.Address);
+
+                localGrainDirectory.InvalidateCacheEntry(address.GrainId);
+                Assert.False(localGrainDirectory.TryCachedLookup(address.GrainId, out _));
+
+                Assert.True(localGrainDirectory.TryLocalLookup(address.GrainId, out var result));
+                Assert.Equal(address, result);
             }
             finally
             {
@@ -750,6 +830,60 @@ namespace UnitTests.Directory
             }
 
             return silos[^1];
+        }
+
+        private static SchedulerInstruments CreateSchedulerInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<SchedulerInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
+        }
+
+        private static CatalogInstruments CreateCatalogInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<CatalogInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
+        }
+
+        private static DirectoryInstruments CreateDirectoryInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<DirectoryInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<DirectoryInstruments>();
+        }
+
+        private static GrainInstruments CreateGrainInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<GrainInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<GrainInstruments>();
+        }
+
+        private static MessagingInstruments CreateMessagingInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<MessagingInstruments>();
+        }
+
+        private static MessagingProcessingInstruments CreateMessagingProcessingInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingProcessingInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<MessagingProcessingInstruments>();
         }
 
         private int generation = 0;

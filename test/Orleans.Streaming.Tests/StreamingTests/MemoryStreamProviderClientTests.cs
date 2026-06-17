@@ -56,7 +56,7 @@ namespace Tester.StreamingTests
                 public void Configure(ISiloBuilder hostBuilder)=> hostBuilder.AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
                     .ConfigurePartitioning(partitionCount))
-                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
+                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(1));
             }
         }
 

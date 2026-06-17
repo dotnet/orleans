@@ -799,7 +799,7 @@ namespace Orleans.Runtime
 
         string SiloName { get; }
 
-        System.Collections.Immutable.ImmutableArray<SiloAddress> GetActiveSilos();
+        SiloAddress[] GetActiveSilos();
         SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress);
         System.Collections.Generic.Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
         bool IsDeadSilo(SiloAddress silo);
@@ -1046,7 +1046,7 @@ namespace Orleans.Runtime.Diagnostics
 
     public static partial class GrainLifecycleEvents
     {
-        public const string ListenerName = "Orleans.GrainsLifecycle";
+        public const string ListenerName = "Orleans.GrainLifecycle";
         public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
 
         public sealed partial class Activated : LifecycleEvent

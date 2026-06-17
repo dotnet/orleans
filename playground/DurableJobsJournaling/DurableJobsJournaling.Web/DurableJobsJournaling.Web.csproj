@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DurableJobsJournaling.Abstractions\DurableJobsJournaling.Abstractions.csproj" />
+    <ProjectReference Include="..\DurableJobsJournaling.ServiceDefaults\DurableJobsJournaling.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Client\Orleans.Client.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+  </ItemGroup>
+
+</Project>

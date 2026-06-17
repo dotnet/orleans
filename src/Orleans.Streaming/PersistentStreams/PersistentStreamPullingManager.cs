@@ -12,6 +12,7 @@ using System.Threading;
 using Orleans.Streams.Filtering;
 using Orleans.Runtime.Scheduler;
 using System.Diagnostics.Metrics;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
 #nullable disable
 namespace Orleans.Streams
@@ -39,6 +40,7 @@ namespace Orleans.Streams
         private readonly IStreamFilter streamFilter;
         private readonly IQueueAdapterFactory adapterFactory;
         private readonly TimeProvider _timeProvider;
+        private readonly StreamInstruments _streamInstruments;
         private RunState managerState;
         private IDisposable queuePrintTimer;
         private int nextAgentId;
@@ -57,6 +59,7 @@ namespace Orleans.Streams
             IBackoffProvider deliveryBackoffProvider,
             IBackoffProvider queueReaderBackoffProvider,
             TimeProvider timeProvider,
+            StreamInstruments streamInstruments,
             SystemTargetShared shared)
             : base(managerId, shared)
         {
@@ -89,11 +92,12 @@ namespace Orleans.Streams
             _deliveryBackoffProvider = deliveryBackoffProvider;
             _queueReaderBackoffProvider = queueReaderBackoffProvider;
             _timeProvider = timeProvider ?? TimeProvider.System;
+            _streamInstruments = streamInstruments;
             _systemTargetShared = shared;
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = shared.LoggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
             LogInfoCreated(GetType().Name, streamProviderName);
-            StreamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
+            _streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
@@ -127,9 +131,11 @@ namespace Orleans.Streams
         {
             managerState = RunState.AgentsStarted;
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
+            var previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
 
             LogInfoStarting(myQueues.Count, new(myQueues));
             await AddNewQueues(myQueues, true);
+            EmitAgentQueueChange(previousQueues);
             LogInfoStarted();
         }
 
@@ -139,6 +145,7 @@ namespace Orleans.Streams
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
             LogInfoStopping(queuesToRemove.Count, new(queuesToRemove));
             await RemoveQueues(queuesToRemove);
+            EmitAgentQueueChange(queuesToRemove);
             LogInfoStopped();
         }
 
@@ -183,6 +190,7 @@ namespace Orleans.Streams
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
             HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
+            IReadOnlyCollection<QueueId> previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
             LogInfoExecutingQueueChangeNotification(
                 notificationSeqNumber,
                 currentQueues.Count,
@@ -199,11 +207,47 @@ namespace Orleans.Streams
             }
             finally
             {
+                EmitAgentQueueChange(previousQueues);
                 LogInfoDoneExecutingQueueChangeNotification(
                     notificationSeqNumber,
                     NumberRunningAgents,
                     new(queuesToAgentsMap.Keys));
             }
+        }
+
+        private QueueId[] CaptureAgentQueuesIfDiagnosticsEnabled() => StreamingEvents.IsBalancerChangedEnabled() ? queuesToAgentsMap.Keys.ToArray() : null;
+
+        private void EmitAgentQueueChange(IReadOnlyCollection<QueueId> previousQueues)
+        {
+            if (previousQueues is null || !StreamingEvents.IsBalancerChangedEnabled())
+            {
+                return;
+            }
+
+            if (HasSameAgentQueues(previousQueues))
+            {
+                return;
+            }
+
+            StreamingEvents.EmitQueueChange(streamProviderName, Silo, previousQueues as QueueId[] ?? [.. previousQueues], queuesToAgentsMap.Keys.ToArray(), queueBalancer);
+        }
+
+        private bool HasSameAgentQueues(IReadOnlyCollection<QueueId> previousQueues)
+        {
+            if (previousQueues.Count != queuesToAgentsMap.Count)
+            {
+                return false;
+            }
+
+            foreach (var queueId in previousQueues)
+            {
+                if (!queuesToAgentsMap.ContainsKey(queueId))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -255,7 +299,8 @@ namespace Orleans.Streams
                             _deliveryBackoffProvider,
                             _queueReaderBackoffProvider,
                             _timeProvider,
-                            _systemTargetShared);
+                            _systemTargetShared,
+                            _streamInstruments);
                         queuesToAgentsMap.Add(queueId, agent);
                         agents.Add(agent);
                     }

@@ -51,6 +51,7 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
             Cluster = builder.Build();
             await Cluster.DeployAsync();
             await Cluster.WaitForLivenessToStabilizeAsync();
+            await Cluster.WaitForClusterManifestToStabilizeAsync();
         }
     }
 
@@ -87,6 +88,7 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
     {
         await fixture.Cluster.StartAdditionalSiloAsync();
         await fixture.Cluster.WaitForLivenessToStabilizeAsync();
+        await fixture.Cluster.WaitForClusterManifestToStabilizeAsync();
         fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
     }
 

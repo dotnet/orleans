@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using Orleans.Runtime;
@@ -11,8 +13,11 @@ namespace Orleans.Metadata
     /// Information about a logical grain type <see cref="GrainType"/>.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
-    public sealed class GrainProperties
+    public sealed class GrainProperties : IEquatable<GrainProperties>
     {
+        [NonSerialized]
+        private int? _hashCode;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainProperties"/> class.
         /// </summary>
@@ -21,7 +26,10 @@ namespace Orleans.Metadata
         /// </param>
         public GrainProperties(ImmutableDictionary<string, string> values)
         {
-            this.Properties = values;
+            ArgumentNullException.ThrowIfNull(values);
+            EnsureOrdinalKeyComparer(values, nameof(values));
+            this.Properties = values.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal);
+            Debug.Assert(HasOrdinalComparers(this.Properties));
         }
 
         /// <summary>
@@ -38,10 +46,10 @@ namespace Orleans.Metadata
         /// </returns>
         public string ToDetailedString()
         {
-            if (this.Properties is null) return string.Empty;
+            if (Properties is null) return string.Empty;
             var result = new StringBuilder("[");
             bool first = true;
-            foreach (var entry in this.Properties)
+            foreach (var entry in Properties)
             {
                 if (!first)
                 {
@@ -54,6 +62,71 @@ namespace Orleans.Metadata
             result.Append("]");
 
             return result.ToString();
+        }
+
+        public override bool Equals(object? obj) => obj is GrainProperties other && Equals(other);
+
+        public bool Equals(GrainProperties? other)
+        {
+            if (ReferenceEquals(this, other)) return true;
+            if (other is null) return false;
+            return PropertiesEqual(Properties, other.Properties);
+        }
+
+        public override int GetHashCode() => _hashCode ??= ComputeHashCode(Properties);
+
+        private static bool PropertiesEqual(ImmutableDictionary<string, string> left, ImmutableDictionary<string, string> right)
+        {
+            Debug.Assert(HasOrdinalKeyComparer(left));
+            Debug.Assert(HasOrdinalKeyComparer(right));
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            foreach (var entry in left)
+            {
+                if (!right.TryGetValue(entry.Key, out var value)
+                    || !string.Equals(entry.Value, value, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasOrdinalComparers(ImmutableDictionary<string, string> properties)
+            => ReferenceEquals(properties.KeyComparer, StringComparer.Ordinal)
+                && ReferenceEquals(properties.ValueComparer, StringComparer.Ordinal);
+
+        private static bool HasOrdinalKeyComparer(ImmutableDictionary<string, string> properties)
+            => ReferenceEquals(properties.KeyComparer, StringComparer.Ordinal);
+
+        private static void EnsureOrdinalKeyComparer(ImmutableDictionary<string, string> properties, string paramName)
+        {
+            if (!HasOrdinalKeyComparer(properties))
+            {
+                throw new ArgumentException("The dictionary must use StringComparer.Ordinal as its key comparer.", paramName);
+            }
+        }
+
+        private static int ComputeHashCode(ImmutableDictionary<string, string> properties)
+        {
+            var hash = 0;
+            foreach (var entry in properties)
+            {
+                hash ^= HashCode.Combine(
+                    StringComparer.Ordinal.GetHashCode(entry.Key),
+                    entry.Value is null ? 0 : StringComparer.Ordinal.GetHashCode(entry.Value));
+            }
+
+            return hash;
         }
     }
 

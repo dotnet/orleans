@@ -366,6 +366,7 @@ namespace Orleans
         public const int RuntimeInitialize = 2000;
         public const int RuntimeServices = 4000;
         public const int RuntimeStorageServices = 6000;
+        public const int ValidateInitialConnectivity = 19900;
     }
 
     [GenerateSerializer]
@@ -439,6 +440,8 @@ namespace Orleans.Configuration
         public bool LivenessEnabled { get { throw null; } set { } }
 
         public System.TimeSpan LocalHealthDegradationMonitoringPeriod { get { throw null; } set { } }
+
+        public int? MaxDefunctSiloEntries { get { throw null; } set { } }
 
         public System.TimeSpan MaxJoinAttemptTime { get { throw null; } set { } }
 
@@ -1253,10 +1256,6 @@ namespace Orleans.Runtime
         public const string WaitMigration = "wait migration";
     }
 
-    public static partial class ClientInstruments
-    {
-    }
-
     [GenerateSerializer]
     [Immutable]
     public partial class ClusterManifestUpdate
@@ -1426,11 +1425,6 @@ namespace Orleans.Runtime
         public bool Succeeded { get { throw null; } init { } }
 
         public override readonly string ToString() { throw null; }
-    }
-
-    public static partial class Instruments
-    {
-        public static readonly System.Diagnostics.Metrics.Meter Meter;
     }
 
     public partial interface IRingRange

@@ -111,10 +111,12 @@ namespace UnitTests.Runtime
             optionsMonitor.CurrentValue.Returns(new SiloMessagingOptions());
 
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
-            localSiloDetails.SiloAddress.Returns(SiloAddress.New(IPAddress.Loopback, 11111, Interlocked.Increment(ref _siloGeneration)));
+            var localSilo = SiloAddress.New(IPAddress.Loopback, 11111, Interlocked.Increment(ref _siloGeneration));
+            localSiloDetails.SiloAddress.Returns(localSilo);
 
             var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
             siloStatusOracle.CurrentStatus.Returns(SiloStatus.Active);
+            siloStatusOracle.GetActiveSilos().Returns(new[] { localSilo });
 
             return new PlacementService(
                 optionsMonitor,
@@ -159,5 +161,6 @@ namespace UnitTests.Runtime
 
             Assert.Equal(workerCount, stoppedEvents.Count);
         }
+
     }
 }

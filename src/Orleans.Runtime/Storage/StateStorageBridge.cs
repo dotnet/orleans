@@ -21,6 +21,7 @@ namespace Orleans.Core
     public partial class StateStorageBridge<TState> : IStorage<TState>, IGrainMigrationParticipant
     {
         private readonly IGrainContext _grainContext;
+        private readonly StorageInstruments _storageInstruments;
         private readonly StateStorageBridgeShared<TState> _shared;
         private GrainState<TState>? _grainState;
 
@@ -71,6 +72,7 @@ namespace Orleans.Core
             ArgumentNullException.ThrowIfNull(store);
 
             _grainContext = grainContext;
+            _storageInstruments = grainContext.ActivationServices.GetRequiredService<StorageInstruments>();
             var sharedInstances = ActivatorUtilities.GetServiceOrCreateInstance<StateStorageBridgeSharedMap>(grainContext.ActivationServices);
             _shared = sharedInstances.Get<TState>(name, store);
         }
@@ -101,11 +103,11 @@ namespace Orleans.Core
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 IsStateInitialized = true;
-                StorageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageReadError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageReadError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_ReadFailed, nameof(ReadStateAsync));
             }
         }
@@ -134,11 +136,11 @@ namespace Orleans.Core
 
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
-                StorageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageWriteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageWriteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_WriteFailed, nameof(WriteStateAsync));
             }
         }
@@ -172,11 +174,11 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Update counters
-                StorageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageDeleteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageDeleteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_DeleteFailed, nameof(ClearStateAsync));
             }
         }

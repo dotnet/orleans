@@ -29,6 +29,12 @@ namespace Orleans.DurableJobs
 
         [Id(3)]
         public Runtime.GrainId TargetGrainId { get { throw null; } init { } }
+
+        [Id(6)]
+        public string? TraceParent { get { throw null; } init { } }
+
+        [Id(7)]
+        public string? TraceState { get { throw null; } init { } }
     }
 
     [GenerateSerializer]
@@ -160,6 +166,10 @@ namespace Orleans.DurableJobs
         public System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get { throw null; } init { } }
 
         public required Runtime.GrainId Target { get { throw null; } init { } }
+
+        public string? TraceParent { get { throw null; } init { } }
+
+        public string? TraceState { get { throw null; } init { } }
     }
 }
 
@@ -180,6 +190,8 @@ namespace Orleans.Hosting
     {
         public bool ConcurrencySlowStartEnabled { get { throw null; } set { } }
 
+        public System.TimeSpan JobStatusPollInterval { get { throw null; } set { } }
+
         public int MaxAdoptedCount { get { throw null; } set { } }
 
         public int MaxConcurrentJobsPerSilo { get { throw null; } set { } }
@@ -188,6 +200,8 @@ namespace Orleans.Hosting
 
         public System.TimeSpan ShardActivationBufferPeriod { get { throw null; } set { } }
 
+        public System.TimeSpan ShardBatchLingerDelay { get { throw null; } set { } }
+
         public int ShardClaimInitialBudget { get { throw null; } set { } }
 
         public int ShardClaimMaxBudget { get { throw null; } set { } }
@@ -195,6 +209,8 @@ namespace Orleans.Hosting
         public System.TimeSpan ShardClaimRampUpDuration { get { throw null; } set { } }
 
         public System.TimeSpan ShardDuration { get { throw null; } set { } }
+
+        public int ShardStripeCount { get { throw null; } set { } }
 
         public System.Func<DurableJobs.IJobRunContext, System.Exception, System.DateTimeOffset?> ShouldRetry { get { throw null; } set { } }
 

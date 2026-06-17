@@ -86,6 +86,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 base.dataAdapter,
                 sharedDimensions,
                 loggerFactory,
+                this.serviceProvider.GetRequiredService<OrleansInstruments>(),
                 cacheMonitorFactory,
                 blockPoolMonitorFactory);
         }
@@ -101,9 +102,10 @@ namespace ServiceBus.Tests.TestStreamProviders
                 IEventHubDataAdapter dataAdater,
                 EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
+                OrleansInstruments instruments,
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                : base(cacheOptions, streamCacheEviction, statisticOptions, dataAdater, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
+                : base(cacheOptions, streamCacheEviction, statisticOptions, dataAdater, sharedDimensions, instruments, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.cachePressureInjectionMonitor = cachePressureInjectionMonitor;
             }

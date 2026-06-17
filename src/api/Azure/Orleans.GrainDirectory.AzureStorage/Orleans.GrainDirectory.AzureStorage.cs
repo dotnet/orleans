@@ -72,6 +72,8 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public int MaxOperationRetries { get { throw null; } set { } }
 
+        public System.TimeSpan MaxPauseBetweenOperationRetries { get { throw null; } set { } }
+
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
 
         public System.TimeSpan PauseBetweenCreationRetries { get { throw null; } set { } }

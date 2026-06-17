@@ -31,11 +31,6 @@ public static class SiloRuntimeMetricsListener
     {
         MeterListener.InstrumentPublished = (instrument, listener) =>
         {
-            if (instrument.Meter != Instruments.Meter)
-            {
-                return;
-            }
-
             if (MetricNames.Contains(instrument.Name))
             {
                 listener.EnableMeasurementEvents(instrument);
@@ -51,15 +46,15 @@ public static class SiloRuntimeMetricsListener
 
     private static void OnMeasurementRecorded(Instrument instrument, int measurement, ReadOnlySpan<KeyValuePair<string, object>> tags, object state)
     {
-        if (instrument == MessagingInstruments.ConnectedClient)
+        if (instrument.Name == InstrumentNames.GATEWAY_CONNECTED_CLIENTS)
         {
             Interlocked.Add(ref _connectedClientCount, measurement);
         }
-        if (instrument == MessagingInstruments.MessageReceivedSizeHistogram)
+        if (instrument.Name == InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE)
         {
             Interlocked.Add(ref _messageReceivedTotal, measurement);
         }
-        if (instrument == MessagingInstruments.MessageSentSizeHistogram)
+        if (instrument.Name == InstrumentNames.MESSAGING_SENT_MESSAGES_SIZE)
         {
             Interlocked.Add(ref _messageSentTotal, measurement);
         }

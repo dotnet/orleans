@@ -1,12 +1,28 @@
-using System.Diagnostics;
-using Orleans.TestingHost.Utils;
+using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Time.Testing;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.TestingHost;
 using TestExtensions;
+using UnitTestGrains;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.TimerTests
 {
+    public static class TimerOrleansTestCollection
+    {
+        public const string Name = nameof(TimerOrleansTest);
+    }
+
+    [CollectionDefinition(TimerOrleansTestCollection.Name)]
+    public sealed class TimerOrleansTestCollectionDefinition : ICollectionFixture<TimerOrleansTest.Fixture>
+    {
+    }
+
     /// <summary>
     /// Tests for Orleans Timer functionality.
     /// Timers provide grain-local, non-durable periodic callbacks. Unlike reminders,
@@ -15,39 +31,215 @@ namespace DefaultCluster.Tests.TimerTests
     /// timeouts, and other scenarios where persistence isn't required.
     /// Timers are more efficient than reminders for high-frequency operations.
     /// </summary>
-    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
+    [Collection(TimerOrleansTestCollection.Name)]
+    public class TimerOrleansTest : OrleansTestingBase
     {
+        private const int ExpectedDefaultTimerTicks = 10;
+        private static readonly TimeSpan OneShotTimerDelay = TimeSpan.FromMilliseconds(100);
+        private static readonly TimeSpan TimerCallbackDelay = TimeSpan.FromMilliseconds(50);
+        private static readonly TimeSpan TimerOverloadDueTime = TimeSpan.FromMilliseconds(25);
+        private static readonly TimeSpan TimerDiagnosticTimeout = TimeSpan.FromSeconds(10);
+        private readonly Fixture fixture;
         private readonly ITestOutputHelper output;
 
-        public TimerOrleansTest(ITestOutputHelper output, DefaultClusterFixture fixture)
-            : base(fixture)
+        public TimerOrleansTest(ITestOutputHelper output, Fixture fixture)
         {
+            this.fixture = fixture;
             this.output = output;
         }
 
-        private static async Task<int> WaitForCounterAtLeast(Func<Task<int>> getCounter, int minimumValue, TimeSpan timeout, TimeSpan delay)
+        private IGrainFactory GrainFactory => fixture.GrainFactory;
+
+        private async Task<int> AdvanceDefaultTimerTicksAsync(ITimerGrain grain, TimeSpan period)
         {
-            var last = 0;
-            await TestingUtils.WaitUntilAsync(
-                async lastTry =>
+            using var timerObserver = TimerDiagnosticObserver.Create();
+            for (var expectedTickCount = 1; expectedTickCount <= ExpectedDefaultTimerTicks; expectedTickCount++)
+            {
+                await AdvanceTimerToTickCountAsync(grain, timerObserver, period, expectedTickCount);
+                await grain.GetCounter();
+            }
+
+            return await grain.GetCounter();
+        }
+
+        private async Task AdvanceDefaultTimerTicksAsync<TGrain>(IReadOnlyList<TGrain> grains, TimeSpan period)
+            where TGrain : ITimerGrain
+        {
+            using var timerObserver = TimerDiagnosticObserver.Create();
+            for (var expectedTickCount = 1; expectedTickCount <= ExpectedDefaultTimerTicks; expectedTickCount++)
+            {
+                var waitForTicks = Task.WhenAll(grains.Select(g => timerObserver.WaitForTickCountAsync(g, expectedTickCount, TimerDiagnosticTimeout)));
+                fixture.AdvanceTime(period);
+                await waitForTicks;
+                await Task.WhenAll(grains.Select(g => g.GetCounter()));
+            }
+        }
+
+        private async Task AdvanceTimerToTickCountAsync(IAddressable grain, TimerDiagnosticObserver timerObserver, TimeSpan dueTime, int expectedTickCount)
+        {
+            var waitForTick = timerObserver.WaitForTickCountAsync(grain, expectedTickCount, TimerDiagnosticTimeout);
+            fixture.AdvanceTime(dueTime);
+            await waitForTick;
+        }
+
+        private async Task AdvanceTimerToTickCountAsync(
+            IAddressable grain,
+            TimerDiagnosticObserver timerObserver,
+            TimeSpan dueTime,
+            TimeSpan callbackDelay,
+            int expectedTickCount)
+        {
+            using var callbackObserver = TimerCallbackDiagnosticObserver.Create();
+            var grainId = grain.GetGrainId();
+            var delayScheduledCount = callbackObserver.GetDelayScheduledCount(grainId);
+
+            fixture.AdvanceTime(dueTime);
+            for (var tickCount = timerObserver.GetTickCount(grain.GetGrainId()) + 1; tickCount <= expectedTickCount; tickCount++)
+            {
+                await timerObserver.WaitForTickStartCountAsync(grain, tickCount, TimerDiagnosticTimeout);
+                await callbackObserver.WaitForDelayScheduledCountAsync(grainId, ++delayScheduledCount, TimerDiagnosticTimeout);
+
+                var waitForTickStop = timerObserver.WaitForTickCountAsync(grain, tickCount, TimerDiagnosticTimeout);
+                fixture.AdvanceTime(callbackDelay);
+                await waitForTickStop;
+            }
+        }
+
+        private async Task<int> DriveExternalTickUntilTimerTicks(INonReentrantTimerCallGrain grain, TimerDiagnosticObserver timerObserver, TimeSpan dueTime, int expectedTimerTicks)
+        {
+            using var callbackObserver = TimerCallbackDiagnosticObserver.Create();
+            var grainId = grain.GetGrainId();
+            var externalTick = grain.ExternalTick("external");
+            await callbackObserver.WaitForDelayScheduledCountAsync(grainId, callbackObserver.GetDelayScheduledCount(grainId) + 1, TimerDiagnosticTimeout);
+            fixture.AdvanceTime(TimerCallbackDelay);
+            await externalTick;
+            await AdvanceTimerToTickCountAsync(grain, timerObserver, dueTime, TimerCallbackDelay, expectedTimerTicks);
+            return 1;
+        }
+
+        private async Task RunSelfDisposingTimerAsync(ITimerCallGrain grain)
+        {
+            using var timerObserver = TimerDiagnosticObserver.Create();
+            var runTimer = grain.RunSelfDisposingTimer();
+            var created = await timerObserver.WaitForTimerCreatedAsync(grain, TimerDiagnosticTimeout);
+            await AdvanceTimerToTickCountAsync(grain, timerObserver, created.DueTime, TimeSpan.FromMilliseconds(100), expectedTickCount: 1);
+            await runTimer;
+        }
+
+        private sealed class TimerCallbackDiagnosticObserver : IDisposable, IObserver<TimerGrainCallbackEvents.CallbackEvent>
+        {
+            private readonly ConcurrentBag<TimerGrainCallbackEvents.DelayScheduled> delayScheduledEvents = new();
+            private readonly object changeLock = new();
+            private TaskCompletionSource changed = CreateCompletionSource();
+            private IDisposable subscription;
+
+            public static TimerCallbackDiagnosticObserver Create()
+            {
+                var observer = new TimerCallbackDiagnosticObserver();
+                observer.subscription = TimerGrainCallbackEvents.AllEvents.Subscribe(observer);
+                return observer;
+            }
+
+            public int GetDelayScheduledCount(GrainId grainId)
+            {
+                return delayScheduledEvents.Count(e => e.GrainId == grainId);
+            }
+
+            public async Task WaitForDelayScheduledCountAsync(GrainId grainId, int expectedCount, TimeSpan timeout)
+            {
+                using var cts = new CancellationTokenSource(timeout);
+
+                while (true)
                 {
-                    last = await getCounter();
-                    if (last >= minimumValue)
+                    Task changedTask;
+                    lock (changeLock)
                     {
-                        return true;
+                        var currentCount = GetDelayScheduledCount(grainId);
+                        if (currentCount >= expectedCount)
+                        {
+                            return;
+                        }
+
+                        changedTask = changed.Task;
                     }
 
-                    if (lastTry)
+                    try
                     {
-                        Assert.Fail($"Counter did not reach {minimumValue} within {timeout}. Last value: {last}");
+                        await changedTask.WaitAsync(cts.Token);
                     }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
 
-                    return false;
-                },
-                timeout,
-                delay);
+                var finalCount = GetDelayScheduledCount(grainId);
+                if (finalCount >= expectedCount)
+                {
+                    return;
+                }
 
-            return last;
+                throw new TimeoutException($"Timed out waiting for {expectedCount} timer callbacks to schedule their fake delay on grain {grainId}. Current count: {finalCount} after {timeout}");
+            }
+
+            void IObserver<TimerGrainCallbackEvents.CallbackEvent>.OnNext(TimerGrainCallbackEvents.CallbackEvent value)
+            {
+                if (value is TimerGrainCallbackEvents.DelayScheduled delayScheduled)
+                {
+                    delayScheduledEvents.Add(delayScheduled);
+                    SignalChanged();
+                }
+            }
+
+            void IObserver<TimerGrainCallbackEvents.CallbackEvent>.OnError(Exception error)
+            {
+            }
+
+            void IObserver<TimerGrainCallbackEvents.CallbackEvent>.OnCompleted()
+            {
+            }
+
+            public void Dispose()
+            {
+                subscription?.Dispose();
+            }
+
+            private static TaskCompletionSource CreateCompletionSource() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            private void SignalChanged()
+            {
+                TaskCompletionSource previous;
+                lock (changeLock)
+                {
+                    previous = changed;
+                    changed = CreateCompletionSource();
+                }
+
+                previous.TrySetResult();
+            }
+        }
+
+        public sealed class Fixture : BaseInProcessTestClusterFixture
+        {
+            private readonly FakeTimeProvider timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
+            {
+                builder.ConfigureSilo((_, siloBuilder) =>
+                {
+                    siloBuilder
+                        .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
+                        .UseInMemoryReminderService()
+                        .UseInMemoryDurableJobs()
+                        .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("MemoryStore");
+
+                    siloBuilder.Services.AddSingleton(timeProvider);
+                    siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(sp => sp.GetRequiredService<FakeTimeProvider>()));
+                });
+            }
+
+            public void AdvanceTime(TimeSpan duration) => timeProvider.Advance(duration);
         }
 
         /// <summary>
@@ -63,16 +255,15 @@ namespace DefaultCluster.Tests.TimerTests
             {
                 var grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
                 var period = await grain.GetTimerPeriod();
-                var timeout = period.Multiply(50);
-                var last = await WaitForCounterAtLeast(grain.GetCounter, 10, timeout, period);
+                var last = await AdvanceDefaultTimerTicksAsync(grain, period);
 
                 output.WriteLine("value = " + last);
-                Assert.True(last >= 10 & last <= 12, last.ToString());
+                Assert.Equal(ExpectedDefaultTimerTicks, last);
 
                 await grain.StopDefaultTimer();
-                await Task.Delay(period.Multiply(2));
+                fixture.AdvanceTime(period.Multiply(2));
                 var curr = await grain.GetCounter();
-                Assert.True(curr == last || curr == last + 1, "curr == last || curr == last + 1");
+                Assert.Equal(last, curr);
             }
         }
 
@@ -94,32 +285,13 @@ namespace DefaultCluster.Tests.TimerTests
                 period = await grain.GetTimerPeriod(); // activate grains
             }
 
-            var tasks = new List<Task>(grains.Count);
+            await AdvanceDefaultTimerTicksAsync(grains, period);
             for (int i = 0; i < grains.Count; i++)
             {
                 ITimerGrain grain = grains[i];
-                tasks.Add(
-                    Task.Run(
-                        async () =>
-                        {
-                            int last = await grain.GetCounter();
-                            var stopwatch = Stopwatch.StartNew();
-                            var timeout = period.Multiply(50);
-                            while (stopwatch.Elapsed < timeout && last < 10)
-                            {
-                                await Task.Delay(period.Divide(2));
-                                last = await grain.GetCounter();
-                            }
-
-                            output.WriteLine("value = " + last);
-                            Assert.True(last >= 10 && last <= 12, "last >= 10 && last <= 12");
-                        }));
-            }
-
-            await Task.WhenAll(tasks);
-            for (int i = 0; i < grains.Count; i++)
-            {
-                ITimerGrain grain = grains[i];
+                var last = await grain.GetCounter();
+                output.WriteLine("value = " + last);
+                Assert.Equal(ExpectedDefaultTimerTicks, last);
                 await grain.StopDefaultTimer();
             }
         }
@@ -137,42 +309,22 @@ namespace DefaultCluster.Tests.TimerTests
             TimeSpan period = await grain.GetTimerPeriod();
 
             // Ensure that the grain works as it should.
-            var last = await grain.GetCounter();
-            var stopwatch = Stopwatch.StartNew();
-            var timeout = period.Multiply(50);
-            while (stopwatch.Elapsed < timeout && last < 10)
-            {
-                await Task.Delay(period.Divide(2));
-                last = await grain.GetCounter();
-            }
-
-            last = await grain.GetCounter();
+            var last = await AdvanceDefaultTimerTicksAsync(grain, period);
+            Assert.Equal(ExpectedDefaultTimerTicks, last);
             output.WriteLine("value = " + last);
 
             // Restart the grain.
             await grain.Deactivate();
-            stopwatch.Restart();
             last = await grain.GetCounter();
             Assert.True(last == 0, "Restarted grains should have zero ticks. Actual: " + last);
             period = await grain.GetTimerPeriod();
 
             // Poke the grain and ensure it still works as it should.
-            while (stopwatch.Elapsed < timeout && last < 10)
-            {
-                await Task.Delay(period.Divide(2));
-                last = await grain.GetCounter();
-            }
-
-            last = await grain.GetCounter();
-            stopwatch.Stop();
-
-            int maximalNumTicks = (int)Math.Round(stopwatch.Elapsed.Divide(period), MidpointRounding.ToPositiveInfinity);
-            Assert.True(
-                last <= maximalNumTicks,
-                $"Assert: last <= maximalNumTicks. Actual: last = {last}, maximalNumTicks = {maximalNumTicks}");
+            last = await AdvanceDefaultTimerTicksAsync(grain, period);
+            Assert.Equal(ExpectedDefaultTimerTicks, last);
 
             output.WriteLine(
-                "Total Elapsed time = " + (stopwatch.Elapsed.TotalSeconds) + " sec. Expected Ticks = " + maximalNumTicks +
+                "Virtual elapsed time = " + (period.Multiply(ExpectedDefaultTimerTicks).TotalSeconds) + " sec. Expected ticks = " + ExpectedDefaultTimerTicks +
                 ". Actual ticks = " + last);
         }
 
@@ -186,19 +338,19 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task AsyncTimerTest_GrainCall()
         {
             const string testName = "AsyncTimerTest_GrainCall";
-            TimeSpan delay = TimeSpan.FromSeconds(5);
-            TimeSpan wait = delay.Multiply(2);
+            TimeSpan delay = OneShotTimerDelay;
 
             ITimerCallGrain grain = null;
 
             Exception error = null;
+            using var timerObserver = TimerDiagnosticObserver.Create();
             try
             {
                 grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
 
                 await grain.StartTimer(testName, delay);
 
-                await Task.Delay(wait);
+                await AdvanceTimerToTickCountAsync(grain, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
 
                 int tickCount = await grain.GetTickCount();
                 Assert.Equal(1, tickCount);
@@ -239,19 +391,11 @@ namespace DefaultCluster.Tests.TimerTests
         {
             var grain = GrainFactory.GetGrain<ITimerRequestGrain>(GetRandomGrainId());
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var timerObserver = TimerDiagnosticObserver.Create();
             var numTimers = await grain.TestAllTimerOverloads();
-            while (true)
-            {
-                var completedTimers = await grain.PollCompletedTimers().WaitAsync(cts.Token);
-                if (completedTimers == numTimers)
-                {
-                    break;
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(50), cts.Token);
-            }
-
+            var waitForTimers = timerObserver.WaitForTickCountAsync(grain, numTimers, TimerDiagnosticTimeout);
+            fixture.AdvanceTime(TimerOverloadDueTime);
+            await waitForTimers;
             await grain.TestCompletedTimerResults();
         }
 
@@ -266,10 +410,10 @@ namespace DefaultCluster.Tests.TimerTests
         {
             // Schedule a timer which disposes itself from its own callback.
             var grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
-            await grain.RunSelfDisposingTimer();
+            await RunSelfDisposingTimerAsync(grain);
 
             var pocoGrain = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
-            await pocoGrain.RunSelfDisposingTimer();
+            await RunSelfDisposingTimerAsync(pocoGrain);
         }
 
         /// <summary>
@@ -283,9 +427,9 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task NonReentrantGrainTimer_Test()
         {
             const string testName = "NonReentrantGrainTimer_Test";
-            var delay = TimeSpan.FromSeconds(5);
-            var wait = delay.Multiply(2);
+            var delay = OneShotTimerDelay;
 
+            using var timerObserver = TimerDiagnosticObserver.Create();
             var grain = GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
 
             // Schedule multiple timers with the same delay
@@ -293,14 +437,8 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.StartTimer($"{testName}_1", delay);
             await grain.StartTimer($"{testName}_2", delay);
 
-            // Invoke some non-interleaving methods.
-            var externalTicks = 0;
-            var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed < wait)
-            {
-                await grain.ExternalTick("external");
-                externalTicks++;
-            }
+            // Invoke some non-interleaving methods while waiting for the timer callbacks.
+            var externalTicks = await DriveExternalTickUntilTimerTicks(grain, timerObserver, delay, expectedTimerTicks: 3);
 
             var tickCount = await grain.GetTickCount();
 
@@ -325,42 +463,26 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task GrainTimer_Change()
         {
             const string testName = nameof(GrainTimer_Change);
-            TimeSpan delay = TimeSpan.FromSeconds(5);
-            TimeSpan wait = delay.Multiply(2);
+            TimeSpan delay = OneShotTimerDelay;
 
+            using var timerObserver = TimerDiagnosticObserver.Create();
             var grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
 
             await grain.StartTimer(testName, delay);
 
-            await Task.Delay(wait);
+            await AdvanceTimerToTickCountAsync(grain, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
 
             int tickCount = await grain.GetTickCount();
             Assert.Equal(1, tickCount);
 
             await grain.RestartTimer(testName, delay);
 
-            await Task.Delay(wait);
+            await AdvanceTimerToTickCountAsync(grain, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 2);
 
             tickCount = await grain.GetTickCount();
             Assert.Equal(2, tickCount);
 
-            // Infinite timeouts should be valid.
-            await grain.RestartTimer(testName, Timeout.InfiniteTimeSpan);
-            await grain.RestartTimer(testName, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-
-            // Zero and sub-ms timeouts should be valid (rounded up to 1ms)
-            await grain.RestartTimer(testName, TimeSpan.Zero);
-            await grain.RestartTimer(testName, TimeSpan.FromMicroseconds(10));
-            await grain.RestartTimer(testName, TimeSpan.Zero, TimeSpan.Zero);
-            await grain.RestartTimer(testName, TimeSpan.FromMicroseconds(10), TimeSpan.FromMicroseconds(10));
-            await grain.RestartTimer(testName, TimeSpan.FromMilliseconds(-0.4));
-            await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(-0.5));
-
-            // Invalid values
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(-5)));
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.MaxValue));
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(-5)));
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.MaxValue));
+            await grain.TestTimerChangeArguments();
 
             Exception err = await grain.GetException();
             Assert.Null(err); // Should be no exceptions during timer callback
@@ -368,20 +490,14 @@ namespace DefaultCluster.Tests.TimerTests
             // Valid operations called from within a timer: updating the period and disposing the timer.
             var grain2 = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
             await grain2.StartTimer(testName, delay, "update_period");
-            await Task.Delay(wait);
+            await AdvanceTimerToTickCountAsync(grain2, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
             Assert.Null(await grain2.GetException()); // Should be no exceptions during timer callback
             Assert.Equal(1, await grain2.GetTickCount());
 
             var grain3 = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
             await grain3.StartTimer(testName, delay, "dispose_timer");
-            var grain3Timeout = wait.Multiply(2);
-            var grain3Stopwatch = Stopwatch.StartNew();
+            await AdvanceTimerToTickCountAsync(grain3, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
             var grain3TickCount = await grain3.GetTickCount();
-            while (grain3Stopwatch.Elapsed < grain3Timeout && grain3TickCount < 1)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(200));
-                grain3TickCount = await grain3.GetTickCount();
-            }
 
             Assert.Null(await grain3.GetException()); // Should be no exceptions during timer callback
             Assert.Equal(1, grain3TickCount);
@@ -402,16 +518,15 @@ namespace DefaultCluster.Tests.TimerTests
             {
                 var grain = GrainFactory.GetGrain<IPocoTimerGrain>(GetRandomGrainId());
                 var period = await grain.GetTimerPeriod();
-                var timeout = period.Multiply(50);
-                var last = await WaitForCounterAtLeast(grain.GetCounter, 10, timeout, period);
+                var last = await AdvanceDefaultTimerTicksAsync(grain, period);
 
                 output.WriteLine("value = " + last);
-                Assert.True(last >= 10 & last <= 12, last.ToString());
+                Assert.Equal(ExpectedDefaultTimerTicks, last);
 
                 await grain.StopDefaultTimer();
-                await Task.Delay(period.Multiply(2));
+                fixture.AdvanceTime(period.Multiply(2));
                 var curr = await grain.GetCounter();
-                Assert.True(curr == last || curr == last + 1, "curr == last || curr == last + 1");
+                Assert.Equal(last, curr);
             }
         }
 
@@ -433,32 +548,13 @@ namespace DefaultCluster.Tests.TimerTests
                 period = await grain.GetTimerPeriod(); // activate grains
             }
 
-            var tasks = new List<Task>(grains.Count);
+            await AdvanceDefaultTimerTicksAsync(grains, period);
             for (int i = 0; i < grains.Count; i++)
             {
                 IPocoTimerGrain grain = grains[i];
-                tasks.Add(
-                    Task.Run(
-                        async () =>
-                        {
-                            int last = await grain.GetCounter();
-                            var stopwatch = Stopwatch.StartNew();
-                            var timeout = period.Multiply(50);
-                            while (stopwatch.Elapsed < timeout && last < 10)
-                            {
-                                await Task.Delay(period.Divide(2));
-                                last = await grain.GetCounter();
-                            }
-
-                            output.WriteLine("value = " + last);
-                            Assert.True(last >= 10 && last <= 12, "last >= 10 && last <= 12");
-                        }));
-            }
-
-            await Task.WhenAll(tasks);
-            for (int i = 0; i < grains.Count; i++)
-            {
-                IPocoTimerGrain grain = grains[i];
+                var last = await grain.GetCounter();
+                output.WriteLine("value = " + last);
+                Assert.Equal(ExpectedDefaultTimerTicks, last);
                 await grain.StopDefaultTimer();
             }
         }
@@ -476,42 +572,22 @@ namespace DefaultCluster.Tests.TimerTests
             TimeSpan period = await grain.GetTimerPeriod();
 
             // Ensure that the grain works as it should.
-            var last = await grain.GetCounter();
-            var stopwatch = Stopwatch.StartNew();
-            var timeout = period.Multiply(50);
-            while (stopwatch.Elapsed < timeout && last < 10)
-            {
-                await Task.Delay(period.Divide(2));
-                last = await grain.GetCounter();
-            }
-
-            last = await grain.GetCounter();
+            var last = await AdvanceDefaultTimerTicksAsync(grain, period);
+            Assert.Equal(ExpectedDefaultTimerTicks, last);
             output.WriteLine("value = " + last);
 
             // Restart the grain.
             await grain.Deactivate();
-            stopwatch.Restart();
             last = await grain.GetCounter();
             Assert.True(last == 0, "Restarted grains should have zero ticks. Actual: " + last);
             period = await grain.GetTimerPeriod();
 
             // Poke the grain and ensure it still works as it should.
-            while (stopwatch.Elapsed < timeout && last < 10)
-            {
-                await Task.Delay(period.Divide(2));
-                last = await grain.GetCounter();
-            }
-
-            last = await grain.GetCounter();
-            stopwatch.Stop();
-
-            int maximalNumTicks = (int)Math.Round(stopwatch.Elapsed.Divide(period), MidpointRounding.ToPositiveInfinity);
-            Assert.True(
-                last <= maximalNumTicks,
-                $"Assert: last <= maximalNumTicks. Actual: last = {last}, maximalNumTicks = {maximalNumTicks}");
+            last = await AdvanceDefaultTimerTicksAsync(grain, period);
+            Assert.Equal(ExpectedDefaultTimerTicks, last);
 
             output.WriteLine(
-                "Total Elapsed time = " + (stopwatch.Elapsed.TotalSeconds) + " sec. Expected Ticks = " + maximalNumTicks +
+                "Virtual elapsed time = " + (period.Multiply(ExpectedDefaultTimerTicks).TotalSeconds) + " sec. Expected ticks = " + ExpectedDefaultTimerTicks +
                 ". Actual ticks = " + last);
         }
 
@@ -525,19 +601,19 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task AsyncTimerTest_GrainCall_Poco()
         {
             const string testName = "AsyncTimerTest_GrainCall";
-            TimeSpan delay = TimeSpan.FromSeconds(5);
-            TimeSpan wait = delay.Multiply(2);
+            TimeSpan delay = OneShotTimerDelay;
 
             IPocoTimerCallGrain grain = null;
 
             Exception error = null;
+            using var timerObserver = TimerDiagnosticObserver.Create();
             try
             {
                 grain = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
 
                 await grain.StartTimer(testName, delay);
 
-                await Task.Delay(wait);
+                await AdvanceTimerToTickCountAsync(grain, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
 
                 int tickCount = await grain.GetTickCount();
                 Assert.Equal(1, tickCount);
@@ -578,19 +654,11 @@ namespace DefaultCluster.Tests.TimerTests
         {
             var grain = GrainFactory.GetGrain<IPocoTimerRequestGrain>(GetRandomGrainId());
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var timerObserver = TimerDiagnosticObserver.Create();
             var numTimers = await grain.TestAllTimerOverloads();
-            while (true)
-            {
-                var completedTimers = await grain.PollCompletedTimers().WaitAsync(cts.Token);
-                if (completedTimers == numTimers)
-                {
-                    break;
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(50), cts.Token);
-            }
-
+            var waitForTimers = timerObserver.WaitForTickCountAsync(grain, numTimers, TimerDiagnosticTimeout);
+            fixture.AdvanceTime(TimerOverloadDueTime);
+            await waitForTimers;
             await grain.TestCompletedTimerResults();
         }
 
@@ -604,9 +672,9 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task NonReentrantGrainTimer_Test_Poco()
         {
             const string testName = "NonReentrantGrainTimer_Test";
-            var delay = TimeSpan.FromSeconds(5);
-            var wait = delay.Multiply(2);
+            var delay = OneShotTimerDelay;
 
+            using var timerObserver = TimerDiagnosticObserver.Create();
             var grain = GrainFactory.GetGrain<IPocoNonReentrantTimerCallGrain>(GetRandomGrainId());
 
             // Schedule multiple timers with the same delay
@@ -614,14 +682,8 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.StartTimer($"{testName}_1", delay);
             await grain.StartTimer($"{testName}_2", delay);
 
-            // Invoke some non-interleaving methods.
-            var externalTicks = 0;
-            var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed < wait)
-            {
-                await grain.ExternalTick("external");
-                externalTicks++;
-            }
+            // Invoke some non-interleaving methods while waiting for the timer callbacks.
+            var externalTicks = await DriveExternalTickUntilTimerTicks(grain, timerObserver, delay, expectedTimerTicks: 3);
 
             var tickCount = await grain.GetTickCount();
 
@@ -645,42 +707,26 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task GrainTimer_Change_Poco()
         {
             const string testName = nameof(GrainTimer_Change);
-            TimeSpan delay = TimeSpan.FromSeconds(5);
-            TimeSpan wait = delay.Multiply(2);
+            TimeSpan delay = OneShotTimerDelay;
 
+            using var timerObserver = TimerDiagnosticObserver.Create();
             var grain = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
 
             await grain.StartTimer(testName, delay);
 
-            await Task.Delay(wait);
+            await AdvanceTimerToTickCountAsync(grain, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
 
             int tickCount = await grain.GetTickCount();
             Assert.Equal(1, tickCount);
 
             await grain.RestartTimer(testName, delay);
 
-            await Task.Delay(wait);
+            await AdvanceTimerToTickCountAsync(grain, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 2);
 
             tickCount = await grain.GetTickCount();
             Assert.Equal(2, tickCount);
 
-            // Infinite timeouts should be valid.
-            await grain.RestartTimer(testName, Timeout.InfiniteTimeSpan);
-            await grain.RestartTimer(testName, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-
-            // Zero and sub-ms timeouts should be valid (rounded up to 1ms)
-            await grain.RestartTimer(testName, TimeSpan.Zero);
-            await grain.RestartTimer(testName, TimeSpan.FromMicroseconds(10));
-            await grain.RestartTimer(testName, TimeSpan.Zero, TimeSpan.Zero);
-            await grain.RestartTimer(testName, TimeSpan.FromMicroseconds(10), TimeSpan.FromMicroseconds(10));
-            await grain.RestartTimer(testName, TimeSpan.FromMilliseconds(-0.4));
-            await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(-0.5));
-
-            // Invalid values
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(-5)));
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.MaxValue));
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(-5)));
-            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.MaxValue));
+            await grain.TestTimerChangeArguments();
 
             Exception err = await grain.GetException();
             Assert.Null(err); // Should be no exceptions during timer callback
@@ -688,13 +734,13 @@ namespace DefaultCluster.Tests.TimerTests
             // Valid operations called from within a timer: updating the period and disposing the timer.
             var grain2 = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
             await grain2.StartTimer(testName, delay, "update_period");
-            await Task.Delay(wait);
+            await AdvanceTimerToTickCountAsync(grain2, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
             Assert.Null(await grain2.GetException()); // Should be no exceptions during timer callback
             Assert.Equal(1, await grain2.GetTickCount());
 
             var grain3 = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
             await grain3.StartTimer(testName, delay, "dispose_timer");
-            await Task.Delay(wait);
+            await AdvanceTimerToTickCountAsync(grain3, timerObserver, delay, TimerCallbackDelay, expectedTickCount: 1);
             Assert.Null(await grain3.GetException()); // Should be no exceptions during timer callback
             Assert.Equal(1, await grain3.GetTickCount());
 

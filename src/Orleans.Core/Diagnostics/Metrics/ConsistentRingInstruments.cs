@@ -4,22 +4,24 @@ using System.Diagnostics.Metrics;
 #nullable disable
 namespace Orleans.Runtime;
 
-internal static class ConsistentRingInstruments
+internal sealed class ConsistentRingInstruments(OrleansInstruments instruments)
 {
-    internal static ObservableGauge<int> RingSize;
-    internal static void RegisterRingSizeObserve(Func<int> observeValue)
+    private ObservableGauge<int> _ringSize;
+    private ObservableGauge<float> _myRangeRingPercentage;
+    private ObservableGauge<float> _averageRingPercentage;
+
+    internal void RegisterRingSizeObserve(Func<int> observeValue)
     {
-        RingSize = Instruments.Meter.CreateObservableGauge(InstrumentNames.CONSISTENTRING_SIZE, observeValue);
+        _ringSize = instruments.Meter.CreateObservableGauge(InstrumentNames.CONSISTENTRING_SIZE, observeValue);
     }
 
-    internal static ObservableGauge<float> MyRangeRingPercentage;
-    internal static void RegisterMyRangeRingPercentageObserve(Func<float> observeValue)
+    internal void RegisterMyRangeRingPercentageObserve(Func<float> observeValue)
     {
-        MyRangeRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.CONSISTENTRING_LOCAL_SIZE_PERCENTAGE, observeValue);
+        _myRangeRingPercentage = instruments.Meter.CreateObservableGauge(InstrumentNames.CONSISTENTRING_LOCAL_SIZE_PERCENTAGE, observeValue);
     }
-    internal static ObservableGauge<float> AverageRingPercentage;
-    internal static void RegisterAverageRingPercentageObserve(Func<float> observeValue)
+
+    internal void RegisterAverageRingPercentageObserve(Func<float> observeValue)
     {
-        AverageRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.CONSISTENTRING_AVERAGE_SIZE_PERCENTAGE, observeValue);
+        _averageRingPercentage = instruments.Meter.CreateObservableGauge(InstrumentNames.CONSISTENTRING_AVERAGE_SIZE_PERCENTAGE, observeValue);
     }
 }

@@ -66,6 +66,14 @@ namespace Orleans.Hosting
             services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
             services.TryAddSingleton<OrleansInstruments>();
+            services.TryAddSingleton<SchedulerInstruments>();
+            services.TryAddSingleton<ConsistentRingInstruments>();
+            services.TryAddSingleton<StorageInstruments>();
+            services.TryAddSingleton<CatalogInstruments>();
+            services.TryAddSingleton<DirectoryInstruments>();
+            services.TryAddSingleton<GrainInstruments>();
+            services.TryAddSingleton<MessagingInstruments>();
+            services.TryAddSingleton<MessagingProcessingInstruments>();
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -186,7 +194,6 @@ namespace Orleans.Hosting
             services.AddFromExisting<IHealthCheckParticipant, MembershipAgent>();
             services.AddSingleton<MembershipTableCleanupAgent>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
-            services.AddFromExisting<IHealthCheckParticipant, MembershipTableCleanupAgent>();
             services.AddSingleton<SiloStatusListenerManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
             services.AddSingleton<ClusterMembershipService>();
@@ -272,7 +279,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainContextAccessor, GrainContextAccessor>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
-            services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
             services.AddSingleton<ILocalActivationStatusChecker, Runtime.LocalActivationStatusChecker>();
 
             // Scoped to a grain activation
@@ -286,9 +292,10 @@ namespace Orleans.Hosting
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
                     var siloStatusOracle = sp.GetRequiredService<ISiloStatusOracle>();
+                    var consistentRingInstruments = sp.GetRequiredService<ConsistentRingInstruments>();
                     if (consistentRingOptions.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing, siloStatusOracle);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing, siloStatusOracle, consistentRingInstruments);
                     }
 
                     return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory, siloStatusOracle);

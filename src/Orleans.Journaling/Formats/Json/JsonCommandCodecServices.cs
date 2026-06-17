@@ -1,9 +1,11 @@
+using Microsoft.Extensions.Options;
+
 namespace Orleans.Journaling.Json;
 
-internal sealed class JsonDurableDictionaryCommandCodecService<TKey, TValue>(JsonJournalOptions options)
+internal sealed class JsonDurableDictionaryCommandCodecService<TKey, TValue>(IOptions<JsonJournalOptions> options)
     : IDurableDictionaryCommandCodec<TKey, TValue> where TKey : notnull
 {
-    private readonly JsonDurableDictionaryCommandCodec<TKey, TValue> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
+    private readonly JsonDurableDictionaryCommandCodec<TKey, TValue> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
     public void WriteSet(TKey key, TValue value, JournalStreamWriter writer) => _inner.WriteSet(key, value, writer);
 
@@ -17,10 +19,10 @@ internal sealed class JsonDurableDictionaryCommandCodecService<TKey, TValue>(Jso
 
 }
 
-internal sealed class JsonDurableListCommandCodecService<T>(JsonJournalOptions options)
+internal sealed class JsonDurableListCommandCodecService<T>(IOptions<JsonJournalOptions> options)
     : IDurableListCommandCodec<T>
 {
-    private readonly JsonDurableListCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
+    private readonly JsonDurableListCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
     public void WriteAdd(T item, JournalStreamWriter writer) => _inner.WriteAdd(item, writer);
 
@@ -38,10 +40,10 @@ internal sealed class JsonDurableListCommandCodecService<T>(JsonJournalOptions o
 
 }
 
-internal sealed class JsonDurableQueueCommandCodecService<T>(JsonJournalOptions options)
+internal sealed class JsonDurableQueueCommandCodecService<T>(IOptions<JsonJournalOptions> options)
     : IDurableQueueCommandCodec<T>
 {
-    private readonly JsonDurableQueueCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
+    private readonly JsonDurableQueueCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
     public void WriteEnqueue(T item, JournalStreamWriter writer) => _inner.WriteEnqueue(item, writer);
 
@@ -55,10 +57,10 @@ internal sealed class JsonDurableQueueCommandCodecService<T>(JsonJournalOptions 
 
 }
 
-internal sealed class JsonDurableSetCommandCodecService<T>(JsonJournalOptions options)
+internal sealed class JsonDurableSetCommandCodecService<T>(IOptions<JsonJournalOptions> options)
     : IDurableSetCommandCodec<T>
 {
-    private readonly JsonDurableSetCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
+    private readonly JsonDurableSetCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
     public void WriteAdd(T item, JournalStreamWriter writer) => _inner.WriteAdd(item, writer);
 
@@ -72,10 +74,10 @@ internal sealed class JsonDurableSetCommandCodecService<T>(JsonJournalOptions op
 
 }
 
-internal sealed class JsonDurableValueCommandCodecService<T>(JsonJournalOptions options)
+internal sealed class JsonDurableValueCommandCodecService<T>(IOptions<JsonJournalOptions> options)
     : IDurableValueCommandCodec<T>
 {
-    private readonly JsonDurableValueCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
+    private readonly JsonDurableValueCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
     public void WriteSet(T value, JournalStreamWriter writer) => _inner.WriteSet(value, writer);
 
@@ -83,10 +85,10 @@ internal sealed class JsonDurableValueCommandCodecService<T>(JsonJournalOptions 
 
 }
 
-internal sealed class JsonPersistentStateCommandCodecService<T>(JsonJournalOptions options)
+internal sealed class JsonPersistentStateCommandCodecService<T>(IOptions<JsonJournalOptions> options)
     : IPersistentStateCommandCodec<T>
 {
-    private readonly JsonPersistentStateCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
+    private readonly JsonPersistentStateCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
     public void WriteSet(T state, ulong version, JournalStreamWriter writer) => _inner.WriteSet(state, version, writer);
 
@@ -96,10 +98,10 @@ internal sealed class JsonPersistentStateCommandCodecService<T>(JsonJournalOptio
 
 }
 
-internal sealed class JsonDurableTaskCompletionSourceCommandCodecService<T>(JsonJournalOptions options)
+internal sealed class JsonDurableTaskCompletionSourceCommandCodecService<T>(IOptions<JsonJournalOptions> options)
     : IDurableTaskCompletionSourceCommandCodec<T>
 {
-    private readonly JsonDurableTaskCompletionSourceCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
+    private readonly JsonDurableTaskCompletionSourceCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
     public void WritePending(JournalStreamWriter writer) => _inner.WritePending(writer);
 

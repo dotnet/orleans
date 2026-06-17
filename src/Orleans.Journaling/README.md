@@ -39,12 +39,12 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.Build().RunAsync();
 ```
 
-If you need to customize `JsonSerializerOptions`, add the generated context through `JsonJournalOptions`:
+If you need to customize `JsonSerializerOptions`, configure `JsonJournalOptions` through the options pipeline:
 
 ```csharp
 siloBuilder
     .AddAzureBlobJournalStorage()
-    .UseJsonJournalFormat(options =>
+    .Configure<JsonJournalOptions>(options =>
     {
         options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.AddTypeInfoResolver(JournalJsonContext.Default);
@@ -90,9 +90,9 @@ public sealed class ShoppingCartGrain(
 }
 ```
 
-All durable state types use the configured JSON codec automatically. `JsonJournalOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
+All durable state types use the configured JSON codec automatically. Configure `JsonJournalOptions` to control the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
 
-For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
+For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
 ## Storage format
 

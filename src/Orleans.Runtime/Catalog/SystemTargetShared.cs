@@ -15,7 +15,11 @@ internal sealed class SystemTargetShared(
     IOptions<SchedulingOptions> schedulingOptions,
     GrainReferenceActivator grainReferenceActivator,
     ITimerRegistry timerRegistry,
-    ActivationDirectory activations)
+    ActivationDirectory activations,
+    SchedulerInstruments schedulerInstruments,
+    GrainInstruments grainInstruments,
+    MessagingInstruments messagingInstruments,
+    MessagingProcessingInstruments messagingProcessingInstruments)
 {
     public SiloAddress SiloAddress => localSiloDetails.SiloAddress;
 
@@ -24,14 +28,16 @@ internal sealed class SystemTargetShared(
     public GrainReferenceActivator GrainReferenceActivator => grainReferenceActivator;
     public ITimerRegistry TimerRegistry => timerRegistry;
 
-    public RuntimeMessagingTrace MessagingTrace { get; } = new(loggerFactory);
+    public RuntimeMessagingTrace MessagingTrace { get; } = new(loggerFactory, messagingInstruments, messagingProcessingInstruments);
     public InsideRuntimeClient RuntimeClient => runtimeClient;
     public ActivationDirectory ActivationDirectory => activations;
+    public GrainInstruments GrainInstruments => grainInstruments;
     public WorkItemGroup CreateWorkItemGroup(SystemTarget systemTarget)
     {
         ArgumentNullException.ThrowIfNull(systemTarget);
         return new WorkItemGroup(
             systemTarget,
-            schedulingOptions);
+            schedulingOptions,
+            schedulerInstruments);
     }
 }

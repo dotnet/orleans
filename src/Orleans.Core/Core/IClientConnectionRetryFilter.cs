@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans
 {
@@ -21,10 +22,9 @@ namespace Orleans
 
     internal sealed class LinearBackoffClientConnectionRetryFilter : IClientConnectionRetryFilter
     {
-        private int _retryCount = 0;
-
-        private const int MaxRetry = 5;
+        private const int MaxRetry = 15;
         private const int Delay = 1_500;
+        private int _retryCount;
 
         public async Task<bool> ShouldRetryConnectionAttempt(
             Exception exception,
@@ -35,9 +35,11 @@ namespace Orleans
                 return false;
             }
 
-            if (!cancellationToken.IsCancellationRequested && exception is SiloUnavailableException)
+            if (!cancellationToken.IsCancellationRequested && exception is OrleansMessageRejectionException or ConnectionFailedException)
             {
-                await Task.Delay(++_retryCount * Delay, cancellationToken);
+                ++_retryCount;
+                var currentDelay = TimeSpan.FromMilliseconds(Delay * _retryCount);
+                await Task.Delay(currentDelay, cancellationToken).ConfigureAwait(false);
                 return true;
             }
 

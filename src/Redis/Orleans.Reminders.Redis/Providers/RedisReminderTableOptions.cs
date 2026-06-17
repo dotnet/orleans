@@ -20,9 +20,12 @@ namespace Orleans.Configuration
         public ConfigurationOptions ConfigurationOptions { get; set; }
 
         /// <summary>
-        /// The delegate used to create a Redis connection multiplexer.
+        /// The delegate used to create a Redis connection multiplexer and indicate whether it is shared.
         /// </summary>
-        public Func<RedisReminderTableOptions, Task<IConnectionMultiplexer>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
+        /// <remarks>
+        /// When <c>IsShared</c> is <see langword="true"/>, the provider will not dispose the returned multiplexer.
+        /// </remarks>
+        public Func<RedisReminderTableOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
 
         /// <summary>
         /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
@@ -33,7 +36,8 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
-        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisReminderTableOptions options) => await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
+        public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisReminderTableOptions options)
+            => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions), IsShared: false);
     }
 
     internal class RedactRedisConfigurationOptions : RedactAttribute

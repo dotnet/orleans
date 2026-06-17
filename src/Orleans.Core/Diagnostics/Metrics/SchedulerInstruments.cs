@@ -2,7 +2,12 @@ using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
 
-internal class SchedulerInstruments
+internal sealed class SchedulerInstruments(OrleansInstruments instruments)
 {
-    internal static readonly Counter<int> LongRunningTurnsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.SCHEDULER_NUM_LONG_RUNNING_TURNS);
+    private readonly Counter<int> _longRunningTurns = instruments.Meter.CreateCounter<int>(InstrumentNames.SCHEDULER_NUM_LONG_RUNNING_TURNS);
+
+    internal void OnLongRunningTurn()
+    {
+        _longRunningTurns.Add(1);
+    }
 }

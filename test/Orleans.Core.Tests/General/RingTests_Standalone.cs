@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
@@ -260,7 +259,7 @@ namespace UnitTests.General
         }
 
         public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Remove(observer);
-        public ImmutableArray<SiloAddress> GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];
+        public SiloAddress[] GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];
     }
 
     internal class RangeBreakable

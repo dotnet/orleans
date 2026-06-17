@@ -1,88 +1,253 @@
 using System;
-using Orleans.Configuration;
-using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Threading;
-using Microsoft.Extensions.Options;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Internal;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
     /// Responsible for cleaning up dead membership table entries.
     /// </summary>
-    internal partial class MembershipTableCleanupAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal partial class MembershipTableCleanupAgent : ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IMembershipTable _membershipTableProvider;
+        private readonly IMembershipManager _membershipManager;
+        private readonly ILocalSiloDetails _localSiloDetails;
+        private readonly TimeProvider _timeProvider;
         private readonly ILogger<MembershipTableCleanupAgent> _logger;
-        private readonly IAsyncTimer? _cleanupDefunctSilosTimer;
+        private readonly CancellationTokenSource _shutdownCts = new();
+        private readonly object _shutdownLock = new();
+        private DateTimeOffset? _lastDefunctSiloCleanupTime;
+        private bool _disposed;
+        private bool _cleanupDefunctSiloEntriesUnsupported;
 
         public MembershipTableCleanupAgent(
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTableProvider,
-            ILogger<MembershipTableCleanupAgent> log,
-            IAsyncTimerFactory timerFactory)
+            IMembershipManager membershipManager,
+            ILocalSiloDetails localSiloDetails,
+            TimeProvider timeProvider,
+            ILogger<MembershipTableCleanupAgent> log)
         {
             _clusterMembershipOptions = clusterMembershipOptions.Value;
             _membershipTableProvider = membershipTableProvider;
+            _membershipManager = membershipManager;
+            _localSiloDetails = localSiloDetails;
+            _timeProvider = timeProvider;
             _logger = log;
-            if (_clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
-            {
-                _cleanupDefunctSilosTimer = timerFactory.Create(
-                    _clusterMembershipOptions.DefunctSiloCleanupPeriod.Value,
-                    nameof(CleanupDefunctSilos));
-            }
         }
 
         public void Dispose()
         {
-            _cleanupDefunctSilosTimer?.Dispose();
+            lock (_shutdownLock)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _shutdownCts.Cancel();
+                _shutdownCts.Dispose();
+            }
         }
 
-        private async Task CleanupDefunctSilos()
+        private void SignalShutdown()
         {
-            if (!_clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
+            lock (_shutdownLock)
+            {
+                if (!_disposed)
+                {
+                    _shutdownCts.Cancel();
+                }
+            }
+        }
+
+        private async Task ProcessMembershipUpdates(CancellationToken cancellationToken)
+        {
+            if (!_clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue
+                && !_clusterMembershipOptions.MaxDefunctSiloEntries.HasValue)
             {
                 LogDebugMembershipTableCleanupDisabled(_logger);
                 return;
             }
 
-            Debug.Assert(_cleanupDefunctSilosTimer is not null);
             LogDebugStartingMembershipTableCleanupAgent(_logger);
             try
             {
-                var period = _clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
-
-                // The first cleanup should be scheduled for shortly after silo startup.
-                var delay = RandomTimeSpan.Next(TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10));
-                while (await _cleanupDefunctSilosTimer.NextTick(delay))
+                await foreach (var _ in _membershipManager.MembershipUpdates.WithCancellation(cancellationToken))
                 {
-                    // Select a random time within the next window.
-                    // The purpose of this is to add jitter to a process which could be affected by contention with other silos.
-                    delay = RandomTimeSpan.Next(period, period + TimeSpan.FromMinutes(5));
-                    try
+                    if (_cleanupDefunctSiloEntriesUnsupported)
                     {
-                        var dateLimit = DateTime.UtcNow - _clusterMembershipOptions.DefunctSiloExpiration;
-                        await _membershipTableProvider.CleanupDefunctSiloEntries(dateLimit);
-                    }
-                    catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
-                    {
-                        _cleanupDefunctSilosTimer.Dispose();
-                        LogWarningCleanupDefunctSiloEntriesNotSupported(_logger);
                         return;
                     }
-                    catch (Exception exception)
+
+                    var membership = _membershipManager.CurrentSnapshot;
+                    if (!IsFirstActiveSilo(membership))
                     {
-                        LogErrorFailedToCleanUpDefunctMembershipTableEntries(_logger, exception);
+                        continue;
                     }
+
+                    await CleanupDefunctSilos(membership, cancellationToken);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Ignore and continue shutting down.
             }
             finally
             {
                 LogDebugStoppedMembershipTableCleanupAgent(_logger);
+            }
+        }
+
+        private async Task CleanupDefunctSilos(MembershipTableSnapshot membership, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var now = _timeProvider.GetUtcNow();
+                DateTimeOffset? beforeDate = default;
+
+                if (_clusterMembershipOptions.DefunctSiloCleanupPeriod is { } cleanupPeriod)
+                {
+                    var expirationBeforeDate = now - _clusterMembershipOptions.DefunctSiloExpiration;
+                    if (ShouldCleanupExpiredSilos(membership, now, expirationBeforeDate, cleanupPeriod))
+                    {
+                        beforeDate = expirationBeforeDate;
+                    }
+                }
+
+                if (_clusterMembershipOptions.MaxDefunctSiloEntries is { } maxDefunctSiloEntries)
+                {
+                    var defunctSiloEntryCount = 0;
+                    var trackedEntryCount = (long)maxDefunctSiloEntries + 1;
+                    var newestDefunctEntries = new PriorityQueue<MembershipEntry, DefunctSiloEntryPriority>();
+                    foreach (var entry in membership.Entries.Values)
+                    {
+                        if (entry.Status != SiloStatus.Dead)
+                        {
+                            continue;
+                        }
+
+                        defunctSiloEntryCount++;
+                        var entryPriority = new DefunctSiloEntryPriority(entry);
+                        if (newestDefunctEntries.Count < trackedEntryCount)
+                        {
+                            newestDefunctEntries.Enqueue(entry, entryPriority);
+                        }
+                        else if (newestDefunctEntries.TryPeek(out _, out var oldestTrackedEntryPriority)
+                            && entryPriority > oldestTrackedEntryPriority)
+                        {
+                            newestDefunctEntries.Dequeue();
+                            newestDefunctEntries.Enqueue(entry, entryPriority);
+                        }
+                    }
+
+                    if (defunctSiloEntryCount > maxDefunctSiloEntries)
+                    {
+                        var newestEntryToRemove = newestDefunctEntries.Peek();
+                        var excessBeforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveIAmAliveTime);
+                        if (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value)
+                        {
+                            beforeDate = excessBeforeDate;
+                        }
+                    }
+                }
+
+                if (!beforeDate.HasValue)
+                {
+                    return;
+                }
+
+                LogDebugCleaningUpDefunctMembershipTableEntries(_logger, beforeDate.Value);
+                await _membershipTableProvider.CleanupDefunctSiloEntries(beforeDate.Value).WaitAsync(cancellationToken);
+                _lastDefunctSiloCleanupTime = now;
+            }
+            catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
+            {
+                _cleanupDefunctSiloEntriesUnsupported = true;
+                LogWarningCleanupDefunctSiloEntriesNotSupported(_logger);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                LogErrorFailedToCleanUpDefunctMembershipTableEntries(_logger, exception);
+            }
+        }
+
+        private bool ShouldCleanupExpiredSilos(MembershipTableSnapshot membership, DateTimeOffset now, DateTimeOffset beforeDate, TimeSpan cleanupPeriod)
+        {
+            if (!_lastDefunctSiloCleanupTime.HasValue || now - _lastDefunctSiloCleanupTime.Value >= cleanupPeriod)
+            {
+                return true;
+            }
+
+            foreach (var entry in membership.Entries.Values)
+            {
+                if (entry.Status != SiloStatus.Active && entry.EffectiveIAmAliveTime < beforeDate.UtcDateTime)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsFirstActiveSilo(MembershipTableSnapshot membership)
+        {
+            var localSiloIsActive = false;
+            foreach (var entry in membership.Entries.Values)
+            {
+                if (entry.Status != SiloStatus.Active)
+                {
+                    continue;
+                }
+
+                var comparison = entry.SiloAddress.CompareTo(_localSiloDetails.SiloAddress);
+                if (comparison < 0)
+                {
+                    return false;
+                }
+
+                if (comparison == 0)
+                {
+                    localSiloIsActive = true;
+                }
+            }
+
+            return localSiloIsActive;
+        }
+
+        private static DateTimeOffset GetDefunctSiloCleanupCutoff(DateTime effectiveIAmAliveTime)
+        {
+            var effectiveIAmAliveTimeUtc = DateTime.SpecifyKind(effectiveIAmAliveTime, DateTimeKind.Utc);
+            return effectiveIAmAliveTimeUtc == DateTime.MaxValue
+                ? DateTimeOffset.MaxValue
+                : new DateTimeOffset(effectiveIAmAliveTimeUtc.AddTicks(1));
+        }
+
+        private readonly struct DefunctSiloEntryPriority(MembershipEntry entry) : IComparable<DefunctSiloEntryPriority>
+        {
+            private readonly MembershipEntry _entry = entry;
+
+            public static bool operator >(DefunctSiloEntryPriority left, DefunctSiloEntryPriority right) => Compare(left, right) > 0;
+
+            public static bool operator <(DefunctSiloEntryPriority left, DefunctSiloEntryPriority right) => Compare(left, right) < 0;
+
+            public int CompareTo(DefunctSiloEntryPriority other) => Compare(this, other);
+
+            private static int Compare(DefunctSiloEntryPriority left, DefunctSiloEntryPriority right)
+            {
+                var result = left._entry.EffectiveIAmAliveTime.CompareTo(right._entry.EffectiveIAmAliveTime);
+                return result != 0 ? result : left._entry.SiloAddress.CompareTo(right._entry.SiloAddress);
             }
         }
 
@@ -93,13 +258,13 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnStart(CancellationToken ct)
             {
-                task = Task.Run(CleanupDefunctSilos);
+                task = Task.Run(() => ProcessMembershipUpdates(_shutdownCts.Token));
                 return Task.CompletedTask;
             }
 
             async Task OnStop(CancellationToken ct)
             {
-                _cleanupDefunctSilosTimer?.Dispose();
+                SignalShutdown();
                 if (task is { })
                 {
                     await task.WaitAsync(ct).SuppressThrowing();
@@ -107,20 +272,9 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [NotNullWhen(false)] out string? reason)
-        {
-            if (_cleanupDefunctSilosTimer is IAsyncTimer timer)
-            {
-                return timer.CheckHealth(lastCheckTime, out reason);
-            }
-
-            reason = default;
-            return true;
-        }
-
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "Membership table cleanup is disabled due to ClusterMembershipOptions.DefunctSiloCleanupPeriod not being specified"
+            Message = "Membership table cleanup is disabled due to ClusterMembershipOptions.DefunctSiloCleanupPeriod and ClusterMembershipOptions.MaxDefunctSiloEntries not being specified"
         )]
         private static partial void LogDebugMembershipTableCleanupDisabled(ILogger logger);
 
@@ -131,8 +285,14 @@ namespace Orleans.Runtime.MembershipService
         private static partial void LogDebugStartingMembershipTableCleanupAgent(ILogger logger);
 
         [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Cleaning up defunct membership table entries older than {BeforeDate}"
+        )]
+        private static partial void LogDebugCleaningUpDefunctMembershipTableEntries(ILogger logger, DateTimeOffset beforeDate);
+
+        [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "IMembershipTable.CleanupDefunctSiloEntries operation is not supported by the current implementation of IMembershipTable. Disabling the timer now."
+            Message = "IMembershipTable.CleanupDefunctSiloEntries operation is not supported by the current implementation of IMembershipTable. Disabling defunct membership table cleanup."
         )]
         private static partial void LogWarningCleanupDefunctSiloEntriesNotSupported(ILogger logger);
 

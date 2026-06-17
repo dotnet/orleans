@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +19,7 @@ namespace Orleans.Runtime.MembershipService
         private MembershipTableSnapshot cachedSnapshot;
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
-        private ImmutableArray<SiloAddress> _activeSilos = [];
+        private SiloAddress[] _activeSilos = [];
 
         public SiloStatusOracle(
             ILocalSiloDetails localSiloDetails,
@@ -53,7 +52,7 @@ namespace Orleans.Runtime.MembershipService
             return status;
         }
 
-        public ImmutableArray<SiloAddress> GetActiveSilos()
+        public SiloAddress[] GetActiveSilos()
         {
             EnsureFreshCache();
             return _activeSilos;
@@ -83,7 +82,7 @@ namespace Orleans.Runtime.MembershipService
 
                 var newSiloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
                 var newSiloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
-                var newActiveSilos = ImmutableArray.CreateBuilder<SiloAddress>();
+                var newActiveSilos = new List<SiloAddress>();
                 foreach (var entry in currentMembership.Entries)
                 {
                     var silo = entry.Key;
@@ -99,7 +98,7 @@ namespace Orleans.Runtime.MembershipService
                 Interlocked.Exchange(ref this.cachedSnapshot, currentMembership);
                 this.siloStatusCache = newSiloStatusCache;
                 this.siloStatusCacheOnlyActive = newSiloStatusCacheOnlyActive;
-                _activeSilos = newActiveSilos.ToImmutable();
+                _activeSilos = newActiveSilos.ToArray();
             }
         }
 

@@ -42,18 +42,21 @@ internal sealed class ServiceLifecycle<TLifecycleObservable>(ILogger<ServiceLife
             observerName: nameof(Started),
             stage: ServiceLifecycleStage.Active,
             onStart: _started.NotifyCompleted,
-            onStop: _ => Task.CompletedTask);
+            onStop: NoOpStop);
 
         lifecycle.Subscribe(
             observerName: nameof(Stopping),
             stage: ServiceLifecycleStage.Active,
-            onStart: _ => Task.CompletedTask,
+            onStart: NoOpStart,
             onStop: _stopping.NotifyCompleted);
 
         lifecycle.Subscribe(
             observerName: nameof(Stopped),
             stage: ServiceLifecycleStage.RuntimeInitialize - 1,
-            onStart: _ => Task.CompletedTask,
+            onStart: NoOpStart,
             onStop: _stopped.NotifyCompleted);
+
+        static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
+        static Task NoOpStop(CancellationToken _) => Task.CompletedTask;
     }
 }

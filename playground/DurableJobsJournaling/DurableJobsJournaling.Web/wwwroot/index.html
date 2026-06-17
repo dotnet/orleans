@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DurableJobs + Journaling Playground</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", system-ui, sans-serif; background: #10131a; color: #eef2ff; }
+    body { margin: 0; padding: 24px; }
+    h1 { margin: 0 0 8px; }
+    .subtitle { color: #aab3cf; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .card { background: #181d29; border: 1px solid #2c3448; border-radius: 14px; padding: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.25); overflow-x: auto; }
+    .metric { font-size: 2rem; font-weight: 700; margin: 8px 0; }
+    label { display: grid; gap: 6px; margin: 10px 0; color: #c8d0ea; }
+    input, select, button { border-radius: 8px; border: 1px solid #39435c; padding: 9px 10px; background: #10131a; color: #eef2ff; }
+    button { cursor: pointer; background: #3654ff; border-color: #5870ff; font-weight: 600; }
+    button.secondary { background: #263044; border-color: #3a465f; }
+    button.danger { background: #b3263b; border-color: #d0475b; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    th, td { border-bottom: 1px solid #2c3448; text-align: left; padding: 8px; }
+    .ok { color: #74e39a; }
+    .bad { color: #ff8194; }
+  </style>
+</head>
+<body>
+  <h1>DurableJobs + Journaling Playground</h1>
+  <div class="subtitle">Azure Blob-backed DurableJobs and journaled grains under controlled workflow load.</div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Load controls</h2>
+      <label>Target concurrency <input id="concurrency" type="number" min="0" value="16"></label>
+      <label>Target starts/sec (0 = unlimited) <input id="throughput" type="number" min="0" step="0.1" value="8"></label>
+      <button onclick="saveSettings()">Apply</button>
+      <button onclick="startLoad()">Start</button>
+      <button class="secondary" onclick="post('/api/load/stop')">Stop</button>
+      <button class="secondary" onclick="post('/api/load/drain')">Drain</button>
+      <button class="danger" onclick="post('/api/load/reset')">Reset</button>
+      <button class="danger" onclick="post('/api/chaos/silo/kill')">Kill silo membership</button>
+    </section>
+
+    <section class="card">
+      <h2>Throughput</h2>
+      <div>In-flight</div><div id="inflight" class="metric">0</div>
+      <div>Starts/sec</div><div id="starts" class="metric">0</div>
+      <div>Completions/sec</div><div id="completions" class="metric">0</div>
+      <div>Failures/sec</div><div id="failures" class="metric">0</div>
+    </section>
+
+    <section class="card">
+      <h2>Latency</h2>
+      <div>End-to-end p50 / p95 / p99</div><div id="e2e" class="metric">0 / 0 / 0</div>
+      <div>Schedule-to-start p95 (legacy)</div><div id="schedule" class="metric">0</div>
+      <div>Stage execution p95</div><div id="execution" class="metric">0</div>
+      <div>Reschedule gap p95</div><div id="gap" class="metric">0</div>
+    </section>
+
+    <section class="card">
+      <h2>Chaos</h2>
+      <pre id="chaos">No chaos action requested.</pre>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>Stages</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Stage</th>
+          <th>Completed</th>
+          <th>Failed</th>
+          <th>Queue p95 / p99</th>
+          <th>Execution p95 / p99</th>
+          <th>Handoff p95</th>
+          <th>State write p95</th>
+          <th>Schedule call p95</th>
+          <th>Stage total p99</th>
+          <th>Workflow elapsed p99</th>
+          <th>Unaccounted p99</th>
+        </tr>
+      </thead>
+      <tbody id="stages"></tbody>
+    </table>
+  </section>
+
+  <section class="card" style="margin-top:16px">
+    <h2>Recent workflows</h2>
+    <table><thead><tr><th>Workflow</th><th>Status</th><th>Latency ms</th><th>Retries</th><th>Failures</th><th>Error</th></tr></thead><tbody id="recent"></tbody></table>
+  </section>
+
+  <script>
+    let controlsInitialized = false;
+
+    async function post(url, body) {
+      const options = { method: 'POST' };
+      if (body !== undefined) {
+        options.headers = { 'content-type': 'application/json' };
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        throw new Error(`${url} failed with ${response.status}`);
+      }
+
+      await refresh();
+    }
+
+    async function saveSettings() {
+      const response = await fetch('/api/load', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(settings())
+      });
+      if (!response.ok) {
+        throw new Error(`/api/load failed with ${response.status}`);
+      }
+
+      applySettings(await response.json());
+      await refresh();
+    }
+
+    async function startLoad() {
+      await post('/api/load/start', settings());
+    }
+
+    function settings() {
+      return {
+        targetConcurrency: Number(concurrency.value),
+        targetStartsPerSecond: Number(throughput.value),
+        stageDelayMilliseconds: 0,
+        stageJitterMilliseconds: 0,
+        failureRate: 0,
+        dueTimeMode: 'Immediate',
+        stageDueDelayMilliseconds: 0
+      };
+    }
+
+    function applySettings(settings) {
+      concurrency.value = settings.targetConcurrency;
+      throughput.value = settings.targetStartsPerSecond;
+    }
+
+    function ms(value) { return Math.round(value || 0).toString(); }
+    function p95p99(summary) { return `${ms(summary?.p95Milliseconds)} / ${ms(summary?.p99Milliseconds)}`; }
+
+    async function refresh() {
+      const snapshot = await (await fetch('/api/metrics/snapshot')).json();
+      if (!controlsInitialized) {
+        applySettings(snapshot.load.settings);
+        controlsInitialized = true;
+      }
+
+      inflight.textContent = snapshot.load.inFlight;
+      starts.textContent = snapshot.rates.startsPerSecond.toFixed(1);
+      completions.textContent = snapshot.rates.completionsPerSecond.toFixed(1);
+      failures.textContent = snapshot.rates.failuresPerSecond.toFixed(1);
+      e2e.textContent = `${ms(snapshot.endToEndLatency.p50Milliseconds)} / ${ms(snapshot.endToEndLatency.p95Milliseconds)} / ${ms(snapshot.endToEndLatency.p99Milliseconds)}`;
+      schedule.textContent = ms(snapshot.scheduleToStartLatency.p95Milliseconds);
+      execution.textContent = ms(snapshot.stageExecutionLatency.p95Milliseconds);
+      gap.textContent = ms(snapshot.rescheduleGapLatency.p95Milliseconds);
+      chaos.textContent = snapshot.lastChaos ? JSON.stringify(snapshot.lastChaos, null, 2) : 'No chaos action requested.';
+      stages.innerHTML = snapshot.stages.map(s => `
+        <tr>
+          <td>${s.stage}</td>
+          <td>${s.completed}</td>
+          <td>${s.failed}</td>
+          <td>${p95p99(s.queueLatency)}</td>
+          <td>${p95p99(s.executionLatency)}</td>
+          <td>${ms(s.handoffLatency?.p95Milliseconds)}</td>
+          <td>${ms(s.stateWriteLatency?.p95Milliseconds)}</td>
+          <td>${ms(s.scheduleCallLatency?.p95Milliseconds)}</td>
+          <td>${ms(s.stageTotalLatency?.p99Milliseconds)}</td>
+          <td>${ms(s.workflowElapsedLatency?.p99Milliseconds)}</td>
+          <td>${ms(s.unaccountedLatency?.p99Milliseconds)}</td>
+        </tr>`).join('');
+      recent.innerHTML = snapshot.recent.map(w => `<tr><td>${w.workflowId}</td><td class="${w.status === 'Completed' ? 'ok' : 'bad'}">${w.status}</td><td>${ms(w.totalLatencyMilliseconds)}</td><td>${w.retryCount}</td><td>${w.failureCount}</td><td>${w.error ?? ''}</td></tr>`).join('');
+    }
+
+    refresh();
+    setInterval(refresh, 1000);
+  </script>
+</body>
+</html>

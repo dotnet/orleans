@@ -27,11 +27,21 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     private readonly DualModeKalmanFilter _memoryUsageFilter = new();
 
     public EnvironmentStatisticsProvider()
+        : this(new OrleansInstruments(new DirectMeterFactory()))
+    {
+    }
+
+    public EnvironmentStatisticsProvider(OrleansInstruments instruments)
+        : this(instruments.Meter)
+    {
+    }
+
+    private EnvironmentStatisticsProvider(Meter meter)
     {
         GC.Collect(0, GCCollectionMode.Forced, true); // we make sure the GC structure wont be empty, also performing a blocking GC guarantees immediate collection.
 
-        _availableMemoryGauge = Instruments.Meter.CreateObservableGauge(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(_availableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
-        _maximumAvailableMemoryGauge = Instruments.Meter.CreateObservableGauge(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(_maximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+        _availableMemoryGauge = meter.CreateObservableGauge(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(_availableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+        _maximumAvailableMemoryGauge = meter.CreateObservableGauge(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(_maximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
     }
 
     /// <inheritdoc />
@@ -93,6 +103,15 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
                     }
                 }
             }
+        }
+    }
+
+    private sealed class DirectMeterFactory : IMeterFactory
+    {
+        public Meter Create(MeterOptions options) => new(options);
+
+        public void Dispose()
+        {
         }
     }
 

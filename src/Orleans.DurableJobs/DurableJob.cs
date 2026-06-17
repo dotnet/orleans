@@ -46,4 +46,18 @@ public sealed class DurableJob
     /// </summary>
     [Id(5)]
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+
+    /// <summary>
+    /// Gets the W3C <c>traceparent</c> value captured when the job was scheduled.
+    /// Used to continue the distributed trace when the job is later executed.
+    /// </summary>
+    [Id(6)]
+    public string? TraceParent { get; init; }
+
+    /// <summary>
+    /// Gets the W3C <c>tracestate</c> value captured when the job was scheduled.
+    /// Used to continue the distributed trace when the job is later executed.
+    /// </summary>
+    [Id(7)]
+    public string? TraceState { get; init; }
 }

@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
@@ -48,8 +50,10 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
 
         private EventHubPartitionCheckpointEntity entity;
-        private Task inProgressSave;
+        private Task inProgressSave = Task.CompletedTask;
         private DateTime? throttleSavesUntilUtc;
+        private string latestOffset = EventHubConstants.StartOfStream;
+        private string persistedOffset = EventHubConstants.StartOfStream;
 
         /// <summary>
         /// Indicates if a checkpoint exists
@@ -112,32 +116,71 @@ namespace Orleans.Streaming.EventHubs
                 entity = results.Entity;
             }
 
-            return entity.Offset;
+            latestOffset = entity.Offset ?? EventHubConstants.StartOfStream;
+            persistedOffset = latestOffset;
+            return latestOffset;
         }
 
         /// <summary>
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
+        /// The latest offset is always tracked in memory so that <see cref="FlushAsync(CancellationToken)"/> can persist it on shutdown.
         /// </summary>
         /// <param name="offset"></param>
         /// <param name="utcNow"></param>
         public void Update(string offset, DateTime utcNow)
         {
-            // if offset has not changed, do nothing
-            if (string.Compare(entity.Offset, offset, StringComparison.Ordinal) == 0)
+            // Checkpoints are monotonic: if a subscriber requests replay from before
+            // the current checkpoint, keep the checkpoint at the latest safe offset.
+            if (!IsAfter(offset, latestOffset))
             {
                 return;
             }
 
-            // if we've saved before but it's not time for another save or the last save operation has not completed, do nothing
+            // Always track the latest safe offset in memory so FlushAsync can persist it.
+            latestOffset = offset;
+
+            // If we've saved before but it's not time for another save or the last save operation has not completed, do nothing.
             if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
             {
                 return;
             }
 
-            entity.Offset = offset;
             throttleSavesUntilUtc = utcNow + persistInterval;
-            inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+            inProgressSave = SaveOffset(latestOffset);
             inProgressSave.Ignore();
+        }
+
+        private async Task SaveOffset(string offset)
+        {
+            entity.Offset = offset;
+            await dataManager.UpsertTableEntryAsync(entity);
+            persistedOffset = offset;
+        }
+
+        /// <summary>
+        /// Flushes any pending checkpoint to persistent storage.
+        /// Awaits any in-progress save, then persists the latest offset if it has advanced beyond the last saved value.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await inProgressSave.WaitAsync(cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.Compare(persistedOffset, latestOffset, StringComparison.Ordinal) != 0)
+            {
+                inProgressSave = SaveOffset(latestOffset);
+                await inProgressSave.WaitAsync(cancellationToken);
+            }
+        }
+
+        private static bool IsAfter(string offset, string currentOffset)
+        {
+            currentOffset ??= EventHubConstants.StartOfStream;
+
+            return long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset)
+                && long.TryParse(currentOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedCurrentOffset)
+                && parsedOffset > parsedCurrentOffset;
         }
 
         [LoggerMessage(

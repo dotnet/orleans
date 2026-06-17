@@ -39,7 +39,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, SiloMetadata.Empty}
             }));
         var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(), default,
-            new List<SiloAddress>() { testLocalSiloAddress }
+                new[] { testLocalSiloAddress }
         ).ToList();
         Assert.NotNull(result);
         Assert.NotEmpty(result);
@@ -62,7 +62,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, siloMetadata},
             }));
         var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
-            new List<SiloAddress>() { testOtherSiloAddress }).ToList();
+                new[] { testOtherSiloAddress }).ToList();
         Assert.Empty(result);
     }
 
@@ -85,7 +85,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, localSiloMetadata},
             }));
         var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
-            new List<SiloAddress>() { testOtherSiloAddress }).ToList();
+                new[] { testOtherSiloAddress }).ToList();
         Assert.Empty(result);
     }
 
@@ -108,7 +108,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, localSiloMetadata},
             }));
         var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
-            new List<SiloAddress>() { testOtherSiloAddress }).ToList();
+                new[] { testOtherSiloAddress }).ToList();
         Assert.NotEmpty(result);
     }
 
@@ -135,7 +135,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testLocalSiloAddress, localSiloMetadata},
             }));
         var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
-            new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2 }).ToList();
+                new[] { testOtherSiloAddress1, testOtherSiloAddress2 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(2, result.Count);
     }

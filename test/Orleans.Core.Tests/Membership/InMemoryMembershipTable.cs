@@ -36,6 +36,7 @@ namespace NonSilo.Tests.Membership
         }
 
         public Action OnReadAll { get; set; }
+        public Action<DateTimeOffset> OnCleanupDefunctSiloEntries { get; set; }
         public TableVersion Version { get; set; } = new TableVersion(0, "0");
 
         public void ClearCalls()
@@ -54,6 +55,7 @@ namespace NonSilo.Tests.Membership
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
+            this.OnCleanupDefunctSiloEntries?.Invoke(beforeDate);
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(CleanupDefunctSiloEntries), beforeDate));

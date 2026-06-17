@@ -40,7 +40,8 @@ internal static class Program
         var container = blobServiceClient.GetBlobContainerClient(settings.ContainerName);
         await container.CreateIfNotExistsAsync();
 
-        var blob = container.GetAppendBlobClient(settings.BlobName);
+        var walBlobName = $"{settings.BlobName}/wal";
+        var blob = container.GetAppendBlobClient(walBlobName);
         if (settings.ResetBlob)
         {
             await blob.DeleteIfExistsAsync();
@@ -60,7 +61,8 @@ internal static class Program
                 {
                     options.BlobServiceClient = blobServiceClient;
                     options.ContainerName = settings.ContainerName;
-                    options.GetBlobName = _ => settings.BlobName;
+                    options.GetWalBlobName = _ => walBlobName;
+                    options.GetCheckpointBlobName = (_, snapshotId) => $"{settings.BlobName}/chk.{snapshotId}";
                 })
                 .UseJsonJournalFormat(JournalingSampleJsonContext.Default);
         });
@@ -85,7 +87,7 @@ internal static class Program
         Console.WriteLine(JsonSerializer.Serialize(recovered, JournalingSampleJsonContext.Default.JournaledSampleSummary));
 
         Console.WriteLine();
-        Console.WriteLine($"Raw JSONL blob contents from {settings.ContainerName}/{settings.BlobName}:");
+        Console.WriteLine($"Raw JSONL blob contents from {settings.ContainerName}/{walBlobName}:");
         Console.WriteLine(await DownloadBlobAsText(blob));
 
         await host.StopAsync();

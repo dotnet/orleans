@@ -27,13 +27,10 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseAzureStorageClustering(options => options.ConfigureTableServiceClient("YOUR_STORAGE_ACCOUNT_URI"))
-        .UseAzureStorageDurableJobs(options =>
+        .UseAzureBlobDurableJobs(options =>
         {
-            options.Configure(o =>
-            {
-                o.BlobServiceClient = new BlobServiceClient("YOUR_AZURE_STORAGE_CONNECTION_STRING");
-                o.ContainerName = "durable-jobs";
-            });
+            options.BlobServiceClient = new BlobServiceClient("YOUR_AZURE_STORAGE_CONNECTION_STRING");
+            options.ContainerName = "durable-jobs";
         });
 });
 
@@ -53,16 +50,13 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseAzureStorageClustering(options => options.ConfigureTableServiceClient("YOUR_STORAGE_ACCOUNT_URI"))
-        .UseAzureStorageDurableJobs(options =>
+        .UseAzureBlobDurableJobs(options =>
         {
-            options.Configure(o =>
-            {
-                var credential = new DefaultAzureCredential();
-                o.BlobServiceClient = new BlobServiceClient(
-                    new Uri("https://youraccount.blob.core.windows.net"),
-                    credential);
-                o.ContainerName = "durable-jobs";
-            });
+            var credential = new DefaultAzureCredential();
+            options.BlobServiceClient = new BlobServiceClient(
+                new Uri("https://youraccount.blob.core.windows.net"),
+                credential);
+            options.ContainerName = "durable-jobs";
         });
 });
 
@@ -78,14 +72,11 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(connectionString))
-        .UseAzureStorageDurableJobs(options =>
+        .UseAzureBlobDurableJobs(options =>
         {
-            options.Configure(o =>
-            {
-                o.BlobServiceClient = new BlobServiceClient(connectionString);
-                // Use different containers for different environments
-                o.ContainerName = $"durable-jobs-{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")?.ToLowerInvariant()}";
-            });
+            options.BlobServiceClient = new BlobServiceClient(connectionString);
+            // Use different containers for different environments
+            options.ContainerName = $"durable-jobs-{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")?.ToLowerInvariant()}";
         })
         .ConfigureServices(services =>
         {

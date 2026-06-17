@@ -59,20 +59,6 @@ namespace Tester.AzureUtils
             return options;
         }
 
-        public static AzureStorageJobShardOptions ConfigureTestDefaults(this AzureStorageJobShardOptions options)
-        {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
-            }
-            else
-            {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
-
-            return options;
-        }
-
         public static Orleans.Configuration.AzureQueueOptions ConfigureTestDefaults(this Orleans.Configuration.AzureQueueOptions options)
         {
             if (TestDefaultConfiguration.UseAadAuthentication)

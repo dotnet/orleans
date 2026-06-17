@@ -33,6 +33,7 @@ namespace Orleans.Providers
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         private readonly TSerializer serializer;
+        private readonly OrleansInstruments orleansInstruments;
         private readonly ulong _nameHash;
         private IStreamQueueMapper streamQueueMapper;
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
@@ -90,6 +91,7 @@ namespace Orleans.Providers
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
+            this.orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
 
             var nameBytes = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(Name.AsSpan()) : Encoding.Unicode.GetBytes(Name);
             XxHash64.Hash(nameBytes, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref _nameHash, 1)));
@@ -102,11 +104,11 @@ namespace Orleans.Providers
         {
             this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
+                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions, this.orleansInstruments);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions, this.orleansInstruments);
             if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions, this.orleansInstruments);
             this.purgePredicate = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
             this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
         }

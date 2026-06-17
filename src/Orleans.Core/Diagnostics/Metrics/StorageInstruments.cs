@@ -5,20 +5,20 @@ using System.Diagnostics.Metrics;
 #nullable disable
 namespace Orleans.Runtime;
 
-internal static class StorageInstruments
+internal sealed class StorageInstruments(OrleansInstruments instruments)
 {
-    private static readonly Histogram<double> StorageReadHistogram = Instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_READ_LATENCY, "ms");
-    private static readonly Histogram<double> StorageWriteHistogram = Instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_WRITE_LATENCY, "ms");
-    private static readonly Histogram<double> StorageClearHistogram = Instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_CLEAR_LATENCY, "ms");
-    private static readonly Counter<int> StorageReadErrorsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_READ_ERRORS);
-    private static readonly Counter<int> StorageWriteErrorsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_WRITE_ERRORS);
-    private static readonly Counter<int> StorageClearErrorsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_CLEAR_ERRORS);
+    private readonly Histogram<double> _storageReadHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_READ_LATENCY, "ms");
+    private readonly Histogram<double> _storageWriteHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_WRITE_LATENCY, "ms");
+    private readonly Histogram<double> _storageClearHistogram = instruments.Meter.CreateHistogram<double>(InstrumentNames.STORAGE_CLEAR_LATENCY, "ms");
+    private readonly Counter<int> _storageReadErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_READ_ERRORS);
+    private readonly Counter<int> _storageWriteErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_WRITE_ERRORS);
+    private readonly Counter<int> _storageClearErrorsCounter = instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_CLEAR_ERRORS);
 
-    internal static void OnStorageRead(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
+    internal void OnStorageRead(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
     {
-        if (StorageReadHistogram.Enabled)
+        if (_storageReadHistogram.Enabled)
         {
-            StorageReadHistogram.Record(
+            _storageReadHistogram.Record(
                 latency.TotalMilliseconds,
                 [
                     new KeyValuePair<string, object>("provider_type_name", providerTypeName),
@@ -28,11 +28,11 @@ internal static class StorageInstruments
         }
     }
 
-    internal static void OnStorageWrite(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
+    internal void OnStorageWrite(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
     {
-        if (StorageWriteHistogram.Enabled)
+        if (_storageWriteHistogram.Enabled)
         {
-            StorageWriteHistogram.Record(
+            _storageWriteHistogram.Record(
                 latency.TotalMilliseconds,
                 [
                     new KeyValuePair<string, object>("provider_type_name", providerTypeName),
@@ -42,11 +42,11 @@ internal static class StorageInstruments
         }
     }
 
-    internal static void OnStorageReadError(string providerTypeName, string stateName, string stateTypeName)
+    internal void OnStorageReadError(string providerTypeName, string stateName, string stateTypeName)
     {
-        if (StorageReadErrorsCounter.Enabled)
+        if (_storageReadErrorsCounter.Enabled)
         {
-            StorageReadErrorsCounter.Add(1,
+            _storageReadErrorsCounter.Add(1,
                 [
                     new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
@@ -55,11 +55,11 @@ internal static class StorageInstruments
         }
     }
 
-    internal static void OnStorageWriteError(string providerTypeName, string stateName, string stateTypeName)
+    internal void OnStorageWriteError(string providerTypeName, string stateName, string stateTypeName)
     {
-        if (StorageWriteErrorsCounter.Enabled)
+        if (_storageWriteErrorsCounter.Enabled)
         {
-            StorageWriteErrorsCounter.Add(1,
+            _storageWriteErrorsCounter.Add(1,
                 [
                     new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
@@ -68,11 +68,11 @@ internal static class StorageInstruments
         }
     }
 
-    internal static void OnStorageDelete(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
+    internal void OnStorageDelete(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
     {
-        if (StorageClearHistogram.Enabled)
+        if (_storageClearHistogram.Enabled)
         {
-            StorageClearHistogram.Record(latency.TotalMilliseconds,
+            _storageClearHistogram.Record(latency.TotalMilliseconds,
                 [
                     new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
@@ -81,11 +81,11 @@ internal static class StorageInstruments
         }
     }
 
-    internal static void OnStorageDeleteError(string providerTypeName, string stateName, string stateTypeName)
+    internal void OnStorageDeleteError(string providerTypeName, string stateName, string stateTypeName)
     {
-        if (StorageClearErrorsCounter.Enabled)
+        if (_storageClearErrorsCounter.Enabled)
         {
-            StorageClearErrorsCounter.Add(1,
+            _storageClearErrorsCounter.Add(1,
                 [
                     new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),

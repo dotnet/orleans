@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
@@ -29,13 +30,13 @@ internal class ApplicationRequestInstruments
             _appRequestsLatencyHistogramAggregator.Record(durationMilliseconds);
     }
 
-    internal void OnAppRequestsTimedOut()
+    internal void OnAppRequestsTimedOut(string grainType)
     {
-        _timedOutRequestsCounter.Add(1);
+        _timedOutRequestsCounter.Add(1, new KeyValuePair<string, object?>("grain_type", grainType));
     }
 
-    internal void OnAppRequestsCanceled()
+    internal void OnAppRequestsCanceled(string grainType)
     {
-        _canceledRequestsCounter.Add(1);
+        _canceledRequestsCounter.Add(1, new KeyValuePair<string, object?>("grain_type", grainType));
     }
 }

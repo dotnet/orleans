@@ -19,7 +19,10 @@ namespace UnitTests.TesterInternal
             var services = new ServiceCollection();
             services.AddOptions();
             services.AddLogging();
+            services.AddMetrics();
             services.AddSingleton(loggerFactory);
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<SchedulerInstruments>();
             services.Configure<SchedulingOptions>(options =>
             {
                 options.DelayWarningThreshold = TimeSpan.FromMilliseconds(100);
@@ -31,7 +34,8 @@ namespace UnitTests.TesterInternal
             activationServices = services.BuildServiceProvider();
             return new WorkItemGroup(
                 context,
-                activationServices.GetRequiredService<IOptions<SchedulingOptions>>());
+                activationServices.GetRequiredService<IOptions<SchedulingOptions>>(),
+                activationServices.GetRequiredService<SchedulerInstruments>());
         }
     }
 }

@@ -86,6 +86,7 @@ namespace Orleans.Runtime.Providers
                 deliveryProvider,
                 queueReaderProvider,
                 timeProvider,
+                ServiceProvider.GetRequiredService<StreamInstruments>(),
                 ServiceProvider.GetRequiredService<SystemTargetShared>());
 
             // Init the manager only after it was registered locally.

@@ -34,7 +34,7 @@ internal sealed class AzureTableStorageGrainDirectoryProviderBuilder : IProvider
                 }
                 else
                 {
-                    // Construct a connection multiplexer from a connection string.
+                    // Construct a table service client from a connection string.
                     var connectionName = configurationSection["ConnectionName"];
                     var connectionString = configurationSection["ConnectionString"];
                     if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
@@ -47,11 +47,11 @@ internal sealed class AzureTableStorageGrainDirectoryProviderBuilder : IProvider
                     {
                         if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
                         {
-                            options.TableServiceClient = new TableServiceClient(uri);
+                            options.SetTableServiceClient(uri);
                         }
                         else
                         {
-                            options.TableServiceClient = new TableServiceClient(connectionString);
+                            options.SetTableServiceClient(connectionString);
                         }
                     }
                 }

@@ -35,23 +35,31 @@ namespace Orleans.Transactions
         private readonly ITransactionAgentStatistics statistics;
         private readonly TransactionRateLoadSheddingOptions options;
         private readonly PeriodicAction monitor;
+        private readonly TimeProvider timeProvider;
         private ITransactionAgentStatistics lastStatistics;
         private double transactionStartedPerSecond;
         private DateTime lastCheckTime;
         private static readonly TimeSpan MetricsCheck = TimeSpan.FromSeconds(15);
         public TransactionOverloadDetector(ITransactionAgentStatistics statistics, IOptions<TransactionRateLoadSheddingOptions> options)
+            : this(statistics, options, TimeProvider.System)
+        {
+        }
+
+        internal TransactionOverloadDetector(ITransactionAgentStatistics statistics, IOptions<TransactionRateLoadSheddingOptions> options, TimeProvider timeProvider)
         {
             this.statistics = statistics;
             this.options = options.Value;
-            this.monitor = new PeriodicAction(MetricsCheck, this.RecordStatistics);
+            this.timeProvider = timeProvider;
+            var now = this.timeProvider.GetUtcNow().UtcDateTime;
+            this.monitor = new PeriodicAction(MetricsCheck, this.RecordStatistics, now + MetricsCheck);
             this.lastStatistics = TransactionAgentStatistics.Copy(statistics);
-            this.lastCheckTime = DateTime.UtcNow;
+            this.lastCheckTime = now;
         }
 
         private void RecordStatistics()
         {
             ITransactionAgentStatistics current = TransactionAgentStatistics.Copy(this.statistics);
-            DateTime now = DateTime.UtcNow;
+            DateTime now = this.timeProvider.GetUtcNow().UtcDateTime;
 
             this.transactionStartedPerSecond = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, current.TransactionsStarted, now);
             this.lastStatistics = current;
@@ -63,7 +71,7 @@ namespace Orleans.Transactions
             if (!this.options.Enabled)
                 return false;
 
-            DateTime now = DateTime.UtcNow;
+            DateTime now = this.timeProvider.GetUtcNow().UtcDateTime;
             this.monitor.TryAction(now);
             double txPerSecondCurrently = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, this.statistics.TransactionsStarted, now);
             //decaying utilization for tx per second

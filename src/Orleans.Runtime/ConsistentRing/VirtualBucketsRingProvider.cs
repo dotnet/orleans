@@ -27,7 +27,7 @@ namespace Orleans.Runtime.ConsistentRing
         private IRingRange myRange;
         private (IRingRange OldRange, IRingRange NewRange, bool Increased) lastNotification;
 
-        internal VirtualBucketsRingProvider(SiloAddress siloAddress, ILoggerFactory loggerFactory, int numVirtualBuckets, ISiloStatusOracle siloStatusOracle)
+        internal VirtualBucketsRingProvider(SiloAddress siloAddress, ILoggerFactory loggerFactory, int numVirtualBuckets, ISiloStatusOracle siloStatusOracle, ConsistentRingInstruments consistentRingInstruments)
         {
             numBucketsPerSilo = numVirtualBuckets;
             _siloStatusOracle = siloStatusOracle;
@@ -43,9 +43,9 @@ namespace Orleans.Runtime.ConsistentRing
 
             LogDebugStarting(logger, nameof(VirtualBucketsRingProvider), new(siloAddress));
 
-            ConsistentRingInstruments.RegisterRingSizeObserve(() => GetRingSize());
-            ConsistentRingInstruments.RegisterMyRangeRingPercentageObserve(() => (float)((IRingRangeInternal)myRange).RangePercentage());
-            ConsistentRingInstruments.RegisterAverageRingPercentageObserve(() =>
+            consistentRingInstruments.RegisterRingSizeObserve(() => GetRingSize());
+            consistentRingInstruments.RegisterMyRangeRingPercentageObserve(() => (float)((IRingRangeInternal)myRange).RangePercentage());
+            consistentRingInstruments.RegisterAverageRingPercentageObserve(() =>
             {
                 int size = GetRingSize();
                 return size == 0 ? 0 : ((float)100.0 / size);

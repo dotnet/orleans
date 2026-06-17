@@ -22,13 +22,20 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 {
     private readonly object _lock = new();
     private readonly IConnectableObservable<ReminderEvents.ReminderEvent> _events;
+    private readonly IConnectableObservable<ReminderEvents.ReminderServiceEvent> _serviceEvents;
     private readonly IDisposable _connection;
+    private readonly IDisposable _serviceConnection;
     private readonly IDisposable _storageSubscription;
     private readonly Dictionary<GrainId, int> _tickCountsByGrain = [];
     private readonly Dictionary<ReminderTickKey, int> _tickCountsByReminder = [];
+    private readonly Dictionary<ReminderTickKey, int> _tickAttemptsByReminder = [];
     private readonly Dictionary<ReminderTickKey, HashSet<LocalReminderInstanceKey>> _activeLocalReminders = [];
+    private readonly Dictionary<ReminderTickKey, int> _localReminderTickWaitArmedCounts = [];
+    private readonly Dictionary<ReminderTickKey, long> _localReminderScheduleVersions = [];
+    private readonly Dictionary<ReminderTickKey, long> _localReminderTickWaitArmedVersions = [];
     private readonly List<TickCountWaiter> _tickCountWaiters = [];
     private readonly List<ActiveReminderCountWaiter> _activeReminderCountWaiters = [];
+    private readonly List<LocalReminderScheduleWaiter> _localReminderScheduleWaiters = [];
 
     /// <summary>
     /// Creates a new instance of the observer and starts listening for reminder diagnostic events.
@@ -44,8 +51,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     public ReminderDiagnosticObserver()
     {
         _events = ReminderEvents.AllEvents.Replay();
+        _serviceEvents = ReminderEvents.ServiceEvents.Replay();
         _storageSubscription = _events.Subscribe(StoreEvent);
         _connection = _events.Connect();
+        _serviceConnection = _serviceEvents.Connect();
     }
 
     private void StoreEvent(ReminderEvents.ReminderEvent value)
@@ -55,6 +64,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         {
             switch (value)
             {
+                case ReminderEvents.TickFiring tickFiring:
+                    var tickFiringKey = new ReminderTickKey(tickFiring.GrainId, tickFiring.ReminderName);
+                    _tickAttemptsByReminder[tickFiringKey] = _tickAttemptsByReminder.GetValueOrDefault(tickFiringKey) + 1;
+                    break;
                 case ReminderEvents.TickCompleted tickCompleted:
                     _tickCountsByGrain[tickCompleted.GrainId] = _tickCountsByGrain.GetValueOrDefault(tickCompleted.GrainId) + 1;
                     var reminderKey = new ReminderTickKey(tickCompleted.GrainId, tickCompleted.ReminderName);
@@ -65,6 +78,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                     var startedKey = new ReminderTickKey(localReminderStarted.GrainId, localReminderStarted.ReminderName);
                     if (!_activeLocalReminders.TryGetValue(startedKey, out var startedInstances))
                     {
+                        ResetLocalReminderScheduleState(startedKey);
                         startedInstances = [];
                         _activeLocalReminders[startedKey] = startedInstances;
                     }
@@ -83,10 +97,34 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                         if (stoppedInstances.Count == 0)
                         {
                             _activeLocalReminders.Remove(stoppedKey);
+                            ResetLocalReminderScheduleState(stoppedKey);
                         }
                     }
 
                     ReleaseReadyActiveReminderWaiters(ready);
+                    break;
+                case ReminderEvents.LocalReminderScheduleChanged localReminderScheduleChanged:
+                    var changedKey = new ReminderTickKey(localReminderScheduleChanged.GrainId, localReminderScheduleChanged.ReminderName);
+                    if (IsActiveLocalReminder(changedKey, localReminderScheduleChanged.Identity))
+                    {
+                        _localReminderScheduleVersions[changedKey] = Math.Max(
+                            _localReminderScheduleVersions.GetValueOrDefault(changedKey),
+                            localReminderScheduleChanged.ScheduleVersion);
+                    }
+
+                    break;
+                case ReminderEvents.LocalReminderTickWaitArmed localReminderTickWaitArmed:
+                    var tickWaitArmedKey = new ReminderTickKey(localReminderTickWaitArmed.GrainId, localReminderTickWaitArmed.ReminderName);
+                    if (IsActiveLocalReminder(tickWaitArmedKey, localReminderTickWaitArmed.Identity)
+                        && localReminderTickWaitArmed.ScheduleVersion >= _localReminderScheduleVersions.GetValueOrDefault(tickWaitArmedKey))
+                    {
+                        _localReminderTickWaitArmedVersions[tickWaitArmedKey] = Math.Max(
+                            _localReminderTickWaitArmedVersions.GetValueOrDefault(tickWaitArmedKey, -1),
+                            localReminderTickWaitArmed.ScheduleVersion);
+                        _localReminderTickWaitArmedCounts[tickWaitArmedKey] = _localReminderTickWaitArmedCounts.GetValueOrDefault(tickWaitArmedKey) + 1;
+                        ReleaseReadyLocalReminderScheduleWaiters(ready);
+                    }
+
                     break;
             }
         }
@@ -166,6 +204,17 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Waits for a reminder service to complete startup.
+    /// </summary>
+    public Task<ReminderEvents.ReminderServiceStarted> WaitForReminderServiceStartedAsync(CancellationToken cancellationToken, SiloAddress? siloAddress = null)
+    {
+        return _serviceEvents
+            .OfType<ReminderEvents.ReminderServiceStarted>()
+            .FirstAsync(e => siloAddress is null || Equals(e.SiloAddress, siloAddress))
+            .ToTask(cancellationToken);
+    }
+
+    /// <summary>
     /// Waits for a reminder to be unregistered.
     /// </summary>
     public Task<ReminderEvents.Unregistered> WaitForReminderUnregisteredAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken)
@@ -208,6 +257,15 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegative(expectedCount);
         ArgumentException.ThrowIfNullOrEmpty(reminderName);
         return WaitForActiveReminderCountCoreAsync(grainId, expectedCount, reminderName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits until an active local owner has armed the next tick wait for a reminder.
+    /// </summary>
+    public Task WaitForLocalReminderScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(reminderName);
+        return WaitForLocalReminderScheduleCoreAsync(grainId, reminderName, cancellationToken);
     }
 
     /// <summary>
@@ -269,11 +327,44 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         return WaitAsync(waiter, cancellationToken);
     }
 
+    private Task WaitForLocalReminderScheduleCoreAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled(cancellationToken);
+        }
+
+        LocalReminderScheduleWaiter? waiter;
+        lock (_lock)
+        {
+            if (IsLocalReminderScheduleReadyCore(grainId, reminderName))
+            {
+                return Task.CompletedTask;
+            }
+
+            waiter = new LocalReminderScheduleWaiter(grainId, reminderName);
+            _localReminderScheduleWaiters.Add(waiter);
+        }
+
+        return WaitAsync(waiter, cancellationToken);
+    }
+
     private async Task WaitAsync(TickCountWaiter waiter, CancellationToken cancellationToken)
     {
         using var registration = cancellationToken.Register(static state =>
         {
             var (observer, pendingWaiter, token) = ((ReminderDiagnosticObserver Observer, TickCountWaiter Waiter, CancellationToken Token))state!;
+            observer.CancelWaiter(pendingWaiter, token);
+        }, (this, waiter, cancellationToken));
+
+        await waiter.TaskSource.Task.ConfigureAwait(false);
+    }
+
+    private async Task WaitAsync(LocalReminderScheduleWaiter waiter, CancellationToken cancellationToken)
+    {
+        using var registration = cancellationToken.Register(static state =>
+        {
+            var (observer, pendingWaiter, token) = ((ReminderDiagnosticObserver Observer, LocalReminderScheduleWaiter Waiter, CancellationToken Token))state!;
             observer.CancelWaiter(pendingWaiter, token);
         }, (this, waiter, cancellationToken));
 
@@ -296,6 +387,16 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         lock (_lock)
         {
             _tickCountWaiters.Remove(waiter);
+        }
+
+        waiter.TaskSource.TrySetCanceled(cancellationToken);
+    }
+
+    private void CancelWaiter(LocalReminderScheduleWaiter waiter, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            _localReminderScheduleWaiters.Remove(waiter);
         }
 
         waiter.TaskSource.TrySetCanceled(cancellationToken);
@@ -328,6 +429,32 @@ public sealed class ReminderDiagnosticObserver : IDisposable
             : 0;
     }
 
+    private bool IsLocalReminderScheduleReadyCore(GrainId grainId, string reminderName)
+    {
+        var key = new ReminderTickKey(grainId, reminderName);
+        if (GetActiveReminderCountCore(grainId, reminderName) == 0)
+        {
+            return false;
+        }
+
+        return _localReminderTickWaitArmedCounts.GetValueOrDefault(key) > _tickAttemptsByReminder.GetValueOrDefault(key)
+            && _localReminderTickWaitArmedVersions.GetValueOrDefault(key, -1) >= _localReminderScheduleVersions.GetValueOrDefault(key);
+    }
+
+    private bool IsActiveLocalReminder(ReminderTickKey key, object identity)
+    {
+        return _activeLocalReminders.TryGetValue(key, out var instances)
+            && instances.Contains(new LocalReminderInstanceKey(identity));
+    }
+
+    private void ResetLocalReminderScheduleState(ReminderTickKey key)
+    {
+        _tickAttemptsByReminder.Remove(key);
+        _localReminderTickWaitArmedCounts.Remove(key);
+        _localReminderScheduleVersions.Remove(key);
+        _localReminderTickWaitArmedVersions.Remove(key);
+    }
+
     private void ReleaseReadyTickWaiters(List<TaskCompletionSource<bool>> ready)
     {
         for (var i = _tickCountWaiters.Count - 1; i >= 0; i--)
@@ -358,6 +485,21 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         }
     }
 
+    private void ReleaseReadyLocalReminderScheduleWaiters(List<TaskCompletionSource<bool>> ready)
+    {
+        for (var i = _localReminderScheduleWaiters.Count - 1; i >= 0; i--)
+        {
+            var waiter = _localReminderScheduleWaiters[i];
+            if (!IsLocalReminderScheduleReadyCore(waiter.GrainId, waiter.ReminderName))
+            {
+                continue;
+            }
+
+            _localReminderScheduleWaiters.RemoveAt(i);
+            ready.Add(waiter.TaskSource);
+        }
+    }
+
     private readonly record struct ReminderTickKey(GrainId GrainId, string ReminderName);
     private readonly record struct LocalReminderInstanceKey(object Identity)
     {
@@ -382,11 +524,19 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
+    private sealed class LocalReminderScheduleWaiter(GrainId grainId, string reminderName)
+    {
+        public GrainId GrainId { get; } = grainId;
+        public string ReminderName { get; } = reminderName;
+        public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
         _storageSubscription.Dispose();
         _connection.Dispose();
+        _serviceConnection.Dispose();
     }
 }
 
@@ -425,6 +575,14 @@ public static class ReminderDiagnosticExtensions
     public static Task WaitForActiveReminderCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int expectedCount, CancellationToken cancellationToken, string reminderName)
     {
         return observer.WaitForActiveReminderCountAsync(grain.GetGrainId(), expectedCount, cancellationToken, reminderName);
+    }
+
+    /// <summary>
+    /// Waits until an active local owner has armed the next tick wait for a grain reminder.
+    /// </summary>
+    public static Task WaitForLocalReminderScheduleAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string reminderName, CancellationToken cancellationToken)
+    {
+        return observer.WaitForLocalReminderScheduleAsync(grain.GetGrainId(), reminderName, cancellationToken);
     }
 
     /// <summary>

@@ -11,6 +11,7 @@ internal partial class ActivationDataActivatorProvider(
     IServiceProvider serviceProvider,
     GrainTypeSharedContextResolver sharedComponentsResolver,
     IOptions<SchedulingOptions> schedulingOptions,
+    SchedulerInstruments schedulerInstruments,
     IOptions<StatelessWorkerOptions> statelessWorkerOptions) : IGrainContextActivatorProvider
 {
     public bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator? activator)
@@ -32,7 +33,8 @@ internal partial class ActivationDataActivatorProvider(
             instanceActivator,
             serviceProvider,
             sharedContext,
-            schedulingOptions);
+            schedulingOptions,
+            schedulerInstruments);
 
         if (sharedContext.PlacementStrategy is StatelessWorkerPlacement)
         {
@@ -60,7 +62,8 @@ internal partial class ActivationDataActivatorProvider(
             IGrainActivator grainActivator,
             IServiceProvider serviceProvider,
             GrainTypeSharedContext sharedComponents,
-            IOptions<SchedulingOptions> schedulingOptions)
+            IOptions<SchedulingOptions> schedulingOptions,
+            SchedulerInstruments schedulerInstruments)
         {
             _schedulingOptions = schedulingOptions;
             _grainActivator = grainActivator;
@@ -68,7 +71,8 @@ internal partial class ActivationDataActivatorProvider(
             _sharedComponents = sharedComponents;
             _createWorkItemGroup = context => new WorkItemGroup(
                 context,
-                _schedulingOptions);
+                _schedulingOptions,
+                schedulerInstruments);
             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
 

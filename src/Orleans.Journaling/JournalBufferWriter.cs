@@ -192,6 +192,22 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
+    /// <summary>
+    /// Gets the current committed byte count without copying or pinning the underlying buffer.
+    /// Intended for diagnostics/instrumentation.
+    /// </summary>
+    internal int CommittedLength
+    {
+        get
+        {
+            lock (_lock)
+            {
+                ThrowIfDisposed();
+                return _committedLength;
+            }
+        }
+    }
+
     internal void Consume(ArcBuffer buffer)
     {
         lock (_lock)

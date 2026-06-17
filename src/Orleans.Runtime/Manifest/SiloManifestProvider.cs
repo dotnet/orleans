@@ -40,13 +40,13 @@ namespace Orleans.Metadata
             foreach (var grainInterface in grainTypeOptions.Value.Interfaces)
             {
                 var interfaceId = grainInterfaceIdProvider.GetGrainInterfaceType(grainInterface);
-                var properties = new Dictionary<string, string>();
+                var properties = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (var provider in propertyProviders)
                 {
                     provider.Populate(grainInterface, interfaceId, properties);
                 }
 
-                var result = new GrainInterfaceProperties(properties.ToImmutableDictionary());
+                var result = new GrainInterfaceProperties(ToImmutablePropertyDictionary(properties));
                 if (builder.TryGetValue(interfaceId, out var graintInterfaceProperty))
                 {
                     throw new InvalidOperationException($"An entry with the key {interfaceId} is already present."
@@ -70,13 +70,13 @@ namespace Orleans.Metadata
             foreach (var grainClass in grainTypeOptions.Value.Classes)
             {
                 var grainType = grainTypeProvider.GetGrainType(grainClass);
-                var properties = new Dictionary<string, string>();
+                var properties = new Dictionary<string, string>(StringComparer.Ordinal);
                 foreach (var provider in grainMetadataProviders)
                 {
                     provider.Populate(grainClass, grainType, properties);
                 }
 
-                var result = new GrainProperties(properties.ToImmutableDictionary());
+                var result = new GrainProperties(ToImmutablePropertyDictionary(properties));
                 if (propertiesMap.TryGetValue(grainType, out var grainProperty))
                 {
                     throw new InvalidOperationException($"An entry with the key {grainType} is already present."
@@ -89,6 +89,17 @@ namespace Orleans.Metadata
             }
 
             return (propertiesMap.ToImmutable(), typeMap.ToImmutable());
+        }
+
+        private static ImmutableDictionary<string, string> ToImmutablePropertyDictionary(Dictionary<string, string> properties)
+        {
+            var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal, StringComparer.Ordinal);
+            foreach (var property in properties)
+            {
+                builder.Add(property.Key, property.Value);
+            }
+
+            return builder.ToImmutable();
         }
     }
 }

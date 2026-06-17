@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -16,6 +17,7 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
     private Dictionary<string, DateTimeOffset> jobExecutionTimes = new();
     private Dictionary<string, IJobRunContext> jobContexts = new();
     private Dictionary<string, bool> cancellationTokenStatus = new();
+    private Dictionary<string, string> jobTraceIds = new();
     private readonly ILocalDurableJobManager _localDurableJobManager;
     private readonly ILogger<DurableJobGrain> _logger;
 
@@ -36,6 +38,7 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
         jobExecutionTimes[ctx.Job.Id] = DateTimeOffset.UtcNow;
         jobContexts[ctx.Job.Id] = ctx;
         cancellationTokenStatus[ctx.Job.Id] = cancellationToken.IsCancellationRequested;
+        jobTraceIds[ctx.Job.Id] = Activity.Current?.TraceId.ToString() ?? string.Empty;
         jobRunStatus[ctx.Job.Id].SetResult();
         return Task.CompletedTask;
     }
@@ -94,5 +97,10 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
     public Task<bool> WasCancellationTokenCancelled(string jobId)
     {
         return Task.FromResult(cancellationTokenStatus.TryGetValue(jobId, out var cancelled) && cancelled);
+    }
+
+    public Task<string> GetJobTraceId(string jobId)
+    {
+        return Task.FromResult(jobTraceIds.TryGetValue(jobId, out var traceId) ? traceId : string.Empty);
     }
 }

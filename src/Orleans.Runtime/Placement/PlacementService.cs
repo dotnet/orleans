@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -102,8 +103,10 @@ namespace Orleans.Runtime.Placement
             lifecycle.Subscribe(
                 nameof(PlacementService),
                 ServiceLifecycleStage.RuntimeInitialize + 1,
-                static _ => Task.CompletedTask,
+                NoOpStart,
                 StopAsync);
+
+            static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
         }
 
         private async Task StopAsync(CancellationToken cancellationToken)
@@ -163,47 +166,50 @@ namespace Orleans.Runtime.Placement
         {
             ThrowIfStopping();
 
+            var grainType = target.GrainIdentity.Type;
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
-            if (_assumeHomogeneousSilosForTesting)
+            var compatibleSilos = _assumeHomogeneousSilosForTesting
+                ? _siloStatusOracle.GetActiveSilos()
+                : target.InterfaceVersion > 0
+                    ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
+                    : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
+
+            if (!_assumeHomogeneousSilosForTesting)
             {
-                return AllActiveSilos;
-            }
-
-            var grainType = target.GrainIdentity.Type;
-            var silos = target.InterfaceVersion > 0
-                ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
-                : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
-
-            var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
-
-            ThrowIfStopping();
-            var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
-            if (filters.Length > 0)
-            {
-                // Capture the parent activity context now so each filter span is parented to the
-                // current activity (e.g. PlaceGrain) rather than to sibling filter spans that may
-                // be active during deferred enumeration.
-                var parentActivityContext = Activity.Current?.Context;
-
-                IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
-                foreach (var placementFilter in filters)
-                {
-                    ThrowIfStopping();
-                    var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                    filteredSilos = InstrumentFilteredSilos(
-                        director.Filter(placementFilter, target, filteredSilos),
-                        placementFilter,
-                        grainType,
-                        parentActivityContext);
-                }
-
                 ThrowIfStopping();
-                compatibleSilos = filteredSilos.ToArray();
+                var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
+                if (filters.Length > 0)
+                {
+                    // Capture the parent activity context now so each filter span is parented to the
+                    // current activity (e.g. PlaceGrain) rather than to sibling filter spans that may
+                    // be active during deferred enumeration.
+                    var parentActivityContext = Activity.Current?.Context;
+
+                    IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
+                    foreach (var placementFilter in filters)
+                    {
+                        ThrowIfStopping();
+                        var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
+                        filteredSilos = InstrumentFilteredSilos(
+                            director.Filter(placementFilter, target, filteredSilos),
+                            placementFilter,
+                            grainType,
+                            parentActivityContext);
+                    }
+
+                    ThrowIfStopping();
+                    compatibleSilos = filteredSilos.ToArray();
+                }
             }
 
             if (compatibleSilos.Length == 0)
             {
+                if (_assumeHomogeneousSilosForTesting)
+                {
+                    throw new OrleansException($"No active nodes are compatible with grain {grainType} and interface {target.InterfaceType} version {target.InterfaceVersion}.");
+                }
+
                 var allWithType = _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
                 var versions = _grainInterfaceVersions.GetSupportedSilos(target.InterfaceType, target.InterfaceVersion).Result;
                 var allWithTypeString = string.Join(", ", allWithType.Select(s => s.ToString())) is string withGrain && !string.IsNullOrWhiteSpace(withGrain) ? withGrain : "none";
@@ -215,18 +221,6 @@ namespace Orleans.Runtime.Placement
             }
 
             return compatibleSilos;
-        }
-
-        public SiloAddress[] AllActiveSilos
-        {
-            get
-            {
-                var result = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
-                if (result.Length > 0) return result;
-
-                LogWarningAllActiveSilos();
-                return new SiloAddress[] { LocalSilo };
-            }
         }
 
         public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
@@ -624,13 +618,6 @@ namespace Orleans.Runtime.Placement
             Message = "AddressMessage Placement SelectTarget {Message}"
         )]
         private partial void LogTraceAddressMessageSelectTarget(Message message);
-
-        [LoggerMessage(
-            EventId = (int)ErrorCode.Catalog_GetApproximateSiloStatuses,
-            Level = LogLevel.Warning,
-            Message = "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty"
-        )]
-        private partial void LogWarningAllActiveSilos();
 
         [LoggerMessage(
             Level = LogLevel.Debug,

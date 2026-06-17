@@ -1,5 +1,5 @@
-using System.Collections.Immutable;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -35,7 +35,7 @@ namespace UnitTests.LivenessTests
         public void ConsistentRingProvider_Test2()
         {
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30, new FakeSiloStatusOracle());
+            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30, new FakeSiloStatusOracle(), CreateConsistentRingInstruments());
             _output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
 
             for (int i = 1; i <= 10; i++)
@@ -54,7 +54,7 @@ namespace UnitTests.LivenessTests
 
             Random random = new Random();
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(random.Next(100000));
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50, new FakeSiloStatusOracle());
+            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50, new FakeSiloStatusOracle(), CreateConsistentRingInstruments());
 
             for (int i = 1; i <= NUM_SILOS - 1; i++)
             {
@@ -117,6 +117,15 @@ namespace UnitTests.LivenessTests
             return queueHistogram;
         }
 
+        private static ConsistentRingInstruments CreateConsistentRingInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<ConsistentRingInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<ConsistentRingInstruments>();
+        }
+
         internal sealed class FakeSiloStatusOracle : ISiloStatusOracle
         {
             private readonly Dictionary<SiloAddress, SiloStatus> _content = [];
@@ -172,8 +181,7 @@ namespace UnitTests.LivenessTests
             }
 
             public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Remove(observer);
-            public ImmutableArray<SiloAddress> GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];
+            public SiloAddress[] GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];
         }
     }
 }
-

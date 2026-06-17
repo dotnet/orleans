@@ -549,9 +549,9 @@ namespace Orleans.Providers.Streams.Common
     public partial class DefaultBlockPoolMonitor : IBlockPoolMonitor
     {
         protected System.Collections.Generic.KeyValuePair<string, object>[] _dimensions;
-        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions) { }
+        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) { }
 
-        protected DefaultBlockPoolMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
+        protected DefaultBlockPoolMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
 
         public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte) { }
 
@@ -562,9 +562,9 @@ namespace Orleans.Providers.Streams.Common
 
     public partial class DefaultCacheMonitor : ICacheMonitor
     {
-        public DefaultCacheMonitor(CacheMonitorDimensions dimensions) { }
+        public DefaultCacheMonitor(CacheMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) { }
 
-        protected DefaultCacheMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
+        protected DefaultCacheMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
 
         public void ReportCacheSize(long totalCacheSizeInByte) { }
 
@@ -583,9 +583,9 @@ namespace Orleans.Providers.Streams.Common
 
     public partial class DefaultQueueAdapterReceiverMonitor : IQueueAdapterReceiverMonitor
     {
-        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions) { }
+        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions, Runtime.OrleansInstruments instruments) { }
 
-        protected DefaultQueueAdapterReceiverMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) { }
+        protected DefaultQueueAdapterReceiverMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions, Runtime.OrleansInstruments instruments) { }
 
         public void TrackInitialization(bool success, System.TimeSpan callTime, System.Exception exception) { }
 
@@ -1480,6 +1480,7 @@ namespace Orleans.Streams
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken token);
         bool IsUnderPressure();
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
+        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
     }
 
     public partial interface IQueueCacheCursor : System.IDisposable
@@ -1582,6 +1583,7 @@ namespace Orleans.Streams
     {
         bool CheckpointExists { get; }
 
+        System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<TCheckpoint> Load();
         void Update(TCheckpoint offset, System.DateTime utcNow);
     }

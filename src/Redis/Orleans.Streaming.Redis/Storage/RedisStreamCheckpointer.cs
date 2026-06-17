@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using StackExchange.Redis;
 using static System.FormattableString;
@@ -55,16 +56,17 @@ internal sealed class RedisStreamCheckpointer
         }
     }
 
-    public async Task FlushAsync()
+    public async Task FlushAsync(CancellationToken cancellationToken)
     {
         while (true)
         {
-            await _inProgressSave;
+            await _inProgressSave.WaitAsync(cancellationToken);
             if (string.Equals(_persistedOffset, Offset, StringComparison.Ordinal))
             {
                 return;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             StartSave(Offset!, DateTime.UtcNow);
         }
     }

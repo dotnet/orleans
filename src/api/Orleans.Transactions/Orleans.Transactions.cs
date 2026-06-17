@@ -453,6 +453,10 @@ namespace Orleans.Transactions
 
     public partial class TransactionAgentStatistics : Abstractions.ITransactionAgentStatistics
     {
+        public TransactionAgentStatistics() { }
+
+        public TransactionAgentStatistics(Runtime.OrleansInstruments instruments) { }
+
         public long TransactionsFailed { get { throw null; } }
 
         public long TransactionsStarted { get { throw null; } }

@@ -19,6 +19,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly IGrainDirectoryCache cache;
         private readonly bool disposeCache;
+        private readonly DirectoryInstruments _directoryInstruments;
 
         private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
         private readonly IClusterMembershipService clusterMembershipService;
@@ -36,11 +37,13 @@ namespace Orleans.Runtime.GrainDirectory
             IServiceProvider serviceProvider,
             GrainDirectoryResolver grainDirectoryResolver,
             IClusterMembershipService clusterMembershipService,
+            DirectoryInstruments directoryInstruments,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions)
         {
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.clusterMembershipService = clusterMembershipService;
-            this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeCache);
+            _directoryInstruments = directoryInstruments;
+            this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeCache, _directoryInstruments);
         }
 
         public async ValueTask<GrainAddress> Lookup(GrainId grainId)
@@ -217,7 +220,7 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowUnsupportedGrainType(grainId);
             }
 
-            DirectoryInstruments.LookupsCacheIssued.Add(1);
+            _directoryInstruments.LookupsCacheIssued.Add(1);
             if (this.cache.LookUp(grainId, out address, out _))
             {
                 // If the silo is dead, remove the entry
@@ -229,7 +232,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     // Entry found and valid -> return it
-                    DirectoryInstruments.LookupsCacheSuccesses.Add(1);
+                    _directoryInstruments.LookupsCacheSuccesses.Add(1);
                     return true;
                 }
             }

@@ -12,11 +12,11 @@ namespace Orleans.Configuration
     {
         public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
 
-        public System.Func<RedisGrainDirectoryOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>> CreateMultiplexer { get { throw null; } set { } }
+        public System.Func<RedisGrainDirectoryOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get { throw null; } set { } }
 
         public System.TimeSpan? EntryExpiry { get { throw null; } set { } }
 
-        public static System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer> DefaultCreateMultiplexer(RedisGrainDirectoryOptions options) { throw null; }
+        public static System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisGrainDirectoryOptions options) { throw null; }
     }
 
     public partial class RedisGrainDirectoryOptionsValidator : IConfigurationValidator
@@ -29,9 +29,13 @@ namespace Orleans.Configuration
 
 namespace Orleans.GrainDirectory.Redis
 {
-    public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<Runtime.ISiloLifecycle>
+    public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<Runtime.ISiloLifecycle>, System.IDisposable, System.IAsyncDisposable
     {
         public RedisGrainDirectory(Configuration.RedisGrainDirectoryOptions directoryOptions, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILogger<RedisGrainDirectory> logger) { }
+
+        public void Dispose() { }
+
+        public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
         public System.Threading.Tasks.Task Initialize(System.Threading.CancellationToken ct = default) { throw null; }
 

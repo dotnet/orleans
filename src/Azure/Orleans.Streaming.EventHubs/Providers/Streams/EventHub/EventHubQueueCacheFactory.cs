@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs.StatisticMonitors;
 
@@ -19,6 +20,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly IEventHubDataAdapter dataAdater;
         private readonly TimePurgePredicate timePurge;
         private readonly EventHubMonitorAggregationDimensions sharedDimensions;
+        private readonly OrleansInstruments orleansInstruments;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private string bufferPoolId;
 
@@ -39,10 +41,11 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public EventHubQueueCacheFactory(
             EventHubStreamCachePressureOptions cacheOptions,
-            StreamCacheEvictionOptions evictionOptions, 
+            StreamCacheEvictionOptions evictionOptions,
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdater,
             EventHubMonitorAggregationDimensions sharedDimensions,
+            OrleansInstruments instruments,
             Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
             Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
         {
@@ -52,8 +55,9 @@ namespace Orleans.Streaming.EventHubs
             this.dataAdater = dataAdater;
             this.timePurge = new TimePurgePredicate(evictionOptions.DataMinTimeInCache, evictionOptions.DataMaxAgeInCache);
             this.sharedDimensions = sharedDimensions;
-            this.CacheMonitorFactory = cacheMonitorFactory ?? ((dimensions, logger) => new DefaultEventHubCacheMonitor(dimensions));
-            this.BlockPoolMonitorFactory = blockPoolMonitorFactory ?? ((dimensions, logger) => new DefaultEventHubBlockPoolMonitor(dimensions));
+            this.orleansInstruments = instruments;
+            this.CacheMonitorFactory = cacheMonitorFactory ?? ((dimensions, logger) => new DefaultEventHubCacheMonitor(dimensions, this.orleansInstruments));
+            this.BlockPoolMonitorFactory = blockPoolMonitorFactory ?? ((dimensions, logger) => new DefaultEventHubBlockPoolMonitor(dimensions, this.orleansInstruments));
         }
 
         /// <summary>

@@ -28,6 +28,8 @@ namespace Orleans.Hosting
 
         internal static IServiceCollection AddTransactionsBaseline(this IServiceCollection services)
         {
+            services.AddMetrics();
+            services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<IClock, Clock>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.AddSingleton<ITransactionClient, TransactionClient>();

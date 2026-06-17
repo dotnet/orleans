@@ -109,6 +109,18 @@ internal partial class LocalDurableJobManager
     private static partial void LogErrorInPeriodicCheck(ILogger logger, Exception exception);
 
     [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Writable shard {ShardId} for key {ShardStartTime}/{ShardStripe} was disposed while scheduling. Removing stale entry and retrying."
+    )]
+    private static partial void LogWritableShardDisposedDuringScheduling(ILogger logger, Exception exception, string shardId, DateTimeOffset shardStartTime, int shardStripe);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Expired writable shard {ShardId} for key {ShardStartTime}/{ShardStripe} was already disposed while completing. Removing stale entry."
+    )]
+    private static partial void LogExpiredWritableShardAlreadyDisposed(ILogger logger, Exception exception, string shardId, DateTimeOffset shardStartTime, int shardStripe);
+
+    [LoggerMessage(
         Level = LogLevel.Information,
         Message = "Unregistered shard {ShardId}"
     )]
@@ -128,9 +140,9 @@ internal partial class LocalDurableJobManager
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Creating new shard for key {ShardKey}"
+        Message = "Creating new shard for key {ShardStartTime}/{ShardStripe}"
     )]
-    private static partial void LogCreatingNewShard(ILogger logger, DateTimeOffset shardKey);
+    private static partial void LogCreatingNewShard(ILogger logger, DateTimeOffset shardStartTime, int shardStripe);
 
     [LoggerMessage(
         Level = LogLevel.Information,

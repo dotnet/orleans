@@ -23,6 +23,7 @@ namespace Orleans.Streaming.EventHubs
     {
         private readonly ILoggerFactory loggerFactory;
         private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
+        private readonly OrleansInstruments orleansInstruments;
 
         /// <summary>
         /// Data adapter
@@ -125,6 +126,7 @@ namespace Orleans.Streaming.EventHubs
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.environmentStatisticsProvider = environmentStatisticsProvider;
+            this.orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
         }
 
         public virtual void Init()
@@ -151,7 +153,7 @@ namespace Orleans.Streaming.EventHubs
 
             if (this.ReceiverMonitorFactory == null)
             {
-                this.ReceiverMonitorFactory = (dimensions, logger) => new DefaultEventHubReceiverMonitor(dimensions);
+                this.ReceiverMonitorFactory = (dimensions, logger) => new DefaultEventHubReceiverMonitor(dimensions, this.orleansInstruments);
             }
 
             this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.EventHubName}");
@@ -263,7 +265,7 @@ namespace Orleans.Streaming.EventHubs
         {
            var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions, this.orleansInstruments);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)

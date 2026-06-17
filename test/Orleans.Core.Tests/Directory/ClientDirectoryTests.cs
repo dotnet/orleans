@@ -80,7 +80,11 @@ namespace NonSilo.Tests.Directory
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
                 timerRegistry: null,
-                activations: new ActivationDirectory());
+                activations: new ActivationDirectory(CreateCatalogInstruments()),
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments(),
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
 
             _directory = new ClientDirectory(
                 grainFactory: _grainFactory,
@@ -95,6 +99,51 @@ namespace NonSilo.Tests.Directory
 
             // Disable automatic publishing to simplify testing.
             _testAccessor.SchedulePublishUpdate = () => { };
+        }
+
+        private static SchedulerInstruments CreateSchedulerInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<SchedulerInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
+        }
+
+        private static CatalogInstruments CreateCatalogInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<CatalogInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<CatalogInstruments>();
+        }
+
+        private static GrainInstruments CreateGrainInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<GrainInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<GrainInstruments>();
+        }
+
+        private static MessagingInstruments CreateMessagingInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<MessagingInstruments>();
+        }
+
+        private static MessagingProcessingInstruments CreateMessagingProcessingInstruments()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingProcessingInstruments>();
+            return services.BuildServiceProvider().GetRequiredService<MessagingProcessingInstruments>();
         }
 
         /// <summary>

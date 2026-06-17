@@ -15,6 +15,19 @@ permissions:
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
+  # Docker images started by workflow steps are centralized so pulls can be retried and mirrors can be swapped in one place.
+  AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
+  EVENTHUBS_EMULATOR_IMAGE: mcr.microsoft.com/azure-messaging/eventhubs-emulator:2.2.0@sha256:2c8e0d4dd93a5fc078df2721eeb3e211442d555d61293ac3972df931c6d9333a
+  COSMOSDB_EMULATOR_IMAGE: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview@sha256:bf3bd3cbe3fae2005a0745f77b01d1fc8cd04112193f3ee32289ee15ee9ae5fa
+  CONSUL_IMAGE: public.ecr.aws/hashicorp/consul:1.19
+  DYNAMODB_IMAGE: amazon/dynamodb-local:latest
+  ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
+  MSSQL_IMAGE: mcr.microsoft.com/mssql/server:latest
+  NATS_IMAGE: nats:latest
+  POSTGRES_IMAGE: postgres
+  REDIS_IMAGE: redis
+  TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0
+  ZOOKEEPER_IMAGE: zookeeper:3.9
 jobs:
   build:
     name: Build
@@ -28,7 +41,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '20.x'
+        node-version: '24.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -36,6 +49,7 @@ jobs:
     - name: Build
       run: dotnet build -bl
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      continue-on-error: true
       with:
         name: build_log_${{ matrix.os }}
         retention-days: 1
@@ -45,22 +59,30 @@ jobs:
     name: Redis provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["Redis"]
         framework: ["net8.0", "net10.0"]
-    services:
-      redis:
-        image: redis
-        ports:
-        - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Start Redis
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$REDIS_IMAGE"
+
+        docker run -d --pull=never --name redis \
+          -p 6379:6379 \
+          --health-cmd "redis-cli ping" \
+          --health-interval 10s \
+          --health-timeout 5s \
+          --health-retries 5 \
+          "$REDIS_IMAGE"
+
+        bash .github/scripts/docker-wait-for-health.sh redis
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -77,8 +99,12 @@ jobs:
         -parallel none -noshadow
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
+    - name: Clean up Redis
+      if: always()
+      run: docker rm -f redis || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -90,6 +116,9 @@ jobs:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
+      CASSANDRA_IMAGE: cassandra:${{ matrix.dbversion }}
     strategy:
       matrix:
         provider: ["Cassandra"]
@@ -97,6 +126,13 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Pre-pull Cassandra test images
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$CASSANDRA_IMAGE"
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -115,6 +151,7 @@ jobs:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.dbversion }}_${{ matrix.framework }}
@@ -126,25 +163,33 @@ jobs:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      POSTGRES_PASSWORD: postgres
     strategy:
       matrix:
         provider: ["PostgreSql"]
         framework: ["net8.0", "net10.0"]
-    services:
-      postgres:
-        image: postgres
-        env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
-          POSTGRES_PASSWORD: postgres
-        ports:
-        - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Start PostgreSQL
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$POSTGRES_IMAGE"
+
+        docker run -d --pull=never --name postgres \
+          -p 5432:5432 \
+          -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+          --health-cmd "pg_isready -U postgres" \
+          --health-interval 10s \
+          --health-timeout 5s \
+          --health-retries 5 \
+          "$POSTGRES_IMAGE"
+
+        bash .github/scripts/docker-wait-for-health.sh postgres
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -162,8 +207,12 @@ jobs:
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
+    - name: Clean up PostgreSQL
+      if: always()
+      run: docker rm -f postgres || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -175,24 +224,57 @@ jobs:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
+      # The official MariaDB 10.6 image is not published to GHCR. Use Google's Docker Hub mirror
+      # pinned to the official Docker Hub digest.
+      MARIADB_IMAGE: mirror.gcr.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      MARIADB_ROOT_PASSWORD: "mariadb"
     strategy:
       matrix:
         provider: ["MySql"]
         framework: ["net8.0", "net10.0"]
-    services:
-      mariadb:
-        image: mariadb:10.6
-        ports:
-          - 3306:3306
-        env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
-          MARIADB_ROOT_PASSWORD: "mariadb"
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Start MariaDB
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$MARIADB_IMAGE"
+
+        docker run -d --pull=never --name mariadb \
+          -p 3306:3306 \
+          -e MARIADB_ROOT_PASSWORD="$MARIADB_ROOT_PASSWORD" \
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -p${MARIADB_ROOT_PASSWORD} --silent" \
+          --health-interval 5s \
+          --health-timeout 5s \
+          --health-retries 24 \
+          "$MARIADB_IMAGE"
+
+        for attempt in $(seq 1 60); do
+          status="$(docker inspect --format '{{.State.Health.Status}}' mariadb)"
+          case "$status" in
+            healthy)
+              exit 0
+              ;;
+            unhealthy)
+              docker logs mariadb
+              exit 1
+              ;;
+          esac
+
+          sleep 2
+        done
+
+        echo "MariaDB did not become healthy in time."
+        docker logs mariadb
+        exit 1
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -208,6 +290,7 @@ jobs:
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -219,22 +302,35 @@ jobs:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      SA_PASSWORD: "yourWeak(!)Password"
     strategy:
       matrix:
         provider: ["SqlServer"]
         framework: ["net8.0", "net10.0"]
-    services:
-      mssql:
-        image: mcr.microsoft.com/mssql/server:latest
-        ports:
-          - 1433:1433
-        env:
-          ACCEPT_EULA: "Y"
-          MSSQL_PID: "Developer"
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
-          SA_PASSWORD: "yourWeak(!)Password"
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Start SQL Server
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$MSSQL_IMAGE"
+
+        docker run -d --pull=never --name mssql \
+          -p 1433:1433 \
+          -e ACCEPT_EULA="$ACCEPT_EULA" \
+          -e MSSQL_PID="$MSSQL_PID" \
+          -e SA_PASSWORD="$SA_PASSWORD" \
+          "$MSSQL_IMAGE"
+
+        echo "Waiting for SQL Server to accept TCP connections..."
+        timeout 120 bash -c 'until nc -z localhost 1433; do sleep 2; done'
+        echo "SQL Server is accepting TCP connections"
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -252,8 +348,12 @@ jobs:
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
+    - name: Clean up SQL Server
+      if: always()
+      run: docker rm -f mssql || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -265,6 +365,8 @@ jobs:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         framework: ["net8.0", "net10.0"]
@@ -273,11 +375,15 @@ jobs:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
       run: |
-        docker run -d --name azurite \
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
+
+        docker run -d --pull=never --name azurite \
           -p 10000:10000 \
           -p 10001:10001 \
           -p 10002:10002 \
-          mcr.microsoft.com/azure-storage/azurite:latest \
+          "$AZURITE_IMAGE" \
           azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
     - name: Wait for Azurite
       run: |
@@ -305,9 +411,10 @@ jobs:
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
     - name: Clean up Azurite
       if: always()
-      run: docker rm -f azurite
+      run: docker rm -f azurite || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -319,6 +426,8 @@ jobs:
     name: Azure Event Hubs provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         framework: ["net8.0", "net10.0"]
@@ -327,11 +436,15 @@ jobs:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
       run: |
-        docker run -d --name azurite \
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
+
+        docker run -d --pull=never --name azurite \
           -p 10000:10000 \
           -p 10001:10001 \
           -p 10002:10002 \
-          mcr.microsoft.com/azure-storage/azurite:latest \
+          "$AZURITE_IMAGE" \
           azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
     - name: Wait for Azurite
       run: |
@@ -340,14 +453,18 @@ jobs:
         echo "Azurite is ready"
     - name: Start Event Hubs emulator
       run: |
-        docker run -d --name eventhubs-emulator \
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$EVENTHUBS_EMULATOR_IMAGE"
+
+        docker run -d --pull=never --name eventhubs-emulator \
           -v ${{ github.workspace }}/.github/eventhubs-emulator/Config.json:/Eventhubs_Emulator/ConfigFiles/Config.json \
           -p 5672:5672 \
           -e BLOB_SERVER=host.docker.internal \
           -e METADATA_SERVER=host.docker.internal \
           -e ACCEPT_EULA=Y \
           --add-host=host.docker.internal:host-gateway \
-          mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest
+          "$EVENTHUBS_EMULATOR_IMAGE"
     - name: Wait for Event Hubs emulator
       run: |
         echo "Waiting for Event Hubs emulator to be ready..."
@@ -376,12 +493,13 @@ jobs:
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
     - name: Clean up Event Hubs emulator
       if: always()
-      run: docker rm -f eventhubs-emulator
+      run: docker rm -f eventhubs-emulator || true
     - name: Clean up Azurite
       if: always()
-      run: docker rm -f azurite
+      run: docker rm -f azurite || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -393,6 +511,8 @@ jobs:
     name: Azure Cosmos DB provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         framework: ["net8.0", "net10.0"]
@@ -405,13 +525,17 @@ jobs:
         global-json-file: global.json
     - name: Start Azure Cosmos DB emulator
       run: |
-        docker run -d --name cosmosdb-emulator \
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$COSMOSDB_EMULATOR_IMAGE"
+
+        docker run -d --pull=never --name cosmosdb-emulator \
           -p 8081:8081 \
           -e PROTOCOL=https \
           -e ENABLE_EXPLORER=false \
           -e ENABLE_TELEMETRY=false \
           -e LOG_LEVEL=warn \
-          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview@sha256:bf3bd3cbe3fae2005a0745f77b01d1fc8cd04112193f3ee32289ee15ee9ae5fa
+          "$COSMOSDB_EMULATOR_IMAGE"
     - name: Wait for Azure Cosmos DB emulator
       run: |
         endpoint="https://localhost:8081/"
@@ -468,6 +592,7 @@ jobs:
       run: docker rm -f cosmosdb-emulator || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -479,12 +604,21 @@ jobs:
     name: Consul provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["Consul"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Pre-pull Consul test images
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$CONSUL_IMAGE"
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -501,6 +635,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -512,17 +647,28 @@ jobs:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["ZooKeeper"]
         framework: ["net8.0", "net10.0"]
-    services:
-      zookeeper:
-        image: zookeeper:3.9
-        ports:
-          - 2181:2181
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Start ZooKeeper
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$ZOOKEEPER_IMAGE"
+
+        docker run -d --pull=never --name zookeeper \
+          -p 2181:2181 \
+          "$ZOOKEEPER_IMAGE"
+
+        echo "Waiting for ZooKeeper to accept TCP connections..."
+        timeout 60 bash -c 'until nc -z localhost 2181; do sleep 1; done'
+        echo "ZooKeeper is accepting TCP connections"
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -539,8 +685,12 @@ jobs:
         -parallel none -noshadow
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
+    - name: Clean up ZooKeeper
+      if: always()
+      run: docker rm -f zookeeper || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -552,23 +702,36 @@ jobs:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      AWS_ACCESS_KEY_ID: root
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      AWS_SECRET_ACCESS_KEY: pass
+      AWS_REGION: us-east-1
     strategy:
       matrix:
         provider: ["DynamoDB"]
         framework: ["net8.0", "net10.0"]
-    services:
-      dynamodb:
-        image: amazon/dynamodb-local:latest
-        ports:
-        - 8000:8000
-        env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-          AWS_ACCESS_KEY_ID: root
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-          AWS_SECRET_ACCESS_KEY: pass
-          AWS_REGION: us-east-1
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Start DynamoDB Local
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
+
+        docker run -d --pull=never --name dynamodb \
+          -p 8000:8000 \
+          -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+          -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+          -e AWS_REGION="$AWS_REGION" \
+          "$DYNAMODB_IMAGE"
+
+        echo "Waiting for DynamoDB Local to accept TCP connections..."
+        timeout 60 bash -c 'until nc -z localhost 8000; do sleep 1; done'
+        echo "DynamoDB Local is accepting TCP connections"
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -589,8 +752,12 @@ jobs:
         ORLEANSDYNAMODBACCESSKEY: "root"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDYNAMODBSECRETKEY: "pass"
+    - name: Clean up DynamoDB Local
+      if: always()
+      run: docker rm -f dynamodb || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -602,30 +769,47 @@ jobs:
     name: AWS SQS provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      AWS_ACCESS_KEY_ID: root
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      AWS_SECRET_ACCESS_KEY: pass
+      AWS_REGION: us-east-1
     strategy:
       matrix:
         provider: ["SQS"]
         framework: ["net8.0", "net10.0"]
-    services:
-      dynamodb:
-        image: amazon/dynamodb-local:latest
-        ports:
-        - 8000:8000
-        env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-          AWS_ACCESS_KEY_ID: root
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-          AWS_SECRET_ACCESS_KEY: pass
-          AWS_REGION: us-east-1
     steps:
+    - uses: actions/checkout@v4
+    - name: Start DynamoDB Local
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
+
+        docker run -d --pull=never --name dynamodb \
+          -p 8000:8000 \
+          -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+          -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+          -e AWS_REGION="$AWS_REGION" \
+          "$DYNAMODB_IMAGE"
     - name: Start ElasticMQ
-      run: docker run -d --name elasticmq -p 9324:9324 softwaremill/elasticmq-native:latest
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$ELASTICMQ_IMAGE"
+
+        docker run -d --pull=never --name elasticmq \
+          -p 9324:9324 \
+          "$ELASTICMQ_IMAGE"
     - name: Wait for ElasticMQ and DynamoDB
       run: |
         echo "Waiting for ElasticMQ and DynamoDB Local to be ready..."
         timeout 60 bash -c 'until nc -z localhost 9324 && nc -z localhost 8000; do sleep 1; done'
         echo "ElasticMQ and DynamoDB Local are ready"
-    - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -650,9 +834,13 @@ jobs:
         ORLEANSDYNAMODBSECRETKEY: "pass"
     - name: Clean up ElasticMQ
       if: always()
-      run: docker rm -f elasticmq
+      run: docker rm -f elasticmq || true
+    - name: Clean up DynamoDB Local
+      if: always()
+      run: docker rm -f dynamodb || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@v4
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -664,6 +852,8 @@ jobs:
     name: NATS stream provider tests
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      BuildExternalAssets: "false"
     strategy:
       matrix:
         provider: ["NATS"]
@@ -677,8 +867,19 @@ jobs:
 #        env:
 #          HTTP_PORT: 8222
     steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start NATS
-      run: docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:latest --js --http_port=8222
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$NATS_IMAGE"
+
+        docker run -d --pull=never --name nats \
+          -p 4222:4222 \
+          -p 8222:8222 \
+          "$NATS_IMAGE" \
+          --js --http_port=8222
     - name: Wait for NATS
       run: |
         echo "Waiting for NATS to be ready..."
@@ -687,7 +888,6 @@ jobs:
           exit 1
         fi
         echo "NATS is ready"
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -705,9 +905,10 @@ jobs:
         -parallel none -noshadow
     - name: Clean up container
       if: always()
-      run: docker rm -f nats
+      run: docker rm -f nats || true
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
@@ -729,7 +930,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '20.x'
+        node-version: '24.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -748,6 +949,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
@@ -781,6 +983,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DurableJobsJournaling.Abstractions\DurableJobsJournaling.Abstractions.csproj" />
+    <ProjectReference Include="..\DurableJobsJournaling.ServiceDefaults\DurableJobsJournaling.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.DurableJobs.AzureStorage\Orleans.DurableJobs.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\..\src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+  </ItemGroup>
+
+</Project>

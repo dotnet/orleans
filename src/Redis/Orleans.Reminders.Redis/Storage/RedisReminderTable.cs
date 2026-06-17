@@ -17,7 +17,7 @@ using static System.FormattableString;
 #nullable disable
 namespace Orleans.Reminders.Redis
 {
-    internal partial class RedisReminderTable : IReminderTable
+    internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncDisposable
     {
         private readonly RedisKey _hashSetKey;
         private readonly RedisReminderTableOptions _redisOptions;
@@ -25,6 +25,7 @@ namespace Orleans.Reminders.Redis
         private readonly ILogger _logger;
         private IConnectionMultiplexer _muxer;
         private IDatabase _db;
+        private bool _muxerIsShared;
 
         public RedisReminderTable(
             ILogger<RedisReminderTable> logger,
@@ -42,7 +43,7 @@ namespace Orleans.Reminders.Redis
         {
             try
             {
-                _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
+                (_muxer, _muxerIsShared) = await _redisOptions.CreateMultiplexer(_redisOptions);
                 _db = _muxer.GetDatabase();
 
                 if (_redisOptions.EntryExpiry is { } expiry)
@@ -176,6 +177,44 @@ namespace Orleans.Reminders.Redis
             catch (Exception exception) when (exception is not ReminderException)
             {
                 throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
+            }
+        }
+
+        public void Dispose()
+        {
+            var muxer = _muxer;
+            if (muxer is null)
+            {
+                return;
+            }
+
+            var muxerIsShared = _muxerIsShared;
+            _muxer = null;
+            _db = null;
+            _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                muxer.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            var muxer = _muxer;
+            if (muxer is null)
+            {
+                return;
+            }
+
+            var muxerIsShared = _muxerIsShared;
+            _muxer = null;
+            _db = null;
+            _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                await muxer.DisposeAsync().ConfigureAwait(false);
             }
         }
 

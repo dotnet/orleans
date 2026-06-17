@@ -332,8 +332,11 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         lifecycle.Subscribe(
             nameof(ActivationMigrationManager),
             ServiceLifecycleStage.RuntimeGrainServices,
-                ct => this.RunOrQueueTask(() => StartAsync(ct)),
-                ct => this.RunOrQueueTask(() => StopAsync(ct)));
+            QueuedStart,
+            QueuedStop);
+
+        Task QueuedStart(CancellationToken ct) => this.RunOrQueueTask(() => StartAsync(ct));
+        Task QueuedStop(CancellationToken ct) => this.RunOrQueueTask(() => StopAsync(ct));
     }
 
     private class MigrationWorkItem : IValueTaskSource
