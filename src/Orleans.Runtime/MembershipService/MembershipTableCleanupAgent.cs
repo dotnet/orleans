@@ -22,6 +22,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger<MembershipTableCleanupAgent> _logger;
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly object _shutdownLock = new();
+        private DateTimeOffset? _lastDefunctSiloCleanupTime;
         private bool _disposed;
         private bool _cleanupDefunctSiloEntriesUnsupported;
 
@@ -109,11 +110,16 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
+                var now = _timeProvider.GetUtcNow();
                 DateTimeOffset? beforeDate = default;
 
                 if (_clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
                 {
-                    beforeDate = _timeProvider.GetUtcNow() - _clusterMembershipOptions.DefunctSiloExpiration;
+                    var expirationBeforeDate = now - _clusterMembershipOptions.DefunctSiloExpiration;
+                    if (ShouldCleanupExpiredSilos(membership, now, expirationBeforeDate))
+                    {
+                        beforeDate = expirationBeforeDate;
+                    }
                 }
 
                 if (_clusterMembershipOptions.MaxDefunctSiloEntries is { } maxDefunctSiloEntries)
@@ -162,6 +168,7 @@ namespace Orleans.Runtime.MembershipService
 
                 LogDebugCleaningUpDefunctMembershipTableEntries(_logger, beforeDate.Value);
                 await _membershipTableProvider.CleanupDefunctSiloEntries(beforeDate.Value).WaitAsync(cancellationToken);
+                _lastDefunctSiloCleanupTime = now;
             }
             catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
             {
@@ -176,6 +183,24 @@ namespace Orleans.Runtime.MembershipService
             {
                 LogErrorFailedToCleanUpDefunctMembershipTableEntries(_logger, exception);
             }
+        }
+
+        private bool ShouldCleanupExpiredSilos(MembershipTableSnapshot membership, DateTimeOffset now, DateTimeOffset beforeDate)
+        {
+            if (!_lastDefunctSiloCleanupTime.HasValue || now - _lastDefunctSiloCleanupTime.Value >= _clusterMembershipOptions.DefunctSiloExpiration)
+            {
+                return true;
+            }
+
+            foreach (var entry in membership.Entries.Values)
+            {
+                if (entry.Status != SiloStatus.Active && entry.EffectiveIAmAliveTime < beforeDate.UtcDateTime)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool IsFirstActiveSilo(MembershipTableSnapshot membership)

@@ -111,6 +111,49 @@ namespace NonSilo.Tests.Membership
             await lifecycle.OnStop();
         }
 
+        [Fact]
+        public async Task MembershipTableCleanupAgent_ExpirationCleanup_SkipsUntilExpiredNonActiveEntryOrExpirationElapsed()
+        {
+            var options = new ClusterMembershipOptions
+            {
+                DefunctSiloCleanupPeriod = TimeSpan.FromMinutes(90),
+                DefunctSiloExpiration = TimeSpan.FromDays(1),
+                MaxDefunctSiloEntries = null
+            };
+            var membershipManager = new TestMembershipManager();
+            var table = new InMemoryMembershipTable();
+            var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
+
+            await lifecycle.OnStart();
+            var now = this.timeProvider.GetUtcNow();
+            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
+            await Until(() => CleanupCallCount(table) == 1);
+
+            table.ClearCalls();
+            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
+            await Task.Delay(TimeSpan.FromMilliseconds(200));
+            Assert.Equal(0, CleanupCallCount(table));
+
+            var expiredNonActiveEntry = Entry(
+                Silo("127.0.0.1:500@100"),
+                SiloStatus.Joining,
+                now - options.DefunctSiloExpiration - TimeSpan.FromTicks(1));
+            membershipManager.Publish(Snapshot(
+                Entry(this.localSilo, SiloStatus.Active, now),
+                expiredNonActiveEntry));
+            await Until(() => CleanupCallCount(table) == 1);
+
+            table.ClearCalls();
+            this.timeProvider.Advance(options.DefunctSiloExpiration);
+            var later = this.timeProvider.GetUtcNow();
+            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, later)));
+            await Until(() => CleanupCallCount(table) == 1);
+
+            await lifecycle.OnStop();
+        }
+
         private async Task BasicScenario(bool enabled)
         {
             var options = new ClusterMembershipOptions
@@ -171,6 +214,8 @@ namespace NonSilo.Tests.Membership
             while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
             Assert.True(maxTimeout > 0);
         }
+
+        private static int CleanupCallCount(InMemoryMembershipTable table) => table.Calls.Count(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntries));
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 

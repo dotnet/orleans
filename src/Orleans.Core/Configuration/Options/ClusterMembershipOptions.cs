@@ -95,8 +95,9 @@ namespace Orleans.Configuration
         public TimeSpan DefunctSiloExpiration { get; set; } = TimeSpan.FromDays(7);
 
         /// <summary>
-        /// Gets or sets a value indicating whether defunct silo entries older than <see cref="DefunctSiloExpiration" /> are removed
-        /// when membership changes are observed.
+        /// Gets or sets a value indicating whether defunct silo entries older than <see cref="DefunctSiloExpiration" /> are removed.
+        /// Cleanup is attempted when membership changes are observed and the current membership snapshot contains expired
+        /// non-active entries, or when <see cref="DefunctSiloExpiration" /> has elapsed since the last cleanup call.
         /// Set this value to <see langword="null"/> to disable expiration-based cleanup.
         /// </summary>
         /// <value>Expiration-based cleanup is enabled by default.</value>
