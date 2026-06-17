@@ -70,7 +70,7 @@ Turn it on when:
 
 You must specify at least one of `MaxConcurrent`, `PermitsPerSecond`, or `RespectOverload`. A configuration with none of them is rejected at startup rather than silently turning into a no-op.
 
-The token bucket's burst size defaults to `ceil(PermitsPerSecond)` (roughly one second of headroom). If your workload genuinely needs a different burst — for example, you tolerate brief spikes of 5× the sustained rate — set `BurstSize(N)` explicitly. Most users should leave it alone.
+The token bucket's burst size defaults to `ceil(PermitsPerSecond)` (roughly one second of headroom). If your workload genuinely needs a different burst — for example, you tolerate brief spikes of 5× the sustained rate — pass it as `PermitsPerSecond(rate, burstSize: N)`. Most users should leave it alone.
 
 ### 3. What happens when the limit binds?
 
