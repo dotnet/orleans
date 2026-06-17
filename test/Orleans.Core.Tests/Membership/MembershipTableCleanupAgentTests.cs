@@ -112,7 +112,7 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public async Task MembershipTableCleanupAgent_ExpirationCleanup_SkipsUntilExpiredNonActiveEntryOrExpirationElapsed()
+        public async Task MembershipTableCleanupAgent_ExpirationCleanup_SkipsUntilExpiredNonActiveEntryOrCleanupPeriodElapsed()
         {
             var options = new ClusterMembershipOptions
             {
@@ -146,7 +146,7 @@ namespace NonSilo.Tests.Membership
             await Until(() => CleanupCallCount(table) == 1);
 
             table.ClearCalls();
-            this.timeProvider.Advance(options.DefunctSiloExpiration);
+            this.timeProvider.Advance(options.DefunctSiloCleanupPeriod.Value);
             var later = this.timeProvider.GetUtcNow();
             membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, later)));
             await Until(() => CleanupCallCount(table) == 1);

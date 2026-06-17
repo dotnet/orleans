@@ -113,10 +113,10 @@ namespace Orleans.Runtime.MembershipService
                 var now = _timeProvider.GetUtcNow();
                 DateTimeOffset? beforeDate = default;
 
-                if (_clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
+                if (_clusterMembershipOptions.DefunctSiloCleanupPeriod is { } cleanupPeriod)
                 {
                     var expirationBeforeDate = now - _clusterMembershipOptions.DefunctSiloExpiration;
-                    if (ShouldCleanupExpiredSilos(membership, now, expirationBeforeDate))
+                    if (ShouldCleanupExpiredSilos(membership, now, expirationBeforeDate, cleanupPeriod))
                     {
                         beforeDate = expirationBeforeDate;
                     }
@@ -183,9 +183,9 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private bool ShouldCleanupExpiredSilos(MembershipTableSnapshot membership, DateTimeOffset now, DateTimeOffset beforeDate)
+        private bool ShouldCleanupExpiredSilos(MembershipTableSnapshot membership, DateTimeOffset now, DateTimeOffset beforeDate, TimeSpan cleanupPeriod)
         {
-            if (!_lastDefunctSiloCleanupTime.HasValue || now - _lastDefunctSiloCleanupTime.Value >= _clusterMembershipOptions.DefunctSiloExpiration)
+            if (!_lastDefunctSiloCleanupTime.HasValue || now - _lastDefunctSiloCleanupTime.Value >= cleanupPeriod)
             {
                 return true;
             }
