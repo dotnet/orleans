@@ -367,7 +367,7 @@ public class TypeConverter
         return false;
     }
 
-    private bool? IsNameTypeAllowed(in QualifiedType type)
+    private bool? IsNamedTypeAllowed(in QualifiedType type)
     {
         if (_allowAllTypes)
         {
@@ -410,7 +410,7 @@ public class TypeConverter
 
         if (_wellKnownAliasToType.TryGetValue(type, out var runtimeType))
         {
-            return IsNameTypeAllowed(runtimeType);
+            return IsNamedTypeAllowed(runtimeType);
         }
 
         return null;
@@ -479,7 +479,7 @@ public class TypeConverter
 
     private ValidationResult UpdateValidationResult(QualifiedType input, ValidationResult state)
     {
-        switch (IsNameTypeAllowed(input))
+        switch (IsNamedTypeAllowed(input))
         {
             case true:
                 return new(true, state.HasUnknownTypeNames, state.ErrorTypes);
