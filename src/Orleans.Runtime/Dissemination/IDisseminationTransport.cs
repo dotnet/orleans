@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -8,7 +9,7 @@ internal interface IDisseminationTransport
 {
     SiloAddress LocalSilo { get; }
 
-    IReadOnlyList<SiloAddress> GetActivePeers();
+    DisseminationMembership GetMembership();
 
     ValueTask<DisseminationCapabilityResponse> GetCapabilities(
         SiloAddress peer,
@@ -22,3 +23,7 @@ internal interface IDisseminationTransport
         DisseminationAntiEntropyRequest request,
         CancellationToken cancellationToken);
 }
+
+internal readonly record struct DisseminationMembership(
+    ImmutableArray<SiloAddress> AllMembers,
+    ImmutableArray<SiloAddress> ActiveMembers);
