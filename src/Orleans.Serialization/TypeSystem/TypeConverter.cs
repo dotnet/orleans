@@ -379,10 +379,20 @@ public class TypeConverter
             return false;
         }
 
-        var filterResult = InspectTypeNameFilters(type);
-        if (filterResult == false)
+        bool? filterResult = null;
+        foreach (var filter in _typeNameFilters)
         {
-            return false;
+            var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly ?? string.Empty);
+            if (isAllowed == false)
+            {
+                _allowedTypes[type] = false;
+                return false;
+            }
+
+            if (isAllowed == true)
+            {
+                filterResult = true;
+            }
         }
 
         if (_allowedTypes.TryGetValue(type, out var allowed))
@@ -419,27 +429,6 @@ public class TypeConverter
         }
 
         return null;
-    }
-
-    private bool? InspectTypeNameFilters(in QualifiedType type)
-    {
-        bool? result = null;
-        foreach (var filter in _typeNameFilters)
-        {
-            var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly ?? string.Empty);
-            if (isAllowed == false)
-            {
-                _allowedTypes[type] = false;
-                return false;
-            }
-
-            if (isAllowed == true)
-            {
-                result = true;
-            }
-        }
-
-        return result;
     }
 
     private QualifiedType ConvertToDisplayName(in QualifiedType input, ref ValidationResult state)
