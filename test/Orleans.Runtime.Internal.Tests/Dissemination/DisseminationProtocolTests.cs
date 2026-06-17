@@ -1,11 +1,10 @@
 #nullable enable
 
 using System;
+using System.Collections.Immutable;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -36,7 +35,7 @@ public class DisseminationProtocolTests
         Assert.True(result);
         var expectedChildren = GetTreeChildren(local, local, peers, fanout: 2);
         Assert.Equal(expectedChildren, transport.GossipBatches.Select(batch => batch.Peer));
-        Assert.All(transport.GossipBatches, batch => Assert.Equal(item.Id, batch.Batch.Items.Single().Id));
+        Assert.All(transport.GossipBatches, batch => Assert.Equal(item.Digest, batch.Batch.Values.Single().Digest));
     }
 
     [Fact]
@@ -57,6 +56,41 @@ public class DisseminationProtocolTests
 
         Assert.False(result);
         Assert.Empty(transport.GossipBatches);
+    }
+
+    [Fact]
+    public async Task PublishDoesNotFailWhenJoiningParticipantIsUnavailable()
+    {
+        var local = CreateSilo(11111);
+        var joining = CreateSilo(11112);
+        var active = CreateSilo(11113);
+        var transport = new FakeTransport(local, joining, active);
+        transport.PeerStatuses[joining] = SiloStatus.Joining;
+        transport.GetCapabilitiesHandler = (target, request, cancellationToken) =>
+        {
+            if (Equals(target, joining))
+            {
+                throw new InvalidOperationException("joining peer is not yet reachable");
+            }
+
+            return ValueTask.FromResult(transport.CreateCapabilityResponse(target, request));
+        };
+
+        var topic = new FakeTopic(local)
+        {
+            MembershipScope = DisseminationMembershipScope.AllMembers,
+        };
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.FailureBackoff = TimeSpan.FromSeconds(5);
+            options.Overlay.TreeFanout = 2;
+        });
+        var value = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+
+        var result = await protocol.Publish(topic.Name, value, targetPeers: null, CancellationToken.None);
+
+        Assert.True(result);
+        Assert.Equal(new[] { active }, transport.GossipBatches.Select(batch => batch.Peer));
     }
 
     [Fact]
@@ -101,7 +135,7 @@ public class DisseminationProtocolTests
     [Fact]
     public async Task ReceiveGossipForwardsOnlyToLocalTreeChildren()
     {
-        var silos = Enumerable.Range(11111, 8).Select(CreateSilo).OrderBy(GetPeerScore, StringComparer.Ordinal).ToArray();
+        var silos = Enumerable.Range(11111, 8).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
         var root = silos[0];
         var local = silos[1];
         var peers = silos.Where(silo => !Equals(silo, local)).ToArray();
@@ -113,7 +147,7 @@ public class DisseminationProtocolTests
         await protocol.ReceiveGossip(new DisseminationGossipBatch
         {
             Sender = root,
-            Items = new[] { item },
+            Values = new[] { item },
         }, CancellationToken.None);
 
         var expectedChildren = GetTreeChildren(local, root, peers, fanout: 2);
@@ -123,7 +157,7 @@ public class DisseminationProtocolTests
     [Fact]
     public async Task DuplicateGossipDoesNotForwardAgain()
     {
-        var silos = Enumerable.Range(11111, 8).Select(CreateSilo).OrderBy(GetPeerScore, StringComparer.Ordinal).ToArray();
+        var silos = Enumerable.Range(11111, 8).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
         var root = silos[0];
         var local = silos[1];
         var peers = silos.Where(silo => !Equals(silo, local)).ToArray();
@@ -134,7 +168,7 @@ public class DisseminationProtocolTests
         var batch = new DisseminationGossipBatch
         {
             Sender = root,
-            Items = new[] { item },
+            Values = new[] { item },
         };
 
         await protocol.ReceiveGossip(batch, CancellationToken.None);
@@ -142,14 +176,14 @@ public class DisseminationProtocolTests
 
         var expectedChildren = GetTreeChildren(local, root, peers, fanout: 2);
         Assert.Equal(expectedChildren.Count, transport.GossipBatches.Count);
-        Assert.Equal(1, topic.ApplyCounts[item.Id.Key]);
+        Assert.Equal(1, topic.ApplyCounts[item.Digest.Key]);
     }
 
     [Fact]
     public async Task TreeRoutingInvalidatesCachedTopologyWhenActivePeersChange()
     {
-        var local = CreateSilo(11111);
-        var initialPeers = Enumerable.Range(11112, 4).Select(CreateSilo).ToList();
+        var local = CreateSilo(11115);
+        var initialPeers = Enumerable.Range(11112, 3).Select(CreateSilo).ToList();
         var transport = new FakeTransport(local, initialPeers.ToArray());
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.TreeFanout = 2);
@@ -203,12 +237,12 @@ public class DisseminationProtocolTests
             },
             Digests = new[]
             {
-                new DisseminationItemId(topic.Name, FakeTopic.DefaultKey, version: 3, FakeTopic.PayloadKind),
+                new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 3, FakeTopic.PayloadKind),
             },
         }, CancellationToken.None);
 
-        var item = Assert.Single(response.Items);
-        Assert.Equal(5, item.Id.Version);
+        var item = Assert.Single(response.Values);
+        Assert.Equal(5, item.Digest.Version);
         Assert.False(response.Truncated);
     }
 
@@ -224,7 +258,7 @@ public class DisseminationProtocolTests
         transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
             Sender = target,
-            Items = new[] { repairItem },
+            Values = new[] { repairItem },
         });
 
         var state = protocol.CreateAntiEntropyState();
@@ -247,9 +281,9 @@ public class DisseminationProtocolTests
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic);
         topic.SetValue(FakeTopic.DefaultKey, version: 1);
-        var badRepairItem = new DisseminationItem
+        var badRepairItem = new DisseminationValue
         {
-            Id = new DisseminationItemId(topic.Name, FakeTopic.DefaultKey, version: 2, FakeTopic.PayloadKind),
+            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2, FakeTopic.PayloadKind),
             Root = peer,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = Array.Empty<byte>(),
@@ -261,7 +295,7 @@ public class DisseminationProtocolTests
             new DisseminationAntiEntropyResponse
             {
                 Sender = peer,
-                Items = new[] { badRepairItem, goodRepairItem },
+                Values = new[] { badRepairItem, goodRepairItem },
             },
         }, CancellationToken.None);
 
@@ -278,9 +312,9 @@ public class DisseminationProtocolTests
         var service = CreateService(transport, topic, options => options.Overlay.AntiEntropyInterval = TimeSpan.FromMilliseconds(1));
         topic.SetValue(FakeTopic.DefaultKey, version: 1);
 
-        var badRepairItem = new DisseminationItem
+        var badRepairItem = new DisseminationValue
         {
-            Id = new DisseminationItemId(topic.Name, FakeTopic.DefaultKey, version: 2, FakeTopic.PayloadKind),
+            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2, FakeTopic.PayloadKind),
             Root = peer,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = Array.Empty<byte>(),
@@ -293,11 +327,11 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(new DisseminationAntiEntropyResponse
             {
                 Sender = target,
-                Items = count switch
+                Values = count switch
                 {
                     1 => new[] { badRepairItem },
                     2 => new[] { goodRepairItem },
-                    _ => Array.Empty<DisseminationItem>(),
+                    _ => Array.Empty<DisseminationValue>(),
                 },
             });
         };
@@ -395,7 +429,7 @@ public class DisseminationProtocolTests
             .Append(local)
             .Append(root)
             .Distinct()
-            .OrderBy(GetPeerScore, StringComparer.Ordinal)
+            .OrderBy(static silo => silo)
             .ToList();
         var rootIndex = participants.FindIndex(silo => Equals(silo, root));
         if (rootIndex > 0)
@@ -414,12 +448,6 @@ public class DisseminationProtocolTests
             .Where(index => index < participants.Count)
             .Select(index => participants[index])
             .ToArray();
-    }
-
-    private static string GetPeerScore(SiloAddress silo)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(silo.ToParsableString()));
-        return Convert.ToHexString(bytes);
     }
 
     private static GrainManifest CreateManifest(params (string Grain, string Key, string Value)[] grains)
@@ -441,15 +469,17 @@ public class DisseminationProtocolTests
     private sealed class FakeTopic(SiloAddress localSilo) : IDisseminationTopic
     {
         public const string PayloadKind = "fake";
-        public static readonly DisseminationValueKey DefaultKey = DisseminationValueKey.FromString("value");
+        public const string DefaultKey = "value";
         private static readonly HashSet<string> Kinds = new(StringComparer.Ordinal) { PayloadKind };
-        private readonly Dictionary<DisseminationValueKey, long> _versions = new();
+        private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
 
-        public Dictionary<DisseminationValueKey, int> ApplyCounts { get; } = new();
+        public Dictionary<string, int> ApplyCounts { get; } = new(StringComparer.Ordinal);
 
         public string Name => "fake-topic";
 
         public int ProtocolVersion => 2;
+
+        public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.ActiveMembers;
 
         public DisseminationTopicOptions Options { get; } = new() { Enabled = true };
 
@@ -457,41 +487,41 @@ public class DisseminationProtocolTests
 
         public bool IsEnabled => true;
 
-        public DisseminationItem CreateItem(SiloAddress root, DisseminationValueKey key, long sequence) => new()
+        public DisseminationValue CreateItem(SiloAddress root, string key, long sequence) => new()
         {
-            Id = new DisseminationItemId(Name, key, sequence, PayloadKind),
+            Digest = new DisseminationDigest(Name, key, sequence, PayloadKind),
             Root = root,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = BitConverter.GetBytes(sequence),
         };
 
-        public void SetValue(DisseminationValueKey key, long version) => _versions[key] = version;
+        public void SetValue(string key, long version) => _versions[key] = version;
 
-        public long GetVersion(DisseminationValueKey key) => _versions.TryGetValue(key, out var version) ? version : 0;
+        public long GetVersion(string key) => _versions.TryGetValue(key, out var version) ? version : 0;
 
-        public IReadOnlyList<DisseminationItemId> GetDigests() =>
-            _versions.Select(entry => new DisseminationItemId(Name, entry.Key, entry.Value, PayloadKind)).ToArray();
+        public IReadOnlyList<DisseminationDigest> GetDigests() =>
+            _versions.Select(entry => new DisseminationDigest(Name, entry.Key, entry.Value, PayloadKind)).ToArray();
 
-        public int CompareVersion(DisseminationItemId left, DisseminationItemId right) => left.Version.CompareTo(right.Version);
+        public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
 
-        public bool IsObsolete(DisseminationItemId id) =>
-            !string.Equals(id.PayloadKind, PayloadKind, StringComparison.Ordinal)
-            || (_versions.TryGetValue(id.Key, out var version) && version > id.Version);
+        public bool IsObsolete(DisseminationDigest digest) =>
+            !string.Equals(digest.PayloadKind, PayloadKind, StringComparison.Ordinal)
+            || (_versions.TryGetValue(digest.Key, out var version) && version > digest.Version);
 
-        public ValueTask<DisseminationItem?> GetItem(DisseminationItemId id, CancellationToken cancellationToken)
+        public ValueTask<DisseminationValue?> GetValue(DisseminationDigest digest, CancellationToken cancellationToken)
         {
-            if (!_versions.TryGetValue(id.Key, out var version) || version < id.Version)
+            if (!_versions.TryGetValue(digest.Key, out var version) || version < digest.Version)
             {
-                return ValueTask.FromResult<DisseminationItem?>(null);
+                return ValueTask.FromResult<DisseminationValue?>(null);
             }
 
-            return ValueTask.FromResult<DisseminationItem?>(CreateItem(localSilo, id.Key, version));
+            return ValueTask.FromResult<DisseminationValue?>(CreateItem(localSilo, digest.Key, version));
         }
 
-        public ValueTask<DisseminationApplyResult> ApplyItem(DisseminationItem item, CancellationToken cancellationToken)
+        public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
         {
-            var version = BitConverter.ToInt64(item.Payload);
-            if (_versions.TryGetValue(item.Id.Key, out var current))
+            var version = BitConverter.ToInt64(value.Payload);
+            if (_versions.TryGetValue(value.Digest.Key, out var current))
             {
                 if (current > version)
                 {
@@ -504,12 +534,12 @@ public class DisseminationProtocolTests
                 }
             }
 
-            _versions[item.Id.Key] = version;
-            ApplyCounts[item.Id.Key] = ApplyCounts.TryGetValue(item.Id.Key, out var count) ? count + 1 : 1;
+            _versions[value.Digest.Key] = version;
+            ApplyCounts[value.Digest.Key] = ApplyCounts.TryGetValue(value.Digest.Key, out var count) ? count + 1 : 1;
             return ValueTask.FromResult(DisseminationApplyResult.Applied);
         }
 
-        public ValueTask OnFallbackRequired(SiloAddress peer, DisseminationItemId id, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
     private sealed class FakeTransport(SiloAddress localSilo, params SiloAddress[] peers) : IDisseminationTransport
@@ -522,6 +552,8 @@ public class DisseminationProtocolTests
 
         public List<SiloAddress> Peers => _peers;
 
+        public Dictionary<SiloAddress, SiloStatus> PeerStatuses { get; } = new();
+
         public HashSet<SiloAddress> IncapablePeers { get; } = new();
 
         public Func<SiloAddress, DisseminationCapabilityRequest, CancellationToken, ValueTask<DisseminationCapabilityResponse>>? GetCapabilitiesHandler { get; set; }
@@ -531,7 +563,28 @@ public class DisseminationProtocolTests
 
         public SiloAddress LocalSilo => localSilo;
 
-        public IReadOnlyList<SiloAddress> GetActivePeers() => _peers;
+        public DisseminationMembership GetMembership()
+        {
+            var allMembers = ImmutableArray.CreateBuilder<SiloAddress>();
+            var activeMembers = ImmutableArray.CreateBuilder<SiloAddress>();
+            foreach (var peer in _peers)
+            {
+                var status = PeerStatuses.TryGetValue(peer, out var peerStatus) ? peerStatus : SiloStatus.Active;
+                if (status is SiloStatus.Joining or SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping)
+                {
+                    allMembers.Add(peer);
+                }
+
+                if (status == SiloStatus.Active)
+                {
+                    activeMembers.Add(peer);
+                }
+            }
+
+            allMembers.Sort(static (left, right) => left.CompareTo(right));
+            activeMembers.Sort(static (left, right) => left.CompareTo(right));
+            return new DisseminationMembership(allMembers.ToImmutable(), activeMembers.ToImmutable());
+        }
 
         public ValueTask<DisseminationCapabilityResponse> GetCapabilities(
             SiloAddress peer,

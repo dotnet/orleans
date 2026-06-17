@@ -36,10 +36,10 @@ internal sealed partial class DisseminationService
 
     public ValueTask<bool> Publish(
         string topicName,
-        DisseminationItem item,
+        DisseminationValue value,
         IReadOnlyCollection<SiloAddress>? targetPeers,
         CancellationToken cancellationToken) =>
-        new(Execute(async () => await _protocol.Publish(topicName, item, targetPeers, cancellationToken)));
+        new(Execute(async () => await _protocol.Publish(topicName, value, targetPeers, cancellationToken)));
 
     public DisseminationCapabilityResponse GetCapabilities(DisseminationCapabilityRequest request)
     {

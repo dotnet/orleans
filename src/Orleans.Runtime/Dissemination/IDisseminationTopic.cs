@@ -11,21 +11,29 @@ internal interface IDisseminationTopic
 
     int ProtocolVersion { get; }
 
+    DisseminationMembershipScope MembershipScope { get; }
+
     DisseminationTopicOptions Options { get; }
 
     IReadOnlySet<string> PayloadKinds { get; }
 
     bool IsEnabled { get; }
 
-    IReadOnlyList<DisseminationItemId> GetDigests();
+    IReadOnlyList<DisseminationDigest> GetDigests();
 
-    int CompareVersion(DisseminationItemId left, DisseminationItemId right);
+    int CompareVersion(DisseminationDigest left, DisseminationDigest right);
 
-    bool IsObsolete(DisseminationItemId id);
+    bool IsObsolete(DisseminationDigest digest);
 
-    ValueTask<DisseminationItem?> GetItem(DisseminationItemId id, CancellationToken cancellationToken);
+    ValueTask<DisseminationValue?> GetValue(DisseminationDigest digest, CancellationToken cancellationToken);
 
-    ValueTask<DisseminationApplyResult> ApplyItem(DisseminationItem item, CancellationToken cancellationToken);
+    ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken);
 
-    ValueTask OnFallbackRequired(SiloAddress peer, DisseminationItemId id, CancellationToken cancellationToken);
+    ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken);
+}
+
+internal enum DisseminationMembershipScope
+{
+    ActiveMembers,
+    AllMembers,
 }
