@@ -140,6 +140,7 @@ public sealed class ReminderThrottleConfigBuilder
     public ReminderThrottleConfigBuilder MaxConcurrent(int value)
     {
         _maxConcurrent = value;
+        _maxConcurrentBlockMode = null;
         return this;
     }
 
@@ -161,6 +162,22 @@ public sealed class ReminderThrottleConfigBuilder
     public ReminderThrottleConfigBuilder PermitsPerSecond(double value)
     {
         _permitsPerSecond = value;
+        _burstSize = null;
+        _permitsPerSecondBlockMode = null;
+        return this;
+    }
+
+    /// <summary>
+    /// Caps the sustained rate of dispatches admitted by this tier and overrides the token
+    /// bucket's burst size.
+    /// </summary>
+    /// <param name="value">A positive, finite permits-per-second rate.</param>
+    /// <param name="burstSize">A positive burst capacity.</param>
+    public ReminderThrottleConfigBuilder PermitsPerSecond(double value, int burstSize)
+    {
+        _permitsPerSecond = value;
+        _burstSize = burstSize;
+        _permitsPerSecondBlockMode = null;
         return this;
     }
 
@@ -173,18 +190,23 @@ public sealed class ReminderThrottleConfigBuilder
     public ReminderThrottleConfigBuilder PermitsPerSecond(double value, ThrottleBlockMode blockMode)
     {
         _permitsPerSecond = value;
+        _burstSize = null;
         _permitsPerSecondBlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
         return this;
     }
 
     /// <summary>
-    /// Overrides the auto-derived burst size for the token bucket. Only required for
-    /// workloads with unusual burst characteristics; most users should leave this unset.
+    /// Caps the sustained rate of dispatches admitted by this tier, overrides the token bucket's
+    /// burst size, and assigns an explicit block mode to the rate limiter.
     /// </summary>
-    /// <param name="value">A positive burst capacity.</param>
-    public ReminderThrottleConfigBuilder BurstSize(int value)
+    /// <param name="value">A positive, finite permits-per-second rate.</param>
+    /// <param name="burstSize">A positive burst capacity.</param>
+    /// <param name="blockMode">The block mode for the rate limiter.</param>
+    public ReminderThrottleConfigBuilder PermitsPerSecond(double value, int burstSize, ThrottleBlockMode blockMode)
     {
-        _burstSize = value;
+        _permitsPerSecond = value;
+        _burstSize = burstSize;
+        _permitsPerSecondBlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
         return this;
     }
 
@@ -244,10 +266,6 @@ public sealed class ReminderThrottleConfigBuilder
         if (_permitsPerSecond is { } permitsPerSecond)
         {
             rate = new LocalRateLimiterConfig(permitsPerSecond, _burstSize, _permitsPerSecondBlockMode ?? _blockMode);
-        }
-        else if (_burstSize is not null)
-        {
-            throw new ArgumentException("BurstSize requires PermitsPerSecond to be specified.");
         }
 
         return new ThrottleConfig(concurrency, rate, _blockMode, _overload, _slowStart);

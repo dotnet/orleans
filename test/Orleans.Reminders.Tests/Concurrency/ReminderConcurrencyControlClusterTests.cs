@@ -204,8 +204,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .PermitsPerSecond(1)
-                        .BurstSize(1)
+                        .PermitsPerSecond(1, 1)
                         .BlockMode(ThrottleBlockMode.SkipImmediately)));
         });
 
@@ -291,8 +290,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .PermitsPerSecond(0.001) // 1 token per ~17 minutes — bucket will be empty for all practical purposes
-                        .BurstSize(1)
+                        .PermitsPerSecond(0.001, 1) // 1 token per ~17 minutes — bucket will be empty for all practical purposes
                         .BlockMode(ThrottleBlockMode.Wait))); // wait forever
         });
 
@@ -374,8 +372,7 @@ public sealed class ReminderConcurrencyControlClusterTests
                 .UseInMemoryReminderService()
                 .AddReminderConcurrencyControl(c => c
                     .PerSilo(t => t
-                        .PermitsPerSecond(1)
-                        .BurstSize(1)
+                        .PermitsPerSecond(1, 1)
                         .BlockMode(ThrottleBlockMode.SkipImmediately)));
         });
 
