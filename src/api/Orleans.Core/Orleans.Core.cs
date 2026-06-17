@@ -435,6 +435,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan DefunctSiloExpiration { get { throw null; } set { } }
 
+        public DisseminationTopicOptions Dissemination { get { throw null; } set { } }
+
         public bool EnableIndirectProbes { get { throw null; } set { } }
 
         public bool EvictWhenMaxJoinAttemptTimeExceeded { get { throw null; } set { } }
@@ -492,6 +494,47 @@ namespace Orleans.Configuration
         public System.TimeSpan OpenConnectionTimeout { get { throw null; } set { } }
 
         public Runtime.Messaging.NetworkProtocolVersion ProtocolVersion { get { throw null; } set { } }
+    }
+
+    public sealed partial class DisseminationOptions
+    {
+        public System.TimeSpan CapabilityCacheTtl { get { throw null; } set { } }
+
+        public bool Enabled { get { throw null; } set { } }
+
+        public System.TimeSpan FailureBackoff { get { throw null; } set { } }
+
+        public int MaxBatchBytes { get { throw null; } set { } }
+
+        public int MaxBatchItems { get { throw null; } set { } }
+
+        public int MaxConcurrentSends { get { throw null; } set { } }
+
+        public DisseminationOverlayOptions Overlay { get { throw null; } set { } }
+    }
+
+    public sealed partial class DisseminationOverlayOptions
+    {
+        public System.TimeSpan AntiEntropyInterval { get { throw null; } set { } }
+
+        public int AntiEntropyPeerCount { get { throw null; } set { } }
+
+        public int TreeFanout { get { throw null; } set { } }
+    }
+
+    public sealed partial class DisseminationTopicOptions
+    {
+        public bool Enabled { get { throw null; } set { } }
+
+        public bool FallbackEnabled { get { throw null; } set { } }
+
+        public System.TimeSpan MaxCoalescingDelay { get { throw null; } set { } }
+
+        public int MaxPayloadBytes { get { throw null; } set { } }
+
+        public int MaxPendingItemCount { get { throw null; } set { } }
+
+        public System.TimeSpan StaleItemTtl { get { throw null; } set { } }
     }
 
     public partial class GatewayOptions
