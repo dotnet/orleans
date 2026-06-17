@@ -12,5 +12,10 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan DeploymentLoadPublisherRefreshTime { get; set; } = DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
         public static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// Gets or sets dissemination options for deployment load statistics.
+        /// </summary>
+        public DisseminationTopicOptions Dissemination { get; set; } = new();
     }
 }
