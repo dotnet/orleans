@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 using Orleans.Metadata;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.Metadata
@@ -31,6 +32,7 @@ namespace Orleans.Runtime.Metadata
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
+        private readonly Dictionary<ManifestHash, GrainManifest> _manifestCache = new();
 
         public ClusterManifestProvider(
             ILocalSiloDetails localSiloDetails,
@@ -46,6 +48,7 @@ namespace Orleans.Runtime.Metadata
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
             LocalGrainManifest = siloManifestProvider.SiloManifest;
+            _manifestCache[ManifestHashCalculator.ComputeHash(LocalGrainManifest)] = LocalGrainManifest;
             _current = CreateClusterManifest(
                 MajorMinorVersion.MinValue,
                 ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
@@ -190,9 +193,7 @@ namespace Orleans.Runtime.Metadata
             {
                 try
                 {
-                    // Get the manifest from the silo.
-                    var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
-                    var manifest = await remoteManifestProvider.GetSiloManifest(_shutdownCts.Token);
+                    var manifest = await GetSiloManifest(siloAddress);
                     return (siloAddress, manifest, null);
                 }
                 catch (Exception exception)
@@ -219,6 +220,7 @@ namespace Orleans.Runtime.Metadata
                     if (result.Value is not null)
                     {
                         modified = true;
+                        _manifestCache[ManifestHashCalculator.ComputeHash(result.Value)] = result.Value;
                         builder[result.Key] = result.Value;
                     }
                     else
@@ -236,7 +238,6 @@ namespace Orleans.Runtime.Metadata
                 var publishSuccess = TryPublishManifest(manifest);
                 return publishSuccess && fetchSuccess;
             }
-
             return fetchSuccess;
         }
 
@@ -275,6 +276,32 @@ namespace Orleans.Runtime.Metadata
             }
 
             return builder?.ToImmutable() ?? silos;
+        }
+
+        private async Task<GrainManifest> GetSiloManifest(SiloAddress siloAddress)
+        {
+            try
+            {
+                var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
+                var hash = await remoteManifestProvider.GetSiloManifestHash().AsTask().WaitAsync(_shutdownCts.Token);
+                if (_manifestCache.TryGetValue(hash, out var cached))
+                {
+                    return cached;
+                }
+
+                var manifest = await remoteManifestProvider.GetSiloManifestByHash(hash).AsTask().WaitAsync(_shutdownCts.Token);
+                if (manifest is not null && ManifestHashCalculator.ComputeHash(manifest) == hash)
+                {
+                    _manifestCache[hash] = manifest;
+                    return manifest;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogDebugErrorRetrievingSiloManifestByHash(exception, siloAddress);
+            }
+            var legacyManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
+            return await legacyManifestProvider.GetSiloManifest(_shutdownCts.Token);
         }
 
         [MemberNotNull(nameof(_runTask))]
@@ -338,6 +365,12 @@ namespace Orleans.Runtime.Metadata
             Message = "Error retrieving silo manifest for silo {SiloAddress}"
         )]
         private partial void LogWarningErrorRetrievingSiloManifest(Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Error retrieving silo manifest by hash for silo {SiloAddress}. Falling back to direct manifest fetch."
+        )]
+        private partial void LogDebugErrorRetrievingSiloManifestByHash(Exception exception, SiloAddress siloAddress);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
