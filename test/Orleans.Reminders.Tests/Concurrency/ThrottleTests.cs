@@ -100,6 +100,21 @@ public sealed class ThrottleConfigTests
         var c = new ReminderThrottleConfigBuilder().MaxConcurrent(1).Build();
         Assert.Same(ThrottleBlockMode.Wait, c.BlockMode);
     }
+
+    [Fact, TestCategory("BVT")]
+    public void Builder_AllowsIndependentLocalLimiterBlockModes()
+    {
+        var concurrencyMode = ThrottleBlockMode.Wait;
+        var rateMode = ThrottleBlockMode.SkipImmediately;
+
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(2, concurrencyMode)
+            .PermitsPerSecond(5, rateMode)
+            .Build();
+
+        Assert.Same(concurrencyMode, config.Concurrency!.BlockMode);
+        Assert.Same(rateMode, config.Rate!.BlockMode);
+    }
 }
 
 public sealed class NoOpThrottleTests
@@ -327,10 +342,34 @@ public sealed class LocalThrottleRateTests
         next.Dispose();
     }
 
+    [Fact, TestCategory("BVT")]
+    public async Task ExplicitLimiterBlockModes_AreAppliedIndependently()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(1, ThrottleBlockMode.Wait)
+            .PermitsPerSecond(1, ThrottleBlockMode.SkipImmediately)
+            .BurstSize(1)
+            .Build();
+        await using var throttle = new TestThrottle(config, clock);
+
+        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
+
+        var secondTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        Assert.False(secondTask.IsCompleted);
+
+        first.Dispose();
+
+        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
+        Assert.Equal(ReminderSkipReason.LocalLimiterFull, second.SkipReason);
+    }
+
     /// <summary>
     /// Regression for adversarial-review finding: WaitUpTo's wait budget must be shared across
-    /// the concurrency and rate phases. Previously, the rate phase started a fresh budget after
-    /// the concurrency phase, allowing total wait to exceed the configured timeout.
+    /// sequential waiting gates. Previously, the rate phase started a fresh budget after the
+    /// concurrency phase, allowing total wait to exceed the configured timeout.
     /// </summary>
     [Fact, TestCategory("BVT")]
     public async Task WaitUpTo_BudgetIsSharedAcrossConcurrencyAndRatePhases()
