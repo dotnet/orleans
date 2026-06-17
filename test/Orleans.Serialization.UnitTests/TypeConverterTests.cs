@@ -40,6 +40,30 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_UsesCachedTypeNameFilterResults()
+        {
+            var typeNameFilterCalls = 0;
+            var converter = CreateConverter(
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) =>
+                    {
+                        if (typeName == typeof(TypeConverterTestsUnconfiguredType).FullName)
+                        {
+                            typeNameFilterCalls++;
+                            return true;
+                        }
+
+                        return null;
+                    })
+                ]);
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsUnconfiguredType));
+
+            Assert.Equal(1, typeNameFilterCalls);
+        }
+
+        [Fact]
         public void TypeConverter_AllowsTypes_WhenATypeFilterExplicitlyAllowsThem()
         {
             var converter = CreateConverter(
