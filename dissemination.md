@@ -59,11 +59,11 @@ Current load publication is the clearest high-rate scalability pressure. Each si
 
 Design:
 
-- Disseminate load updates as latest-wins topic items.
-- Item id: `(topic = load, origin silo, statistics DateTime ticks)`.
+- Disseminate load updates as latest-wins topic values.
+- Digest: `(topic = load, key = origin silo address string, version = statistics DateTime ticks, payload kind = SiloRuntimeStatistics)`.
 - Coalesce pending load updates by origin silo.
 - Keep only the latest statistics per origin while sends are in flight.
-- Apply each item independently: newer timestamps replace older timestamps; equal timestamps are duplicates.
+- Apply each value independently: newer timestamps replace older timestamps; equal timestamps are duplicates.
 - Keep direct stale-stat repair as a correctness backstop for active silos.
 
 Backstop:
@@ -98,7 +98,7 @@ Design:
 - The external membership table remains canonical.
 - Receivers merge only through existing membership-table snapshot processing.
 - Use full snapshots first; do not require deltas for correctness.
-- Item id: `(topic = membership, origin silo, membership table version)`.
+- Digest: `(topic = membership, key = "cluster", version = membership table version, payload kind = MembershipSnapshot)`.
 - Older, equal, duplicated, and reordered snapshots are harmless because the membership manager already merges by version.
 
 Backstop:
@@ -132,7 +132,7 @@ Design:
 
 - Disseminate manifest hash summaries or hints only.
 - Use content-addressed storage: `ManifestHash -> GrainManifest`.
-- Item id: `(topic = manifest, origin silo, manifest version or hash)`.
+- Digest or hash hint: `(topic = manifest, key = silo address string, version = manifest version, payload kind = ManifestHash)`.
 - Pull missing manifests by hash from peers.
 - Preserve current fully materialized client/gateway manifest APIs.
 - Do not push full manifests via eager gossip.
@@ -217,10 +217,8 @@ Coalescers
 
 Shared dissemination substrate
   Topic registry
-  Shared overlay
-  Per-item seen/cache state
-  Eager/lazy edge state
-  Prune/graft repair
+  Deterministic spanning tree
+  Digest anti-entropy repair
   Capability and fallback
   Batch construction
 
@@ -229,28 +227,26 @@ Transport
   Legacy topic-specific fallback calls
 ```
 
-### Shared overlay
+### Deterministic spanning trees
 
-The overlay owns peer relationships:
+The dissemination substrate maintains two rooted k-ary trees from cluster membership:
 
-- Eager peers receive full payload batches.
-- Lazy peers receive advertisement batches.
-- Capability state determines which peers can receive new control operations.
-- Failure/backoff state prevents error storms.
-- Membership updates remove inactive peers and add replacement candidates.
+- `AllMembers`: silos in `Joining`, `Active`, `ShuttingDown`, or `Stopping`.
+- `ActiveMembers`: silos in `Active`.
 
-Initial peer sets should use an expander-style construction similar to `ClusterHealthMonitor`:
+Both tree inputs are immutable arrays sorted by the natural deterministic `SiloAddress` sort order, not by an additional hash. When cluster membership changes, both cached topologies are rebuilt from the latest member arrays. Each topic declares which membership scope it uses:
 
-- Use multiple salted hash rings over active silos.
-- Exclude self.
-- Select low-overlap neighbors.
-- Use the result only to seed/replenish eager/lazy peer sets.
+- Membership snapshots use `AllMembers`, matching existing membership gossip eligibility.
+- Deployment load statistics use `ActiveMembers`, matching existing load publisher behavior.
+- Manifest exchange remains active-only and pull-based.
 
-Do not recompute eager peers on every tick. Steady-state adaptation belongs to prune/graft edge state.
+For a broadcast rooted at `root`, treat `root` as logical tree index `0` by rotating the selected sorted array during child lookup. For fanout `k`, the node at tree index `i` owns child tree indexes `k * i + 1` through `k * i + k`.
+
+The all-members tree can include silos which are not reachable yet or are leaving. Active participants still need to be known dissemination-capable before a publish uses the tree. Transient unavailability for `Joining`, `ShuttingDown`, or `Stopping` participants does not fail publication: missed subtrees are repaired by anti-entropy or removed by cluster membership.
 
 ### Topic API
 
-A topic driver supplies item semantics. The substrate supplies transport, batching, deduplication, and repair.
+A topic driver supplies value semantics. The substrate supplies transport, batching, duplicate suppression, and repair.
 
 Example shape:
 
@@ -259,49 +255,66 @@ internal interface IDisseminationTopic
 {
     string Name { get; }
 
+    DisseminationMembershipScope MembershipScope { get; }
+
     DisseminationTopicOptions Options { get; }
 
-    ValueTask<IReadOnlyList<DisseminationItem>> DrainPendingItems(
-        int maxItems,
-        int maxBytes,
+    IReadOnlyList<DisseminationDigest> GetDigests();
+
+    int CompareVersion(DisseminationDigest left, DisseminationDigest right);
+
+    bool IsObsolete(DisseminationDigest digest);
+
+    ValueTask<DisseminationValue?> GetValue(
+        DisseminationDigest digest,
         CancellationToken cancellationToken);
 
-    bool IsObsolete(DisseminationItemId id);
-
-    ValueTask<DisseminationApplyResult> ApplyItem(
-        DisseminationItem item,
+    ValueTask<DisseminationApplyResult> ApplyValue(
+        DisseminationValue value,
         CancellationToken cancellationToken);
 
     ValueTask OnFallbackRequired(
         SiloAddress peer,
-        DisseminationItemId id,
+        DisseminationDigest digest,
         CancellationToken cancellationToken);
 }
 ```
 
-Item and advertisement shapes:
+Digest and value shapes:
 
 ```csharp
-internal readonly record struct DisseminationItemId(
+internal readonly record struct DisseminationDigest(
     string Topic,
-    SiloAddress Origin,
-    long Sequence,
+    string Key,
+    long Version,
     string PayloadKind);
 
-internal sealed class DisseminationItem
+internal sealed class DisseminationValue
 {
-    public DisseminationItemId Id { get; init; }
-    public uint Round { get; init; }
+    public DisseminationDigest Digest { get; init; }
+    public SiloAddress Root { get; init; }
     public DateTimeOffset ExpiresAt { get; init; }
     public byte[] Payload { get; init; }
 }
-
-internal sealed class DisseminationAdvertisement
-{
-    public DisseminationItemId Id { get; init; }
-    public uint Round { get; init; }
-}
 ```
+
+`DisseminationDigest` is the payload-free summary exchanged during anti-entropy. It identifies one version of one logical value:
+
+| Property | Meaning |
+|---|---|
+| `Topic` | Logical namespace and semantic owner, such as `load` or `membership`. |
+| `Key` | Topic-local string key. Membership uses `"cluster"`; load statistics use the source silo's `SiloAddress.ToParsableString()` value. |
+| `Version` | Monotonic version for this `(Topic, Key, PayloadKind)` stream. Higher versions supersede lower versions according to topic comparison rules. |
+| `PayloadKind` | Concrete payload shape within the topic, allowing one topic to support multiple wire formats or value types. |
+
+`DisseminationValue` carries a digest plus routing and payload data:
+
+| Property | Meaning |
+|---|---|
+| `Digest` | The `DisseminationDigest` for the value being sent. |
+| `Root` | Silo which rooted this tree broadcast. This is routing metadata and is not necessarily the same as the value key. |
+| `ExpiresAt` | Time after which the value should not be applied or forwarded. |
+| `Payload` | Serialized topic-specific value. The topic owns deserialization, validation, version comparison, and application. |
 
 Apply result:
 
@@ -536,9 +549,12 @@ Recommended instruments:
 |---|---|---|---|
 | `orleans.dissemination.gossip.sent` | Counter | messages | `topic`, `kind` |
 | `orleans.dissemination.gossip.received` | Counter | messages | `topic`, `kind` |
-| `orleans.dissemination.items.sent` | Counter | items | `topic`, `kind` |
-| `orleans.dissemination.items.applied` | Counter | items | `topic`, `result` |
+| `orleans.dissemination.values.sent` | Counter | values | `topic`, `kind` |
+| `orleans.dissemination.values.applied` | Counter | values | `topic`, `result` |
 | `orleans.dissemination.bytes.sent` | Counter | bytes | `topic`, `kind` |
+| `orleans.dissemination.anti_entropy.exchanges` | Counter | operations | `direction`, `truncated` |
+| `orleans.dissemination.anti_entropy.digests` | Counter | digests | `direction` |
+| `orleans.dissemination.anti_entropy.values` | Counter | values | `direction` |
 | `orleans.dissemination.prunes.sent` | Counter | messages | `topic` |
 | `orleans.dissemination.grafts.sent` | Counter | items | `topic` |
 | `orleans.dissemination.grafts.served` | Counter | items | `topic`, `result` |
@@ -547,7 +563,7 @@ Recommended instruments:
 | `orleans.dissemination.send.duration` | Histogram | milliseconds | `topic`, `kind` |
 | `orleans.dissemination.convergence.latency` | Histogram | milliseconds | `topic` |
 | `orleans.dissemination.fallbacks` | Counter | operations | `topic`, `reason` |
-| `orleans.dissemination.payload.dropped` | Counter | items | `topic`, `reason` |
+| `orleans.dissemination.payload.dropped` | Counter | values | `topic`, `reason` |
 
 Avoid unbounded metric cardinality:
 
@@ -574,28 +590,28 @@ Recommended events:
 | `Dissemination.AdvertiseReceive` | Lazy advertisement batch received. |
 | `Dissemination.PruneSend` | Edge demotion requested. |
 | `Dissemination.PruneReceive` | Edge demotion processed. |
-| `Dissemination.GraftSend` | Missing item repair requested. |
+| `Dissemination.GraftSend` | Missing value repair requested. |
 | `Dissemination.GraftReceive` | Repair request received. |
 | `Dissemination.GraftServe` | Cached payload served or unavailable. |
-| `Dissemination.ItemApply` | Topic item applied/duplicate/obsolete/rejected. |
-| `Dissemination.ItemCoalesce` | Pending item replaced or batched. |
+| `Dissemination.ValueApply` | Topic value applied/duplicate/obsolete/rejected. |
+| `Dissemination.ValueCoalesce` | Pending value replaced or batched. |
 | `Dissemination.CacheEvict` | Payload evicted. |
 | `Dissemination.CapabilityProbe` | Peer capability result. |
 | `Dissemination.Fallback` | Topic fallback used. |
 | `Dissemination.PayloadDrop` | Oversize or invalid payload dropped. |
 
-Event payloads may include peer and item identity because `DiagnosticListener` is opt-in and diagnostic, but payloads must not include sensitive data beyond internal runtime identifiers.
+Event payloads may include peer and value identity because `DiagnosticListener` is opt-in and diagnostic, but payloads must not include sensitive data beyond internal runtime identifiers.
 
 Example event payload:
 
 ```csharp
-internal sealed class DisseminationItemEvent
+internal sealed class DisseminationValueEvent
 {
     public string Topic { get; init; }
     public SiloAddress LocalSilo { get; init; }
     public SiloAddress? Peer { get; init; }
-    public SiloAddress Origin { get; init; }
-    public long Sequence { get; init; }
+    public string Key { get; init; }
+    public long Version { get; init; }
     public string PayloadKind { get; init; }
     public string Result { get; init; }
     public int PayloadBytes { get; init; }
