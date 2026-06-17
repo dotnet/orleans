@@ -302,15 +302,17 @@ namespace Orleans.Reminders.Concurrency
 
         public ThrottleConfig Build() { throw null; }
 
-        public ReminderThrottleConfigBuilder BurstSize(int value) { throw null; }
-
         public ReminderThrottleConfigBuilder MaxConcurrent(int value) { throw null; }
 
         public ReminderThrottleConfigBuilder MaxConcurrent(int value, ThrottleBlockMode blockMode) { throw null; }
 
         public ReminderThrottleConfigBuilder PermitsPerSecond(double value) { throw null; }
 
+        public ReminderThrottleConfigBuilder PermitsPerSecond(double value, int burstSize) { throw null; }
+
         public ReminderThrottleConfigBuilder PermitsPerSecond(double value, ThrottleBlockMode blockMode) { throw null; }
+
+        public ReminderThrottleConfigBuilder PermitsPerSecond(double value, int burstSize, ThrottleBlockMode blockMode) { throw null; }
 
         public ReminderThrottleConfigBuilder RespectOverload(ThrottleBlockMode onOverload, System.TimeSpan? pollInterval = null) { throw null; }
 
