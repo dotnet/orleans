@@ -23,80 +23,101 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
 
     public int ProtocolVersion => 2;
 
+    public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.ActiveMembers;
+
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
 
     public IReadOnlySet<string> PayloadKinds => SupportedPayloadKinds;
 
     public bool IsEnabled => Options.Enabled;
 
-    public DisseminationItem CreateItem(SiloAddress origin, SiloRuntimeStatistics statistics)
+    public DisseminationValue CreateItem(SiloAddress origin, SiloRuntimeStatistics statistics)
     {
         var payload = serializer.SerializeToArray(statistics);
-        return new DisseminationItem
+        return new DisseminationValue
         {
-            Id = new DisseminationItemId(Name, DisseminationValueKey.FromSiloAddress(origin), statistics.DateTime.Ticks, DisseminationTopicNames.SiloRuntimeStatistics),
+            Digest = new DisseminationDigest(Name, origin.ToParsableString(), statistics.DateTime.Ticks, DisseminationTopicNames.SiloRuntimeStatistics),
             Root = origin,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
             Payload = payload,
         };
     }
 
-    public IReadOnlyList<DisseminationItemId> GetDigests()
+    public IReadOnlyList<DisseminationDigest> GetDigests()
     {
-        var digests = new List<DisseminationItemId>();
+        var digests = new List<DisseminationDigest>();
         foreach (var entry in deploymentLoadPublisher.PeriodicStatistics)
         {
             if (!deploymentLoadPublisher.IsRuntimeStatisticsObsolete(entry.Key, entry.Value.DateTime.Ticks))
             {
-                digests.Add(new DisseminationItemId(
+                digests.Add(new DisseminationDigest(
                     Name,
-                    DisseminationValueKey.FromSiloAddress(entry.Key),
+                    entry.Key.ToParsableString(),
                     entry.Value.DateTime.Ticks,
                     DisseminationTopicNames.SiloRuntimeStatistics));
             }
         }
 
-        digests.Sort(static (left, right) => string.CompareOrdinal(left.Key.ToString(), right.Key.ToString()));
+        digests.Sort(static (left, right) => string.CompareOrdinal(left.Key, right.Key));
         return digests;
     }
 
-    public int CompareVersion(DisseminationItemId left, DisseminationItemId right) => left.Version.CompareTo(right.Version);
+    public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
 
-    public bool IsObsolete(DisseminationItemId id) =>
-        !string.Equals(id.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
-        || id.Key.SiloAddress is null
-        || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(id.Key.SiloAddress, id.Version);
+    public bool IsObsolete(DisseminationDigest digest) =>
+        !string.Equals(digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
+        || !TryGetSiloAddress(digest.Key, out var siloAddress)
+        || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, digest.Version);
 
-    public ValueTask<DisseminationItem?> GetItem(DisseminationItemId id, CancellationToken cancellationToken)
+    public ValueTask<DisseminationValue?> GetValue(DisseminationDigest digest, CancellationToken cancellationToken)
     {
-        if (!string.Equals(id.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
-            || id.Key.SiloAddress is null
-            || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(id.Key.SiloAddress, out var statistics)
-            || statistics.DateTime.Ticks < id.Version)
+        if (!string.Equals(digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
+            || !TryGetSiloAddress(digest.Key, out var siloAddress)
+            || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
+            || statistics.DateTime.Ticks < digest.Version)
         {
-            return ValueTask.FromResult<DisseminationItem?>(null);
+            return ValueTask.FromResult<DisseminationValue?>(null);
         }
 
-        return ValueTask.FromResult<DisseminationItem?>(CreateItem(id.Key.SiloAddress, statistics));
+        return ValueTask.FromResult<DisseminationValue?>(CreateItem(siloAddress, statistics));
     }
 
-    public ValueTask<DisseminationApplyResult> ApplyItem(DisseminationItem item, CancellationToken cancellationToken)
+    public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
     {
-        if (!string.Equals(item.Id.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
-            || item.Id.Key.SiloAddress is null)
+        if (!string.Equals(value.Digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
+            || !TryGetSiloAddress(value.Digest.Key, out var siloAddress))
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
 
-        var statistics = serializer.Deserialize<SiloRuntimeStatistics>(item.Payload);
-        return ValueTask.FromResult(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(item.Id.Key.SiloAddress, statistics));
+        var statistics = serializer.Deserialize<SiloRuntimeStatistics>(value.Payload);
+        return ValueTask.FromResult(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress peer, DisseminationItemId id, CancellationToken cancellationToken)
+    public async ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken)
     {
-        if (Options.FallbackEnabled && id.Key.SiloAddress is not null)
+        if (Options.FallbackEnabled && TryGetSiloAddress(digest.Key, out var siloAddress))
         {
-            await deploymentLoadPublisher.RefreshSiloStatisticsForDissemination(id.Key.SiloAddress);
+            await deploymentLoadPublisher.RefreshSiloStatisticsForDissemination(siloAddress);
+        }
+    }
+
+    private static bool TryGetSiloAddress(string key, out SiloAddress siloAddress)
+    {
+        try
+        {
+            siloAddress = SiloAddress.FromParsableString(key);
+            return true;
+        }
+        catch (FormatException)
+        {
+            siloAddress = default!;
+            return false;
+        }
+        catch (OverflowException)
+        {
+            siloAddress = default!;
+            return false;
         }
     }
 }
