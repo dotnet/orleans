@@ -124,8 +124,6 @@ namespace Orleans.Runtime.MembershipService
 
                 if (_clusterMembershipOptions.MaxDefunctSiloEntries is { } maxDefunctSiloEntries)
                 {
-                    ArgumentOutOfRangeException.ThrowIfNegative(maxDefunctSiloEntries, nameof(ClusterMembershipOptions.MaxDefunctSiloEntries));
-
                     var defunctSiloEntryCount = 0;
                     var trackedEntryCount = (long)maxDefunctSiloEntries + 1;
                     var newestDefunctEntries = new PriorityQueue<MembershipEntry, DefunctSiloEntryPriority>();
