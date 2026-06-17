@@ -16,7 +16,7 @@ internal sealed class MembershipDisseminationTopic(
     TimeProvider timeProvider,
     ILocalSiloDetails localSiloDetails) : IDisseminationTopic
 {
-    private static readonly DisseminationValueKey MembershipKey = DisseminationValueKey.FromString("cluster");
+    private const string MembershipKey = "cluster";
     private static readonly HashSet<string> SupportedPayloadKinds = new(StringComparer.Ordinal)
     {
         DisseminationTopicNames.MembershipSnapshot,
@@ -26,66 +26,68 @@ internal sealed class MembershipDisseminationTopic(
 
     public int ProtocolVersion => 2;
 
+    public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
+
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
 
     public IReadOnlySet<string> PayloadKinds => SupportedPayloadKinds;
 
     public bool IsEnabled => Options.Enabled;
 
-    public DisseminationItem CreateItem(SiloAddress origin, MembershipTableSnapshot snapshot)
+    public DisseminationValue CreateItem(SiloAddress origin, MembershipTableSnapshot snapshot)
     {
         var payload = serializer.SerializeToArray(snapshot);
-        return new DisseminationItem
+        return new DisseminationValue
         {
-            Id = new DisseminationItemId(Name, MembershipKey, snapshot.Version.Value, DisseminationTopicNames.MembershipSnapshot),
+            Digest = new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value, DisseminationTopicNames.MembershipSnapshot),
             Root = origin,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
             Payload = payload,
         };
     }
 
-    public IReadOnlyList<DisseminationItemId> GetDigests()
+    public IReadOnlyList<DisseminationDigest> GetDigests()
     {
         var snapshot = membershipManager.CurrentSnapshot;
         return new[]
         {
-            new DisseminationItemId(Name, MembershipKey, snapshot.Version.Value, DisseminationTopicNames.MembershipSnapshot),
+            new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value, DisseminationTopicNames.MembershipSnapshot),
         };
     }
 
-    public int CompareVersion(DisseminationItemId left, DisseminationItemId right) => left.Version.CompareTo(right.Version);
+    public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
 
-    public bool IsObsolete(DisseminationItemId id) =>
-        !string.Equals(id.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
-        || id.Key != MembershipKey
-        || membershipManager.CurrentSnapshot.Version.Value > id.Version;
+    public bool IsObsolete(DisseminationDigest digest) =>
+        !string.Equals(digest.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
+        || digest.Key != MembershipKey
+        || membershipManager.CurrentSnapshot.Version.Value > digest.Version;
 
-    public ValueTask<DisseminationItem?> GetItem(DisseminationItemId id, CancellationToken cancellationToken)
+    public ValueTask<DisseminationValue?> GetValue(DisseminationDigest digest, CancellationToken cancellationToken)
     {
-        if (!string.Equals(id.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
-            || id.Key != MembershipKey)
+        if (!string.Equals(digest.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
+            || digest.Key != MembershipKey)
         {
-            return ValueTask.FromResult<DisseminationItem?>(null);
+            return ValueTask.FromResult<DisseminationValue?>(null);
         }
 
         var snapshot = membershipManager.CurrentSnapshot;
-        if (snapshot.Version.Value < id.Version)
+        if (snapshot.Version.Value < digest.Version)
         {
-            return ValueTask.FromResult<DisseminationItem?>(null);
+            return ValueTask.FromResult<DisseminationValue?>(null);
         }
 
-        return ValueTask.FromResult<DisseminationItem?>(CreateItem(localSiloDetails.SiloAddress, snapshot));
+        return ValueTask.FromResult<DisseminationValue?>(CreateItem(localSiloDetails.SiloAddress, snapshot));
     }
 
-    public async ValueTask<DisseminationApplyResult> ApplyItem(DisseminationItem item, CancellationToken cancellationToken)
+    public async ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
     {
-        if (!string.Equals(item.Id.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
-            || item.Id.Key != MembershipKey)
+        if (!string.Equals(value.Digest.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
+            || value.Digest.Key != MembershipKey)
         {
             return DisseminationApplyResult.Rejected;
         }
 
-        var snapshot = serializer.Deserialize<MembershipTableSnapshot>(item.Payload);
+        var snapshot = serializer.Deserialize<MembershipTableSnapshot>(value.Payload);
         var currentVersion = membershipManager.CurrentSnapshot.Version;
         if (snapshot.Version < currentVersion)
         {
@@ -101,11 +103,11 @@ internal sealed class MembershipDisseminationTopic(
         return DisseminationApplyResult.Applied;
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress peer, DisseminationItemId id, CancellationToken cancellationToken)
+    public async ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken)
     {
         if (Options.FallbackEnabled)
         {
-            await membershipManager.Refresh(new MembershipVersion(id.Version), cancellationToken);
+            await membershipManager.Refresh(new MembershipVersion(digest.Version), cancellationToken);
         }
     }
 }
