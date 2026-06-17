@@ -121,6 +121,44 @@ public sealed class OverloadBackoffTests
         var lease = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
         Assert.Equal(ReminderAdmissionOutcome.Admitted, lease.Outcome);
     }
+
+    /// <summary>
+    /// Regression for composed admission gates: once an earlier gate establishes a timeout budget,
+    /// a later wait-based gate must honor only the remaining budget rather than starting over.
+    /// </summary>
+    [Fact, TestCategory("BVT")]
+    public async Task RespectOverload_ConsumesSharedBudgetBeforeConcurrencyWait()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var detector = new FakeOverloadDetector { IsOverloaded = false };
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(1, ThrottleBlockMode.Wait)
+            .RespectOverload(ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(800)), pollInterval: TimeSpan.FromMilliseconds(100))
+            .Build();
+        await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
+
+        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
+
+        detector.IsOverloaded = true;
+        var secondTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        Assert.False(secondTask.IsCompleted);
+
+        detector.IsOverloaded = false;
+        clock.Advance(TimeSpan.FromMilliseconds(100));
+        Assert.False(secondTask.IsCompleted);
+
+        clock.Advance(TimeSpan.FromMilliseconds(250));
+        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
+        Assert.Equal(ReminderSkipReason.AcquireTimeout, second.SkipReason);
+        Assert.True(second.WaitedFor <= TimeSpan.FromMilliseconds(900), $"Total wait exceeded the configured budget: {second.WaitedFor}");
+
+        first.Dispose();
+    }
 }
 
 /// <summary>

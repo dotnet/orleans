@@ -82,7 +82,7 @@ Choose by calling `BlockMode(...)` with one of:
 | `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip the tick if no permit became available. | Bounded tardiness, bounded skip rate. Skips are classified as `ReminderSkipReason.AcquireTimeout` for observability. |
 | `ThrottleBlockMode.SkipImmediately` | Skip the tick if no permit is available right now. | Maximum downstream protection; minimum delivery guarantee. Best when "missing a tick" is materially better than "exceeding the limit". |
 
-The concurrency and rate phases share a single `WaitUpTo` budget: a `WaitUpTo(500ms)` cap means the total wait across both phases is at most 500 ms, not 500 ms per phase.
+All sequential waiting phases share a single `WaitUpTo` budget: a `WaitUpTo(500ms)` cap means the total wait across the composed gates is at most 500 ms, not 500 ms per gate.
 
 **Reasoning prompts:**
 
