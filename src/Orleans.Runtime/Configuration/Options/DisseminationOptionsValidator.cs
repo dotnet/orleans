@@ -33,9 +33,19 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
         }
 
         var overlay = options.Overlay;
-        if (overlay.TreeFanout <= 0)
+        if (overlay.TargetHopCount <= 0)
         {
-            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.TreeFanout)} must be greater than 0.");
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.TargetHopCount)} must be greater than 0.");
+        }
+
+        if (overlay.MinFanOutFactor <= 0)
+        {
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.MinFanOutFactor)} must be greater than 0.");
+        }
+
+        if (overlay.MaxFanOutFactor < overlay.MinFanOutFactor)
+        {
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.MaxFanOutFactor)} must be greater than or equal to {nameof(DisseminationOverlayOptions.MinFanOutFactor)}.");
         }
 
         if (overlay.AntiEntropyInterval <= TimeSpan.Zero)

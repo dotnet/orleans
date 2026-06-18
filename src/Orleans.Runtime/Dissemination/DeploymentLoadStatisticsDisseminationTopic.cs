@@ -69,9 +69,14 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         || !TryGetSiloAddress(digest.Key, out var siloAddress)
         || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, digest.Version);
 
-    public ValueTask<DisseminationValue?> GetValue(DisseminationDigest digest, CancellationToken cancellationToken)
+    public ValueTask<DisseminationValue?> GetValue(
+        DisseminationDigest digest,
+        DisseminationDigest? peerDigest,
+        IReadOnlySet<string> peerPayloadKinds,
+        CancellationToken cancellationToken)
     {
         if (!string.Equals(digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
+            || !peerPayloadKinds.Contains(DisseminationTopicNames.SiloRuntimeStatistics)
             || !TryGetSiloAddress(digest.Key, out var siloAddress)
             || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
             || statistics.DateTime.Ticks < digest.Version)
