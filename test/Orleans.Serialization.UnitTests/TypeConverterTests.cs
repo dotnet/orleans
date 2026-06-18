@@ -148,27 +148,6 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
-        public void TypeConverter_AllowsEnums()
-        {
-            var converter = CreateConverter();
-
-            AssertRoundTrips(converter, typeof(TypeConverterTestsUnconfiguredEnum));
-            AssertRoundTrips(converter, typeof(List<TypeConverterTestsUnconfiguredEnum>));
-        }
-
-        [Fact]
-        public void TypeConverter_RejectsEnums_WhenTypeNameFilterDeniesThem()
-        {
-            var converter = CreateConverter(
-                typeNameFilters:
-                [
-                    new DelegateTypeNameFilter((typeName, _) => typeName == typeof(TypeConverterTestsUnconfiguredEnum).FullName ? false : null)
-                ]);
-
-            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsUnconfiguredEnum));
-        }
-
-        [Fact]
         public void TypeConverter_AllowsBuiltInAliasesUnderFailClosedBehavior()
         {
             var converter = CreateConverter();
@@ -363,12 +342,6 @@ namespace Orleans.Serialization.UnitTests
         internal sealed class Nested
         {
         }
-    }
-
-    internal enum TypeConverterTestsUnconfiguredEnum
-    {
-        One,
-        Two
     }
 
     internal sealed class TypeConverterTestsGenericArgumentAllowedByTypeFilter

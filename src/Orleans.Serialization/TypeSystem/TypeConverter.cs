@@ -594,11 +594,6 @@ public class TypeConverter
 
     private bool? IsTypeAllowedByConfiguration(Type type)
     {
-        if (type.IsEnum)
-        {
-            return true;
-        }
-
         return IsAssemblyAllowed(CachedTypeResolver.GetName(type.Assembly)) || IsAssemblyAllowed(type.Assembly.FullName) ? true : null;
     }
 
