@@ -432,6 +432,8 @@ namespace Orleans.Runtime.Messaging
         {
             if (!MayForward(message, this.messagingOptions)) return false;
 
+            // Clear the receiver cache so placement can find the correct destination.
+            message.MessageReceiver = null;
             message.ForwardCount = message.ForwardCount + 1;
             _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
 

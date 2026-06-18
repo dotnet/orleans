@@ -259,6 +259,20 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
+        protected override bool ShouldSetMessageReceiver(Message message)
+        {
+            if (message.Direction is Message.Directions.Request or Message.Directions.OneWay
+                && message.SendingSilo is { } sendingSilo
+                && this.RemoteSiloAddress is { } remoteSiloAddress
+                && !remoteSiloAddress.Matches(sendingSilo))
+            {
+                // Avoid caching the previous-hop connection for forwarded messages.
+                return false;
+            }
+
+            return true;
+        }
+
         public void FailMessage(Message msg, string reason)
         {
             if (msg.IsPing())
@@ -310,6 +324,15 @@ namespace Orleans.Runtime.Messaging
 
         public override void ReceiveMessage(Message message, IMessageReceiverCache cache)
         {
+            if (message.TargetSilo is { } targetSilo
+                && this.RemoteSiloAddress is { } remoteSiloAddress
+                && !remoteSiloAddress.Matches(targetSilo))
+            {
+                cache.MessageReceiver = null;
+                this.messageCenter.SendMessage(message, receiverCache: null);
+                return;
+            }
+
             message.TargetSilo ??= this.RemoteSiloAddress;
             base.ReceiveMessage(message, cache);
         }

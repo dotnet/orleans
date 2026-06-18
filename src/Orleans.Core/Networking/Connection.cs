@@ -270,6 +270,8 @@ namespace Orleans.Runtime.Messaging
         protected abstract void OnReceivedMessage(Message message);
         protected abstract void OnSendMessageFailure(Message message, string error);
 
+        protected virtual bool ShouldSetMessageReceiver(Message message) => true;
+
         private async Task ProcessIncoming()
         {
             await Task.Yield();
@@ -297,7 +299,11 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     Debug.Assert(message is not null);
-                                    message.MessageReceiver = this;
+                                    if (ShouldSetMessageReceiver(message))
+                                    {
+                                        message.MessageReceiver = this;
+                                    }
+
                                     RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
