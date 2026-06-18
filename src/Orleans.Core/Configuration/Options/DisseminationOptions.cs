@@ -49,9 +49,29 @@ public sealed class DisseminationOptions
 public sealed class DisseminationOverlayOptions
 {
     /// <summary>
-    /// Gets or sets the deterministic spanning tree fanout.
+    /// Gets or sets the code-configured fanout selector.
     /// </summary>
-    public int TreeFanout { get; set; } = 3;
+    /// <remarks>
+    /// The argument is the current participant count for the selected dissemination topology.
+    /// When this value is <see langword="null"/>, <see cref="TargetHopCount"/>, <see cref="MinFanOutFactor"/>,
+    /// and <see cref="MaxFanOutFactor"/> are used to derive a fanout factor.
+    /// </remarks>
+    public Func<int, int>? FanOutFactor { get; set; }
+
+    /// <summary>
+    /// Gets or sets the target number of tree hops used by the bindable fanout selector.
+    /// </summary>
+    public int TargetHopCount { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the minimum fanout factor used by the bindable fanout selector.
+    /// </summary>
+    public int MinFanOutFactor { get; set; } = 4;
+
+    /// <summary>
+    /// Gets or sets the maximum fanout factor used by the bindable fanout selector.
+    /// </summary>
+    public int MaxFanOutFactor { get; set; } = 32;
 
     /// <summary>
     /// Gets or sets the interval between anti-entropy repair rounds.
