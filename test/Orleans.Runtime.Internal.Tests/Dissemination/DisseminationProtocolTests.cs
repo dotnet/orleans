@@ -266,7 +266,7 @@ public class DisseminationProtocolTests
                 .Select(index => silos[index])
                 .ToHashSet();
 
-            Assert.True(peers.Count <= Math.Min(testCase.PeerCount, Math.Max(0, expectedCandidates.Count)));
+            Assert.True(peers.Length <= Math.Min(testCase.PeerCount, Math.Max(0, expectedCandidates.Count)));
             Assert.DoesNotContain(local, peers);
             Assert.All(peers, peer => Assert.Contains(peer, expectedCandidates));
         });

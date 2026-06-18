@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -10,16 +11,21 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
 
-internal sealed partial class DisseminationProtocol
+internal sealed partial class DisseminationProtocol(
+    IDisseminationTransport transport,
+    IOptionsMonitor<DisseminationOptions> options,
+    IEnumerable<IDisseminationTopic> topics,
+    TimeProvider timeProvider,
+    ILogger<DisseminationProtocol> logger)
 {
-    private readonly IDisseminationTransport _transport;
-    private readonly IOptionsMonitor<DisseminationOptions> _options;
-    private readonly Dictionary<string, IDisseminationTopic> _topics;
-    private readonly TimeProvider _timeProvider;
-    private readonly ILogger<DisseminationProtocol> _logger;
-    private readonly Dictionary<CapabilityKey, CapabilityEntry> _capabilityCache = new();
-    private readonly Dictionary<CapabilityKey, DateTimeOffset> _capabilityProbeBackoffUntil = new();
-    private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = new();
+    private readonly IDisseminationTransport _transport = transport;
+    private readonly IOptionsMonitor<DisseminationOptions> _options = options;
+    private readonly FrozenDictionary<string, IDisseminationTopic> _topics = topics.ToFrozenDictionary(static topic => topic.Name, StringComparer.Ordinal);
+    private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly ILogger<DisseminationProtocol> _logger = logger;
+    private readonly Dictionary<CapabilityKey, CapabilityEntry> _capabilityCache = [];
+    private readonly Dictionary<CapabilityKey, DateTimeOffset> _capabilityProbeBackoffUntil = [];
+    private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
     private readonly object _capabilityLock = new();
     private readonly object _failureLock = new();
     private readonly object _topologyLock = new();
@@ -27,21 +33,7 @@ internal sealed partial class DisseminationProtocol
     private ParticipantTopology _allMembersTopology = ParticipantTopology.Empty;
     private long _antiEntropyRound;
 
-    public DisseminationProtocol(
-        IDisseminationTransport transport,
-        IOptionsMonitor<DisseminationOptions> options,
-        IEnumerable<IDisseminationTopic> topics,
-        TimeProvider timeProvider,
-        ILogger<DisseminationProtocol> logger)
-    {
-        _transport = transport;
-        _options = options;
-        _timeProvider = timeProvider;
-        _logger = logger;
-        _topics = topics.ToDictionary(static topic => topic.Name, StringComparer.Ordinal);
-    }
-
-    public IReadOnlyDictionary<string, IDisseminationTopic> Topics => _topics;
+    public FrozenDictionary<string, IDisseminationTopic> Topics => _topics;
 
     public async ValueTask<bool> Publish(
         string topicName,
@@ -89,10 +81,7 @@ internal sealed partial class DisseminationProtocol
             return;
         }
 
-        foreach (var group in batch.Values.GroupBy(static item => item.Digest.Topic))
-        {
-            DisseminationInstruments.OnGossipReceived(group.Key, "tree", group.Count());
-        }
+        DisseminationInstruments.OnGossipReceived(batch.Values, "tree");
 
         foreach (var item in batch.Values)
         {
@@ -120,7 +109,7 @@ internal sealed partial class DisseminationProtocol
             {
                 Topic = topic.Name,
                 ProtocolVersion = topic.ProtocolVersion,
-                PayloadKinds = topic.PayloadKinds.ToArray(),
+                PayloadKinds = [.. topic.PayloadKinds],
             });
 
             foreach (var digest in topic.GetDigests())
@@ -146,7 +135,7 @@ internal sealed partial class DisseminationProtocol
     {
         if (state.PeersByTopic.Count == 0 || state.Topics.Count == 0)
         {
-            return Array.Empty<DisseminationAntiEntropyResponse>();
+            return [];
         }
 
         var peers = state.PeersByTopic.Values.SelectMany(static value => value).Distinct().ToArray();
@@ -166,7 +155,7 @@ internal sealed partial class DisseminationProtocol
             var request = new DisseminationAntiEntropyRequest
             {
                 Sender = _transport.LocalSilo,
-                Topics = topics.ToArray(),
+                Topics = [.. topics],
                 Digests = digests,
             };
 
@@ -218,13 +207,13 @@ internal sealed partial class DisseminationProtocol
     {
         if (!_options.CurrentValue.Enabled)
         {
-            return CreateAntiEntropyResponse(Array.Empty<DisseminationValue>(), truncated: false);
+            return CreateAntiEntropyResponse([], truncated: false);
         }
 
         var requestedTopics = GetRequestedTopics(request);
         if (requestedTopics.Count == 0)
         {
-            return CreateAntiEntropyResponse(Array.Empty<DisseminationValue>(), truncated: false);
+            return CreateAntiEntropyResponse([], truncated: false);
         }
 
         var remoteDigests = GetRemoteDigestMap(request.Digests);
@@ -278,7 +267,7 @@ internal sealed partial class DisseminationProtocol
         }
 
         DisseminationInstruments.OnAntiEntropyExchange("in", request.Digests.Length, values.Count, truncated);
-        return CreateAntiEntropyResponse(values.ToArray(), truncated);
+        return CreateAntiEntropyResponse([.. values], truncated);
     }
 
     private async ValueTask<DisseminationApplyResult> ApplyReceivedValue(
@@ -343,7 +332,7 @@ internal sealed partial class DisseminationProtocol
         var batch = new DisseminationGossipBatch
         {
             Sender = _transport.LocalSilo,
-            Values = new[] { item },
+            Values = [item],
         };
 
         var sent = await SafeSend(peer, target => _transport.SendGossip(target, batch, cancellationToken));
@@ -431,14 +420,14 @@ internal sealed partial class DisseminationProtocol
         {
             Topic = topic.Name,
             ProtocolVersion = topic.ProtocolVersion,
-            PayloadKinds = topic.PayloadKinds.ToArray(),
+            PayloadKinds = [.. topic.PayloadKinds],
         };
 
         try
         {
             var response = await _transport.GetCapabilities(peer, request, cancellationToken);
             var supported = response.Supported && response.ProtocolVersion >= topic.ProtocolVersion;
-            var payloadKinds = response.PayloadKinds.ToHashSet(StringComparer.Ordinal);
+            var payloadKinds = response.PayloadKinds.ToFrozenSet(StringComparer.Ordinal);
             lock (_capabilityLock)
             {
                 _capabilityCache[key] = new CapabilityEntry(supported, payloadKinds, now + _options.CurrentValue.CapabilityCacheTtl);
@@ -466,7 +455,7 @@ internal sealed partial class DisseminationProtocol
 
     private async ValueTask<bool> AreParticipantsCapable(
         ImmutableArray<SiloAddress> participants,
-        HashSet<SiloAddress> activeMembers,
+        FrozenSet<SiloAddress> activeMembers,
         IDisseminationTopic topic,
         string payloadKind,
         CancellationToken cancellationToken)
@@ -528,7 +517,7 @@ internal sealed partial class DisseminationProtocol
                 {
                     Topic = request.Topic,
                     ProtocolVersion = request.ProtocolVersion,
-                    PayloadKinds = supportedPayloadKinds.ToArray(),
+                    PayloadKinds = [.. supportedPayloadKinds],
                 });
             }
         }
@@ -536,7 +525,7 @@ internal sealed partial class DisseminationProtocol
         return result;
     }
 
-    private Dictionary<string, RequestedTopic> GetRequestedTopics(DisseminationAntiEntropyRequest request)
+    private FrozenDictionary<string, RequestedTopic> GetRequestedTopics(DisseminationAntiEntropyRequest request)
     {
         var result = new Dictionary<string, RequestedTopic>(StringComparer.Ordinal);
         foreach (var requestedTopic in request.Topics)
@@ -549,17 +538,17 @@ internal sealed partial class DisseminationProtocol
 
             var payloadKinds = topic.PayloadKinds
                 .Intersect(requestedTopic.PayloadKinds, StringComparer.Ordinal)
-                .ToHashSet(StringComparer.Ordinal);
+                .ToFrozenSet(StringComparer.Ordinal);
             if (payloadKinds.Count > 0)
             {
                 result[topic.Name] = new RequestedTopic(topic, payloadKinds);
             }
         }
 
-        return result;
+        return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private Dictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(IEnumerable<DisseminationDigest> digests)
+    private FrozenDictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(IEnumerable<DisseminationDigest> digests)
     {
         var result = new Dictionary<DigestKey, DisseminationDigest>();
         foreach (var digest in digests)
@@ -576,14 +565,14 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        return result;
+        return result.ToFrozenDictionary();
     }
 
-    private IReadOnlyDictionary<string, IReadOnlyList<SiloAddress>> GetAntiEntropyPeersByTopic(
+    private FrozenDictionary<string, ImmutableArray<SiloAddress>> GetAntiEntropyPeersByTopic(
         IReadOnlyList<DisseminationCapabilityRequest> topics,
         long round)
     {
-        var result = new Dictionary<string, IReadOnlyList<SiloAddress>>(StringComparer.Ordinal);
+        var result = new Dictionary<string, ImmutableArray<SiloAddress>>(StringComparer.Ordinal);
         foreach (var request in topics)
         {
             if (_topics.TryGetValue(request.Topic, out var topic) && topic.IsEnabled)
@@ -592,33 +581,32 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        return result;
+        return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private IReadOnlyList<SiloAddress> SelectAntiEntropyPeers(DisseminationMembershipScope membershipScope, long round)
+    private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(DisseminationMembershipScope membershipScope, long round)
     {
         var options = _options.CurrentValue.Overlay;
         var topology = GetParticipantTopology(membershipScope, root: null, includeLocal: true);
         var participants = topology.Participants;
         if (participants.Length <= 1)
         {
-            return Array.Empty<SiloAddress>();
+            return [];
         }
 
         if (!topology.Indices.TryGetValue(_transport.LocalSilo, out var localIndex))
         {
-            return Array.Empty<SiloAddress>();
+            return [];
         }
 
         var fanout = GetFanOutFactor(participants.Length);
         var candidates = GetAntiEntropyCandidateIndexes(localIndex, participants.Length, fanout);
-        return candidates
+        return [.. candidates
             .Where(index => index != localIndex)
             .OrderBy(index => GetRepairPeerScore(participants[index], round, localIndex))
             .ThenBy(index => participants[index])
             .Take(options.AntiEntropyPeerCount)
-            .Select(index => participants[index])
-            .ToArray();
+            .Select(index => participants[index])];
     }
 
     private static IEnumerable<int> GetAntiEntropyCandidateIndexes(int localIndex, int participantCount, int fanout)
@@ -639,14 +627,14 @@ internal sealed partial class DisseminationProtocol
             yield break;
         }
 
-        var parentIndex = (localIndex / fanout) - 1;
+        var parentIndex = localIndex / fanout - 1;
         if (parentIndex < 0)
         {
             yield break;
         }
 
         var (previousLevelStart, previousLevelEnd) = GetLevelRange(parentIndex, participantCount, fanout);
-        var windowStart = previousLevelStart + (((parentIndex - previousLevelStart) / fanout) * fanout);
+        var windowStart = previousLevelStart + (parentIndex - previousLevelStart) / fanout * fanout;
         var windowEnd = Math.Min(previousLevelEnd, windowStart + fanout);
         for (var i = windowStart; i < windowEnd; i++)
         {
@@ -670,8 +658,8 @@ internal sealed partial class DisseminationProtocol
     private static ulong GetRepairPeerScore(SiloAddress peer, long round, int localIndex)
     {
         var value = (ulong)(uint)peer.GetConsistentHashCode();
-        value ^= ((ulong)round * 0x9E3779B97F4A7C15UL);
-        value ^= ((ulong)(uint)localIndex << 32);
+        value ^= (ulong)round * 0x9E3779B97F4A7C15UL;
+        value ^= (ulong)(uint)localIndex << 32;
         return Mix(value);
     }
 
@@ -717,7 +705,7 @@ internal sealed partial class DisseminationProtocol
     {
         if (!topology.Indices.TryGetValue(root, out var rootIndex))
         {
-            return Array.Empty<SiloAddress>();
+            return [];
         }
 
         var fanout = GetFanOutFactor(topology.Participants.Length);
@@ -731,7 +719,7 @@ internal sealed partial class DisseminationProtocol
     {
         if (!topology.Indices.TryGetValue(_transport.LocalSilo, out var localIndex))
         {
-            return Array.Empty<SiloAddress>();
+            return [];
         }
 
         var fanout = GetFanOutFactor(topology.Participants.Length);
@@ -776,7 +764,7 @@ internal sealed partial class DisseminationProtocol
 
     private static void AddTarget(SiloAddress peer, SiloAddress root, SiloAddress? except, List<SiloAddress> result)
     {
-        if (Equals(peer, root) || (except is { } excluded && Equals(peer, excluded)) || result.Contains(peer))
+        if (Equals(peer, root) || except is { } excluded && Equals(peer, excluded) || result.Contains(peer))
         {
             return;
         }
@@ -804,7 +792,7 @@ internal sealed partial class DisseminationProtocol
         return membershipScope == DisseminationMembershipScope.AllMembers ? allMembers : activeMembers;
     }
 
-    private HashSet<SiloAddress> GetActiveMemberSet(SiloAddress? root, bool includeLocal) =>
+    private FrozenSet<SiloAddress> GetActiveMemberSet(SiloAddress? root, bool includeLocal) =>
         GetCachedParticipantTopology(
             DisseminationMembershipScope.ActiveMembers,
             _transport.GetMembership().ActiveMembers,
@@ -858,10 +846,9 @@ internal sealed partial class DisseminationProtocol
         bool includeLocal,
         bool preserveOrder)
     {
-        var participantSet = new HashSet<SiloAddress>(participants);
-        var orderedParticipants = preserveOrder
-            ? participants.Where(participantSet.Remove).ToList()
-            : participantSet.OrderBy(static participant => participant).ToList();
+        List<SiloAddress> orderedParticipants = [..preserveOrder
+            ? participants.Distinct()
+            : participants.Distinct().OrderBy(static participant => participant)];
         if (includeLocal)
         {
             AddParticipant(_transport.LocalSilo);
@@ -877,7 +864,7 @@ internal sealed partial class DisseminationProtocol
             orderedParticipants.Sort(static (left, right) => left.CompareTo(right));
         }
 
-        return orderedParticipants.ToImmutableArray();
+        return [.. orderedParticipants];
 
         void AddParticipant(SiloAddress participant)
         {
@@ -888,7 +875,7 @@ internal sealed partial class DisseminationProtocol
                     orderedParticipants.Add(participant);
                 }
             }
-            else if (participantSet.Add(participant))
+            else if (!orderedParticipants.Contains(participant))
             {
                 orderedParticipants.Add(participant);
             }
@@ -903,7 +890,7 @@ internal sealed partial class DisseminationProtocol
             indices[sortedParticipants[i]] = i;
         }
 
-        return new ParticipantTopology(sortedParticipants, indices, sortedParticipants.ToHashSet());
+        return new ParticipantTopology(sortedParticipants, indices.ToFrozenDictionary(), sortedParticipants.ToFrozenSet());
     }
 
     private bool TryGetEnabledTopic(string topicName, out IDisseminationTopic topic)
@@ -961,8 +948,8 @@ internal sealed partial class DisseminationProtocol
 
     private void EmitApplyResult(DisseminationValue item, SiloAddress sender, DisseminationApplyResult result)
     {
-        DisseminationEvents.EmitValue(item.Digest, _transport.LocalSilo, sender, result.ToString(), item.Payload.Length);
-        DisseminationInstruments.OnValueApplied(item.Digest.Topic, result.ToString());
+        DisseminationEvents.EmitValue(item.Digest, _transport.LocalSilo, sender, result, item.Payload.Length);
+        DisseminationInstruments.OnValueApplied(item.Digest.Topic, result);
     }
 
     private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(DisseminationValue[] values, bool truncated) => new()
@@ -1007,23 +994,23 @@ internal sealed partial class DisseminationProtocol
     private static DigestKey GetDigestKey(DisseminationDigest digest) => new(digest.Topic, digest.Key, digest.PayloadKind);
 
     public sealed record AntiEntropyState(
-        IReadOnlyDictionary<string, IReadOnlyList<SiloAddress>> PeersByTopic,
+        FrozenDictionary<string, ImmutableArray<SiloAddress>> PeersByTopic,
         IReadOnlyList<DisseminationCapabilityRequest> Topics,
         IReadOnlyList<DisseminationDigest> Digests)
     {
         public static readonly AntiEntropyState Empty = new(
-            new Dictionary<string, IReadOnlyList<SiloAddress>>(StringComparer.Ordinal),
-            Array.Empty<DisseminationCapabilityRequest>(),
-            Array.Empty<DisseminationDigest>());
+            FrozenDictionary<string, ImmutableArray<SiloAddress>>.Empty,
+            [],
+            []);
     }
 
     private readonly record struct CapabilityKey(SiloAddress Peer, string Topic);
 
-    private readonly record struct CapabilityEntry(bool Supported, HashSet<string> PayloadKinds, DateTimeOffset ExpiresAt);
+    private readonly record struct CapabilityEntry(bool Supported, FrozenSet<string> PayloadKinds, DateTimeOffset ExpiresAt);
 
     private readonly record struct DigestKey(string Topic, string Key, string PayloadKind);
 
-    private readonly record struct RequestedTopic(IDisseminationTopic Topic, HashSet<string> PayloadKinds);
+    private readonly record struct RequestedTopic(IDisseminationTopic Topic, FrozenSet<string> PayloadKinds);
 
     private enum CapabilityStatus
     {
@@ -1034,13 +1021,13 @@ internal sealed partial class DisseminationProtocol
 
     private sealed record ParticipantTopology(
         ImmutableArray<SiloAddress> Participants,
-        IReadOnlyDictionary<SiloAddress, int> Indices,
-        HashSet<SiloAddress> ParticipantSet)
+        FrozenDictionary<SiloAddress, int> Indices,
+        FrozenSet<SiloAddress> ParticipantSet)
     {
         public static readonly ParticipantTopology Empty = new(
-            ImmutableArray<SiloAddress>.Empty,
-            new Dictionary<SiloAddress, int>(),
-            new HashSet<SiloAddress>());
+            [],
+            FrozenDictionary<SiloAddress, int>.Empty,
+            FrozenSet<SiloAddress>.Empty);
     }
 
     [LoggerMessage(
