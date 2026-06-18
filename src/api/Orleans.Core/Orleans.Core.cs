@@ -517,7 +517,13 @@ namespace Orleans.Configuration
 
         public int AntiEntropyPeerCount { get { throw null; } set { } }
 
-        public int TreeFanout { get { throw null; } set { } }
+        public System.Func<int, int>? FanOutFactor { get { throw null; } set { } }
+
+        public int MaxFanOutFactor { get { throw null; } set { } }
+
+        public int MinFanOutFactor { get { throw null; } set { } }
+
+        public int TargetHopCount { get { throw null; } set { } }
     }
 
     public sealed partial class DisseminationTopicOptions

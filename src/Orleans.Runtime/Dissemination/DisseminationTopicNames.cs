@@ -8,5 +8,6 @@ internal static class DisseminationTopicNames
 
     public const string SiloRuntimeStatistics = "SiloRuntimeStatistics";
     public const string MembershipSnapshot = "MembershipSnapshot";
+    public const string MembershipSnapshotDiff = "MembershipSnapshotDiff";
     public const string ManifestHash = "ManifestHash";
 }

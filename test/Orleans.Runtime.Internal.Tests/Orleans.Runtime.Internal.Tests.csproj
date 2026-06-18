@@ -8,7 +8,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Accordant" PrivateAssets="all" />
     <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="System.Collections.Immutable" VersionOverride="10.0.0" PrivateAssets="all" />
+    <PackageReference Include="System.IO.Pipelines" VersionOverride="10.0.5" PrivateAssets="all" />
+    <PackageReference Include="System.Text.Json" VersionOverride="10.0.5" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,4 +30,3 @@
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
   </ItemGroup>
 </Project>
-
