@@ -25,7 +25,11 @@ internal interface IDisseminationTopic
 
     bool IsObsolete(DisseminationDigest digest);
 
-    ValueTask<DisseminationValue?> GetValue(DisseminationDigest digest, CancellationToken cancellationToken);
+    ValueTask<DisseminationValue?> GetValue(
+        DisseminationDigest digest,
+        DisseminationDigest? peerDigest,
+        IReadOnlySet<string> peerPayloadKinds,
+        CancellationToken cancellationToken);
 
     ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken);
 
