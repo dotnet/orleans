@@ -19,30 +19,118 @@ internal static class DisseminationInstruments
 
     public static void OnGossipSent(string topic, string kind, int itemCount, int byteCount)
     {
-        GossipSent.Add(1, Tag("topic", topic), Tag("kind", kind));
-        ValuesSent.Add(itemCount, Tag("topic", topic), Tag("kind", kind));
-        BytesSent.Add(byteCount, Tag("topic", topic), Tag("kind", kind));
+        var gossipSentEnabled = GossipSent.Enabled;
+        var valuesSentEnabled = ValuesSent.Enabled;
+        var bytesSentEnabled = BytesSent.Enabled;
+        if (!gossipSentEnabled && !valuesSentEnabled && !bytesSentEnabled)
+        {
+            return;
+        }
+
+        var topicTag = Tag("topic", topic);
+        var kindTag = Tag("kind", kind);
+        if (gossipSentEnabled)
+        {
+            GossipSent.Add(1, topicTag, kindTag);
+        }
+
+        if (valuesSentEnabled)
+        {
+            ValuesSent.Add(itemCount, topicTag, kindTag);
+        }
+
+        if (bytesSentEnabled)
+        {
+            BytesSent.Add(byteCount, topicTag, kindTag);
+        }
     }
 
     public static void OnGossipReceived(string topic, string kind, int itemCount)
     {
-        GossipReceived.Add(1, Tag("topic", topic), Tag("kind", kind));
-        ValuesApplied.Add(itemCount, Tag("topic", topic), Tag("result", "received"));
+        var gossipReceivedEnabled = GossipReceived.Enabled;
+        var valuesAppliedEnabled = ValuesApplied.Enabled;
+        if (!gossipReceivedEnabled && !valuesAppliedEnabled)
+        {
+            return;
+        }
+
+        var topicTag = Tag("topic", topic);
+        if (gossipReceivedEnabled)
+        {
+            GossipReceived.Add(1, topicTag, Tag("kind", kind));
+        }
+
+        if (valuesAppliedEnabled)
+        {
+            ValuesApplied.Add(itemCount, topicTag, Tag("result", "received"));
+        }
     }
 
-    public static void OnValueApplied(string topic, string result) =>
-        ValuesApplied.Add(1, Tag("topic", topic), Tag("result", result));
+    public static void OnGossipReceived(DisseminationValue[] values, string kind)
+    {
+        if (!GossipReceived.Enabled && !ValuesApplied.Enabled)
+        {
+            return;
+        }
+
+        foreach (var group in values.GroupBy(static item => item.Digest.Topic))
+        {
+            OnGossipReceived(group.Key, kind, group.Count());
+        }
+    }
+
+    public static void OnValueApplied(string topic, DisseminationApplyResult result)
+    {
+        if (!ValuesApplied.Enabled)
+        {
+            return;
+        }
+
+        ValuesApplied.Add(1, Tag("topic", topic), Tag("result", result.ToString()));
+    }
 
     public static void OnAntiEntropyExchange(string direction, int digestCount, int itemCount, bool truncated)
     {
-        AntiEntropyExchanges.Add(1, Tag("direction", direction), Tag("truncated", truncated));
-        AntiEntropyDigests.Add(digestCount, Tag("direction", direction));
-        AntiEntropyValues.Add(itemCount, Tag("direction", direction));
+        var antiEntropyExchangesEnabled = AntiEntropyExchanges.Enabled;
+        var antiEntropyDigestsEnabled = AntiEntropyDigests.Enabled;
+        var antiEntropyValuesEnabled = AntiEntropyValues.Enabled;
+        if (!antiEntropyExchangesEnabled && !antiEntropyDigestsEnabled && !antiEntropyValuesEnabled)
+        {
+            return;
+        }
+
+        var directionTag = Tag("direction", direction);
+        if (antiEntropyExchangesEnabled)
+        {
+            AntiEntropyExchanges.Add(1, directionTag, Tag("truncated", truncated));
+        }
+
+        if (antiEntropyDigestsEnabled)
+        {
+            AntiEntropyDigests.Add(digestCount, directionTag);
+        }
+
+        if (antiEntropyValuesEnabled)
+        {
+            AntiEntropyValues.Add(itemCount, directionTag);
+        }
     }
 
-    public static void OnFallback(string topic, string reason) => Fallbacks.Add(1, Tag("topic", topic), Tag("reason", reason));
+    public static void OnFallback(string topic, string reason)
+    {
+        if (Fallbacks.Enabled)
+        {
+            Fallbacks.Add(1, Tag("topic", topic), Tag("reason", reason));
+        }
+    }
 
-    public static void OnPayloadDropped(string topic, string reason) => PayloadDropped.Add(1, Tag("topic", topic), Tag("reason", reason));
+    public static void OnPayloadDropped(string topic, string reason)
+    {
+        if (PayloadDropped.Enabled)
+        {
+            PayloadDropped.Add(1, Tag("topic", topic), Tag("reason", reason));
+        }
+    }
 
     private static KeyValuePair<string, object?> Tag(string name, object value) => new(name, value);
 }
