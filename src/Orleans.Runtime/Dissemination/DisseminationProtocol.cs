@@ -28,7 +28,14 @@ internal sealed partial class DisseminationProtocol(
     private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
     private readonly object _capabilityLock = new();
     private readonly object _failureLock = new();
+    private readonly object _gossipQueueLock = new();
+    private readonly object _recentUpdateLock = new();
     private readonly object _topologyLock = new();
+    private readonly Dictionary<SiloAddress, PendingGossipBatch> _pendingGossip = [];
+    private readonly Dictionary<ValueStreamKey, DateTimeOffset> _lastUpdateReceivedAt = [];
+    private DateTimeOffset? _nextGossipFlushAt;
+    private CancellationTokenSource? _gossipFlushWakeup;
+    private bool _gossipFlushScheduled;
     private ParticipantTopology _activeMembersTopology = ParticipantTopology.Empty;
     private ParticipantTopology _allMembersTopology = ParticipantTopology.Empty;
     private long _antiEntropyRound;
@@ -55,6 +62,7 @@ internal sealed partial class DisseminationProtocol(
 
         var root = item.Root is not null ? item.Root : _transport.LocalSilo;
         item = EnsureRoot(item, root);
+        RecordRecentUpdate(item.Digest);
         var topology = targetPeers is { Count: > 0 }
             ? BuildParticipantTopology(targetPeers, root, includeLocal: true)
             : GetParticipantTopology(topic.MembershipScope, root, includeLocal: true);
@@ -68,7 +76,7 @@ internal sealed partial class DisseminationProtocol(
 
         foreach (var peer in GetOriginatorTreeTargets(topology, root))
         {
-            await SendGossip(peer, item, cancellationToken);
+            EnqueueGossip(peer, item);
         }
 
         return true;
@@ -98,6 +106,8 @@ internal sealed partial class DisseminationProtocol(
 
         var topics = new List<DisseminationCapabilityRequest>();
         var digests = new List<DisseminationDigest>();
+        var currentValueStreams = new List<ValueStreamKey>();
+        var now = _timeProvider.GetUtcNow();
         foreach (var topic in _topics.Values)
         {
             if (!topic.IsEnabled)
@@ -117,11 +127,16 @@ internal sealed partial class DisseminationProtocol(
                 if (string.Equals(digest.Topic, topic.Name, StringComparison.Ordinal)
                     && topic.PayloadKinds.Contains(digest.PayloadKind))
                 {
-                    digests.Add(digest);
+                    currentValueStreams.Add(GetValueStreamKey(digest));
+                    if (ShouldRequestAntiEntropy(topic, digest, now))
+                    {
+                        digests.Add(digest);
+                    }
                 }
             }
         }
 
+        PruneRecentUpdates(currentValueStreams.ToFrozenSet());
         var round = Interlocked.Increment(ref _antiEntropyRound);
         return new AntiEntropyState(
             GetAntiEntropyPeersByTopic(topics, round),
@@ -152,6 +167,11 @@ internal sealed partial class DisseminationProtocol(
             }
 
             var digests = state.Digests.Where(digest => IsRequested(topics, digest)).ToArray();
+            if (digests.Length == 0)
+            {
+                continue;
+            }
+
             var request = new DisseminationAntiEntropyRequest
             {
                 Sender = _transport.LocalSilo,
@@ -232,15 +252,15 @@ internal sealed partial class DisseminationProtocol(
                 }
 
                 var digestKey = GetDigestKey(localDigest);
-                var hasRemoteDigest = remoteDigests.TryGetValue(digestKey, out var remoteDigest);
-                if (hasRemoteDigest && requestedTopic.Topic.CompareVersion(localDigest, remoteDigest) <= 0)
+                if (!remoteDigests.TryGetValue(digestKey, out var remoteDigest)
+                    || requestedTopic.Topic.CompareVersion(localDigest, remoteDigest) <= 0)
                 {
                     continue;
                 }
 
                 var item = await requestedTopic.Topic.GetValue(
                     localDigest,
-                    hasRemoteDigest ? remoteDigest : null,
+                    remoteDigest,
                     requestedTopic.PayloadKinds,
                     cancellationToken);
                 if (item is null
@@ -301,6 +321,10 @@ internal sealed partial class DisseminationProtocol(
 
         var result = await topic.ApplyValue(value, cancellationToken);
         EmitApplyResult(value, sender, result);
+        if (result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate)
+        {
+            RecordRecentUpdate(value.Digest);
+        }
 
         if (result == DisseminationApplyResult.Applied && forward)
         {
@@ -310,38 +334,273 @@ internal sealed partial class DisseminationProtocol(
         return result;
     }
 
-    private async Task Forward(DisseminationValue item, IDisseminationTopic topic, SiloAddress sender, CancellationToken cancellationToken)
+    private Task Forward(DisseminationValue item, IDisseminationTopic topic, SiloAddress sender, CancellationToken cancellationToken)
     {
         var root = item.Root is not null ? item.Root : sender;
         item = EnsureRoot(item, root);
         var topology = GetParticipantTopology(topic.MembershipScope, root, includeLocal: true);
         foreach (var peer in GetForwardingTreeTargets(topology, root, sender))
         {
-            await SendGossip(peer, item, cancellationToken);
+            EnqueueGossip(peer, item);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    internal async Task FlushPendingGossip(CancellationToken cancellationToken)
+    {
+        var batches = DrainPendingGossip(force: true);
+        CancelScheduledGossipFlushDelay();
+        await SendGossipBatches(batches, cancellationToken);
+    }
+
+    private void EnqueueGossip(SiloAddress peer, DisseminationValue item)
+    {
+        if (!_topics.TryGetValue(item.Digest.Topic, out var topic))
+        {
+            return;
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        var key = GetDigestKey(item.Digest);
+        lock (_gossipQueueLock)
+        {
+            if (!_pendingGossip.TryGetValue(peer, out var pending))
+            {
+                pending = new PendingGossipBatch(now + topic.Options.MaxCoalescingDelay);
+                _pendingGossip.Add(peer, pending);
+            }
+            else if (pending.Values.TryGetValue(key, out var existing)
+                && topic.CompareVersion(existing.Digest, item.Digest) >= 0)
+            {
+                return;
+            }
+            else if (now + topic.Options.MaxCoalescingDelay < pending.FlushAfter)
+            {
+                pending.FlushAfter = now + topic.Options.MaxCoalescingDelay;
+            }
+
+            pending.AddOrReplace(key, item);
+            if (pending.Values.Count >= _options.CurrentValue.MaxBatchItems
+                || pending.ByteCount >= _options.CurrentValue.MaxBatchBytes
+                || CountPendingTopicValues(pending, item.Digest.Topic) >= topic.Options.MaxPendingItemCount)
+            {
+                pending.FlushAfter = now;
+            }
+        }
+
+        ScheduleGossipFlush();
+    }
+
+    private void ScheduleGossipFlush()
+    {
+        var startFlushLoop = false;
+        lock (_gossipQueueLock)
+        {
+            if (_pendingGossip.Count == 0)
+            {
+                return;
+            }
+
+            var next = GetNextPendingGossipFlushUnsafe();
+            if (!_gossipFlushScheduled)
+            {
+                _gossipFlushScheduled = true;
+                _nextGossipFlushAt = next;
+                startFlushLoop = true;
+            }
+            else if (_nextGossipFlushAt is null || next < _nextGossipFlushAt.Value)
+            {
+                _nextGossipFlushAt = next;
+                _gossipFlushWakeup?.Cancel();
+            }
+        }
+
+        if (startFlushLoop)
+        {
+            _ = Task.Run(RunScheduledGossipFlush);
         }
     }
 
-    private async ValueTask<bool> SendGossip(SiloAddress peer, DisseminationValue item, CancellationToken cancellationToken)
+    private async Task RunScheduledGossipFlush()
     {
-        if (!_topics.TryGetValue(item.Digest.Topic, out var topic)
-            || await GetCapabilityStatus(peer, topic, item.Digest.PayloadKind, cancellationToken) != CapabilityStatus.Supported)
+        try
         {
-            return false;
+            while (true)
+            {
+                var delay = GetDelayUntilNextGossipFlush(out var wakeupToken);
+                if (delay is null)
+                {
+                    return;
+                }
+
+                if (delay > TimeSpan.Zero)
+                {
+                    try
+                    {
+                        await Task.Delay(delay.Value, _timeProvider, wakeupToken);
+                    }
+                    catch (OperationCanceledException) when (wakeupToken.IsCancellationRequested)
+                    {
+                        continue;
+                    }
+                }
+
+                var batches = DrainPendingGossip(force: false);
+                await SendGossipBatches(batches, CancellationToken.None);
+            }
+        }
+        catch (Exception exception)
+        {
+            LogDebugGossipFlushFailed(_logger, exception);
+        }
+        finally
+        {
+            var reschedule = false;
+            lock (_gossipQueueLock)
+            {
+                _gossipFlushScheduled = false;
+                _nextGossipFlushAt = null;
+                _gossipFlushWakeup = null;
+                reschedule = _pendingGossip.Count > 0;
+            }
+
+            if (reschedule)
+            {
+                ScheduleGossipFlush();
+            }
+        }
+    }
+
+    private TimeSpan? GetDelayUntilNextGossipFlush(out CancellationToken wakeupToken)
+    {
+        lock (_gossipQueueLock)
+        {
+            if (_pendingGossip.Count == 0)
+            {
+                _nextGossipFlushAt = null;
+                _gossipFlushWakeup = null;
+                wakeupToken = CancellationToken.None;
+                return null;
+            }
+
+            var now = _timeProvider.GetUtcNow();
+            var next = GetNextPendingGossipFlushUnsafe();
+            _nextGossipFlushAt = next;
+            if (next <= now)
+            {
+                _gossipFlushWakeup = null;
+                wakeupToken = CancellationToken.None;
+                return TimeSpan.Zero;
+            }
+
+            _gossipFlushWakeup = new CancellationTokenSource();
+            wakeupToken = _gossipFlushWakeup.Token;
+            return next - now;
+        }
+    }
+
+    private void CancelScheduledGossipFlushDelay()
+    {
+        lock (_gossipQueueLock)
+        {
+            _gossipFlushWakeup?.Cancel();
+        }
+    }
+
+    private DateTimeOffset GetNextPendingGossipFlushUnsafe() => _pendingGossip.Values.Min(static pending => pending.FlushAfter);
+
+    private List<QueuedGossipBatch> DrainPendingGossip(bool force)
+    {
+        var now = _timeProvider.GetUtcNow();
+        var result = new List<QueuedGossipBatch>();
+        lock (_gossipQueueLock)
+        {
+            foreach (var (peer, pending) in _pendingGossip.ToArray())
+            {
+                if (!force && pending.FlushAfter > now)
+                {
+                    continue;
+                }
+
+                _pendingGossip.Remove(peer);
+                result.Add(new QueuedGossipBatch(peer, [.. pending.Values.Values
+                    .OrderBy(static value => value.Digest.Topic, StringComparer.Ordinal)
+                    .ThenBy(static value => value.Digest.PayloadKind, StringComparer.Ordinal)
+                    .ThenBy(static value => value.Digest.Key, StringComparer.Ordinal)]));
+            }
         }
 
+        result.Sort(static (left, right) => left.Peer.CompareTo(right.Peer));
+        return result;
+    }
+
+    private async Task SendGossipBatches(List<QueuedGossipBatch> batches, CancellationToken cancellationToken)
+    {
+        foreach (var queued in batches)
+        {
+            await SendGossipBatch(queued.Peer, queued.Values, cancellationToken);
+        }
+    }
+
+    private async Task SendGossipBatch(SiloAddress peer, IReadOnlyList<DisseminationValue> values, CancellationToken cancellationToken)
+    {
+        var currentBatch = new List<DisseminationValue>();
+        var byteCount = 0;
+        foreach (var item in values)
+        {
+            if (!_topics.TryGetValue(item.Digest.Topic, out var topic)
+                || await GetCapabilityStatus(peer, topic, item.Digest.PayloadKind, cancellationToken) != CapabilityStatus.Supported)
+            {
+                continue;
+            }
+
+            if (currentBatch.Count > 0
+                && (currentBatch.Count >= _options.CurrentValue.MaxBatchItems
+                    || byteCount + item.Payload.Length > _options.CurrentValue.MaxBatchBytes))
+            {
+                await SendGossipBatchCore(peer, [.. currentBatch], cancellationToken);
+                currentBatch.Clear();
+                byteCount = 0;
+            }
+
+            currentBatch.Add(item);
+            byteCount += item.Payload.Length;
+        }
+
+        if (currentBatch.Count > 0)
+        {
+            await SendGossipBatchCore(peer, [.. currentBatch], cancellationToken);
+        }
+    }
+
+    private async Task SendGossipBatchCore(SiloAddress peer, DisseminationValue[] values, CancellationToken cancellationToken)
+    {
         var batch = new DisseminationGossipBatch
         {
             Sender = _transport.LocalSilo,
-            Values = [item],
+            Values = values,
         };
 
         var sent = await SafeSend(peer, target => _transport.SendGossip(target, batch, cancellationToken));
         if (sent)
         {
-            DisseminationInstruments.OnGossipSent(item.Digest.Topic, "tree", 1, item.Payload.Length);
+            DisseminationInstruments.OnGossipSent(values, "tree");
+        }
+    }
+
+    private static int CountPendingTopicValues(PendingGossipBatch pending, string topic)
+    {
+        var result = 0;
+        foreach (var value in pending.Values.Values)
+        {
+            if (string.Equals(value.Digest.Topic, topic, StringComparison.Ordinal))
+            {
+                result++;
+            }
         }
 
-        return sent;
+        return result;
     }
 
     private async ValueTask<bool> SafeSend(SiloAddress peer, Func<SiloAddress, Task> send)
@@ -566,6 +825,39 @@ internal sealed partial class DisseminationProtocol(
         }
 
         return result.ToFrozenDictionary();
+    }
+
+    private bool ShouldRequestAntiEntropy(IDisseminationTopic topic, DisseminationDigest digest, DateTimeOffset now)
+    {
+        var key = GetValueStreamKey(digest);
+        lock (_recentUpdateLock)
+        {
+            return !_lastUpdateReceivedAt.TryGetValue(key, out var lastReceived)
+                || now - lastReceived >= topic.Options.ExpectedUpdateCadence;
+        }
+    }
+
+    private void RecordRecentUpdate(DisseminationDigest digest)
+    {
+        var key = GetValueStreamKey(digest);
+        lock (_recentUpdateLock)
+        {
+            _lastUpdateReceivedAt[key] = _timeProvider.GetUtcNow();
+        }
+    }
+
+    private void PruneRecentUpdates(FrozenSet<ValueStreamKey> currentValueStreams)
+    {
+        lock (_recentUpdateLock)
+        {
+            foreach (var key in _lastUpdateReceivedAt.Keys.ToArray())
+            {
+                if (!currentValueStreams.Contains(key))
+                {
+                    _lastUpdateReceivedAt.Remove(key);
+                }
+            }
+        }
     }
 
     private FrozenDictionary<string, ImmutableArray<SiloAddress>> GetAntiEntropyPeersByTopic(
@@ -993,6 +1285,8 @@ internal sealed partial class DisseminationProtocol(
 
     private static DigestKey GetDigestKey(DisseminationDigest digest) => new(digest.Topic, digest.Key, digest.PayloadKind);
 
+    private static ValueStreamKey GetValueStreamKey(DisseminationDigest digest) => new(digest.Topic, digest.Key);
+
     public sealed record AntiEntropyState(
         FrozenDictionary<string, ImmutableArray<SiloAddress>> PeersByTopic,
         IReadOnlyList<DisseminationCapabilityRequest> Topics,
@@ -1010,7 +1304,31 @@ internal sealed partial class DisseminationProtocol(
 
     private readonly record struct DigestKey(string Topic, string Key, string PayloadKind);
 
+    private readonly record struct ValueStreamKey(string Topic, string Key);
+
     private readonly record struct RequestedTopic(IDisseminationTopic Topic, FrozenSet<string> PayloadKinds);
+
+    private readonly record struct QueuedGossipBatch(SiloAddress Peer, ImmutableArray<DisseminationValue> Values);
+
+    private sealed class PendingGossipBatch(DateTimeOffset flushAfter)
+    {
+        public Dictionary<DigestKey, DisseminationValue> Values { get; } = [];
+
+        public DateTimeOffset FlushAfter { get; set; } = flushAfter;
+
+        public int ByteCount { get; private set; }
+
+        public void AddOrReplace(DigestKey key, DisseminationValue value)
+        {
+            if (Values.Remove(key, out var previous))
+            {
+                ByteCount -= previous.Payload.Length;
+            }
+
+            Values[key] = value;
+            ByteCount += value.Payload.Length;
+        }
+    }
 
     private enum CapabilityStatus
     {
@@ -1044,4 +1362,9 @@ internal sealed partial class DisseminationProtocol(
         Level = LogLevel.Debug,
         Message = "Failed to apply anti-entropy repair value from {Sender} for topic {Topic}, key {Key}, version {Version}.")]
     private static partial void LogDebugAntiEntropyRepairValueFailed(ILogger logger, Exception exception, SiloAddress sender, string topic, string key, long version);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dissemination gossip batch flush failed.")]
+    private static partial void LogDebugGossipFlushFailed(ILogger logger, Exception exception);
 }

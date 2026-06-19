@@ -81,6 +81,11 @@ internal sealed class DisseminationTopicOptionsValidator
             return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.StaleItemTtl)} must be greater than {nameof(DisseminationTopicOptions.MaxCoalescingDelay)}.");
         }
 
+        if (options.ExpectedUpdateCadence <= TimeSpan.Zero)
+        {
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.ExpectedUpdateCadence)} must be greater than 0.");
+        }
+
         if (options.MaxPayloadBytes <= 0)
         {
             return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.MaxPayloadBytes)} must be greater than 0.");
