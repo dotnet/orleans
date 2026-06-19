@@ -110,6 +110,14 @@ public sealed class DisseminationTopicOptions
     public TimeSpan StaleItemTtl { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Gets or sets the expected cadence for updates in this topic.
+    /// </summary>
+    /// <remarks>
+    /// Anti-entropy requests omit digests for topic keys which have received an update within this interval.
+    /// </remarks>
+    public TimeSpan ExpectedUpdateCadence { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Gets or sets a value indicating whether topic-specific fallback is enabled.
     /// </summary>
     public bool FallbackEnabled { get; set; } = true;

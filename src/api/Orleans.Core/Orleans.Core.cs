@@ -546,6 +546,8 @@ namespace Orleans.Configuration
     {
         public bool Enabled { get { throw null; } set { } }
 
+        public System.TimeSpan ExpectedUpdateCadence { get { throw null; } set { } }
+
         public bool FallbackEnabled { get { throw null; } set { } }
 
         public System.TimeSpan MaxCoalescingDelay { get { throw null; } set { } }
