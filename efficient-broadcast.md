@@ -2,7 +2,7 @@
 
 ## Status
 
-This document describes the current efficient-broadcast branch and the next design changes discussed for it. The branch already implements deterministic tree broadcast, digest-based anti-entropy repair, value-oriented wire contracts, natural `SiloAddress` ordering, and per-topic membership scopes. Five items are accepted as design direction and still need implementation work: status-and-age-prioritized topology ordering, dynamic fanout, fixed-tree fast-path forwarding, level-aware randomized anti-entropy peer selection, and diff-capable value exchange for topics which can produce diffs.
+This document describes the current efficient-broadcast branch. The branch implements deterministic fixed-tree broadcast, digest-based anti-entropy repair, value-oriented wire contracts, status-and-age-prioritized topology ordering, dynamic fanout, per-topic membership scopes, level-aware randomized repair peer selection, membership snapshot diffs, manifest peer-fill, stale-only anti-entropy probes, and per-peer outbound gossip coalescing.
 
 ## Problem statement
 
@@ -59,7 +59,7 @@ The payload envelope is `DisseminationValue`:
 | `Digest` | The resulting value identity/version represented by the payload. |
 | `Root` | The silo which originated the update and acts as the temporary virtual root for fast-path forwarding. The value key lives in `Digest.Key`. |
 | `ExpiresAt` | A topic TTL after which the value is no longer useful and is dropped as stale. |
-| `Payload` | Serialized topic payload. Today this is a full value for implemented topics. Future diff-capable topics can encode a delta payload while keeping `Digest.Version` as the post-apply version. |
+| `Payload` | Serialized topic payload. Deployment load uses full values. Membership can use either a full snapshot or a diff payload while keeping `Digest.Version` as the post-apply version. |
 
 Using a plain string key keeps the common wire model simple and topic-neutral. Topic implementations validate and parse their own keys at the boundary.
 
@@ -115,9 +115,11 @@ originatorTargets = topLevel + children(index(root))
 
 This gives every participant the same fixed topology when their membership view agrees. The originator sends to at most `2 * fanout` distinct peers, and every other forwarding participant sends to at most `fanout` peers.
 
+Outbound tree sends are queued per peer before transport. The queue coalesces values by `(topic, key, payloadKind)` and keeps only the newest version for each stream, then flushes when the earliest topic `MaxCoalescingDelay` expires or when batch/item limits are reached. This preserves monotonic latest-wins semantics while allowing different originators' values to share the same `DisseminationGossipBatch` on relay nodes.
+
 ### Critique of the fixed-tree fast path
 
-The fixed-tree design improves the common deployment-load case. Since each silo periodically originates its own load value, rotating the tree around each originator spreads every originator's direct sends across the whole cluster over time. A fixed forest keeps each originator's direct fast-path target set bounded and stable while preserving deterministic reachability.
+The fixed-tree design improves the common deployment-load case. Each silo periodically originates its own load value, so a fixed forest keeps every originator's direct fast-path target set bounded and stable while preserving deterministic reachability.
 
 The subtle correctness requirement is that the fixed topology must behave like a forest under a temporary virtual root. If the design used a single fixed root and the originator only sent to that root's children, the fixed root itself would miss updates originated by other silos. Defining the first `fanout` ordered participants as top-level virtual-root children gives complete coverage: the top-level nodes cover the fixed forest, while the originator also sends to its own children to cover the subtree below the originator when its parent excludes it.
 
@@ -159,20 +161,22 @@ Anti-entropy periodically compares local digests with selected peers and transfe
 
 Current branch behavior:
 
-1. Enumerate enabled topics and their local `DisseminationDigest` values.
+1. Enumerate enabled topics and their local `DisseminationDigest` values whose `(topic, key)` streams have not received a recent update.
 2. Select repair peers per topic using that topic's membership scope.
 3. Capability-probe selected peers for topic protocol version and payload kinds.
-4. Send `DisseminationAntiEntropyRequest` containing requested topics and local digests.
+4. Send `DisseminationAntiEntropyRequest` containing requested topics and stale local digests. If no stale digests remain for a peer after capability filtering, skip that peer for the round.
 5. The receiver maps remote digests by `(topic, key, payloadKind)`.
-6. For each local digest, if local state is newer than the requester digest or the requester has no digest, materialize a value.
+6. For each requested local digest key, if local state is newer than the requester digest, materialize a value.
 7. Return values up to `MaxBatchItems` and `MaxBatchBytes`, setting `Truncated` if more values remain.
 8. The requester applies returned values locally.
 
-Sorted digest iteration makes truncation deterministic, so repeated repair rounds converge over time.
+Each topic has an `ExpectedUpdateCadence` used to decide when a `(topic, key)` stream is stale enough to probe. Deployment load statistics default to 2 seconds and membership snapshots default to 10 seconds. Recent tree or repair updates suppress digest probes for that stream until the cadence elapses. Omitted digests mean "not probing this stream in this round" rather than "missing this stream", which keeps anti-entropy from returning values for streams that are already receiving regular fast-path updates. When a topic knows that a stream should exist but has no local value, it can send an explicit low-watermark digest for that key; deployment load does this for active silos with missing local statistics.
 
-### Accepted change: level-aware randomized repair peer selection
+Sorted digest iteration makes truncation deterministic, so repeated stale repair rounds converge over time.
 
-The intended repair-peer selection is level-aware and randomized, using the same fixed topic topology and evaluated fanout factor.
+### Level-aware randomized repair peer selection
+
+Repair-peer selection is level-aware and randomized, using the same fixed topic topology and evaluated fanout factor.
 
 For each topic repair round:
 
@@ -187,11 +191,11 @@ This keeps repair traffic bounded, sends repair probes against or sideways to th
 
 ## Diff-capable value exchange
 
-The current implemented topics materialize full values. Diffable topics, especially membership snapshots, can reduce bytes using topic-specific diffs.
+Deployment load statistics materialize full latest-wins values. Membership snapshots reduce anti-entropy repair bytes using topic-specific diffs when the peer's digest is within retained history, and fall back to full snapshots otherwise.
 
-Accepted design direction:
+Implemented repair design:
 
-- Both push and pull should exchange diffs when a topic can produce and apply them.
+- Anti-entropy pull can exchange diffs when a topic can produce and apply them.
 - The source of truth for a topic should be able to accept a peer digest and produce the smallest useful payload for that peer.
 - `DisseminationDigest.Version` remains the target value version after the payload is applied.
 - `PayloadKind` distinguishes full snapshots from diff payloads, so capability probing can negotiate support and mixed-version peers can fall back to full values.
@@ -288,9 +292,9 @@ Integration points:
 - `src\Orleans.Runtime\Manifest\ClusterManifestProvider.cs` and `src\Orleans.Runtime\GrainTypeManager\ClusterManifestSystemTarget.cs`: fetch manifest hashes first, reuse cached manifests by hash, validate hashes, and fall back to direct manifest fetch.
 - `src\Orleans.Runtime\Hosting\DefaultSiloServices.cs`: registers dissemination service, transport, system target, and topics.
 
-## Implementation plan for accepted follow-up decisions
+## Implemented follow-up decisions
 
-1. Implement fixed-tree fast-path forwarding.
+1. Fixed-tree fast-path forwarding.
    - Order participants by status rank, age, and `SiloAddress`.
    - Use status rank `Active`, `Joining`, `ShuttingDown`, `Stopping` for `AllMembers`; `ActiveMembers` has a constant status component.
    - Preserve the supplied topology order when building `ParticipantTopology`.
@@ -300,28 +304,39 @@ Integration points:
    - De-duplicate sends and exclude the originator from outbound target sets.
    - Add tests for top-level originators, deep originators, the first ordered participant, small clusters, all-member status/age ordering, dynamic fanout, and complete reachability.
 
-2. Implement level-aware randomized anti-entropy peer selection.
+2. Level-aware randomized anti-entropy peer selection.
    - Use the fixed forest levels from the topic's membership scope.
    - Add a testable repair-round salt source or derive one from time/round number.
    - Add helpers to compute k-ary tree level ranges and previous-level candidate windows.
    - Preserve per-topic membership scope selection.
    - Add tests for root, first-level, deeper-level, small-cluster, and bounded peer-count cases.
 
-3. Extend topic materialization for peer-aware payload selection.
+3. Peer-aware repair payload selection.
    - Add a topic API which accepts the peer digest when available and returns the best payload kind: diff if useful, full value otherwise.
    - Keep current full-value behavior as the default implementation path.
-   - Ensure anti-entropy requests and future peer-aware pushes can ask for a payload relative to a remote digest.
+   - Ensure anti-entropy requests can ask for a payload relative to a remote digest.
 
-4. Add membership diff support.
+4. Membership diff support.
    - Retain a bounded history of membership changes by membership version.
    - Add a membership diff payload kind and advertise it through capability probing.
    - Apply diffs only when the local base version matches the payload requirements.
    - Fall back to full snapshots when history is missing, truncated, or incompatible.
 
-5. Improve manifest convergence by fetching from peer cluster manifests.
+5. Manifest convergence from peer cluster manifests.
    - When several active members are missing, query one or more active peers for their cluster manifest or hash summary.
    - Fill and validate all manifests available from that response.
    - Fall back to direct per-silo fetch for the remaining missing entries.
+
+6. Stale-only anti-entropy.
+   - Add per-topic `ExpectedUpdateCadence`.
+   - Track recent `(topic, key)` updates and omit fresh streams from anti-entropy requests.
+   - Treat omitted digests as unprobed streams rather than missing streams.
+   - Let topics emit low-watermark digests for known missing streams which still need repair.
+
+7. Per-peer outbound gossip coalescing.
+   - Queue tree sends per peer before transport.
+   - Coalesce pending values by `(topic, key, payloadKind)` and keep the newest version.
+   - Flush by earliest topic coalescing delay, batch item/byte limits, or per-topic pending item limits.
 
 ## Future work, shortcomings, and trade-offs
 
@@ -329,7 +344,7 @@ The main trade-off is that the tree fast path reduces sends and relies on anti-e
 
 Other trade-offs and improvement areas:
 
-- Level-aware randomized anti-entropy should improve convergence under skew and correlated failures, but it is still probabilistic and needs careful tests for small clusters and first-level/root behavior.
+- Level-aware randomized anti-entropy improves convergence under skew and correlated failures, but it is still probabilistic and should be monitored under real cluster churn.
 - Fixed-tree forwarding bounds each originator's direct send set, while top-level and high-level participants carry more relay traffic than leaves.
 - Status-and-age-prioritized ordering improves expected interior-node availability and value hit-rate while keeping ordering deterministic.
 - Dynamic fanout trades direct send count for tree depth: a 2-hop target gives faster convergence with larger fanout; a 3-hop target lowers per-node sends and adds one relay hop.
@@ -338,5 +353,5 @@ Other trade-offs and improvement areas:
 - Deterministic trees require silos to mostly agree on membership. Anti-entropy repairs short-lived skew, but the fast path can duplicate or miss during disagreement.
 - The protocol scope is monotonic versioned values. Ordered event streams would need separate sequencing, retention, and acknowledgment semantics.
 - Manifest whole-cluster fetch can reduce request count but can also transfer more bytes than per-silo fetch in highly divergent clusters. Hash validation and fallback keep it safe.
-- Tree sends are still simple and per-value. A future batcher could coalesce cross-topic work, respect `MaxConcurrentSends`, and enforce fair scheduling.
+- Tree sends are coalesced per peer before transport. Future scheduling work could respect `MaxConcurrentSends` across flushes and enforce cross-topic fairness under sustained overload.
 - Once the protocol ships, wire-shape or payload-kind changes should become additive and versioned. The current branch keeps protocol version `2` while the contract is branch-local.
