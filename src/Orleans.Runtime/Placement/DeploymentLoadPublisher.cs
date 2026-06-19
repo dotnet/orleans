@@ -149,6 +149,9 @@ namespace Orleans.Runtime
 
         internal Task RefreshSiloStatisticsForDissemination(SiloAddress silo) => RefreshSiloStatistics(silo);
 
+        internal IReadOnlyCollection<SiloAddress> GetActiveSilosForDissemination() =>
+            _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
+
         private async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats, IReadOnlyCollection<SiloAddress> members)
         {
             try

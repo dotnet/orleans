@@ -66,7 +66,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets dissemination options for membership updates.
         /// </summary>
-        public DisseminationTopicOptions Dissemination { get; set; } = new();
+        public DisseminationTopicOptions Dissemination { get; set; } = new() { ExpectedUpdateCadence = TimeSpan.FromSeconds(10) };
 
         /// <summary>
         /// Gets or sets the number of silos each silo probes for liveness.
