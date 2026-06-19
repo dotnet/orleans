@@ -88,6 +88,7 @@ internal sealed partial class DisseminationService
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
+        await Execute(async () => await _protocol.FlushPendingGossip(cancellationToken));
         _shutdownCts?.Cancel();
         if (_antiEntropyTask is not null)
         {

@@ -45,6 +45,19 @@ internal static class DisseminationInstruments
         }
     }
 
+    public static void OnGossipSent(DisseminationValue[] values, string kind)
+    {
+        if (!GossipSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
+        {
+            return;
+        }
+
+        foreach (var group in values.GroupBy(static item => item.Digest.Topic))
+        {
+            OnGossipSent(group.Key, kind, group.Count(), group.Sum(static item => item.Payload.Length));
+        }
+    }
+
     public static void OnGossipReceived(string topic, string kind, int itemCount)
     {
         var gossipReceivedEnabled = GossipReceived.Enabled;
