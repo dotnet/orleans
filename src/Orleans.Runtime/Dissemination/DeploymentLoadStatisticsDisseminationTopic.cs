@@ -46,16 +46,17 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
     public IReadOnlyList<DisseminationDigest> GetDigests()
     {
         var digests = new List<DisseminationDigest>();
-        foreach (var entry in deploymentLoadPublisher.PeriodicStatistics)
+        foreach (var siloAddress in deploymentLoadPublisher.GetActiveSilosForDissemination())
         {
-            if (!deploymentLoadPublisher.IsRuntimeStatisticsObsolete(entry.Key, entry.Value.DateTime.Ticks))
-            {
-                digests.Add(new DisseminationDigest(
-                    Name,
-                    entry.Key.ToParsableString(),
-                    entry.Value.DateTime.Ticks,
-                    DisseminationTopicNames.SiloRuntimeStatistics));
-            }
+            var version = deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
+                && !deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, statistics.DateTime.Ticks)
+                    ? statistics.DateTime.Ticks
+                    : long.MinValue;
+            digests.Add(new DisseminationDigest(
+                Name,
+                siloAddress.ToParsableString(),
+                version,
+                DisseminationTopicNames.SiloRuntimeStatistics));
         }
 
         digests.Sort(static (left, right) => string.CompareOrdinal(left.Key, right.Key));
