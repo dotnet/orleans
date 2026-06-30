@@ -38,8 +38,7 @@ internal sealed partial class ActivationData :
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
     IAsyncDisposable,
-    IDisposable,
-    IMessageReceiver
+    IDisposable
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
@@ -762,7 +761,7 @@ internal sealed partial class ActivationData :
                     }
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                    messageCenter.SendMessage(response, receiverCache: null);
+                    messageCenter.SendMessage(response);
                 }
             }
 
@@ -787,7 +786,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                    messageCenter.SendMessage(response, receiverCache: null);
+                    messageCenter.SendMessage(response);
                 }
             }
 
@@ -811,7 +810,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                    messageCenter.SendMessage(response, receiverCache: null);
+                    messageCenter.SendMessage(response);
                 }
 
                 queueLength++;
@@ -2307,15 +2306,6 @@ internal sealed partial class ActivationData :
     )]
     private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
 
-    public void ReceiveMessage(Message message, IMessageReceiverCache cache)
-    {
-        if (!IsValid)
-        {
-            cache.MessageReceiver = null;
-        }
-
-        ReceiveMessage(message);
-    }
     #endregion
 
     /// <summary>

@@ -140,7 +140,6 @@ namespace Orleans.Runtime
                 message.SendingSilo = MySilo;
 
             IGrainContext sendingActivation = RuntimeContext.Current;
-            message.MessageReceiver = sendingActivation ?? HostedClient;
 
             if (sendingActivation == null)
             {
@@ -156,13 +155,11 @@ namespace Orleans.Runtime
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
             SharedCallbackData sharedData;
-            IMessageReceiverCache targetCache = target;
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
                 message.IsSystemMessage = true;
                 sharedData = this.systemSharedCallbackData;
-                targetCache = null;
             }
             else
             {
@@ -190,15 +187,7 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-
-            if (targetCache?.MessageReceiver is IMessageReceiver receiver)
-            {
-                receiver.ReceiveMessage(message, targetCache);
-            }
-            else
-            {
-                this.MessageCenter.AddressAndSendMessage(message, targetCache);
-            }
+            this.MessageCenter.AddressAndSendMessage(message);
         }
 
         public void SendResponse(Message request, Response response)
@@ -409,7 +398,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     LogTraceNoCallbackForRejection(this.logger, message);
-                    this.MessageCenter.AddressAndSendMessage(message, targetCache: null);
+                    this.MessageCenter.AddressAndSendMessage(message);
                     return;
                 }
 

@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingInstrumentation.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
-                this.messageCenter.TryDeliverToProxy(rejection, targetCache: null);
+                this.messageCenter.TryDeliverToProxy(rejection);
                 LogRejectingRequestDueToOverloading(this.Log, msg);
                 this.gatewayInstruments.OnGatewayLoadShedding();
                 return;
@@ -105,7 +105,7 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
                 }
 
-                this.messageCenter.SendMessage(msg, receiverCache: null);
+                this.messageCenter.SendMessage(msg);
             }
         }
 
@@ -187,7 +187,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 msg.RetryCount++;
-                this.messageCenter.SendMessage(msg, receiverCache: null);
+                this.messageCenter.SendMessage(msg);
             }
             else
             {

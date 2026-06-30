@@ -17,7 +17,7 @@ using Orleans.Serialization.Invocation;
 #nullable disable
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract partial class Connection : IMessageReceiver
+    internal abstract partial class Connection
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
@@ -270,8 +270,6 @@ namespace Orleans.Runtime.Messaging
         protected abstract void OnReceivedMessage(Message message);
         protected abstract void OnSendMessageFailure(Message message, string error);
 
-        protected virtual bool ShouldSetMessageReceiver(Message message) => true;
-
         private async Task ProcessIncoming()
         {
             await Task.Yield();
@@ -299,11 +297,6 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     Debug.Assert(message is not null);
-                                    if (ShouldSetMessageReceiver(message))
-                                    {
-                                        message.MessageReceiver = this;
-                                    }
-
                                     RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
@@ -520,18 +513,6 @@ namespace Orleans.Runtime.Messaging
             }
 
             return true;
-        }
-
-        public virtual void ReceiveMessage(Message message, IMessageReceiverCache cache)
-        {
-            if (!IsValid)
-            {
-                cache.MessageReceiver = null;
-                RetryMessage(message);
-                return;
-            }
-
-            Send(message);
         }
 
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>

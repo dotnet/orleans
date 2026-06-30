@@ -2228,7 +2228,7 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(System.Threading.Tasks.Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
     [DefaultInvokableBaseType(typeof(System.Collections.Generic.IAsyncEnumerable<>), typeof(AsyncEnumerableRequest<>))]
-    public partial class GrainReference : IAddressable, System.IEquatable<GrainReference>, System.ISpanFormattable, System.IFormattable, IMessageReceiverCache
+    public partial class GrainReference : IAddressable, System.IEquatable<GrainReference>, System.ISpanFormattable, System.IFormattable
     {
         protected GrainReference(GrainReferenceShared shared, IdSpan key) { }
 
@@ -2243,8 +2243,6 @@ namespace Orleans.Runtime
         public GrainInterfaceType InterfaceType { get { throw null; } }
 
         public ushort InterfaceVersion { get { throw null; } }
-
-        public object? MessageReceiver { get { throw null; } set { } }
 
         public virtual TGrainInterface Cast<TGrainInterface>()
             where TGrainInterface : IAddressable { throw null; }
@@ -2619,11 +2617,6 @@ namespace Orleans.Runtime
     public partial interface IGrainTimer : System.IDisposable
     {
         void Change(System.TimeSpan dueTime, System.TimeSpan period);
-    }
-
-    public partial interface IMessageReceiverCache
-    {
-        object? MessageReceiver { get; set; }
     }
 
     public partial interface IRehydrationContext
