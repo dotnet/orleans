@@ -30,8 +30,6 @@ internal sealed class MembershipDisseminationTopic(
 
     public string Name => DisseminationTopicNames.Membership;
 
-    public int ProtocolVersion => 2;
-
     public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
 
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
@@ -73,7 +71,6 @@ internal sealed class MembershipDisseminationTopic(
     public ValueTask<DisseminationValue?> GetValue(
         DisseminationDigest digest,
         DisseminationDigest? peerDigest,
-        IReadOnlySet<string> peerPayloadKinds,
         CancellationToken cancellationToken)
     {
         if (!string.Equals(digest.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
@@ -89,17 +86,11 @@ internal sealed class MembershipDisseminationTopic(
             return ValueTask.FromResult<DisseminationValue?>(null);
         }
 
-        if (peerPayloadKinds.Contains(DisseminationTopicNames.MembershipSnapshotDiff)
-            && peerDigest is { } remote
+        if (peerDigest is { } remote
             && remote.Version < snapshot.Version.Value
             && TryCreateDiffValue(remote.Version, snapshot, out var diffValue))
         {
             return ValueTask.FromResult<DisseminationValue?>(diffValue);
-        }
-
-        if (!peerPayloadKinds.Contains(DisseminationTopicNames.MembershipSnapshot))
-        {
-            return ValueTask.FromResult<DisseminationValue?>(null);
         }
 
         return ValueTask.FromResult<DisseminationValue?>(CreateItem(localSiloDetails.SiloAddress, snapshot));
