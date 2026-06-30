@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Orleans.Runtime.Dissemination;
@@ -46,20 +45,6 @@ internal static class DisseminationEvents
         }
     }
 
-    public static void EmitCapabilityProbe(SiloAddress localSilo, SiloAddress peer, string topic, bool supported)
-    {
-        if (Listener.IsEnabled("Dissemination.CapabilityProbe"))
-        {
-            Listener.Write("Dissemination.CapabilityProbe", new Dictionary<string, object?>
-            {
-                ["LocalSilo"] = localSilo,
-                ["Peer"] = peer,
-                ["Topic"] = topic,
-                ["Supported"] = supported,
-                ["Timestamp"] = DateTimeOffset.UtcNow,
-            });
-        }
-    }
 }
 
 internal sealed class DisseminationValueEvent

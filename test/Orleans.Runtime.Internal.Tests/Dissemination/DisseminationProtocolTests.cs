@@ -45,41 +45,39 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task PublishReturnsFalseWhenAnyParticipantIsIncapable()
+    public async Task PublishQueuesTreeGossipWithoutCapabilityProbing()
     {
         var local = CreateSilo(11111);
         var peers = Enumerable.Range(11112, 6).Select(CreateSilo).ToArray();
-        var transport = new FakeTransport(local, peers)
-        {
-            IncapablePeers = { peers[^1] },
-        };
-
+        var transport = new FakeTransport(local, peers);
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
         var result = await protocol.Publish(topic.Name, item, peers, CancellationToken.None);
+        await protocol.FlushPendingGossip(CancellationToken.None);
 
-        Assert.False(result);
-        Assert.Empty(transport.GossipBatches);
+        Assert.True(result);
+        Assert.Equal(GetOriginatorTreeTargets(local, peers, fanout: 2), transport.GossipBatches.Select(batch => batch.Peer));
     }
 
     [Fact]
-    public async Task PublishDoesNotFailWhenJoiningParticipantIsUnavailable()
+    public async Task PublishAttemptsJoiningParticipantAndReliesOnSendBackoff()
     {
         var local = CreateSilo(11111);
         var joining = CreateSilo(11112);
         var active = CreateSilo(11113);
         var transport = new FakeTransport(local, joining, active);
         transport.PeerStatuses[joining] = SiloStatus.Joining;
-        transport.GetCapabilitiesHandler = (target, request, cancellationToken) =>
+        transport.SendGossipHandler = (target, batch, cancellationToken) =>
         {
             if (Equals(target, joining))
             {
                 throw new InvalidOperationException("joining peer is not yet reachable");
             }
 
-            return ValueTask.FromResult(transport.CreateCapabilityResponse(target, request));
+            transport.GossipBatches.Add((target, batch));
+            return Task.CompletedTask;
         };
 
         var topic = new FakeTopic(local)
@@ -101,42 +99,44 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task CapabilityProbeFailureUsesFailureBackoffInsteadOfCapabilityCache()
+    public async Task SendFailureUsesFailureBackoff()
     {
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
         var transport = new FakeTransport(local, peer);
         var timeProvider = new TestTimeProvider();
-        var probeCount = 0;
-        transport.GetCapabilitiesHandler = (target, request, cancellationToken) =>
+        var sendCount = 0;
+        transport.SendGossipHandler = (target, batch, cancellationToken) =>
         {
-            if (Interlocked.Increment(ref probeCount) == 1)
+            if (Interlocked.Increment(ref sendCount) == 1)
             {
                 timeProvider.Advance(TimeSpan.FromSeconds(10));
-                throw new InvalidOperationException("transient probe failure");
+                throw new InvalidOperationException("transient send failure");
             }
 
-            return ValueTask.FromResult(transport.CreateCapabilityResponse(target, request));
+            transport.GossipBatches.Add((target, batch));
+            return Task.CompletedTask;
         };
 
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic, options =>
         {
-            options.CapabilityCacheTtl = TimeSpan.FromHours(1);
             options.FailureBackoff = TimeSpan.FromSeconds(5);
         }, timeProvider);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
         var firstResult = await protocol.Publish(topic.Name, item, new[] { peer }, CancellationToken.None);
+        await protocol.FlushPendingGossip(CancellationToken.None);
         var secondResult = await protocol.Publish(topic.Name, item, new[] { peer }, CancellationToken.None);
+        await protocol.FlushPendingGossip(CancellationToken.None);
         timeProvider.Advance(TimeSpan.FromSeconds(5));
         var thirdResult = await protocol.Publish(topic.Name, item, new[] { peer }, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
-        Assert.False(firstResult);
-        Assert.False(secondResult);
+        Assert.True(firstResult);
+        Assert.True(secondResult);
         Assert.True(thirdResult);
-        Assert.Equal(2, probeCount);
+        Assert.Equal(2, sendCount);
         Assert.Single(transport.GossipBatches);
     }
 
@@ -310,6 +310,7 @@ public class DisseminationProtocolTests
             var local = silos[testCase.LocalIndex];
             var transport = new FakeTransport(local, silos.Where(silo => !Equals(silo, local)).ToArray());
             var topic = new FakeTopic(local);
+            topic.ExpectedKeys.Add(FakeTopic.DefaultKey);
             var protocol = CreateProtocol(transport, topic, options =>
             {
                 options.Overlay.FanOutFactor = _ => testCase.Fanout;
@@ -342,15 +343,7 @@ public class DisseminationProtocolTests
         var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
         {
             Sender = peer,
-            Topics = new[]
-            {
-                new DisseminationCapabilityRequest
-                {
-                    Topic = topic.Name,
-                    ProtocolVersion = topic.ProtocolVersion,
-                    PayloadKinds = new[] { FakeTopic.PayloadKind },
-                },
-            },
+            Topics = [topic.Name],
             Digests = new[]
             {
                 new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 3, FakeTopic.PayloadKind),
@@ -376,15 +369,7 @@ public class DisseminationProtocolTests
         var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
         {
             Sender = peer,
-            Topics =
-            [
-                new DisseminationCapabilityRequest
-                {
-                    Topic = topic.Name,
-                    ProtocolVersion = topic.ProtocolVersion,
-                    PayloadKinds = [FakeTopic.PayloadKind],
-                },
-            ],
+            Topics = [topic.Name],
             Digests =
             [
                 new DisseminationDigest(topic.Name, "requested", version: 3, FakeTopic.PayloadKind),
@@ -454,7 +439,7 @@ public class DisseminationProtocolTests
         var digest = Assert.Single(transport.AntiEntropyRequests[0].Request.Digests);
         Assert.Equal(FakeTopic.DefaultKey, digest.Key);
         Assert.Equal(long.MinValue, digest.Version);
-        Assert.Equal(topic.Name, Assert.Single(transport.AntiEntropyRequests[0].Request.Topics).Topic);
+        Assert.Equal(topic.Name, Assert.Single(transport.AntiEntropyRequests[0].Request.Topics));
     }
 
     [Fact]
@@ -599,7 +584,6 @@ public class DisseminationProtocolTests
         var value = await sourceTopic.GetValue(
             localDigest,
             peerDigest,
-            sourceTopic.PayloadKinds,
             CancellationToken.None);
 
         Assert.NotNull(value);
@@ -943,8 +927,6 @@ public class DisseminationProtocolTests
 
         public string Name => "fake-topic";
 
-        public int ProtocolVersion => 2;
-
         public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.ActiveMembers;
 
         public DisseminationTopicOptions Options { get; } = new() { Enabled = true };
@@ -992,10 +974,9 @@ public class DisseminationProtocolTests
         public ValueTask<DisseminationValue?> GetValue(
             DisseminationDigest digest,
             DisseminationDigest? peerDigest,
-            IReadOnlySet<string> peerPayloadKinds,
             CancellationToken cancellationToken)
         {
-            if (!peerPayloadKinds.Contains(PayloadKind) || !_versions.TryGetValue(digest.Key, out var version) || version < digest.Version)
+            if (!_versions.TryGetValue(digest.Key, out var version) || version < digest.Version)
             {
                 return ValueTask.FromResult<DisseminationValue?>(null);
             }
@@ -1041,10 +1022,6 @@ public class DisseminationProtocolTests
 
         public Dictionary<SiloAddress, DateTime> StartTimes { get; } = new();
 
-        public HashSet<SiloAddress> IncapablePeers { get; } = new();
-
-        public Func<SiloAddress, DisseminationCapabilityRequest, CancellationToken, ValueTask<DisseminationCapabilityResponse>>? GetCapabilitiesHandler { get; set; }
-
         public Func<SiloAddress, DisseminationGossipBatch, CancellationToken, Task>? SendGossipHandler { get; set; }
 
         public Func<SiloAddress, DisseminationAntiEntropyRequest, ValueTask<DisseminationAntiEntropyResponse>> ExchangeAntiEntropyHandler { get; set; } =
@@ -1076,29 +1053,6 @@ public class DisseminationProtocolTests
                 .ToImmutableArray();
             return new DisseminationMembership(allMembers, activeMembers);
         }
-
-        public ValueTask<DisseminationCapabilityResponse> GetCapabilities(
-            SiloAddress peer,
-            DisseminationCapabilityRequest request,
-            CancellationToken cancellationToken)
-        {
-            if (GetCapabilitiesHandler is not null)
-            {
-                return GetCapabilitiesHandler(peer, request, cancellationToken);
-            }
-
-            return ValueTask.FromResult(CreateCapabilityResponse(peer, request));
-        }
-
-        public DisseminationCapabilityResponse CreateCapabilityResponse(
-            SiloAddress peer,
-            DisseminationCapabilityRequest request) => new()
-            {
-                Topic = request.Topic,
-                ProtocolVersion = request.ProtocolVersion,
-                Supported = !IncapablePeers.Contains(peer),
-                PayloadKinds = IncapablePeers.Contains(peer) ? Array.Empty<string>() : request.PayloadKinds,
-            };
 
         public Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken)
         {
@@ -1160,7 +1114,6 @@ public class DisseminationProtocolTests
             var value = await _topic.GetValue(
                 localDigest,
                 peerDigest,
-                new HashSet<string>(StringComparer.Ordinal) { FakeTopic.PayloadKind },
                 CancellationToken.None);
             return value is null
                 ? new ModelRepairResponse(false, 0)

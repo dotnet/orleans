@@ -6,41 +6,10 @@ namespace Orleans.Runtime;
 
 internal interface IDisseminationSystemTarget : ISystemTarget
 {
-    Task<DisseminationCapabilityResponse> GetCapabilities(DisseminationCapabilityRequest request);
-
     [OneWay]
     Task PushGossip(DisseminationGossipBatch batch);
 
     Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request);
-}
-
-[GenerateSerializer]
-internal sealed class DisseminationCapabilityRequest
-{
-    [Id(0)]
-    public string Topic { get; init; } = string.Empty;
-
-    [Id(1)]
-    public int ProtocolVersion { get; init; }
-
-    [Id(2)]
-    public string[] PayloadKinds { get; init; } = Array.Empty<string>();
-}
-
-[GenerateSerializer]
-internal sealed class DisseminationCapabilityResponse
-{
-    [Id(0)]
-    public string Topic { get; init; } = string.Empty;
-
-    [Id(1)]
-    public int ProtocolVersion { get; init; }
-
-    [Id(2)]
-    public bool Supported { get; init; }
-
-    [Id(3)]
-    public string[] PayloadKinds { get; init; } = Array.Empty<string>();
 }
 
 [GenerateSerializer, Immutable]
@@ -120,7 +89,7 @@ internal sealed class DisseminationAntiEntropyRequest
     public SiloAddress Sender { get; init; } = default!;
 
     [Id(1)]
-    public DisseminationCapabilityRequest[] Topics { get; init; } = Array.Empty<DisseminationCapabilityRequest>();
+    public string[] Topics { get; init; } = Array.Empty<string>();
 
     [Id(2)]
     public DisseminationDigest[] Digests { get; init; } = Array.Empty<DisseminationDigest>();
