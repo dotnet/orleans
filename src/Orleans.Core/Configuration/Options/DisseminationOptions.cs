@@ -18,11 +18,6 @@ public sealed class DisseminationOptions
     public int MaxConcurrentSends { get; set; } = 32;
 
     /// <summary>
-    /// Gets or sets how long peer capability probe results are cached.
-    /// </summary>
-    public TimeSpan CapabilityCacheTtl { get; set; } = TimeSpan.FromMinutes(5);
-
-    /// <summary>
     /// Gets or sets how long failed peers are backed off before retrying.
     /// </summary>
     public TimeSpan FailureBackoff { get; set; } = TimeSpan.FromSeconds(5);

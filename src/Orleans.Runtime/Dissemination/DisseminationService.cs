@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -16,7 +15,6 @@ internal sealed partial class DisseminationService
     private readonly IOptionsMonitor<DisseminationOptions> _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger;
-    private readonly Dictionary<string, IDisseminationTopic> _topics;
     private CancellationTokenSource? _shutdownCts;
     private Task? _antiEntropyTask;
 
@@ -30,8 +28,7 @@ internal sealed partial class DisseminationService
         _options = options;
         _timeProvider = timeProvider;
         _logger = logger;
-        _topics = topics.ToDictionary(static topic => topic.Name, StringComparer.Ordinal);
-        _protocol = new DisseminationProtocol(transport, options, _topics.Values, timeProvider, logger);
+        _protocol = new DisseminationProtocol(transport, options, topics, timeProvider, logger);
     }
 
     public ValueTask<bool> Publish(
@@ -40,31 +37,6 @@ internal sealed partial class DisseminationService
         IReadOnlyCollection<SiloAddress>? targetPeers,
         CancellationToken cancellationToken) =>
         new(Execute(async () => await _protocol.Publish(topicName, value, targetPeers, cancellationToken)));
-
-    public DisseminationCapabilityResponse GetCapabilities(DisseminationCapabilityRequest request)
-    {
-        if (!_options.CurrentValue.Enabled
-            || !_topics.TryGetValue(request.Topic, out var topic)
-            || !topic.IsEnabled
-            || request.ProtocolVersion > topic.ProtocolVersion)
-        {
-            return new DisseminationCapabilityResponse
-            {
-                Topic = request.Topic,
-                ProtocolVersion = request.ProtocolVersion,
-                Supported = false,
-            };
-        }
-
-        var payloadKinds = topic.PayloadKinds.Intersect(request.PayloadKinds, StringComparer.Ordinal).ToArray();
-        return new DisseminationCapabilityResponse
-        {
-            Topic = request.Topic,
-            ProtocolVersion = topic.ProtocolVersion,
-            Supported = payloadKinds.Length > 0,
-            PayloadKinds = payloadKinds,
-        };
-    }
 
     public Task ReceiveGossip(DisseminationGossipBatch batch, CancellationToken cancellationToken) =>
         Execute(async () => await _protocol.ReceiveGossip(batch, cancellationToken));

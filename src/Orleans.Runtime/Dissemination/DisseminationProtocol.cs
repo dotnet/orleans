@@ -23,10 +23,7 @@ internal sealed partial class DisseminationProtocol(
     private readonly FrozenDictionary<string, IDisseminationTopic> _topics = topics.ToFrozenDictionary(static topic => topic.Name, StringComparer.Ordinal);
     private readonly TimeProvider _timeProvider = timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger = logger;
-    private readonly Dictionary<CapabilityKey, CapabilityEntry> _capabilityCache = [];
-    private readonly Dictionary<CapabilityKey, DateTimeOffset> _capabilityProbeBackoffUntil = [];
     private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
-    private readonly object _capabilityLock = new();
     private readonly object _failureLock = new();
     private readonly object _gossipQueueLock = new();
     private readonly object _recentUpdateLock = new();
@@ -66,13 +63,6 @@ internal sealed partial class DisseminationProtocol(
         var topology = targetPeers is { Count: > 0 }
             ? BuildParticipantTopology(targetPeers, root, includeLocal: true)
             : GetParticipantTopology(topic.MembershipScope, root, includeLocal: true);
-        var activeMembers = targetPeers is { Count: > 0 }
-            ? topology.ParticipantSet
-            : GetActiveMemberSet(root, includeLocal: true);
-        if (!await AreParticipantsCapable(topology.Participants, activeMembers, topic, item.Digest.PayloadKind, cancellationToken))
-        {
-            return false;
-        }
 
         foreach (var peer in GetOriginatorTreeTargets(topology, root))
         {
@@ -104,7 +94,6 @@ internal sealed partial class DisseminationProtocol(
             return AntiEntropyState.Empty;
         }
 
-        var topics = new List<DisseminationCapabilityRequest>();
         var digests = new List<DisseminationDigest>();
         var currentValueStreams = new List<ValueStreamKey>();
         var now = _timeProvider.GetUtcNow();
@@ -114,13 +103,6 @@ internal sealed partial class DisseminationProtocol(
             {
                 continue;
             }
-
-            topics.Add(new DisseminationCapabilityRequest
-            {
-                Topic = topic.Name,
-                ProtocolVersion = topic.ProtocolVersion,
-                PayloadKinds = [.. topic.PayloadKinds],
-            });
 
             foreach (var digest in topic.GetDigests())
             {
@@ -137,10 +119,14 @@ internal sealed partial class DisseminationProtocol(
         }
 
         PruneRecentUpdates(currentValueStreams.ToFrozenSet());
+        var topics = digests
+            .Select(static digest => digest.Topic)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         var round = Interlocked.Increment(ref _antiEntropyRound);
         return new AntiEntropyState(
             GetAntiEntropyPeersByTopic(topics, round),
-            topics.ToArray(),
+            topics,
             SortDigests(digests).ToArray());
     }
 
@@ -148,7 +134,7 @@ internal sealed partial class DisseminationProtocol(
         AntiEntropyState state,
         CancellationToken cancellationToken)
     {
-        if (state.PeersByTopic.Count == 0 || state.Topics.Count == 0)
+        if (state.PeersByTopic.Count == 0 || state.Topics.Count == 0 || state.Digests.Count == 0)
         {
             return [];
         }
@@ -158,15 +144,14 @@ internal sealed partial class DisseminationProtocol(
         foreach (var peer in peers)
         {
             var requestedTopics = state.Topics
-                .Where(request => state.PeersByTopic.TryGetValue(request.Topic, out var topicPeers) && topicPeers.Contains(peer))
+                .Where(topic => state.PeersByTopic.TryGetValue(topic, out var topicPeers) && topicPeers.Contains(peer))
                 .ToArray();
-            var topics = await GetCapableAntiEntropyTopics(peer, requestedTopics, cancellationToken);
-            if (topics.Count == 0)
+            if (requestedTopics.Length == 0)
             {
                 continue;
             }
 
-            var digests = state.Digests.Where(digest => IsRequested(topics, digest)).ToArray();
+            var digests = state.Digests.Where(digest => requestedTopics.Contains(digest.Topic, StringComparer.Ordinal)).ToArray();
             if (digests.Length == 0)
             {
                 continue;
@@ -175,7 +160,7 @@ internal sealed partial class DisseminationProtocol(
             var request = new DisseminationAntiEntropyRequest
             {
                 Sender = _transport.LocalSilo,
-                Topics = [.. topics],
+                Topics = requestedTopics,
                 Digests = digests,
             };
 
@@ -246,11 +231,6 @@ internal sealed partial class DisseminationProtocol(
         {
             foreach (var localDigest in SortDigests(requestedTopic.Topic.GetDigests()))
             {
-                if (!requestedTopic.PayloadKinds.Contains(localDigest.PayloadKind))
-                {
-                    continue;
-                }
-
                 var digestKey = GetDigestKey(localDigest);
                 if (!remoteDigests.TryGetValue(digestKey, out var remoteDigest)
                     || requestedTopic.Topic.CompareVersion(localDigest, remoteDigest) <= 0)
@@ -261,10 +241,9 @@ internal sealed partial class DisseminationProtocol(
                 var item = await requestedTopic.Topic.GetValue(
                     localDigest,
                     remoteDigest,
-                    requestedTopic.PayloadKinds,
                     cancellationToken);
                 if (item is null
-                    || !requestedTopic.PayloadKinds.Contains(item.Digest.PayloadKind)
+                    || !requestedTopic.Topic.PayloadKinds.Contains(item.Digest.PayloadKind)
                     || !ValidatePayloadSize(requestedTopic.Topic, item))
                 {
                     continue;
@@ -549,8 +528,8 @@ internal sealed partial class DisseminationProtocol(
         var byteCount = 0;
         foreach (var item in values)
         {
-            if (!_topics.TryGetValue(item.Digest.Topic, out var topic)
-                || await GetCapabilityStatus(peer, topic, item.Digest.PayloadKind, cancellationToken) != CapabilityStatus.Supported)
+            if (!TryGetEnabledTopic(item.Digest.Topic, out var topic)
+                || !topic.PayloadKinds.Contains(item.Digest.PayloadKind))
             {
                 continue;
             }
@@ -647,160 +626,14 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private async ValueTask<CapabilityStatus> GetCapabilityStatus(
-        SiloAddress peer,
-        IDisseminationTopic topic,
-        string payloadKind,
-        CancellationToken cancellationToken)
-    {
-        var now = _timeProvider.GetUtcNow();
-        var key = new CapabilityKey(peer, topic.Name);
-        lock (_capabilityLock)
-        {
-            if (_capabilityCache.TryGetValue(key, out var cached) && cached.ExpiresAt > now)
-            {
-                return cached.Supported && cached.PayloadKinds.Contains(payloadKind)
-                    ? CapabilityStatus.Supported
-                    : CapabilityStatus.Unsupported;
-            }
-
-            if (_capabilityProbeBackoffUntil.TryGetValue(key, out var probeBackoffUntil))
-            {
-                if (probeBackoffUntil > now)
-                {
-                    return CapabilityStatus.Unavailable;
-                }
-
-                _capabilityProbeBackoffUntil.Remove(key);
-            }
-        }
-
-        var request = new DisseminationCapabilityRequest
-        {
-            Topic = topic.Name,
-            ProtocolVersion = topic.ProtocolVersion,
-            PayloadKinds = [.. topic.PayloadKinds],
-        };
-
-        try
-        {
-            var response = await _transport.GetCapabilities(peer, request, cancellationToken);
-            var supported = response.Supported && response.ProtocolVersion >= topic.ProtocolVersion;
-            var payloadKinds = response.PayloadKinds.ToFrozenSet(StringComparer.Ordinal);
-            lock (_capabilityLock)
-            {
-                _capabilityCache[key] = new CapabilityEntry(supported, payloadKinds, now + _options.CurrentValue.CapabilityCacheTtl);
-                _capabilityProbeBackoffUntil.Remove(key);
-            }
-
-            DisseminationEvents.EmitCapabilityProbe(_transport.LocalSilo, peer, topic.Name, supported);
-            return supported && payloadKinds.Contains(payloadKind)
-                ? CapabilityStatus.Supported
-                : CapabilityStatus.Unsupported;
-        }
-        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            LogDebugCapabilityProbeFailed(_logger, exception, peer, topic.Name);
-            lock (_capabilityLock)
-            {
-                _capabilityCache.Remove(key);
-                _capabilityProbeBackoffUntil[key] = _timeProvider.GetUtcNow() + _options.CurrentValue.FailureBackoff;
-            }
-
-            DisseminationEvents.EmitCapabilityProbe(_transport.LocalSilo, peer, topic.Name, supported: false);
-            return CapabilityStatus.Unavailable;
-        }
-    }
-
-    private async ValueTask<bool> AreParticipantsCapable(
-        ImmutableArray<SiloAddress> participants,
-        FrozenSet<SiloAddress> activeMembers,
-        IDisseminationTopic topic,
-        string payloadKind,
-        CancellationToken cancellationToken)
-    {
-        var probes = new List<Task<(SiloAddress Participant, CapabilityStatus Status)>>(participants.Length);
-        foreach (var participant in participants)
-        {
-            if (!Equals(participant, _transport.LocalSilo))
-            {
-                probes.Add(Probe(participant));
-            }
-        }
-
-        if (probes.Count == 0)
-        {
-            return true;
-        }
-
-        var results = await Task.WhenAll(probes);
-        foreach (var (participant, status) in results)
-        {
-            if (activeMembers.Contains(participant) && status != CapabilityStatus.Supported)
-            {
-                return false;
-            }
-        }
-
-        return true;
-
-        async Task<(SiloAddress Participant, CapabilityStatus Status)> Probe(SiloAddress participant) =>
-            (participant, await GetCapabilityStatus(participant, topic, payloadKind, cancellationToken));
-    }
-
-    private async ValueTask<List<DisseminationCapabilityRequest>> GetCapableAntiEntropyTopics(
-        SiloAddress peer,
-        IReadOnlyList<DisseminationCapabilityRequest> topics,
-        CancellationToken cancellationToken)
-    {
-        var result = new List<DisseminationCapabilityRequest>(topics.Count);
-        foreach (var request in topics)
-        {
-            if (!_topics.TryGetValue(request.Topic, out var topic) || !topic.IsEnabled)
-            {
-                continue;
-            }
-
-            var supportedPayloadKinds = new List<string>(request.PayloadKinds.Length);
-            foreach (var payloadKind in request.PayloadKinds)
-            {
-                if (await GetCapabilityStatus(peer, topic, payloadKind, cancellationToken) == CapabilityStatus.Supported)
-                {
-                    supportedPayloadKinds.Add(payloadKind);
-                }
-            }
-
-            if (supportedPayloadKinds.Count > 0)
-            {
-                result.Add(new DisseminationCapabilityRequest
-                {
-                    Topic = request.Topic,
-                    ProtocolVersion = request.ProtocolVersion,
-                    PayloadKinds = [.. supportedPayloadKinds],
-                });
-            }
-        }
-
-        return result;
-    }
-
     private FrozenDictionary<string, RequestedTopic> GetRequestedTopics(DisseminationAntiEntropyRequest request)
     {
         var result = new Dictionary<string, RequestedTopic>(StringComparer.Ordinal);
-        foreach (var requestedTopic in request.Topics)
+        foreach (var topicName in request.Topics)
         {
-            if (!TryGetEnabledTopic(requestedTopic.Topic, out var topic)
-                || requestedTopic.ProtocolVersion > topic.ProtocolVersion)
+            if (TryGetEnabledTopic(topicName, out var topic))
             {
-                continue;
-            }
-
-            var payloadKinds = topic.PayloadKinds
-                .Intersect(requestedTopic.PayloadKinds, StringComparer.Ordinal)
-                .ToFrozenSet(StringComparer.Ordinal);
-            if (payloadKinds.Count > 0)
-            {
-                result[topic.Name] = new RequestedTopic(topic, payloadKinds);
+                result[topic.Name] = new RequestedTopic(topic);
             }
         }
 
@@ -861,15 +694,15 @@ internal sealed partial class DisseminationProtocol(
     }
 
     private FrozenDictionary<string, ImmutableArray<SiloAddress>> GetAntiEntropyPeersByTopic(
-        IReadOnlyList<DisseminationCapabilityRequest> topics,
+        IReadOnlyList<string> topics,
         long round)
     {
         var result = new Dictionary<string, ImmutableArray<SiloAddress>>(StringComparer.Ordinal);
-        foreach (var request in topics)
+        foreach (var topicName in topics)
         {
-            if (_topics.TryGetValue(request.Topic, out var topic) && topic.IsEnabled)
+            if (_topics.TryGetValue(topicName, out var topic) && topic.IsEnabled)
             {
-                result[request.Topic] = SelectAntiEntropyPeers(topic.MembershipScope, round);
+                result[topicName] = SelectAntiEntropyPeers(topic.MembershipScope, round);
             }
         }
 
@@ -1084,13 +917,6 @@ internal sealed partial class DisseminationProtocol(
         return membershipScope == DisseminationMembershipScope.AllMembers ? allMembers : activeMembers;
     }
 
-    private FrozenSet<SiloAddress> GetActiveMemberSet(SiloAddress? root, bool includeLocal) =>
-        GetCachedParticipantTopology(
-            DisseminationMembershipScope.ActiveMembers,
-            _transport.GetMembership().ActiveMembers,
-            root,
-            includeLocal).ParticipantSet;
-
     private ParticipantTopology GetCachedParticipantTopology(
         DisseminationMembershipScope membershipScope,
         IEnumerable<SiloAddress> participants,
@@ -1262,20 +1088,6 @@ internal sealed partial class DisseminationProtocol(
                 Payload = item.Payload,
             };
 
-    private static bool IsRequested(IEnumerable<DisseminationCapabilityRequest> requests, DisseminationDigest digest)
-    {
-        foreach (var request in requests)
-        {
-            if (string.Equals(request.Topic, digest.Topic, StringComparison.Ordinal)
-                && request.PayloadKinds.Contains(digest.PayloadKind, StringComparer.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static IEnumerable<DisseminationDigest> SortDigests(IEnumerable<DisseminationDigest> digests) =>
         digests
             .OrderBy(static digest => digest.Topic, StringComparer.Ordinal)
@@ -1289,7 +1101,7 @@ internal sealed partial class DisseminationProtocol(
 
     public sealed record AntiEntropyState(
         FrozenDictionary<string, ImmutableArray<SiloAddress>> PeersByTopic,
-        IReadOnlyList<DisseminationCapabilityRequest> Topics,
+        IReadOnlyList<string> Topics,
         IReadOnlyList<DisseminationDigest> Digests)
     {
         public static readonly AntiEntropyState Empty = new(
@@ -1298,15 +1110,11 @@ internal sealed partial class DisseminationProtocol(
             []);
     }
 
-    private readonly record struct CapabilityKey(SiloAddress Peer, string Topic);
-
-    private readonly record struct CapabilityEntry(bool Supported, FrozenSet<string> PayloadKinds, DateTimeOffset ExpiresAt);
-
     private readonly record struct DigestKey(string Topic, string Key, string PayloadKind);
 
     private readonly record struct ValueStreamKey(string Topic, string Key);
 
-    private readonly record struct RequestedTopic(IDisseminationTopic Topic, FrozenSet<string> PayloadKinds);
+    private readonly record struct RequestedTopic(IDisseminationTopic Topic);
 
     private readonly record struct QueuedGossipBatch(SiloAddress Peer, ImmutableArray<DisseminationValue> Values);
 
@@ -1330,13 +1138,6 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private enum CapabilityStatus
-    {
-        Supported,
-        Unsupported,
-        Unavailable,
-    }
-
     private sealed record ParticipantTopology(
         ImmutableArray<SiloAddress> Participants,
         FrozenDictionary<SiloAddress, int> Indices,
@@ -1352,11 +1153,6 @@ internal sealed partial class DisseminationProtocol(
         Level = LogLevel.Debug,
         Message = "Dissemination send to {Peer} failed.")]
     private static partial void LogDebugDisseminationSendFailed(ILogger logger, Exception exception, SiloAddress peer);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Dissemination capability probe to {Peer} for topic {Topic} failed.")]
-    private static partial void LogDebugCapabilityProbeFailed(ILogger logger, Exception exception, SiloAddress peer, string topic);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
