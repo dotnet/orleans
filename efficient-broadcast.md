@@ -17,8 +17,8 @@ The goal is to reduce routine fanout while preserving correctness backstops. The
 | Relevant silos can address each other directly | Dissemination can build trees from cluster membership. |
 | Membership and fault detection are authoritative | Dissemination uses membership to choose peers and relies on existing liveness logic to remove failed silos. |
 | Values are monotonic per `(topic, key, payloadKind)` | Topic version comparison provides duplicate suppression. |
-| Topics own value semantics | The protocol handles routing, validation, capability, and batching. Topics compare versions, materialize values, apply values, and perform fallback. |
-| Rolling upgrades are supported | Peers are capability-probed by topic, protocol version, and payload kind before new messages are sent. This branch keeps protocol version `2` while the contract is branch-local. |
+| Topics own value semantics | The protocol handles routing, validation, and batching. Topics compare versions, materialize values, apply values, and perform fallback. |
+| Rolling upgrades are best-effort | New dissemination messages are attempted directly. Peers which cannot process them fail or reject them, and anti-entropy plus existing fallback paths repair after the temporary mismatch clears. |
 | Payloads are bounded | Oversize payloads are rejected and topic fallback is used. Batch responses are bounded by item count and bytes. |
 | Delivery is best-effort | Tree send failures are repaired by anti-entropy on its periodic cadence. |
 | Different runtime systems have different membership eligibility | The protocol maintains both active-only and all-member topologies and lets each topic choose. |
@@ -50,7 +50,7 @@ Each disseminated value is summarized by a payload-free `DisseminationDigest`:
 | `Topic` | Logical dissemination topic, such as membership or deployment load. |
 | `Key` | Topic-defined string identifying one monotonic value stream within the topic. Examples: `"cluster"` for membership and `SiloAddress.ToParsableString()` for load statistics. |
 | `Version` | Topic-defined monotonic version. The protocol treats it as opaque except for sorting; topics decide whether one digest is newer than another. |
-| `PayloadKind` | Concrete payload shape or encoding for this topic. It is included in capability checks and digest comparison keys. Future diff payloads can use separate payload kinds. |
+| `PayloadKind` | Concrete payload shape or encoding for this topic. It is included in digest comparison keys and receiver-side validation. Diff payloads use separate payload kinds. |
 
 The payload envelope is `DisseminationValue`:
 
@@ -88,7 +88,7 @@ Each topic declares a `DisseminationMembershipScope`:
 - Deployment load statistics use `ActiveMembers`, matching existing load publishing behavior.
 - Manifest exchange remains active-only and pull-based today.
 
-The all-member tree can include silos which are joining or leaving. Active participants must be known dissemination-capable before publication succeeds. Transient probe or send failure for non-active participants in the all-member tree allows publication to proceed; missed values are repaired by anti-entropy or made irrelevant by membership changes.
+The all-member tree can include silos which are joining or leaving. Publication does not preflight peers. Transient send failures, temporary version mismatches, and membership skew are repaired by anti-entropy or made irrelevant by membership changes.
 
 ## Fast-path algorithm: fixed deterministic tree broadcast
 
@@ -163,12 +163,11 @@ Current branch behavior:
 
 1. Enumerate enabled topics and their local `DisseminationDigest` values whose `(topic, key)` streams have not received a recent update.
 2. Select repair peers per topic using that topic's membership scope.
-3. Capability-probe selected peers for topic protocol version and payload kinds.
-4. Send `DisseminationAntiEntropyRequest` containing requested topics and stale local digests. If no stale digests remain for a peer after capability filtering, skip that peer for the round.
-5. The receiver maps remote digests by `(topic, key, payloadKind)`.
-6. For each requested local digest key, if local state is newer than the requester digest, materialize a value.
-7. Return values up to `MaxBatchItems` and `MaxBatchBytes`, setting `Truncated` if more values remain.
-8. The requester applies returned values locally.
+3. Send `DisseminationAntiEntropyRequest` containing requested topic names and stale local digests. If no stale digests remain for a peer, skip that peer for the round.
+4. The receiver maps remote digests by `(topic, key, payloadKind)`.
+5. For each requested local digest key, if local state is newer than the requester digest, materialize a value.
+6. Return values up to `MaxBatchItems` and `MaxBatchBytes`, setting `Truncated` if more values remain.
+7. The requester applies returned values locally.
 
 Each topic has an `ExpectedUpdateCadence` used to decide when a `(topic, key)` stream is stale enough to probe. Deployment load statistics default to 2 seconds and membership snapshots default to 10 seconds. Recent tree or repair updates suppress digest probes for that stream until the cadence elapses. Omitted digests mean "not probing this stream in this round" rather than "missing this stream", which keeps anti-entropy from returning values for streams that are already receiving regular fast-path updates. When a topic knows that a stream should exist but has no local value, it can send an explicit low-watermark digest for that key; deployment load does this for active silos with missing local statistics.
 
@@ -198,7 +197,7 @@ Implemented repair design:
 - Anti-entropy pull can exchange diffs when a topic can produce and apply them.
 - The source of truth for a topic should be able to accept a peer digest and produce the smallest useful payload for that peer.
 - `DisseminationDigest.Version` remains the target value version after the payload is applied.
-- `PayloadKind` distinguishes full snapshots from diff payloads, so capability probing can negotiate support and mixed-version peers can fall back to full values.
+- `PayloadKind` distinguishes full snapshots from diff payloads, so receivers can validate and reject unsupported payloads.
 - A diff payload must include enough topic-specific base information for the receiver to decide whether it can apply the diff. If the receiver's local base is too old, too new, or missing, the topic rejects the diff and relies on anti-entropy or fallback to obtain a full value.
 
 Membership is the primary diff candidate. To support membership diffs effectively, the membership source should retain a bounded change history keyed by membership version. When a peer digest is within the retained range, the responder can send the changes from the peer's version to the current version. If the peer is too far behind or the change history has been truncated, the responder sends a full `MembershipTableSnapshot`.
@@ -226,17 +225,15 @@ Accepted improvement:
 
 This keeps manifests pull-based while reducing the number of direct per-member requests during convergence.
 
-## Capability, failure handling, and fallback
-
-Capability probing is per `(peer, topic)`. A capability request includes the topic protocol version and supported payload kinds. Results are cached for `CapabilityCacheTtl`.
+## Failure handling and fallback
 
 Failure behavior:
 
-- Transient capability probe failures use short backoff and leave capability support undecided.
 - Send and anti-entropy request failures back off the peer temporarily using `FailureBackoff`.
-- Publication requires active participants in the selected tree to support the topic and payload kind. This prevents a missing active internal tree node from silently stranding active descendants.
+- Publication queues tree sends without capability probing. If a peer cannot process a batch, the send fails or the receiver rejects unsupported values.
 - Non-active participants in the all-member tree can be unavailable while publication proceeds.
-- If dissemination is disabled, payloads are oversize, peers are incompatible, or topic fallback is required, the producer uses the existing topic-specific safety path.
+- If dissemination is disabled, payloads are oversize, or topic fallback is required, the producer uses the existing topic-specific safety path.
+- Anti-entropy repairs missed values after transient send failures, temporary mixed-version mismatches, or short-lived membership skew.
 
 ## Algorithms and data structures
 
@@ -244,14 +241,12 @@ Important structures:
 
 | Structure | Purpose |
 |---|---|
-| `DisseminationDigest` | Payload-free summary used for identity, version comparison, capability filtering, and anti-entropy. |
+| `DisseminationDigest` | Payload-free summary used for identity, version comparison, receiver validation, and anti-entropy. |
 | `DisseminationValue` | Payload envelope used by tree gossip and anti-entropy responses. |
 | `DisseminationMembership` | Transport snapshot containing ordered `AllMembers` and `ActiveMembers`. |
 | `ParticipantTopology` | Cached ordered participants, index map, and participant set for one membership scope. |
 | `DigestKey` | Protocol comparison key `(topic, key, payloadKind)` used to compare versions for the same value stream. |
 | `AntiEntropyState` | Per-round local topics, digests, and selected peers grouped by topic. |
-| `_capabilityCache` | Cached peer topic capabilities and supported payload kinds. |
-| `_capabilityProbeBackoffUntil` | Short backoff for failed capability probes. |
 | `_failureBackoffUntil` | Short backoff for failed sends and anti-entropy requests. |
 
 Important ordering rules:
@@ -273,7 +268,7 @@ Core contracts:
 
 Runtime implementation:
 
-- `src\Orleans.Runtime\Dissemination\DisseminationProtocol.cs`: tree broadcast, anti-entropy, capability cache, topology cache, validation, and failure backoff.
+- `src\Orleans.Runtime\Dissemination\DisseminationProtocol.cs`: tree broadcast, anti-entropy, topology cache, validation, and failure backoff.
 - `src\Orleans.Runtime\Dissemination\DisseminationService.cs`: serialized protocol execution and anti-entropy lifecycle loop.
 - `src\Orleans.Runtime\Dissemination\DisseminationSystemTarget.cs`: Orleans system target endpoint.
 - `src\Orleans.Runtime\Dissemination\OrleansDisseminationTransport.cs`: system-target transport adapter and membership-scope construction.
@@ -318,7 +313,7 @@ Integration points:
 
 4. Membership diff support.
    - Retain a bounded history of membership changes by membership version.
-   - Add a membership diff payload kind and advertise it through capability probing.
+   - Add a membership diff payload kind and validate it at the receiver.
    - Apply diffs only when the local base version matches the payload requirements.
    - Fall back to full snapshots when history is missing, truncated, or incompatible.
 
@@ -340,7 +335,7 @@ Integration points:
 
 ## Future work, shortcomings, and trade-offs
 
-The main trade-off is that the tree fast path reduces sends and relies on anti-entropy for repair. A capable child send failure can leave that child's subtree stale until anti-entropy repairs it. Convergence latency is bounded by anti-entropy cadence.
+The main trade-off is that the tree fast path reduces sends and relies on anti-entropy for repair. A child send failure can leave that child's subtree stale until anti-entropy repairs it. Convergence latency is bounded by anti-entropy cadence.
 
 Other trade-offs and improvement areas:
 
@@ -349,9 +344,9 @@ Other trade-offs and improvement areas:
 - Status-and-age-prioritized ordering improves expected interior-node availability and value hit-rate while keeping ordering deterministic.
 - Dynamic fanout trades direct send count for tree depth: a 2-hop target gives faster convergence with larger fanout; a 3-hop target lowers per-node sends and adds one relay hop.
 - Diff repair reduces bytes for membership but adds history retention, new payload kinds, base-version validation, and fallback paths.
-- Capability probing can be `O(N)` on first publication after cache expiry because active tree participants must be known capable.
+- Removing capability probing keeps the fast path cheap but means unsupported or temporarily mismatched peers discover incompatibility by rejecting or failing actual dissemination messages.
 - Deterministic trees require silos to mostly agree on membership. Anti-entropy repairs short-lived skew, but the fast path can duplicate or miss during disagreement.
 - The protocol scope is monotonic versioned values. Ordered event streams would need separate sequencing, retention, and acknowledgment semantics.
 - Manifest whole-cluster fetch can reduce request count but can also transfer more bytes than per-silo fetch in highly divergent clusters. Hash validation and fallback keep it safe.
 - Tree sends are coalesced per peer before transport. Future scheduling work could respect `MaxConcurrentSends` across flushes and enforce cross-topic fairness under sustained overload.
-- Once the protocol ships, wire-shape or payload-kind changes should become additive and versioned. The current branch keeps protocol version `2` while the contract is branch-local.
+- Once the protocol ships, wire-shape or payload-kind changes should become additive and versioned.
