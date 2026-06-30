@@ -9,8 +9,6 @@ internal interface IDisseminationTopic
 {
     string Name { get; }
 
-    int ProtocolVersion { get; }
-
     DisseminationMembershipScope MembershipScope { get; }
 
     DisseminationTopicOptions Options { get; }
@@ -28,7 +26,6 @@ internal interface IDisseminationTopic
     ValueTask<DisseminationValue?> GetValue(
         DisseminationDigest digest,
         DisseminationDigest? peerDigest,
-        IReadOnlySet<string> peerPayloadKinds,
         CancellationToken cancellationToken);
 
     ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken);

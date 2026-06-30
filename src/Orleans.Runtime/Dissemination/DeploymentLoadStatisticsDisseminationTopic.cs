@@ -21,8 +21,6 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
 
     public string Name => DisseminationTopicNames.DeploymentLoad;
 
-    public int ProtocolVersion => 2;
-
     public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.ActiveMembers;
 
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
@@ -73,11 +71,9 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
     public ValueTask<DisseminationValue?> GetValue(
         DisseminationDigest digest,
         DisseminationDigest? peerDigest,
-        IReadOnlySet<string> peerPayloadKinds,
         CancellationToken cancellationToken)
     {
         if (!string.Equals(digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
-            || !peerPayloadKinds.Contains(DisseminationTopicNames.SiloRuntimeStatistics)
             || !TryGetSiloAddress(digest.Key, out var siloAddress)
             || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
             || statistics.DateTime.Ticks < digest.Version)

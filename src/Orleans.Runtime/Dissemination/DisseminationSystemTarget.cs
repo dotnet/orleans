@@ -15,9 +15,6 @@ internal sealed class DisseminationSystemTarget : SystemTarget, IDisseminationSy
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
-    public Task<DisseminationCapabilityResponse> GetCapabilities(DisseminationCapabilityRequest request) =>
-        Task.FromResult(_service.GetCapabilities(request));
-
     public Task PushGossip(DisseminationGossipBatch batch) =>
         this.RunOrQueueTask(() => _service.ReceiveGossip(batch, CancellationToken.None));
 

@@ -498,8 +498,6 @@ namespace Orleans.Configuration
 
     public sealed partial class DisseminationOptions
     {
-        public System.TimeSpan CapabilityCacheTtl { get { throw null; } set { } }
-
         public bool Enabled { get { throw null; } set { } }
 
         public System.TimeSpan FailureBackoff { get { throw null; } set { } }
