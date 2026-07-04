@@ -307,6 +307,16 @@ namespace Orleans
         [Id(10)]
         public DateTime IAmAliveTime { get; set; }
 
+        /// <summary>
+        /// Gets or sets the silo metadata, if it is available from the membership table.
+        /// </summary>
+        /// <remarks>
+        /// A <see langword="null"/> value indicates that metadata is unavailable. An empty dictionary indicates
+        /// that metadata is available and the silo has not supplied any metadata values.
+        /// </remarks>
+        [Id(11)]
+        public ImmutableDictionary<string, string> Metadata { get; set; }
+
         internal DateTime EffectiveIAmAliveTime
         {
             get
@@ -370,7 +380,8 @@ namespace Orleans
                 UpdateZone = UpdateZone,
                 FaultZone = FaultZone,
                 StartTime = StartTime,
-                IAmAliveTime = IAmAliveTime
+                IAmAliveTime = IAmAliveTime,
+                Metadata = Metadata
             };
 
             return copy;
@@ -435,6 +446,7 @@ namespace Orleans
 
             return @$"[SiloAddress={SiloAddress} SiloName={SiloName} Status={Status} HostName={HostName} ProxyPort={ProxyPort} RoleName={RoleName
                 } UpdateZone={UpdateZone} FaultZone={FaultZone} StartTime={LogFormatter.PrintDate(StartTime)} IAmAliveTime={LogFormatter.PrintDate(IAmAliveTime)
+                } MetadataAvailable={Metadata is not null} MetadataCount={Metadata?.Count ?? 0
                 }{(suspecters == null ? null : " Suspecters=")}{suspecters}{(suspectTimes == null ? null : " SuspectTimes=")}{suspectTimes}]";
         }
     }

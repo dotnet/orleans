@@ -24,6 +24,7 @@ namespace Orleans.Runtime.MembershipService
         public const string SUSPECTING_TIMES_PROPERTY_NAME = "SuspectingTimes";
         public const string START_TIME_PROPERTY_NAME = "StartTime";
         public const string I_AM_ALIVE_TIME_PROPERTY_NAME = "IAmAliveTime";
+        public const string METADATA_PROPERTY_NAME = "MetadataJson";
         internal const char Seperator = '-';
         internal const string TABLE_VERSION_ROW = "VersionRow"; // Range key for version row.
         public const string MEMBERSHIP_VERSION_PROPERTY_NAME = "MembershipVersion";
@@ -41,6 +42,7 @@ namespace Orleans.Runtime.MembershipService
         public string SuspectingTimes { get; set; }
         public string StartTime { get; set; }
         public string IAmAliveTime { get; set; }
+        public string Metadata { get; set; }
         public int ETag { get; set; }
 
         public int MembershipVersion { get; set; }
@@ -91,6 +93,9 @@ namespace Orleans.Runtime.MembershipService
 
             if (fields.TryGetValue(I_AM_ALIVE_TIME_PROPERTY_NAME, out var aliveTime))
                 IAmAliveTime = aliveTime.S;
+
+            if (fields.TryGetValue(METADATA_PROPERTY_NAME, out var metadata))
+                Metadata = metadata.S;
 
             if (fields.TryGetValue(ETAG_PROPERTY_NAME, out var sETag) &&
                 int.TryParse(sETag.N, out var etag))
@@ -194,6 +199,9 @@ namespace Orleans.Runtime.MembershipService
 
             if (!string.IsNullOrWhiteSpace(IAmAliveTime))
                 fields.Add(I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(IAmAliveTime));
+
+            if (!string.IsNullOrWhiteSpace(Metadata))
+                fields.Add(METADATA_PROPERTY_NAME, new AttributeValue(Metadata));
 
             fields.Add(MEMBERSHIP_VERSION_PROPERTY_NAME, new AttributeValue { N = MembershipVersion.ToString() });
 

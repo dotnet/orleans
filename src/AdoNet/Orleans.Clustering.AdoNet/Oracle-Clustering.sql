@@ -21,6 +21,7 @@ CREATE TABLE "ORLEANSMEMBERSHIPTABLE"
     "STATUS" NUMBER(*,0) NOT NULL ENABLE,
     "PROXYPORT" NUMBER(*,0),
     "SUSPECTTIMES" VARCHAR2(4000 BYTE),
+    "METADATAJSON" NCLOB,
     "STARTTIME" TIMESTAMP (6) NOT NULL ENABLE,
     "IAMALIVETIME" TIMESTAMP (6) NOT NULL ENABLE,
 
@@ -31,7 +32,7 @@ CREATE TABLE "ORLEANSMEMBERSHIPTABLE"
 /
 
 CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_SILONAME IN NVARCHAR2, PARAM_HOSTNAME IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
-                                    PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER, PARAM_STARTTIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_PROXYPORT IN NUMBER, PARAM_VERSION IN NUMBER)
+                                    PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER, PARAM_STARTTIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_PROXYPORT IN NUMBER, PARAM_METADATAJSON IN NCLOB, PARAM_VERSION IN NUMBER)
   RETURN NUMBER IS
   rowcount NUMBER;
   PRAGMA AUTONOMOUS_TRANSACTION;
@@ -46,6 +47,7 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
       HostName,
       Status,
       ProxyPort,
+      MetadataJson,
       StartTime,
       IAmAliveTime
     )
@@ -58,6 +60,7 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
       PARAM_HOSTNAME,
       PARAM_STATUS,
       PARAM_PROXYPORT,
+      PARAM_METADATAJSON,
       PARAM_STARTTIME,
       PARAM_IAMALIVETIME
     FROM DUAL WHERE NOT EXISTS
@@ -92,7 +95,7 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
 /
 
 CREATE OR REPLACE FUNCTION UpdateMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2, PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER,
-                                               PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_SUSPECTTIMES IN VARCHAR2, PARAM_VERSION IN NUMBER
+                                               PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_SUSPECTTIMES IN VARCHAR2, PARAM_METADATAJSON IN NCLOB, PARAM_VERSION IN NUMBER
                                               )
   RETURN NUMBER IS
   rowcount NUMBER;
@@ -110,6 +113,7 @@ CREATE OR REPLACE FUNCTION UpdateMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
       SET
         Status = PARAM_STATUS,
         SuspectTimes = PARAM_SUSPECTTIMES,
+        MetadataJson = PARAM_METADATAJSON,
         IAmAliveTime = PARAM_IAMALIVETIME
       WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
         AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
@@ -182,7 +186,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'InsertMembershipKey','
-    SELECT INSERTMEMBERSHIP(:DeploymentId,:IAmAliveTime,:SiloName,:Hostname,:Address,:Port,:Generation,:StartTime,:Status,:ProxyPort,:Version) FROM DUAL
+    SELECT INSERTMEMBERSHIP(:DeploymentId,:IAmAliveTime,:SiloName,:Hostname,:Address,:Port,:Generation,:StartTime,:Status,:ProxyPort,:MetadataJson,:Version) FROM DUAL
 ');
 /
 
@@ -190,7 +194,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpdateMembershipKey','
-    SELECT UpdateMembership(:DeploymentId, :Address, :Port, :Generation, :IAmAliveTime, :Status, :SuspectTimes, :Version) AS RESULT FROM DUAL
+    SELECT UpdateMembership(:DeploymentId, :Address, :Port, :Generation, :IAmAliveTime, :Status, :SuspectTimes, :MetadataJson, :Version) AS RESULT FROM DUAL
 ');
 /
 
@@ -199,7 +203,7 @@ VALUES
 (
     'MembershipReadRowKey','
     SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName,
-       m.Status, m.ProxyPort, m.SuspectTimes, m.StartTime, m.IAmAliveTime, v.Version
+       m.Status, m.ProxyPort, m.SuspectTimes, m.MetadataJson, m.StartTime, m.IAmAliveTime, v.Version
     FROM
         OrleansMembershipVersionTable v
         LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
@@ -216,7 +220,7 @@ VALUES
 (
     'MembershipReadAllKey','
     SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName, m.Status,
-       m.ProxyPort, m.SuspectTimes, m.StartTime, m.IAmAliveTime, v.Version
+       m.ProxyPort, m.SuspectTimes, m.MetadataJson, m.StartTime, m.IAmAliveTime, v.Version
     FROM
         OrleansMembershipVersionTable v
         LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId

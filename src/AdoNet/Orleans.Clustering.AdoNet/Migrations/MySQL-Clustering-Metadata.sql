@@ -1,77 +1,6 @@
--- For each deployment, there will be only one (active) membership version table version column which will be updated periodically.
-CREATE TABLE OrleansMembershipVersionTable
-(
-    DeploymentId NVARCHAR(150) NOT NULL,
-    Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    Version INT NOT NULL DEFAULT 0,
+ALTER TABLE OrleansMembershipTable ADD COLUMN MetadataJson TEXT NULL;
 
-    CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY(DeploymentId)
-);
-
--- Every silo instance has a row in the membership table.
-CREATE TABLE OrleansMembershipTable
-(
-    DeploymentId NVARCHAR(150) NOT NULL,
-    Address VARCHAR(45) NOT NULL,
-    Port INT NOT NULL,
-    Generation INT NOT NULL,
-    SiloName NVARCHAR(150) NOT NULL,
-    HostName NVARCHAR(150) NOT NULL,
-    Status INT NOT NULL,
-    ProxyPort INT NULL,
-    SuspectTimes VARCHAR(8000) NULL,
-    MetadataJson TEXT NULL,
-    StartTime DATETIME NOT NULL,
-    IAmAliveTime DATETIME NOT NULL,
-
-    CONSTRAINT PK_MembershipTable_DeploymentId PRIMARY KEY(DeploymentId, Address, Port, Generation),
-    CONSTRAINT FK_MembershipTable_MembershipVersionTable_DeploymentId FOREIGN KEY (DeploymentId) REFERENCES OrleansMembershipVersionTable (DeploymentId)
-);
-
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'UpdateIAmAlivetimeKey','
-    -- This is expected to never fail by Orleans, so return value
-    -- is not needed nor is it checked.
-    UPDATE OrleansMembershipTable
-    SET
-        IAmAliveTime = @IAmAliveTime
-    WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND Address = @Address AND @Address IS NOT NULL
-        AND Port = @Port AND @Port IS NOT NULL
-        AND Generation = @Generation AND @Generation IS NOT NULL;
-');
-
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'InsertMembershipVersionKey','
-    INSERT INTO OrleansMembershipVersionTable
-    (
-        DeploymentId
-    )
-    SELECT * FROM ( SELECT @DeploymentId ) AS TMP
-    WHERE NOT EXISTS
-    (
-    SELECT 1
-    FROM
-        OrleansMembershipVersionTable
-    WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-    );
-
-    SELECT ROW_COUNT();
-');
-
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'InsertMembershipKey','
-    call InsertMembershipKey(@DeploymentId, @Address, @Port, @Generation,
-    @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime, @MetadataJson);'
-);
+DROP PROCEDURE IF EXISTS InsertMembershipKey;
 
 DELIMITER $$
 
@@ -151,11 +80,13 @@ END$$
 
 DELIMITER ;
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'UpdateMembershipKey','
-    START TRANSACTION;
+UPDATE OrleansQuery
+SET QueryText = 'call InsertMembershipKey(@DeploymentId, @Address, @Port, @Generation,
+    @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime, @MetadataJson);'
+WHERE QueryKey = 'InsertMembershipKey';
+
+UPDATE OrleansQuery
+SET QueryText = 'START TRANSACTION;
 
     UPDATE OrleansMembershipVersionTable
     SET
@@ -179,29 +110,11 @@ VALUES
 
     SELECT ROW_COUNT();
     COMMIT;
-');
+'
+WHERE QueryKey = 'UpdateMembershipKey';
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'GatewaysQueryKey','
-    SELECT
-        Address,
-        ProxyPort,
-        Generation
-    FROM
-        OrleansMembershipTable
-    WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND Status = @Status AND @Status IS NOT NULL
-        AND ProxyPort > 0;
-');
-
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'MembershipReadRowKey','
-    SELECT
+UPDATE OrleansQuery
+SET QueryText = 'SELECT
         v.DeploymentId,
         m.Address,
         m.Port,
@@ -217,20 +130,17 @@ VALUES
         v.Version
     FROM
         OrleansMembershipVersionTable v
-        -- This ensures the version table will returned even if there is no matching membership row.
         LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
         AND Address = @Address AND @Address IS NOT NULL
         AND Port = @Port AND @Port IS NOT NULL
         AND Generation = @Generation AND @Generation IS NOT NULL
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-');
+'
+WHERE QueryKey = 'MembershipReadRowKey';
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'MembershipReadAllKey','
-    SELECT
+UPDATE OrleansQuery
+SET QueryText = 'SELECT
         v.DeploymentId,
         m.Address,
         m.Port,
@@ -249,14 +159,5 @@ VALUES
         ON v.DeploymentId = m.DeploymentId
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-');
-
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'DeleteMembershipTableEntriesKey','
-    DELETE FROM OrleansMembershipTable
-    WHERE DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-    DELETE FROM OrleansMembershipVersionTable
-    WHERE DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-');
+'
+WHERE QueryKey = 'MembershipReadAllKey';

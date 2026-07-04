@@ -9,6 +9,15 @@ public record SiloMetadata
 {
     public static SiloMetadata Empty { get; } = new SiloMetadata();
 
+    public SiloMetadata()
+    {
+    }
+
+    public SiloMetadata(IEnumerable<KeyValuePair<string, string>> metadata)
+    {
+        AddMetadata(metadata);
+    }
+
     [Id(0)]
     public ImmutableDictionary<string, string> Metadata { get; private set; } = ImmutableDictionary<string, string>.Empty;
 
