@@ -348,6 +348,132 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
+        /// <summary>
+        /// Sequence number gaps can exceed int.MaxValue: MemoryStreamQueueGrain seeds its counter
+        /// with DateTime.UtcNow.Ticks on every activation, so a queue grain deactivation moves the
+        /// numbering far ahead in a single step. Compare must not truncate the difference to 32 bits.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void CompareHandlesSequenceNumberGapsLargerThanIntMaxValue()
+        {
+            // Gaps chosen so that the truncated 32 bit difference has the wrong sign or is zero.
+            var olderMessage = new CachedMessage { SequenceNumber = 100 };
+            Assert.True(olderMessage.Compare(new EventSequenceTokenV2(100L + int.MaxValue + 2)) < 0);
+            Assert.True(olderMessage.Compare(new EventSequenceTokenV2(100 + (1L << 32))) < 0);
+
+            var newerMessage = new CachedMessage { SequenceNumber = 100L + int.MaxValue + 2 };
+            Assert.True(newerMessage.Compare(new EventSequenceTokenV2(100)) > 0);
+
+            // Equal sequence numbers still compare by event index.
+            var message = new CachedMessage { SequenceNumber = 100, EventIndex = 1 };
+            Assert.True(message.Compare(new EventSequenceTokenV2(100, 0)) > 0);
+            Assert.True(message.Compare(new EventSequenceTokenV2(100, 2)) < 0);
+            Assert.Equal(0, message.Compare(new EventSequenceTokenV2(100, 1)));
+        }
+
+        /// <summary>
+        /// An idle cursor must see messages published after a sequence number jump larger than
+        /// int.MaxValue (e.g. the queue grain was deactivated and re-seeded its counter from
+        /// DateTime.UtcNow.Ticks). With an overflowing compare the new message looks older than
+        /// the cursor and delivery silently stalls.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void IdleCursorContinuesAfterLargeSequenceNumberJump()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null);
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            const long firstEpochSequenceNumber = 1000;
+            // Larger than int.MaxValue, chosen so the truncated 32 bit difference flips sign.
+            const long secondEpochSequenceNumber = firstEpochSequenceNumber + 5 + (3L << 30);
+
+            // Add messages from the first epoch and consume them all, leaving the cursor idle.
+            for (var i = 0; i < 5; i++)
+            {
+                EnqueueMessage(firstEpochSequenceNumber + i);
+            }
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(firstEpochSequenceNumber));
+            for (var i = 0; i < 5; i++)
+            {
+                Assert.True(cache.TryGetNextMessage(cursor, out _));
+            }
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            // The queue grain is reactivated and its numbering jumps far ahead of the previous epoch.
+            EnqueueMessage(secondEpochSequenceNumber);
+
+            // The idle cursor should pick up the new message.
+            Assert.True(cache.TryGetNextMessage(cursor, out var container));
+            Assert.Equal(secondEpochSequenceNumber, container.SequenceToken.SequenceNumber);
+
+            void EnqueueMessage(long sequenceNumber)
+            {
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = stream,
+                    SequenceNumber = sequenceNumber,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+            }
+        }
+
+        /// <summary>
+        /// A cursor placed at a token that sits after a sequence number jump larger than int.MaxValue
+        /// must start at that token. With an overflowing compare the token looks older than the oldest
+        /// cached message; because purge metadata exists, the cursor is then silently rewound to the
+        /// oldest cached message and the entire cache is re-delivered.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void CursorNotRewoundToOldestMessageAfterLargeSequenceNumberJump()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, TimeSpan.FromSeconds(30));
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            const long firstEpochSequenceNumber = 1000;
+            // Larger than int.MaxValue, chosen so the truncated 32 bit difference flips sign.
+            const long secondEpochSequenceNumber = firstEpochSequenceNumber + 1 + int.MaxValue + 3L;
+
+            // Add messages from the first epoch.
+            for (var i = 0; i < 5; i++)
+            {
+                EnqueueMessage(firstEpochSequenceNumber + i);
+            }
+
+            // Evict the oldest message so that purge metadata is recorded for the stream.
+            cache.RemoveOldestMessage();
+
+            // The queue grain is reactivated and its numbering jumps far ahead of the previous epoch.
+            EnqueueMessage(secondEpochSequenceNumber);
+
+            // A cursor for the new message must deliver that message only, not the whole cache.
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(secondEpochSequenceNumber));
+            Assert.True(cache.TryGetNextMessage(cursor, out var container));
+            Assert.Equal(secondEpochSequenceNumber, container.SequenceToken.SequenceNumber);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            void EnqueueMessage(long sequenceNumber)
+            {
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = stream,
+                    SequenceNumber = sequenceNumber,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+            }
+        }
+
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)
         {
             int sequenceNumber = startOfCache;
