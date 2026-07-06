@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime.Dissemination;
@@ -45,7 +46,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnGossipSent(DisseminationValue[] values, string kind)
+    public static void OnGossipSent(ImmutableArray<DisseminationValue> values, string kind)
     {
         if (!GossipSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
         {
@@ -79,7 +80,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnGossipReceived(DisseminationValue[] values, string kind)
+    public static void OnGossipReceived(ImmutableArray<DisseminationValue> values, string kind)
     {
         if (!GossipReceived.Enabled && !ValuesApplied.Enabled)
         {
