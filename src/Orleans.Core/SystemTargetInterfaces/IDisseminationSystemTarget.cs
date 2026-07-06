@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 
@@ -56,7 +57,7 @@ internal readonly struct DisseminationDigest : IEquatable<DisseminationDigest>
     public static bool operator !=(DisseminationDigest left, DisseminationDigest right) => !left.Equals(right);
 }
 
-[GenerateSerializer]
+[GenerateSerializer, Immutable]
 internal sealed class DisseminationValue
 {
     [Id(0)]
@@ -69,40 +70,40 @@ internal sealed class DisseminationValue
     public DateTimeOffset ExpiresAt { get; init; }
 
     [Id(3)]
-    public byte[] Payload { get; init; } = Array.Empty<byte>();
+    public ReadOnlyMemory<byte> Payload { get; init; } = Array.Empty<byte>();
 }
 
-[GenerateSerializer]
+[GenerateSerializer, Immutable]
 internal sealed class DisseminationGossipBatch
 {
     [Id(0)]
     public SiloAddress Sender { get; init; } = default!;
 
     [Id(1)]
-    public DisseminationValue[] Values { get; init; } = Array.Empty<DisseminationValue>();
+    public ImmutableArray<DisseminationValue> Values { get; init; } = [];
 }
 
-[GenerateSerializer]
+[GenerateSerializer, Immutable]
 internal sealed class DisseminationAntiEntropyRequest
 {
     [Id(0)]
     public SiloAddress Sender { get; init; } = default!;
 
     [Id(1)]
-    public string[] Topics { get; init; } = Array.Empty<string>();
+    public ImmutableArray<string> Topics { get; init; } = [];
 
     [Id(2)]
-    public DisseminationDigest[] Digests { get; init; } = Array.Empty<DisseminationDigest>();
+    public ImmutableArray<DisseminationDigest> Digests { get; init; } = [];
 }
 
-[GenerateSerializer]
+[GenerateSerializer, Immutable]
 internal sealed class DisseminationAntiEntropyResponse
 {
     [Id(0)]
     public SiloAddress Sender { get; init; } = default!;
 
     [Id(1)]
-    public DisseminationValue[] Values { get; init; } = Array.Empty<DisseminationValue>();
+    public ImmutableArray<DisseminationValue> Values { get; init; } = [];
 
     [Id(2)]
     public bool Truncated { get; init; }
