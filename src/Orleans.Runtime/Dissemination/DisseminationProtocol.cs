@@ -29,7 +29,7 @@ internal sealed partial class DisseminationProtocol(
     private readonly object _recentUpdateLock = new();
     private readonly object _topologyLock = new();
     private readonly Dictionary<SiloAddress, PendingGossipBatch> _pendingGossip = [];
-    private readonly Dictionary<ValueStreamKey, DateTimeOffset> _lastUpdateReceivedAt = [];
+    private readonly Dictionary<DigestKey, DateTimeOffset> _lastUpdateReceivedAt = [];
     private DateTimeOffset? _nextGossipFlushAt;
     private CancellationTokenSource? _gossipFlushWakeup;
     private bool _gossipFlushScheduled;
@@ -100,7 +100,7 @@ internal sealed partial class DisseminationProtocol(
         var digests = new List<DisseminationDigest>();
         var topics = new List<string>();
         var topicNames = new HashSet<string>(StringComparer.Ordinal);
-        var currentValueStreams = new HashSet<ValueStreamKey>();
+        var currentValueStreams = new HashSet<DigestKey>();
         var now = _timeProvider.GetUtcNow();
         foreach (var topic in _topics.Values)
         {
@@ -113,7 +113,7 @@ internal sealed partial class DisseminationProtocol(
             {
                 if (string.Equals(digest.Topic, topic.Name, StringComparison.Ordinal))
                 {
-                    currentValueStreams.Add(GetValueStreamKey(digest));
+                    currentValueStreams.Add(GetDigestKey(digest));
                     if (ShouldRequestAntiEntropy(topic, digest, now))
                     {
                         digests.Add(digest);
@@ -660,7 +660,7 @@ internal sealed partial class DisseminationProtocol(
 
     private bool ShouldRequestAntiEntropy(IDisseminationTopic topic, DisseminationDigest digest, DateTimeOffset now)
     {
-        var key = GetValueStreamKey(digest);
+        var key = GetDigestKey(digest);
         lock (_recentUpdateLock)
         {
             return !_lastUpdateReceivedAt.TryGetValue(key, out var lastReceived)
@@ -670,18 +670,18 @@ internal sealed partial class DisseminationProtocol(
 
     private void RecordRecentUpdate(DisseminationDigest digest)
     {
-        var key = GetValueStreamKey(digest);
+        var key = GetDigestKey(digest);
         lock (_recentUpdateLock)
         {
             _lastUpdateReceivedAt[key] = _timeProvider.GetUtcNow();
         }
     }
 
-    private void PruneRecentUpdates(HashSet<ValueStreamKey> currentValueStreams)
+    private void PruneRecentUpdates(HashSet<DigestKey> currentValueStreams)
     {
         lock (_recentUpdateLock)
         {
-            List<ValueStreamKey>? staleKeys = null;
+            List<DigestKey>? staleKeys = null;
             foreach (var key in _lastUpdateReceivedAt.Keys)
             {
                 if (!currentValueStreams.Contains(key))
@@ -1207,8 +1207,6 @@ internal sealed partial class DisseminationProtocol(
 
     private static DigestKey GetDigestKey(DisseminationDigest digest) => new(digest.Topic, digest.Key);
 
-    private static ValueStreamKey GetValueStreamKey(DisseminationDigest digest) => new(digest.Topic, digest.Key);
-
     public sealed record AntiEntropyState(
         FrozenDictionary<string, ImmutableArray<SiloAddress>> PeersByTopic,
         IReadOnlyList<string> Topics,
@@ -1221,8 +1219,6 @@ internal sealed partial class DisseminationProtocol(
     }
 
     private readonly record struct DigestKey(string Topic, string Key);
-
-    private readonly record struct ValueStreamKey(string Topic, string Key);
 
     private sealed class PendingGossipBatch(DateTimeOffset flushAfter)
     {
