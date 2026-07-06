@@ -256,7 +256,7 @@ internal sealed partial class DisseminationProtocol(
                     continue;
                 }
 
-                var localDigest = CreateDigest(requestedTopic, topicDigest);
+                var localDigest = new DisseminationDigest(requestedTopic.Name, topicDigest.Key, topicDigest.Version);
                 if (requestedTopic.CompareVersion(localDigest, remoteDigest) <= 0)
                 {
                     continue;
@@ -1132,9 +1132,6 @@ internal sealed partial class DisseminationProtocol(
         Values = values,
         Truncated = truncated,
     };
-
-    private static DisseminationDigest CreateDigest(IDisseminationTopic topic, DisseminationTopicDigest digest) =>
-        new(topic.Name, digest.Key, digest.Version);
 
     public sealed record AntiEntropyState(FrozenDictionary<string, AntiEntropyTopicState> Topics)
     {
