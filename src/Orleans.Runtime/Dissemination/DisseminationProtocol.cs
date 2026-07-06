@@ -930,21 +930,18 @@ internal sealed partial class DisseminationProtocol(
 
         lock (_gossipQueueLock)
         {
-            if (_pendingGossip.Count > 0)
+            foreach (var peer in _pendingGossip.Keys)
             {
-                foreach (var peer in _pendingGossip.Keys)
+                if (!IsCurrentParticipant(peer))
                 {
-                    if (!IsCurrentParticipant(peer))
-                    {
-                        _pendingGossip.Remove(peer);
-                    }
+                    _pendingGossip.Remove(peer);
                 }
+            }
 
-                if (_pendingGossip.Count == 0)
-                {
-                    _nextGossipFlushAt = null;
-                    _gossipFlushWakeup?.Cancel();
-                }
+            if (_pendingGossip.Count == 0)
+            {
+                _nextGossipFlushAt = null;
+                _gossipFlushWakeup?.Cancel();
             }
         }
 
