@@ -516,7 +516,6 @@ internal sealed partial class DisseminationProtocol(
         var result = new List<(SiloAddress Peer, ImmutableArray<DisseminationValue> Values)>();
         lock (_gossipQueueLock)
         {
-            List<SiloAddress>? drainedPeers = null;
             foreach (var (peer, pending) in _pendingGossip)
             {
                 if (!force && pending.FlushAfter > now)
@@ -524,16 +523,8 @@ internal sealed partial class DisseminationProtocol(
                     continue;
                 }
 
-                (drainedPeers ??= []).Add(peer);
+                _pendingGossip.Remove(peer);
                 result.Add((peer, [.. pending.Values.Values]));
-            }
-
-            if (drainedPeers is not null)
-            {
-                foreach (var peer in drainedPeers)
-                {
-                    _pendingGossip.Remove(peer);
-                }
             }
         }
 
@@ -681,23 +672,12 @@ internal sealed partial class DisseminationProtocol(
     {
         lock (_recentUpdateLock)
         {
-            List<DigestKey>? staleKeys = null;
             foreach (var key in _lastUpdateReceivedAt.Keys)
             {
                 if (!currentValueStreams.Contains(key))
                 {
-                    (staleKeys ??= []).Add(key);
+                    _lastUpdateReceivedAt.Remove(key);
                 }
-            }
-
-            if (staleKeys is null)
-            {
-                return;
-            }
-
-            foreach (var key in staleKeys)
-            {
-                _lastUpdateReceivedAt.Remove(key);
             }
         }
     }
@@ -939,23 +919,11 @@ internal sealed partial class DisseminationProtocol(
 
         lock (_failureLock)
         {
-            if (_failureBackoffUntil.Count > 0)
+            foreach (var (peer, until) in _failureBackoffUntil)
             {
-                List<SiloAddress>? peersToRemove = null;
-                foreach (var (peer, until) in _failureBackoffUntil)
+                if (until <= now || !IsCurrentParticipant(peer))
                 {
-                    if (until <= now || !IsCurrentParticipant(peer))
-                    {
-                        (peersToRemove ??= []).Add(peer);
-                    }
-                }
-
-                if (peersToRemove is not null)
-                {
-                    foreach (var peer in peersToRemove)
-                    {
-                        _failureBackoffUntil.Remove(peer);
-                    }
+                    _failureBackoffUntil.Remove(peer);
                 }
             }
         }
@@ -964,18 +932,9 @@ internal sealed partial class DisseminationProtocol(
         {
             if (_pendingGossip.Count > 0)
             {
-                List<SiloAddress>? peersToRemove = null;
                 foreach (var peer in _pendingGossip.Keys)
                 {
                     if (!IsCurrentParticipant(peer))
-                    {
-                        (peersToRemove ??= []).Add(peer);
-                    }
-                }
-
-                if (peersToRemove is not null)
-                {
-                    foreach (var peer in peersToRemove)
                     {
                         _pendingGossip.Remove(peer);
                     }
