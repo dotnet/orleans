@@ -467,7 +467,7 @@ public class DisseminationProtocolTests
             });
 
             var state = protocol.CreateAntiEntropyState();
-            var peers = state.PeersByTopic[topic.Name];
+            var peers = state.Topics[topic.Name].Peers;
             var expectedCandidates = GetAntiEntropyCandidateIndexes(testCase.LocalIndex, testCase.Count, testCase.Fanout)
                 .Where(index => index != testCase.LocalIndex)
                 .Select(index => silos[index])
@@ -510,8 +510,8 @@ public class DisseminationProtocolTests
 
                 var state = protocol.CreateAntiEntropyState();
 
-                Assert.Equal(expectedFirst, state.PeersByTopic[firstTopic.Name]);
-                Assert.Equal(expectedSecond, state.PeersByTopic[secondTopic.Name]);
+                Assert.Equal(expectedFirst, state.Topics[firstTopic.Name].Peers);
+                Assert.Equal(expectedSecond, state.Topics[secondTopic.Name].Peers);
                 return;
             }
         }
@@ -587,18 +587,18 @@ public class DisseminationProtocolTests
         }, CancellationToken.None);
 
         var recentState = protocol.CreateAntiEntropyState();
-        Assert.Empty(recentState.Digests);
+        Assert.Empty(recentState.Topics);
         var recentResponses = await protocol.ExchangeAntiEntropy(recentState, CancellationToken.None);
         Assert.Empty(recentResponses);
         Assert.Empty(transport.AntiEntropyRequests);
 
         timeProvider.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromMilliseconds(1));
         var beforeCadenceState = protocol.CreateAntiEntropyState();
-        Assert.Empty(beforeCadenceState.Digests);
+        Assert.Empty(beforeCadenceState.Topics);
 
         timeProvider.Advance(TimeSpan.FromMilliseconds(1));
         var staleState = protocol.CreateAntiEntropyState();
-        var digest = Assert.Single(staleState.Digests);
+        var digest = Assert.Single(staleState.Topics[topic.Name].Digests);
         Assert.Equal(FakeTopic.DefaultKey, digest.Key);
     }
 
@@ -766,9 +766,11 @@ public class DisseminationProtocolTests
         var serializer = serviceProvider.GetRequiredService<Serializer>();
         var sourceManager = new FakeMembershipManager(baseSnapshot);
         var sourceTopic = CreateMembershipTopic(local, sourceManager, serializer);
-        var peerDigest = Assert.Single(sourceTopic.GetDigests());
+        var peerTopicDigest = Assert.Single(sourceTopic.GetDigests());
+        var peerDigest = new DisseminationDigest(sourceTopic.Name, peerTopicDigest.Key, peerTopicDigest.Version);
         sourceManager.CurrentSnapshot = updatedSnapshot;
-        var localDigest = Assert.Single(sourceTopic.GetDigests());
+        var localTopicDigest = Assert.Single(sourceTopic.GetDigests());
+        var localDigest = new DisseminationDigest(sourceTopic.Name, localTopicDigest.Key, localTopicDigest.Version);
 
         var value = await sourceTopic.GetValue(
             localDigest,
@@ -1205,16 +1207,16 @@ public class DisseminationProtocolTests
 
         public long GetVersion(string key) => _versions.TryGetValue(key, out var version) ? version : 0;
 
-        public IReadOnlyList<DisseminationDigest> GetDigests()
+        public IReadOnlyList<DisseminationTopicDigest> GetDigests()
         {
             var digests = _versions
-                .Select(entry => new DisseminationDigest(Name, entry.Key, entry.Value))
+                .Select(entry => new DisseminationTopicDigest(entry.Key, entry.Value))
                 .ToList();
             foreach (var key in ExpectedKeys)
             {
                 if (!_versions.ContainsKey(key))
                 {
-                    digests.Add(new DisseminationDigest(Name, key, long.MinValue));
+                    digests.Add(new DisseminationTopicDigest(key, long.MinValue));
                 }
             }
 
@@ -1374,14 +1376,15 @@ public class DisseminationProtocolTests
                 return new ModelRepairResponse(false, 0);
             }
 
+            var fullLocalDigest = new DisseminationDigest(_topic.Name, localDigest.Key, localDigest.Version);
             var peerDigest = new DisseminationDigest(_topic.Name, FakeTopic.DefaultKey, peerVersion);
-            if (_topic.CompareVersion(localDigest, peerDigest) <= 0)
+            if (_topic.CompareVersion(fullLocalDigest, peerDigest) <= 0)
             {
                 return new ModelRepairResponse(false, 0);
             }
 
             var value = await _topic.GetValue(
-                localDigest,
+                fullLocalDigest,
                 peerDigest,
                 CancellationToken.None);
             return value is null
