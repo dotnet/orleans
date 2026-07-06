@@ -71,30 +71,30 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic);
         topic.SetValue("obsolete", version: 10);
 
-        var unsupportedPayloadKind = new DisseminationValue
+        var mismatchedTopic = new DisseminationValue
         {
-            Digest = new DisseminationDigest(topic.Name, "unsupported", version: 1, payloadKind: "unsupported"),
+            Digest = new DisseminationDigest("other-topic", "unsupported", version: 1),
             Root = local,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = BitConverter.GetBytes(1L),
         };
         var expired = new DisseminationValue
         {
-            Digest = new DisseminationDigest(topic.Name, "expired", version: 1, FakeTopic.PayloadKind),
+            Digest = new DisseminationDigest(topic.Name, "expired", version: 1),
             Root = local,
             ExpiresAt = DateTimeOffset.UnixEpoch,
             Payload = BitConverter.GetBytes(1L),
         };
         var obsolete = topic.CreateItem(local, "obsolete", sequence: 5);
 
-        Assert.False(await protocol.Publish(topic.Name, unsupportedPayloadKind, [peer], CancellationToken.None));
+        Assert.False(await protocol.Publish(topic.Name, mismatchedTopic, [peer], CancellationToken.None));
         Assert.False(await protocol.Publish(topic.Name, expired, [peer], CancellationToken.None));
         Assert.False(await protocol.Publish(topic.Name, obsolete, [peer], CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
         Assert.Equal(
-            new[] { unsupportedPayloadKind.Digest, expired.Digest, obsolete.Digest },
+            new[] { mismatchedTopic.Digest, expired.Digest, obsolete.Digest },
             topic.FallbackDigests);
     }
 
@@ -178,6 +178,65 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task MembershipRefreshPrunesFailureBackoffForRemovedPeers()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var sendCount = 0;
+        transport.SendGossipHandler = (target, batch, cancellationToken) =>
+        {
+            if (++sendCount == 1)
+            {
+                throw new InvalidOperationException("peer failed before removal");
+            }
+
+            transport.GossipBatches.Add((target, batch));
+            return Task.CompletedTask;
+        };
+
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.FailureBackoff = TimeSpan.FromMinutes(1);
+            options.Overlay.FanOutFactor = static _ => 1;
+        }, new TestTimeProvider());
+
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), targetPeers: null, CancellationToken.None));
+        await protocol.FlushPendingGossip(CancellationToken.None);
+        Assert.Equal(1, sendCount);
+
+        transport.Peers.Remove(peer);
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), targetPeers: null, CancellationToken.None));
+
+        transport.Peers.Add(peer);
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "after-return", sequence: 3), targetPeers: null, CancellationToken.None));
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Equal(2, sendCount);
+        Assert.Single(transport.GossipBatches);
+    }
+
+    [Fact]
+    public async Task MembershipRefreshDropsPendingGossipForRemovedPeers()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 1);
+
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), targetPeers: null, CancellationToken.None));
+
+        transport.Peers.Remove(peer);
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), targetPeers: null, CancellationToken.None));
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Empty(transport.GossipBatches);
+    }
+
+    [Fact]
     public async Task ReceiveGossipForwardsOnlyToLocalTreeChildren()
     {
         var silos = Enumerable.Range(11111, 8).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
@@ -224,6 +283,30 @@ public class DisseminationProtocolTests
         var expectedChildren = GetForwardingTreeTargets(local, root, peers, fanout: 2, sender: root);
         Assert.Equal(expectedChildren.Count, transport.GossipBatches.Count);
         Assert.Equal(1, topic.ApplyCounts[item.Digest.Key]);
+    }
+
+    [Fact]
+    public async Task ReceiveGossipWithMissingRootRefreshesMembershipAndDoesNotForward()
+    {
+        var root = CreateSilo(11111);
+        var local = CreateSilo(11112);
+        var sender = CreateSilo(11113);
+        var peer = CreateSilo(11114);
+        var transport = new FakeTransport(local, sender, peer);
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
+
+        await protocol.ReceiveGossip(new DisseminationGossipBatch
+        {
+            Sender = sender,
+            Values = [item],
+        }, CancellationToken.None);
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Equal(1, topic.GetVersion(FakeTopic.DefaultKey));
+        Assert.Equal(1, transport.RefreshMembershipCallCount);
+        Assert.Empty(transport.GossipBatches);
     }
 
     [Fact]
@@ -423,7 +506,7 @@ public class DisseminationProtocolTests
             Topics = [topic.Name],
             Digests =
             [
-                new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 3, FakeTopic.PayloadKind),
+                new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 3),
             ],
         }, CancellationToken.None);
 
@@ -449,7 +532,7 @@ public class DisseminationProtocolTests
             Topics = [topic.Name],
             Digests =
             [
-                new DisseminationDigest(topic.Name, "requested", version: 3, FakeTopic.PayloadKind),
+                new DisseminationDigest(topic.Name, "requested", version: 3),
             ],
         }, CancellationToken.None);
 
@@ -530,7 +613,7 @@ public class DisseminationProtocolTests
         topic.SetValue(FakeTopic.DefaultKey, version: 1);
         var badRepairItem = new DisseminationValue
         {
-            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2, FakeTopic.PayloadKind),
+            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2),
             Root = peer,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = Array.Empty<byte>(),
@@ -561,7 +644,7 @@ public class DisseminationProtocolTests
 
         var badRepairItem = new DisseminationValue
         {
-            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2, FakeTopic.PayloadKind),
+            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2),
             Root = peer,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = Array.Empty<byte>(),
@@ -664,7 +747,9 @@ public class DisseminationProtocolTests
             CancellationToken.None);
 
         Assert.NotNull(value);
-        Assert.Equal(DisseminationTopicNames.MembershipSnapshotDiff, value.Digest.PayloadKind);
+        var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        Assert.NotNull(update.Diff);
+        Assert.Null(update.Snapshot);
         var receiverManager = new FakeMembershipManager(baseSnapshot);
         var receiverTopic = CreateMembershipTopic(peer, receiverManager, serializer);
         var result = await receiverTopic.ApplyValue(value, CancellationToken.None);
@@ -1060,9 +1145,7 @@ public class DisseminationProtocolTests
 
     private sealed class FakeTopic(SiloAddress localSilo, string name = "fake-topic") : IDisseminationTopic
     {
-        public const string PayloadKind = "fake";
         public const string DefaultKey = "value";
-        private static readonly HashSet<string> Kinds = new(StringComparer.Ordinal) { PayloadKind };
         private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
 
         public Dictionary<string, int> ApplyCounts { get; } = new(StringComparer.Ordinal);
@@ -1077,13 +1160,11 @@ public class DisseminationProtocolTests
 
         public DisseminationTopicOptions Options { get; } = new() { Enabled = true };
 
-        public IReadOnlySet<string> PayloadKinds => Kinds;
-
         public bool IsEnabled => true;
 
         public DisseminationValue CreateItem(SiloAddress root, string key, long sequence) => new()
         {
-            Digest = new DisseminationDigest(Name, key, sequence, PayloadKind),
+            Digest = new DisseminationDigest(Name, key, sequence),
             Root = root,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = BitConverter.GetBytes(sequence),
@@ -1098,13 +1179,13 @@ public class DisseminationProtocolTests
         public IReadOnlyList<DisseminationDigest> GetDigests()
         {
             var digests = _versions
-                .Select(entry => new DisseminationDigest(Name, entry.Key, entry.Value, PayloadKind))
+                .Select(entry => new DisseminationDigest(Name, entry.Key, entry.Value))
                 .ToList();
             foreach (var key in ExpectedKeys)
             {
                 if (!_versions.ContainsKey(key))
                 {
-                    digests.Add(new DisseminationDigest(Name, key, long.MinValue, PayloadKind));
+                    digests.Add(new DisseminationDigest(Name, key, long.MinValue));
                 }
             }
 
@@ -1114,8 +1195,7 @@ public class DisseminationProtocolTests
         public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
 
         public bool IsObsolete(DisseminationDigest digest) =>
-            !string.Equals(digest.PayloadKind, PayloadKind, StringComparison.Ordinal)
-            || (_versions.TryGetValue(digest.Key, out var version) && version > digest.Version);
+            _versions.TryGetValue(digest.Key, out var version) && version > digest.Version;
 
         public ValueTask<DisseminationValue?> GetValue(
             DisseminationDigest digest,
@@ -1151,7 +1231,7 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(DisseminationApplyResult.Applied);
         }
 
-        public ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken)
+        public ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken)
         {
             FallbackDigests.Add(digest);
             return ValueTask.CompletedTask;
@@ -1179,6 +1259,8 @@ public class DisseminationProtocolTests
 
         public SiloAddress LocalSilo => localSilo;
 
+        public int RefreshMembershipCallCount { get; private set; }
+
         public DisseminationMembership GetMembership()
         {
             var members = _peers.Append(localSilo).Distinct().Select(peer =>
@@ -1202,6 +1284,12 @@ public class DisseminationProtocolTests
                 .Select(static member => member.Peer)
                 .ToImmutableArray();
             return new DisseminationMembership(allMembers, activeMembers);
+        }
+
+        public Task RefreshMembership(CancellationToken cancellationToken)
+        {
+            RefreshMembershipCallCount++;
+            return Task.CompletedTask;
         }
 
         public Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken)
@@ -1255,7 +1343,7 @@ public class DisseminationProtocolTests
                 return new ModelRepairResponse(false, 0);
             }
 
-            var peerDigest = new DisseminationDigest(_topic.Name, FakeTopic.DefaultKey, peerVersion, FakeTopic.PayloadKind);
+            var peerDigest = new DisseminationDigest(_topic.Name, FakeTopic.DefaultKey, peerVersion);
             if (_topic.CompareVersion(localDigest, peerDigest) <= 0)
             {
                 return new ModelRepairResponse(false, 0);

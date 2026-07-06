@@ -20,11 +20,6 @@ internal sealed class MembershipDisseminationTopic(
 {
     private const string MembershipKey = "cluster";
     private const int MaxSnapshotHistory = 32;
-    private static readonly HashSet<string> SupportedPayloadKinds = new(StringComparer.Ordinal)
-    {
-        DisseminationTopicNames.MembershipSnapshot,
-        DisseminationTopicNames.MembershipSnapshotDiff,
-    };
     private readonly object _historyLock = new();
     private readonly SortedDictionary<long, MembershipTableSnapshot> _snapshotHistory = new();
 
@@ -34,20 +29,17 @@ internal sealed class MembershipDisseminationTopic(
 
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
 
-    public IReadOnlySet<string> PayloadKinds => SupportedPayloadKinds;
-
     public bool IsEnabled => Options.Enabled;
 
     public DisseminationValue CreateItem(SiloAddress origin, MembershipTableSnapshot snapshot)
     {
         RememberSnapshot(snapshot);
-        var payload = serializer.SerializeToArray(snapshot);
         return new DisseminationValue
         {
-            Digest = new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value, DisseminationTopicNames.MembershipSnapshot),
+            Digest = new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value),
             Root = origin,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
-            Payload = payload,
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }),
         };
     }
 
@@ -57,15 +49,14 @@ internal sealed class MembershipDisseminationTopic(
         RememberSnapshot(snapshot);
         return new[]
         {
-            new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value, DisseminationTopicNames.MembershipSnapshot),
+            new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value),
         };
     }
 
     public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
 
     public bool IsObsolete(DisseminationDigest digest) =>
-        !IsSupportedPayloadKind(digest.PayloadKind)
-        || digest.Key != MembershipKey
+        digest.Key != MembershipKey
         || membershipManager.CurrentSnapshot.Version.Value > digest.Version;
 
     public ValueTask<DisseminationValue?> GetValue(
@@ -73,8 +64,7 @@ internal sealed class MembershipDisseminationTopic(
         DisseminationDigest? peerDigest,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(digest.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
-            || digest.Key != MembershipKey)
+        if (digest.Key != MembershipKey)
         {
             return ValueTask.FromResult<DisseminationValue?>(null);
         }
@@ -103,17 +93,19 @@ internal sealed class MembershipDisseminationTopic(
             return DisseminationApplyResult.Rejected;
         }
 
-        if (string.Equals(value.Digest.PayloadKind, DisseminationTopicNames.MembershipSnapshotDiff, StringComparison.Ordinal))
+        var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        if (update.Diff is { } diff)
         {
-            return await ApplyDiff(value, cancellationToken);
+            return update.Snapshot is null
+                ? await ApplyDiff(diff, cancellationToken)
+                : DisseminationApplyResult.Rejected;
         }
 
-        if (!string.Equals(value.Digest.PayloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal))
+        if (update.Snapshot is not { } snapshot)
         {
             return DisseminationApplyResult.Rejected;
         }
 
-        var snapshot = serializer.Deserialize<MembershipTableSnapshot>(value.Payload);
         var currentVersion = membershipManager.CurrentSnapshot.Version;
         if (snapshot.Version < currentVersion)
         {
@@ -130,7 +122,7 @@ internal sealed class MembershipDisseminationTopic(
         return DisseminationApplyResult.Applied;
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken)
+    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken)
     {
         if (Options.FallbackEnabled)
         {
@@ -151,22 +143,19 @@ internal sealed class MembershipDisseminationTopic(
             value = default!;
             return false;
         }
-
         var diff = CreateDiff(baseSnapshot, snapshot);
-        var payload = serializer.SerializeToArray(diff);
         value = new DisseminationValue
         {
-            Digest = new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value, DisseminationTopicNames.MembershipSnapshotDiff),
+            Digest = new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value),
             Root = localSiloDetails.SiloAddress,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
-            Payload = payload,
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }),
         };
         return true;
     }
 
-    private async ValueTask<DisseminationApplyResult> ApplyDiff(DisseminationValue value, CancellationToken cancellationToken)
+    private async ValueTask<DisseminationApplyResult> ApplyDiff(MembershipTableSnapshotDiff diff, CancellationToken cancellationToken)
     {
-        var diff = serializer.Deserialize<MembershipTableSnapshotDiff>(value.Payload);
         var current = membershipManager.CurrentSnapshot;
         if (current.Version.Value > diff.Version.Value)
         {
@@ -269,10 +258,6 @@ internal sealed class MembershipDisseminationTopic(
         IAmAliveTime = iAmAliveTime,
     };
 
-    private static bool IsSupportedPayloadKind(string payloadKind) =>
-        string.Equals(payloadKind, DisseminationTopicNames.MembershipSnapshot, StringComparison.Ordinal)
-        || string.Equals(payloadKind, DisseminationTopicNames.MembershipSnapshotDiff, StringComparison.Ordinal);
-
     private static bool MembershipEntriesEqual(MembershipEntry left, MembershipEntry right) =>
         left.SiloAddress == right.SiloAddress
         && left.Status == right.Status
@@ -308,6 +293,16 @@ internal sealed class MembershipDisseminationTopic(
 
         return true;
     }
+}
+
+[GenerateSerializer, Immutable]
+internal sealed class MembershipTableSnapshotUpdate
+{
+    [Id(0)]
+    public MembershipTableSnapshot? Snapshot { get; init; }
+
+    [Id(1)]
+    public MembershipTableSnapshotDiff? Diff { get; init; }
 }
 
 [GenerateSerializer, Immutable]
