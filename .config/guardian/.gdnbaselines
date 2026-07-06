@@ -150,6 +150,111 @@
       "createdDate": "2024-08-02 00:42:13Z",
       "expirationDate": "2025-01-19 00:45:11Z",
       "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
+    },
+    "cabf6781f05e5d25c364458eaadda6629bf4612fb1b716cdb7c6ef25b28248e6": {
+      "signature": "cabf6781f05e5d25c364458eaadda6629bf4612fb1b716cdb7c6ef25b28248e6",
+      "alternativeSignatures": [
+        "646f2f7b87094a419f9fc5a2c101316f7dc70eaa70b95df3c139275533eea538"
+      ],
+      "target": "vswhere.2.6.7/tools/vswhere.exe",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2025-01-09 00:31:08Z",
+      "expirationDate": "2025-06-28 00:35:03Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+    },
+    "d08c7702b82da26b4796ed979da06bb3e5425d06a3c1e9e7f7b14c8d740390c8": {
+      "signature": "d08c7702b82da26b4796ed979da06bb3e5425d06a3c1e9e7f7b14c8d740390c8",
+      "alternativeSignatures": [
+        "65c0cfcf671599df8692063ff5ee1b3c77d016958ea772962c289b414139dae0"
+      ],
+      "target": "test/Benchmarks/bin/Release/net8.0/runtimes/win-arm64/native/capstone.dll",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2025-01-09 00:31:08Z",
+      "expirationDate": "2025-06-28 00:35:03Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+    },
+    "a5db0cc6cb155071fec6f71c852507035008468d7121284cc819f937e3247815": {
+      "signature": "a5db0cc6cb155071fec6f71c852507035008468d7121284cc819f937e3247815",
+      "alternativeSignatures": [
+        "52c415eb464471a05a07969512053498a175e487e9d85c8b831176b3b920a9fe"
+      ],
+      "target": "test/Benchmarks/bin/Release/net8.0/runtimes/win-x64/native/capstone.dll",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2025-01-09 00:31:08Z",
+      "expirationDate": "2025-06-28 00:35:03Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+    },
+    "446b34f6111339557b69440e43f772cf3c0eaf2072a048a5878eaf5ec52ced1b": {
+      "signature": "446b34f6111339557b69440e43f772cf3c0eaf2072a048a5878eaf5ec52ced1b",
+      "alternativeSignatures": [
+        "6cf662335bc501de4d47bea44af5021d502f5b87e944554c46377d5fee5faf43"
+      ],
+      "target": "test/Benchmarks/bin/Release/net8.0/runtimes/win-x86/native/capstone.dll",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2025-01-09 00:31:08Z",
+      "expirationDate": "2025-06-28 00:35:03Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+    },
+    "551d9c232b0582ea5586cc554c39e22e5765d7b5bab6463205daf12cc3bdc200": {
+      "signature": "551d9c232b0582ea5586cc554c39e22e5765d7b5bab6463205daf12cc3bdc200",
+      "alternativeSignatures": [
+        "90036af9a88461082f332bb6b7d21e76ea9f787723bab492be183e5fbcf888a9"
+      ],
+      "target": "test/Benchmarks.AdoNet/bin/Release/net8.0/runtimes/win-arm64/native/capstone.dll",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2025-01-09 00:31:08Z",
+      "expirationDate": "2025-06-28 00:35:03Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+    },
+    "5e2c7d0b68b6409f8d2e377d4080974a9557ba3c4d175e7031ebb6ea763a38cc": {
+      "signature": "5e2c7d0b68b6409f8d2e377d4080974a9557ba3c4d175e7031ebb6ea763a38cc",
+      "alternativeSignatures": [
+        "92400697d6a7c7a35f664f4c29345cfb3921c9b98d5f938cc1a42b3e498bbcc8"
+      ],
+      "target": "test/Benchmarks.AdoNet/bin/Release/net8.0/runtimes/win-x64/native/capstone.dll",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2025-01-09 00:31:08Z",
+      "expirationDate": "2025-06-28 00:35:03Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+    },
+    "f189723b12d346d27f95598ee97f8e6cdaf07dcaf450702476bfea91adc0f499": {
+      "signature": "f189723b12d346d27f95598ee97f8e6cdaf07dcaf450702476bfea91adc0f499",
+      "alternativeSignatures": [
+        "af70a99d4c41ae5cca1eb00158335851f2ec3cc18e07f79edc2d4004ea6a6bd2"
+      ],
+      "target": "test/Benchmarks.AdoNet/bin/Release/net8.0/runtimes/win-x86/native/capstone.dll",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2025-01-09 00:31:08Z",
+      "expirationDate": "2025-06-28 00:35:03Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
     }
   }
 }
