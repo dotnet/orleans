@@ -638,7 +638,7 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private FrozenDictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(IEnumerable<DisseminationDigest> digests)
+    private Dictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(IEnumerable<DisseminationDigest> digests)
     {
         var result = new Dictionary<DigestKey, DisseminationDigest>();
         foreach (var digest in digests)
@@ -655,7 +655,7 @@ internal sealed partial class DisseminationProtocol(
             }
         }
 
-        return result.ToFrozenDictionary();
+        return result;
     }
 
     private bool ShouldRequestAntiEntropy(IDisseminationTopic topic, DisseminationDigest digest, DateTimeOffset now)
