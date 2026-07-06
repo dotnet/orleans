@@ -29,7 +29,6 @@
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="coverlet.msbuild" Version="8.0.0" />
     <PackageVersion Include="CsCheck" Version="4.5.0" />
-    <PackageVersion Include="Microsoft.Accordant" Version="0.1.6" />
     <PackageVersion Include="FSharp.Core" Version="9.0.303" />
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
     <PackageVersion Include="Google.Protobuf" Version="3.33.5" />
@@ -139,6 +138,7 @@
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.Accordant" Version="0.1.6" />
     <PackageVersion Update="Azure.Core" Version="1.51.1" />
     <PackageVersion Update="Azure.Identity" Version="1.18.0" />
     <PackageVersion Update="Azure.Security.KeyVault.Secrets" Version="4.8.0" />
