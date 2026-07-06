@@ -715,6 +715,16 @@ public class DisseminationProtocolTests
         Assert.Equal(TimeSpan.FromSeconds(10), new ClusterMembershipOptions().Dissemination.ExpectedUpdateCadence);
     }
 
+    [Fact]
+    public void DisseminationOptionsUseBatchDefaults()
+    {
+        var options = new DisseminationOptions();
+
+        Assert.Equal(1024 * 1024, options.MaxBatchBytes);
+        Assert.Equal(8 * 1024, options.MaxBatchItems);
+        Assert.Equal(options.MaxBatchBytes, new DisseminationTopicOptions().MaxPayloadBytes);
+    }
+
     private static DisseminationProtocol CreateProtocol(
         FakeTransport transport,
         FakeTopic topic,
