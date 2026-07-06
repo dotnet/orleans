@@ -941,9 +941,18 @@ internal sealed partial class DisseminationProtocol(
         {
             if (_failureBackoffUntil.Count > 0)
             {
-                foreach (var (peer, until) in _failureBackoffUntil.ToArray())
+                List<SiloAddress>? peersToRemove = null;
+                foreach (var (peer, until) in _failureBackoffUntil)
                 {
                     if (until <= now || !IsCurrentParticipant(peer))
+                    {
+                        (peersToRemove ??= []).Add(peer);
+                    }
+                }
+
+                if (peersToRemove is not null)
+                {
+                    foreach (var peer in peersToRemove)
                     {
                         _failureBackoffUntil.Remove(peer);
                     }
@@ -955,9 +964,18 @@ internal sealed partial class DisseminationProtocol(
         {
             if (_pendingGossip.Count > 0)
             {
-                foreach (var peer in _pendingGossip.Keys.ToArray())
+                List<SiloAddress>? peersToRemove = null;
+                foreach (var peer in _pendingGossip.Keys)
                 {
                     if (!IsCurrentParticipant(peer))
+                    {
+                        (peersToRemove ??= []).Add(peer);
+                    }
+                }
+
+                if (peersToRemove is not null)
+                {
+                    foreach (var peer in peersToRemove)
                     {
                         _pendingGossip.Remove(peer);
                     }
