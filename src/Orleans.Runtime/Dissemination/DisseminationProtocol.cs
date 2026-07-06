@@ -97,11 +97,10 @@ internal sealed partial class DisseminationProtocol(
             return AntiEntropyState.Empty;
         }
 
-        var digests = new List<DisseminationDigest>();
-        var topics = new List<string>();
-        var topicNames = new HashSet<string>(StringComparer.Ordinal);
+        var topics = new Dictionary<string, AntiEntropyTopicState>(StringComparer.Ordinal);
         var currentValueStreams = new HashSet<DigestKey>();
         var now = _timeProvider.GetUtcNow();
+        var round = Interlocked.Increment(ref _antiEntropyRound);
         foreach (var topic in _topics.Values)
         {
             if (!topic.IsEnabled)
@@ -109,64 +108,57 @@ internal sealed partial class DisseminationProtocol(
                 continue;
             }
 
-            foreach (var digest in topic.GetDigests())
+            List<DisseminationTopicDigest>? topicDigests = null;
+            foreach (var topicDigest in topic.GetDigests())
             {
-                if (string.Equals(digest.Topic, topic.Name, StringComparison.Ordinal))
+                var digest = CreateDigest(topic, topicDigest);
+                currentValueStreams.Add(GetDigestKey(digest));
+                if (ShouldRequestAntiEntropy(topic, digest, now))
                 {
-                    currentValueStreams.Add(GetDigestKey(digest));
-                    if (ShouldRequestAntiEntropy(topic, digest, now))
-                    {
-                        digests.Add(digest);
-                        if (topicNames.Add(digest.Topic))
-                        {
-                            topics.Add(digest.Topic);
-                        }
-                    }
+                    (topicDigests ??= []).Add(topicDigest);
                 }
             }
+
+            if (topicDigests is null)
+            {
+                continue;
+            }
+
+            topicDigests.Sort(static (left, right) =>
+            {
+                var result = string.Compare(left.Key, right.Key, StringComparison.Ordinal);
+                return result != 0 ? result : left.Version.CompareTo(right.Version);
+            });
+
+            topics.Add(topic.Name, new AntiEntropyTopicState(
+                SelectAntiEntropyPeers(topic.Name, topic.MembershipScope, round),
+                [.. topicDigests]));
         }
 
         PruneRecentUpdates(currentValueStreams);
-        var requestedTopics = topics.ToArray();
-        var round = Interlocked.Increment(ref _antiEntropyRound);
-        return new AntiEntropyState(
-            GetAntiEntropyPeersByTopic(requestedTopics, round),
-            requestedTopics,
-            SortDigests(digests).ToArray());
+        return topics.Count == 0
+            ? AntiEntropyState.Empty
+            : new AntiEntropyState(topics.ToFrozenDictionary(StringComparer.Ordinal));
     }
 
     public async Task<IReadOnlyList<DisseminationAntiEntropyResponse>> ExchangeAntiEntropy(
         AntiEntropyState state,
         CancellationToken cancellationToken)
     {
-        if (state.PeersByTopic.Count == 0 || state.Topics.Count == 0 || state.Digests.Count == 0)
+        if (state.Topics.Count == 0)
         {
             return [];
         }
 
-        var digestsByTopic = new Dictionary<string, List<DisseminationDigest>>(StringComparer.Ordinal);
-        foreach (var digest in state.Digests)
-        {
-            if (!digestsByTopic.TryGetValue(digest.Topic, out var topicDigests))
-            {
-                topicDigests = [];
-                digestsByTopic.Add(digest.Topic, topicDigests);
-            }
-
-            topicDigests.Add(digest);
-        }
-
         var requestsByPeer = new Dictionary<SiloAddress, (List<string> Topics, List<DisseminationDigest> Digests)>();
-        foreach (var topicName in state.Topics)
+        foreach (var (topicName, topicState) in state.Topics)
         {
-            if (!state.PeersByTopic.TryGetValue(topicName, out var peers)
-                || peers.Length == 0
-                || !digestsByTopic.TryGetValue(topicName, out var topicDigests))
+            if (topicState.Peers.Length == 0 || topicState.Digests.Length == 0)
             {
                 continue;
             }
 
-            foreach (var peer in peers)
+            foreach (var peer in topicState.Peers)
             {
                 if (!requestsByPeer.TryGetValue(peer, out var pendingRequest))
                 {
@@ -175,7 +167,10 @@ internal sealed partial class DisseminationProtocol(
                 }
 
                 pendingRequest.Topics.Add(topicName);
-                pendingRequest.Digests.AddRange(topicDigests);
+                foreach (var digest in topicState.Digests)
+                {
+                    pendingRequest.Digests.Add(new DisseminationDigest(topicName, digest.Key, digest.Version));
+                }
             }
         }
 
@@ -253,8 +248,9 @@ internal sealed partial class DisseminationProtocol(
                 continue;
             }
 
-            foreach (var localDigest in requestedTopic.GetDigests())
+            foreach (var topicDigest in requestedTopic.GetDigests())
             {
+                var localDigest = CreateDigest(requestedTopic, topicDigest);
                 var digestKey = GetDigestKey(localDigest);
                 if (!remoteDigests.TryGetValue(digestKey, out var remoteDigest)
                     || requestedTopic.CompareVersion(localDigest, remoteDigest) <= 0)
@@ -680,22 +676,6 @@ internal sealed partial class DisseminationProtocol(
                 }
             }
         }
-    }
-
-    private FrozenDictionary<string, ImmutableArray<SiloAddress>> GetAntiEntropyPeersByTopic(
-        IReadOnlyList<string> topics,
-        long round)
-    {
-        var result = new Dictionary<string, ImmutableArray<SiloAddress>>(StringComparer.Ordinal);
-        foreach (var topicName in topics)
-        {
-            if (_topics.TryGetValue(topicName, out var topic) && topic.IsEnabled)
-            {
-                result[topicName] = SelectAntiEntropyPeers(topicName, topic.MembershipScope, round);
-            }
-        }
-
-        return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
     private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(string topicName, DisseminationMembershipScope membershipScope, long round)
@@ -1155,24 +1135,19 @@ internal sealed partial class DisseminationProtocol(
         Truncated = truncated,
     };
 
-    private static IEnumerable<DisseminationDigest> SortDigests(IEnumerable<DisseminationDigest> digests) =>
-        digests
-            .OrderBy(static digest => digest.Topic, StringComparer.Ordinal)
-            .ThenBy(static digest => digest.Key, StringComparer.Ordinal)
-            .ThenBy(static digest => digest.Version);
-
     private static DigestKey GetDigestKey(DisseminationDigest digest) => new(digest.Topic, digest.Key);
 
-    public sealed record AntiEntropyState(
-        FrozenDictionary<string, ImmutableArray<SiloAddress>> PeersByTopic,
-        IReadOnlyList<string> Topics,
-        IReadOnlyList<DisseminationDigest> Digests)
+    private static DisseminationDigest CreateDigest(IDisseminationTopic topic, DisseminationTopicDigest digest) =>
+        new(topic.Name, digest.Key, digest.Version);
+
+    public sealed record AntiEntropyState(FrozenDictionary<string, AntiEntropyTopicState> Topics)
     {
-        public static readonly AntiEntropyState Empty = new(
-            FrozenDictionary<string, ImmutableArray<SiloAddress>>.Empty,
-            [],
-            []);
+        public static readonly AntiEntropyState Empty = new(FrozenDictionary<string, AntiEntropyTopicState>.Empty);
     }
+
+    public readonly record struct AntiEntropyTopicState(
+        ImmutableArray<SiloAddress> Peers,
+        ImmutableArray<DisseminationTopicDigest> Digests);
 
     private readonly record struct DigestKey(string Topic, string Key);
 

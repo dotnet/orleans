@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +16,7 @@ internal interface IDisseminationTopic
 
     bool IsEnabled { get; }
 
-    IReadOnlyList<DisseminationDigest> GetDigests();
+    IReadOnlyList<DisseminationTopicDigest> GetDigests();
 
     int CompareVersion(DisseminationDigest left, DisseminationDigest right);
 
@@ -35,4 +36,33 @@ internal enum DisseminationMembershipScope
 {
     ActiveMembers,
     AllMembers,
+}
+
+internal readonly struct DisseminationTopicDigest : IEquatable<DisseminationTopicDigest>
+{
+    public DisseminationTopicDigest(string key, long version)
+    {
+        Key = key ?? string.Empty;
+        Version = version;
+    }
+
+    public string Key { get; }
+
+    public long Version { get; }
+
+    public bool Equals(DisseminationTopicDigest other) =>
+        string.Equals(Key, other.Key, StringComparison.Ordinal)
+        && Version == other.Version;
+
+    public override bool Equals(object? obj) => obj is DisseminationTopicDigest other && Equals(other);
+
+    public override int GetHashCode() => HashCode.Combine(
+        StringComparer.Ordinal.GetHashCode(Key ?? string.Empty),
+        Version);
+
+    public override string ToString() => $"{Key}/{Version}";
+
+    public static bool operator ==(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Equals(right);
+
+    public static bool operator !=(DisseminationTopicDigest left, DisseminationTopicDigest right) => !left.Equals(right);
 }
