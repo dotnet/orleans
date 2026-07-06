@@ -13,8 +13,6 @@ internal interface IDisseminationTopic
 
     DisseminationTopicOptions Options { get; }
 
-    IReadOnlySet<string> PayloadKinds { get; }
-
     bool IsEnabled { get; }
 
     IReadOnlyList<DisseminationDigest> GetDigests();
@@ -30,7 +28,7 @@ internal interface IDisseminationTopic
 
     ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken);
 
-    ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken);
+    ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken);
 }
 
 internal enum DisseminationMembershipScope

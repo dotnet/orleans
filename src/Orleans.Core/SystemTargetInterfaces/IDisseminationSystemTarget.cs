@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Immutable;
-using System.Threading.Tasks;
 using Orleans.Concurrency;
 
 namespace Orleans.Runtime;
@@ -16,12 +14,11 @@ internal interface IDisseminationSystemTarget : ISystemTarget
 [GenerateSerializer, Immutable]
 internal readonly struct DisseminationDigest : IEquatable<DisseminationDigest>
 {
-    public DisseminationDigest(string topic, string key, long version, string payloadKind)
+    public DisseminationDigest(string topic, string key, long version)
     {
         Topic = topic ?? string.Empty;
         Key = key ?? string.Empty;
         Version = version;
-        PayloadKind = payloadKind ?? string.Empty;
     }
 
     [Id(0)]
@@ -33,24 +30,19 @@ internal readonly struct DisseminationDigest : IEquatable<DisseminationDigest>
     [Id(2)]
     public long Version { get; }
 
-    [Id(3)]
-    public string PayloadKind { get; }
-
     public bool Equals(DisseminationDigest other) =>
         string.Equals(Topic, other.Topic, StringComparison.Ordinal)
         && string.Equals(Key, other.Key, StringComparison.Ordinal)
-        && Version == other.Version
-        && string.Equals(PayloadKind, other.PayloadKind, StringComparison.Ordinal);
+        && Version == other.Version;
 
     public override bool Equals(object? obj) => obj is DisseminationDigest other && Equals(other);
 
     public override int GetHashCode() => HashCode.Combine(
         StringComparer.Ordinal.GetHashCode(Topic ?? string.Empty),
         StringComparer.Ordinal.GetHashCode(Key ?? string.Empty),
-        Version,
-        StringComparer.Ordinal.GetHashCode(PayloadKind ?? string.Empty));
+        Version);
 
-    public override string ToString() => $"{Topic}/{Key}/{Version}/{PayloadKind}";
+    public override string ToString() => $"{Topic}/{Key}/{Version}";
 
     public static bool operator ==(DisseminationDigest left, DisseminationDigest right) => left.Equals(right);
 
@@ -64,7 +56,7 @@ internal sealed class DisseminationValue
     public DisseminationDigest Digest { get; init; }
 
     [Id(1)]
-    public SiloAddress Root { get; init; } = default!;
+    public required SiloAddress Root { get; init; }
 
     [Id(2)]
     public DateTimeOffset ExpiresAt { get; init; }
@@ -77,7 +69,7 @@ internal sealed class DisseminationValue
 internal sealed class DisseminationGossipBatch
 {
     [Id(0)]
-    public SiloAddress Sender { get; init; } = default!;
+    public required SiloAddress Sender { get; init; }
 
     [Id(1)]
     public ImmutableArray<DisseminationValue> Values { get; init; } = [];
@@ -87,7 +79,7 @@ internal sealed class DisseminationGossipBatch
 internal sealed class DisseminationAntiEntropyRequest
 {
     [Id(0)]
-    public SiloAddress Sender { get; init; } = default!;
+    public required SiloAddress Sender { get; init; }
 
     [Id(1)]
     public ImmutableArray<string> Topics { get; init; } = [];
@@ -100,7 +92,7 @@ internal sealed class DisseminationAntiEntropyRequest
 internal sealed class DisseminationAntiEntropyResponse
 {
     [Id(0)]
-    public SiloAddress Sender { get; init; } = default!;
+    public required SiloAddress Sender { get; init; }
 
     [Id(1)]
     public ImmutableArray<DisseminationValue> Values { get; init; } = [];

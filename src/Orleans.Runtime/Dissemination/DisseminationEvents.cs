@@ -19,7 +19,6 @@ internal static class DisseminationEvents
                 Peer = peer,
                 Key = digest.Key,
                 Version = digest.Version,
-                PayloadKind = digest.PayloadKind,
                 Result = result.ToString(),
                 PayloadBytes = payloadBytes,
                 Timestamp = DateTimeOffset.UtcNow,
@@ -37,7 +36,6 @@ internal static class DisseminationEvents
                 LocalSilo = localSilo,
                 Key = digest.Key,
                 Version = digest.Version,
-                PayloadKind = digest.PayloadKind,
                 Result = reason,
                 PayloadBytes = payloadBytes,
                 Timestamp = DateTimeOffset.UtcNow,
@@ -51,15 +49,13 @@ internal sealed class DisseminationValueEvent
 {
     public string Topic { get; init; } = string.Empty;
 
-    public SiloAddress LocalSilo { get; init; } = default!;
+    public required SiloAddress LocalSilo { get; init; }
 
     public SiloAddress? Peer { get; init; }
 
     public string Key { get; init; } = string.Empty;
 
     public long Version { get; init; }
-
-    public string PayloadKind { get; init; } = string.Empty;
 
     public string Result { get; init; } = string.Empty;
 
