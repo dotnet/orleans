@@ -9,7 +9,9 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using CsCheck;
+#if NET10_0_OR_GREATER
 using Microsoft.Accordant;
+#endif
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -706,6 +708,7 @@ public class DisseminationProtocolTests
         }
     }
 
+#if NET10_0_OR_GREATER
     [Fact]
     public async Task MonotonicDisseminationModelConformsToAccordantSpec()
     {
@@ -747,6 +750,7 @@ public class DisseminationProtocolTests
         var failures = results.Where(static result => !result.Success).ToArray();
         Assert.Empty(failures);
     }
+#endif
 
     [Fact]
     public async Task MembershipTopicReturnsAndAppliesDiffWhenPeerVersionIsRetained()
@@ -1132,6 +1136,7 @@ public class DisseminationProtocolTests
             System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
     }
 
+#if NET10_0_OR_GREATER
     private static Spec<MonotonicDisseminationState> CreateMonotonicDisseminationSpec()
     {
         var spec = new Spec<MonotonicDisseminationState>()
@@ -1179,6 +1184,7 @@ public class DisseminationProtocolTests
 
         return spec;
     }
+#endif
 
     private sealed class FakeTopic(SiloAddress localSilo, string name = "fake-topic") : IDisseminationTopic
     {
@@ -1361,6 +1367,7 @@ public class DisseminationProtocolTests
         };
     }
 
+#if NET10_0_OR_GREATER
     private sealed class MonotonicDisseminationHarness(SiloAddress localSilo)
     {
         private readonly FakeTopic _topic = new(localSilo);
@@ -1406,6 +1413,7 @@ public class DisseminationProtocolTests
             _ => ModelApplyResult.Rejected,
         };
     }
+#endif
 
     private sealed class FakeMembershipManager(MembershipTableSnapshot currentSnapshot) : IMembershipManager
     {
@@ -1480,6 +1488,7 @@ public class DisseminationProtocolTests
     }
 }
 
+#if NET10_0_OR_GREATER
 [State]
 public partial class MonotonicDisseminationState
 {
@@ -1497,3 +1506,4 @@ public enum ModelApplyResult
 public sealed record ModelApplyResponse(ModelApplyResult Result, long Version);
 
 public sealed record ModelRepairResponse(bool HasValue, long Version);
+#endif
