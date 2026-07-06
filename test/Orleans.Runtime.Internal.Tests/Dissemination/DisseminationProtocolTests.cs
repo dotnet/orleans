@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -532,11 +533,9 @@ public class DisseminationProtocolTests
         var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
         {
             Sender = peer,
-            Topics = [topic.Name],
-            Digests =
-            [
-                new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 3),
-            ],
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest(FakeTopic.DefaultKey, version: 3)),
         }, CancellationToken.None);
 
         var item = Assert.Single(response.Values);
@@ -558,11 +557,9 @@ public class DisseminationProtocolTests
         var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
         {
             Sender = peer,
-            Topics = [topic.Name],
-            Digests =
-            [
-                new DisseminationDigest(topic.Name, "requested", version: 3),
-            ],
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest("requested", version: 3)),
         }, CancellationToken.None);
 
         var item = Assert.Single(response.Values);
@@ -625,10 +622,11 @@ public class DisseminationProtocolTests
         Assert.Equal(7, topic.GetVersion(FakeTopic.DefaultKey));
         Assert.Empty(transport.GossipBatches);
         Assert.Single(transport.AntiEntropyRequests);
-        var digest = Assert.Single(transport.AntiEntropyRequests[0].Request.Digests);
+        var digestsByTopic = Assert.Single(transport.AntiEntropyRequests[0].Request.DigestsByTopic);
+        Assert.Equal(topic.Name, digestsByTopic.Key);
+        var digest = Assert.Single(digestsByTopic.Value);
         Assert.Equal(FakeTopic.DefaultKey, digest.Key);
         Assert.Equal(long.MinValue, digest.Version);
-        Assert.Equal(topic.Name, Assert.Single(transport.AntiEntropyRequests[0].Request.Topics));
     }
 
     [Fact]
@@ -883,6 +881,14 @@ public class DisseminationProtocolTests
 
     private static SiloAddress[] CreateSilos(int count) =>
         Enumerable.Range(11111, count).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
+
+    private static FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>> CreateAntiEntropyRequestDigests(
+        string topicName,
+        params DisseminationTopicDigest[] digests) =>
+        new Dictionary<string, ImmutableArray<DisseminationTopicDigest>>(StringComparer.Ordinal)
+        {
+            [topicName] = [.. digests],
+        }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static MembershipDisseminationTopic CreateMembershipTopic(
         SiloAddress local,

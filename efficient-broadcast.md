@@ -160,10 +160,10 @@ Anti-entropy periodically compares local digests with selected peers and transfe
 
 Current branch behavior:
 
-1. Enumerate enabled topics and their local `DisseminationDigest` values whose `(topic, key)` streams have not received a recent update.
+1. Enumerate enabled topics and their local `DisseminationTopicDigest` values whose `(topic, key)` streams have not received a recent update.
 2. Select repair peers per topic using that topic's membership scope.
-3. Send `DisseminationAntiEntropyRequest` containing requested topic names and stale local digests. If no stale digests remain for a peer, skip that peer for the round.
-4. The receiver maps remote digests by `(topic, key, payloadKind)`.
+3. Send `DisseminationAntiEntropyRequest` containing a per-topic map of stale local digests. If no stale digests remain for a peer, skip that peer for the round.
+4. The receiver maps remote digests by key within each requested topic.
 5. For each requested local digest key, if local state is newer than the requester digest, materialize a value.
 6. Return values up to `MaxBatchItems` and `MaxBatchBytes`, where `MaxBatchBytes` is the sum of payload byte lengths rather than exact serialized envelope size, setting `Truncated` if more values remain.
 7. The requester applies returned values locally.

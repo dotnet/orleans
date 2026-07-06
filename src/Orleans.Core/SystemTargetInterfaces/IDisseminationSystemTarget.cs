@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Orleans.Concurrency;
 
@@ -50,6 +51,38 @@ internal readonly struct DisseminationDigest : IEquatable<DisseminationDigest>
 }
 
 [GenerateSerializer, Immutable]
+internal readonly struct DisseminationTopicDigest : IEquatable<DisseminationTopicDigest>
+{
+    public DisseminationTopicDigest(string key, long version)
+    {
+        Key = key ?? string.Empty;
+        Version = version;
+    }
+
+    [Id(0)]
+    public string Key { get; }
+
+    [Id(1)]
+    public long Version { get; }
+
+    public bool Equals(DisseminationTopicDigest other) =>
+        string.Equals(Key, other.Key, StringComparison.Ordinal)
+        && Version == other.Version;
+
+    public override bool Equals(object? obj) => obj is DisseminationTopicDigest other && Equals(other);
+
+    public override int GetHashCode() => HashCode.Combine(
+        StringComparer.Ordinal.GetHashCode(Key ?? string.Empty),
+        Version);
+
+    public override string ToString() => $"{Key}/{Version}";
+
+    public static bool operator ==(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Equals(right);
+
+    public static bool operator !=(DisseminationTopicDigest left, DisseminationTopicDigest right) => !left.Equals(right);
+}
+
+[GenerateSerializer, Immutable]
 internal sealed class DisseminationValue
 {
     [Id(0)]
@@ -82,10 +115,8 @@ internal sealed class DisseminationAntiEntropyRequest
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public ImmutableArray<string> Topics { get; init; } = [];
-
-    [Id(2)]
-    public ImmutableArray<DisseminationDigest> Digests { get; init; } = [];
+    public FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>> DigestsByTopic { get; init; } =
+        FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>>.Empty;
 }
 
 [GenerateSerializer, Immutable]
