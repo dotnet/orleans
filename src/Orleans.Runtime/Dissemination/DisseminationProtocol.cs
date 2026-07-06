@@ -60,8 +60,8 @@ internal sealed partial class DisseminationProtocol(
         var root = item.Root;
         var topology = targetPeers is { Count: > 0 }
             ? BuildParticipantTopology(targetPeers, root, includeLocal: true)
-            : GetParticipantTopology(topic.MembershipScope);
-        if (!await EnsureRootParticipates(topology, root, cancellationToken))
+            : await GetParticipantTopologyForRouting(topic.MembershipScope, root, cancellationToken);
+        if (topology is null)
         {
             return false;
         }
@@ -217,36 +217,35 @@ internal sealed partial class DisseminationProtocol(
             return CreateAntiEntropyResponse([], truncated: false);
         }
 
-        var requestedTopics = GetRequestedTopics(request);
-        if (requestedTopics.Count == 0)
-        {
-            return CreateAntiEntropyResponse([], truncated: false);
-        }
-
         var remoteDigests = GetRemoteDigestMap(request.Digests);
         var values = new List<DisseminationValue>();
         var byteCount = 0;
         var truncated = false;
         var options = _options.CurrentValue;
 
-        foreach (var requestedTopic in requestedTopics.Values.OrderBy(static topic => topic.Topic.Name, StringComparer.Ordinal))
+        foreach (var topicName in request.Topics)
         {
-            foreach (var localDigest in SortDigests(requestedTopic.Topic.GetDigests()))
+            if (!TryGetEnabledTopic(topicName, out var requestedTopic))
+            {
+                continue;
+            }
+
+            foreach (var localDigest in requestedTopic.GetDigests())
             {
                 var digestKey = GetDigestKey(localDigest);
                 if (!remoteDigests.TryGetValue(digestKey, out var remoteDigest)
-                    || requestedTopic.Topic.CompareVersion(localDigest, remoteDigest) <= 0)
+                    || requestedTopic.CompareVersion(localDigest, remoteDigest) <= 0)
                 {
                     continue;
                 }
 
-                var item = await requestedTopic.Topic.GetValue(
+                var item = await requestedTopic.GetValue(
                     localDigest,
                     remoteDigest,
                     cancellationToken);
                 if (item is null
-                    || !string.Equals(item.Digest.Topic, requestedTopic.Topic.Name, StringComparison.Ordinal)
-                    || !ValidatePayloadSize(requestedTopic.Topic, item))
+                    || !string.Equals(item.Digest.Topic, requestedTopic.Name, StringComparison.Ordinal)
+                    || !ValidatePayloadSize(requestedTopic, item))
                 {
                     continue;
                 }
@@ -312,8 +311,8 @@ internal sealed partial class DisseminationProtocol(
     private async Task Forward(DisseminationValue item, IDisseminationTopic topic, SiloAddress sender, CancellationToken cancellationToken)
     {
         var root = item.Root;
-        var topology = GetParticipantTopology(topic.MembershipScope);
-        if (!await EnsureRootParticipates(topology, root, cancellationToken))
+        var topology = await GetParticipantTopologyForRouting(topic.MembershipScope, root, cancellationToken);
+        if (topology is null)
         {
             return;
         }
@@ -621,20 +620,6 @@ internal sealed partial class DisseminationProtocol(
             SetPeerBackoff(peer);
             return null;
         }
-    }
-
-    private FrozenDictionary<string, RequestedTopic> GetRequestedTopics(DisseminationAntiEntropyRequest request)
-    {
-        var result = new Dictionary<string, RequestedTopic>(StringComparer.Ordinal);
-        foreach (var topicName in request.Topics)
-        {
-            if (TryGetEnabledTopic(topicName, out var topic))
-            {
-                result[topic.Name] = new RequestedTopic(topic);
-            }
-        }
-
-        return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
     private FrozenDictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(IEnumerable<DisseminationDigest> digests)
@@ -1051,19 +1036,21 @@ internal sealed partial class DisseminationProtocol(
         return new ParticipantTopology(participants, indices.ToFrozenDictionary());
     }
 
-    private async ValueTask<bool> EnsureRootParticipates(
-        ParticipantTopology topology,
+    private async ValueTask<ParticipantTopology?> GetParticipantTopologyForRouting(
+        DisseminationMembershipScope membershipScope,
         SiloAddress root,
         CancellationToken cancellationToken)
     {
+        var topology = GetParticipantTopology(membershipScope);
         if (topology.Indices.ContainsKey(root))
         {
-            return true;
+            return topology;
         }
 
         LogDebugDisseminationRootMissing(_logger, root);
         await _transport.RefreshMembership(cancellationToken);
-        return false;
+        topology = GetParticipantTopology(membershipScope);
+        return topology.Indices.ContainsKey(root) ? topology : null;
     }
 
     private bool TryGetEnabledTopic(string topicName, out IDisseminationTopic topic)
@@ -1188,8 +1175,6 @@ internal sealed partial class DisseminationProtocol(
 
     private readonly record struct ValueStreamKey(string Topic, string Key);
 
-    private readonly record struct RequestedTopic(IDisseminationTopic Topic);
-
     private readonly record struct QueuedGossipBatch(SiloAddress Peer, ImmutableArray<DisseminationValue> Values);
 
     private sealed class PendingGossipBatch(DateTimeOffset flushAfter)
@@ -1238,6 +1223,6 @@ internal sealed partial class DisseminationProtocol(
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Dissemination root {Root} is missing from local membership; refreshing membership and skipping routing.")]
+        Message = "Dissemination root {Root} is missing from local membership; refreshing membership before routing.")]
     private static partial void LogDebugDisseminationRootMissing(ILogger logger, SiloAddress root);
 }
