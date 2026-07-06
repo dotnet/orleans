@@ -2,7 +2,7 @@
 
 ## Status
 
-This document describes the current efficient-broadcast branch. The branch implements deterministic fixed-tree broadcast, digest-based anti-entropy repair, value-oriented wire contracts, status-and-age-prioritized topology ordering, dynamic fanout, per-topic membership scopes, level-aware randomized repair peer selection, membership snapshot diffs, manifest peer-fill, stale-only anti-entropy probes, and per-peer outbound gossip coalescing.
+This document describes the current efficient-broadcast branch. The branch implements deterministic fixed-tree broadcast, digest-based anti-entropy repair, value-oriented wire contracts, status-and-age-prioritized topology ordering, dynamic fanout, per-topic membership scopes, level-aware randomized repair peer selection, membership snapshot diffs, manifest peer-fill, stale-only anti-entropy probes, and per-peer outbound gossip coalescing. Dissemination is currently opt-in: the global `DisseminationOptions.Enabled` flag and each topic's `DisseminationTopicOptions.Enabled` flag default to `false`, so existing direct publication/gossip paths remain the default unless dissemination is explicitly enabled.
 
 ## Problem statement
 
@@ -18,8 +18,8 @@ The goal is to reduce routine fanout while preserving correctness backstops. The
 | Membership and fault detection are authoritative | Dissemination uses membership to choose peers and relies on existing liveness logic to remove failed silos. |
 | Values are monotonic per `(topic, key, payloadKind)` | Topic version comparison provides duplicate suppression. |
 | Topics own value semantics | The protocol handles routing, validation, and batching. Topics compare versions, materialize values, apply values, and perform fallback. |
-| Rolling upgrades are best-effort | New dissemination messages are attempted directly. Peers which cannot process them fail or reject them, and anti-entropy plus existing fallback paths repair after the temporary mismatch clears. |
-| Payloads are bounded | Oversize payloads are rejected and topic fallback is used. Batch responses are bounded by item count and bytes. |
+| Rolling upgrades are best-effort | New dissemination messages are attempted directly. Peers which cannot process them fail or reject them, and anti-entropy plus existing authoritative refresh paths repair after the temporary mismatch clears. |
+| Payloads are bounded | Oversize payloads are rejected and topic fallback is used during publication. Gossip and anti-entropy batches are bounded by item count and total payload bytes. |
 | Delivery is best-effort | Tree send failures are repaired by anti-entropy on its periodic cadence. |
 | Different runtime systems have different membership eligibility | The protocol maintains both active-only and all-member topologies and lets each topic choose. |
 
@@ -166,7 +166,7 @@ Current branch behavior:
 3. Send `DisseminationAntiEntropyRequest` containing requested topic names and stale local digests. If no stale digests remain for a peer, skip that peer for the round.
 4. The receiver maps remote digests by `(topic, key, payloadKind)`.
 5. For each requested local digest key, if local state is newer than the requester digest, materialize a value.
-6. Return values up to `MaxBatchItems` and `MaxBatchBytes`, setting `Truncated` if more values remain.
+6. Return values up to `MaxBatchItems` and `MaxBatchBytes`, where `MaxBatchBytes` is the sum of payload byte lengths rather than exact serialized envelope size, setting `Truncated` if more values remain.
 7. The requester applies returned values locally.
 
 Each topic has an `ExpectedUpdateCadence` used to decide when a `(topic, key)` stream is stale enough to probe. Deployment load statistics default to 2 seconds and membership snapshots default to 10 seconds. Recent tree or repair updates suppress digest probes for that stream until the cadence elapses. Omitted digests mean "not probing this stream in this round" rather than "missing this stream", which keeps anti-entropy from returning values for streams that are already receiving regular fast-path updates. When a topic knows that a stream should exist but has no local value, it can send an explicit low-watermark digest for that key; deployment load does this for active silos with missing local statistics.
@@ -180,7 +180,7 @@ Repair-peer selection is level-aware and randomized, using the same fixed topic 
 For each topic repair round:
 
 1. Build the same participant topology used by that topic.
-2. Derive a per-topic, per-round pseudo-random salt using lightweight randomness with enough variation to spread contacts over time.
+2. Derive a per-topic, per-round pseudo-random salt using lightweight deterministic hashing with enough variation to spread contacts over time.
 3. Map the local silo into the fixed forest's level-order indexes.
 4. Prefer candidates from the previous tree level, meaning one level closer to the virtual root. To keep fanout bounded, sample from a fanout-sized window in that previous level near the local node's parent group.
 5. If the local silo is in the top level, sample from the same top level excluding itself, so top-level nodes cross-check each other.
@@ -200,7 +200,7 @@ Implemented repair design:
 - `PayloadKind` distinguishes full snapshots from diff payloads, so receivers can validate and reject unsupported payloads.
 - A diff payload must include enough topic-specific base information for the receiver to decide whether it can apply the diff. If the receiver's local base is too old, too new, or missing, the topic rejects the diff and relies on anti-entropy or fallback to obtain a full value.
 
-Membership is the primary diff candidate. To support membership diffs effectively, the membership source should retain a bounded change history keyed by membership version. When a peer digest is within the retained range, the responder can send the changes from the peer's version to the current version. If the peer is too far behind or the change history has been truncated, the responder sends a full `MembershipTableSnapshot`.
+Membership is the primary diff candidate. The current implementation retains up to 32 membership snapshots keyed by membership version. When a peer digest is within the retained range, the responder sends the changes from the peer's version to the current version. If the peer is too far behind or the change history has been truncated, the responder sends a full `MembershipTableSnapshot`.
 
 Deployment load statistics already use small latest-wins full payloads. Cluster manifests use content-addressed pull and can fetch a whole cluster manifest from a peer when that is cheaper than many per-silo fetches.
 
@@ -232,8 +232,8 @@ Failure behavior:
 - Send and anti-entropy request failures back off the peer temporarily using `FailureBackoff`.
 - Publication queues tree sends without capability probing. If a peer cannot process a batch, the send fails or the receiver rejects unsupported values.
 - Non-active participants in the all-member tree can be unavailable while publication proceeds.
-- If dissemination is disabled, payloads are oversize, or topic fallback is required, the producer uses the existing topic-specific safety path.
-- Anti-entropy repairs missed values after transient send failures, temporary mixed-version mismatches, or short-lived membership skew.
+- If dissemination is disabled, publish-time validation fails, payloads are oversize, or topic fallback is required before queueing, the producer uses the existing topic-specific safety path.
+- After publication has queued successfully, tree-send failures, unsupported receivers, temporary mixed-version mismatches, or short-lived membership skew are repaired by anti-entropy and existing authoritative refresh paths rather than by immediate legacy send fallback.
 
 ## Algorithms and data structures
 
