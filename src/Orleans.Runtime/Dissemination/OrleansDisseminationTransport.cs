@@ -32,6 +32,9 @@ internal sealed class OrleansDisseminationTransport(
         return new DisseminationMembership(allMembers, activeMembers);
     }
 
+    public Task RefreshMembership(CancellationToken cancellationToken) =>
+        membershipManager.Refresh(targetVersion: null, cancellationToken);
+
     public Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken)
     {
         var target = grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, peer);

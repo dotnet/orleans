@@ -14,18 +14,11 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
     Serializer serializer,
     TimeProvider timeProvider) : IDisseminationTopic
 {
-    private static readonly HashSet<string> SupportedPayloadKinds = new(StringComparer.Ordinal)
-    {
-        DisseminationTopicNames.SiloRuntimeStatistics,
-    };
-
     public string Name => DisseminationTopicNames.DeploymentLoad;
 
     public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.ActiveMembers;
 
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
-
-    public IReadOnlySet<string> PayloadKinds => SupportedPayloadKinds;
 
     public bool IsEnabled => Options.Enabled;
 
@@ -34,7 +27,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         var payload = serializer.SerializeToArray(statistics);
         return new DisseminationValue
         {
-            Digest = new DisseminationDigest(Name, origin.ToParsableString(), statistics.DateTime.Ticks, DisseminationTopicNames.SiloRuntimeStatistics),
+            Digest = new DisseminationDigest(Name, origin.ToParsableString(), statistics.DateTime.Ticks),
             Root = origin,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
             Payload = payload,
@@ -53,8 +46,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
             digests.Add(new DisseminationDigest(
                 Name,
                 siloAddress.ToParsableString(),
-                version,
-                DisseminationTopicNames.SiloRuntimeStatistics));
+                version));
         }
 
         digests.Sort(static (left, right) => string.CompareOrdinal(left.Key, right.Key));
@@ -64,8 +56,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
     public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
 
     public bool IsObsolete(DisseminationDigest digest) =>
-        !string.Equals(digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
-        || !TryGetSiloAddress(digest.Key, out var siloAddress)
+        !TryGetSiloAddress(digest.Key, out var siloAddress)
         || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, digest.Version);
 
     public ValueTask<DisseminationValue?> GetValue(
@@ -73,8 +64,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         DisseminationDigest? peerDigest,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
-            || !TryGetSiloAddress(digest.Key, out var siloAddress)
+        if (!TryGetSiloAddress(digest.Key, out var siloAddress)
             || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
             || statistics.DateTime.Ticks < digest.Version)
         {
@@ -86,8 +76,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
 
     public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
     {
-        if (!string.Equals(value.Digest.PayloadKind, DisseminationTopicNames.SiloRuntimeStatistics, StringComparison.Ordinal)
-            || !TryGetSiloAddress(value.Digest.Key, out var siloAddress))
+        if (!TryGetSiloAddress(value.Digest.Key, out var siloAddress))
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
@@ -96,7 +85,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         return ValueTask.FromResult(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken)
+    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken)
     {
         if (Options.FallbackEnabled && TryGetSiloAddress(digest.Key, out var siloAddress))
         {

@@ -50,7 +50,6 @@ Each disseminated value is summarized by a payload-free `DisseminationDigest`:
 | `Topic` | Logical dissemination topic, such as membership or deployment load. |
 | `Key` | Topic-defined string identifying one monotonic value stream within the topic. Examples: `"cluster"` for membership and `SiloAddress.ToParsableString()` for load statistics. |
 | `Version` | Topic-defined monotonic version. The protocol treats it as opaque except for sorting; topics decide whether one digest is newer than another. |
-| `PayloadKind` | Concrete payload shape or encoding for this topic. It is included in digest comparison keys and receiver-side validation. Diff payloads use separate payload kinds. |
 
 The payload envelope is `DisseminationValue`:
 
@@ -197,7 +196,7 @@ Implemented repair design:
 - Anti-entropy pull can exchange diffs when a topic can produce and apply them.
 - The source of truth for a topic should be able to accept a peer digest and produce the smallest useful payload for that peer.
 - `DisseminationDigest.Version` remains the target value version after the payload is applied.
-- `PayloadKind` distinguishes full snapshots from diff payloads, so receivers can validate and reject unsupported payloads.
+- Membership diff and snapshot payloads are self-describing, so receivers can validate and reject unsupported payloads without widening the digest identity.
 - A diff payload must include enough topic-specific base information for the receiver to decide whether it can apply the diff. If the receiver's local base is too old, too new, or missing, the topic rejects the diff and relies on anti-entropy or fallback to obtain a full value.
 
 Membership is the primary diff candidate. The current implementation retains up to 32 membership snapshots keyed by membership version. When a peer digest is within the retained range, the responder sends the changes from the peer's version to the current version. If the peer is too far behind or the change history has been truncated, the responder sends a full `MembershipTableSnapshot`.
@@ -343,10 +342,10 @@ Other trade-offs and improvement areas:
 - Fixed-tree forwarding bounds each originator's direct send set, while top-level and high-level participants carry more relay traffic than leaves.
 - Status-and-age-prioritized ordering improves expected interior-node availability and value hit-rate while keeping ordering deterministic.
 - Dynamic fanout trades direct send count for tree depth: a 2-hop target gives faster convergence with larger fanout; a 3-hop target lowers per-node sends and adds one relay hop.
-- Diff repair reduces bytes for membership but adds history retention, new payload kinds, base-version validation, and fallback paths.
+- Diff repair reduces bytes for membership but adds history retention, self-describing payloads, base-version validation, and fallback paths.
 - Removing capability probing keeps the fast path cheap but means unsupported or temporarily mismatched peers discover incompatibility by rejecting or failing actual dissemination messages.
 - Deterministic trees require silos to mostly agree on membership. Anti-entropy repairs short-lived skew, but the fast path can duplicate or miss during disagreement.
 - The protocol scope is monotonic versioned values. Ordered event streams would need separate sequencing, retention, and acknowledgment semantics.
 - Manifest whole-cluster fetch can reduce request count but can also transfer more bytes than per-silo fetch in highly divergent clusters. Hash validation and fallback keep it safe.
 - Tree sends are coalesced per peer before transport. Future scheduling work could respect `MaxConcurrentSends` across flushes and enforce cross-topic fairness under sustained overload.
-- Once the protocol ships, wire-shape or payload-kind changes should become additive and versioned.
+- Once the protocol ships, wire-shape changes should become additive and versioned.
