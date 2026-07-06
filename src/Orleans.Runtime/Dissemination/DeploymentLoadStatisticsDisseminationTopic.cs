@@ -34,17 +34,16 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         };
     }
 
-    public IReadOnlyList<DisseminationDigest> GetDigests()
+    public IReadOnlyList<DisseminationTopicDigest> GetDigests()
     {
-        var digests = new List<DisseminationDigest>();
+        var digests = new List<DisseminationTopicDigest>();
         foreach (var siloAddress in deploymentLoadPublisher.GetActiveSilosForDissemination())
         {
             var version = deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
                 && !deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, statistics.DateTime.Ticks)
                     ? statistics.DateTime.Ticks
                     : long.MinValue;
-            digests.Add(new DisseminationDigest(
-                Name,
+            digests.Add(new DisseminationTopicDigest(
                 siloAddress.ToParsableString(),
                 version));
         }
