@@ -98,7 +98,9 @@ internal sealed partial class DisseminationProtocol(
         }
 
         var digests = new List<DisseminationDigest>();
-        var currentValueStreams = new List<ValueStreamKey>();
+        var topics = new List<string>();
+        var topicNames = new HashSet<string>(StringComparer.Ordinal);
+        var currentValueStreams = new HashSet<ValueStreamKey>();
         var now = _timeProvider.GetUtcNow();
         foreach (var topic in _topics.Values)
         {
@@ -115,20 +117,21 @@ internal sealed partial class DisseminationProtocol(
                     if (ShouldRequestAntiEntropy(topic, digest, now))
                     {
                         digests.Add(digest);
+                        if (topicNames.Add(digest.Topic))
+                        {
+                            topics.Add(digest.Topic);
+                        }
                     }
                 }
             }
         }
 
-        PruneRecentUpdates(currentValueStreams.ToFrozenSet());
-        var topics = digests
-            .Select(static digest => digest.Topic)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        PruneRecentUpdates(currentValueStreams);
+        var requestedTopics = topics.ToArray();
         var round = Interlocked.Increment(ref _antiEntropyRound);
         return new AntiEntropyState(
-            GetAntiEntropyPeersByTopic(topics, round),
-            topics,
+            GetAntiEntropyPeersByTopic(requestedTopics, round),
+            requestedTopics,
             SortDigests(digests).ToArray());
     }
 
@@ -681,16 +684,27 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private void PruneRecentUpdates(FrozenSet<ValueStreamKey> currentValueStreams)
+    private void PruneRecentUpdates(HashSet<ValueStreamKey> currentValueStreams)
     {
         lock (_recentUpdateLock)
         {
-            foreach (var key in _lastUpdateReceivedAt.Keys.ToArray())
+            List<ValueStreamKey>? staleKeys = null;
+            foreach (var key in _lastUpdateReceivedAt.Keys)
             {
                 if (!currentValueStreams.Contains(key))
                 {
-                    _lastUpdateReceivedAt.Remove(key);
+                    (staleKeys ??= []).Add(key);
                 }
+            }
+
+            if (staleKeys is null)
+            {
+                return;
+            }
+
+            foreach (var key in staleKeys)
+            {
+                _lastUpdateReceivedAt.Remove(key);
             }
         }
     }
