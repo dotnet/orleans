@@ -245,7 +245,7 @@ namespace Orleans
     }
 
     [GenerateSerializer]
-    public sealed partial class MembershipEntry
+    public sealed partial class MembershipEntry : System.ISpanFormattable, System.IFormattable
     {
         [Id(8)]
         public int FaultZone { get { throw null; } set { } }
@@ -283,6 +283,10 @@ namespace Orleans
         public void AddOrUpdateSuspector(Runtime.SiloAddress localSilo, System.DateTime voteTime, int maxVotes) { }
 
         public void AddSuspector(Runtime.SiloAddress suspectingSilo, System.DateTime suspectingTime) { }
+
+        string System.IFormattable.ToString(string format, System.IFormatProvider formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider provider) { throw null; }
 
         public string ToFullString() { throw null; }
 

@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// Represents a snapshot of cluster membership.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
-    public sealed class ClusterMembershipSnapshot
+    public sealed class ClusterMembershipSnapshot : ISpanFormattable
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterMembershipSnapshot"/> class.
@@ -135,11 +135,74 @@ namespace Orleans.Runtime
                     sb.Append(", ");
                 }
 
-                sb.Append(member.Value);
+                sb.Append($"{member.Value}");
             }
 
             sb.Append("] }}");
             return sb.ToString();
+        }
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        {
+            var written = 0;
+
+            if (!destination.TryWrite($"ClusterMembershipSnapshot {{ Version = {this.Version}, Members.Count = {this.Members.Count}, Members = [", out var length))
+            {
+                goto fail;
+            }
+
+            Advance(ref destination, ref written, length);
+
+            var first = true;
+            foreach (var member in this.Members)
+            {
+                if (first)
+                {
+                    first = false;
+                }
+                else if (!Append(ref destination, ref written, ", "))
+                {
+                    goto fail;
+                }
+
+                if (!destination.TryWrite($"{member.Value}", out length))
+                {
+                    goto fail;
+                }
+
+                Advance(ref destination, ref written, length);
+            }
+
+            if (!Append(ref destination, ref written, "] }}"))
+            {
+                goto fail;
+            }
+
+            charsWritten = written;
+            return true;
+
+        fail:
+            charsWritten = 0;
+            return false;
+
+            static bool Append(ref Span<char> destination, ref int written, ReadOnlySpan<char> value)
+            {
+                if (!value.TryCopyTo(destination))
+                {
+                    return false;
+                }
+
+                Advance(ref destination, ref written, value.Length);
+                return true;
+            }
+
+            static void Advance(ref Span<char> destination, ref int written, int length)
+            {
+                destination = destination[length..];
+                written += length;
+            }
         }
     }
 }

@@ -2737,7 +2737,7 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     [Immutable]
     [System.Text.Json.Serialization.JsonConverter(typeof(MembershipVersionConverter))]
-    public readonly partial struct MembershipVersion : System.IComparable<MembershipVersion>, System.IEquatable<MembershipVersion>
+    public readonly partial struct MembershipVersion : System.IComparable<MembershipVersion>, System.IEquatable<MembershipVersion>, System.ISpanFormattable, System.IFormattable
     {
         private readonly int _dummyPrimitive;
         public MembershipVersion(long version) { }
@@ -2766,6 +2766,10 @@ namespace Orleans.Runtime
         public static bool operator <(MembershipVersion left, MembershipVersion right) { throw null; }
 
         public static bool operator <=(MembershipVersion left, MembershipVersion right) { throw null; }
+
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public override readonly string ToString() { throw null; }
     }

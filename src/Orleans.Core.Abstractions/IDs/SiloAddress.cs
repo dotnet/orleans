@@ -238,7 +238,7 @@ namespace Orleans.Runtime
         /// <returns>String representation of this SiloAddress.</returns>
         public override string ToString() => $"{this}";
 
-        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => format == "H" ? ToStringWithHashCode() : ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
@@ -248,7 +248,10 @@ namespace Orleans.Runtime
             if (format.Length == 1 && format[0] == 'H')
             {
                 if (!destination[charsWritten..].TryWrite($"/x{GetConsistentHashCode():X8}", out var len))
+                {
+                    charsWritten = 0;
                     return false;
+                }
 
                 charsWritten += len;
             }

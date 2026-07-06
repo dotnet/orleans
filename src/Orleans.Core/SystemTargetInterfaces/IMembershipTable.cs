@@ -249,7 +249,7 @@ namespace Orleans
 
     [GenerateSerializer]
     [Serializable]
-    public sealed class MembershipEntry
+    public sealed class MembershipEntry : ISpanFormattable
     {
         /// <summary>
         /// The silo unique identity (ip:port:epoch). Used mainly by the Membership Protocol.
@@ -427,6 +427,11 @@ namespace Orleans
         }
 
         public override string ToString() => $"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}", out charsWritten);
 
         public string ToFullString()
         {

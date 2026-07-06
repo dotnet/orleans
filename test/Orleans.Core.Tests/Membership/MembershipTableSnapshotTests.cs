@@ -96,6 +96,20 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(unknownSilo));
         }
 
+        [Fact]
+        public void MembershipTableSnapshot_TryFormat_MatchesToString()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var snapshot = MembershipTableSnapshot.Create(Table(Entry(silo, SiloStatus.Active)));
+
+            AssertSpanFormattable(snapshot);
+            AssertSpanFormattable(snapshot.Version);
+            AssertSpanFormattable(snapshot.Entries[silo]);
+            AssertSpanFormattable(silo);
+            AssertSpanFormattable(silo, "H");
+            AssertSpanFormattable(MembershipVersion.MinValue);
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime = default)
@@ -125,6 +139,24 @@ namespace NonSilo.Tests.Membership
             }
 
             return new MembershipTableSnapshot(table.Version, entries.ToImmutable());
+        }
+
+        private static void AssertSpanFormattable(ISpanFormattable value, string format = null)
+        {
+            var expected = value.ToString(format, null);
+            var formatSpan = format is null ? default : format.AsSpan();
+            Span<char> destination = stackalloc char[expected.Length];
+
+            Assert.True(value.TryFormat(destination, out var charsWritten, formatSpan, null));
+            Assert.Equal(expected.Length, charsWritten);
+            Assert.Equal(expected, destination[..charsWritten].ToString());
+
+            if (expected.Length > 0)
+            {
+                Span<char> tooSmall = stackalloc char[expected.Length - 1];
+                Assert.False(value.TryFormat(tooSmall, out charsWritten, formatSpan, null));
+                Assert.Equal(0, charsWritten);
+            }
         }
 
     }

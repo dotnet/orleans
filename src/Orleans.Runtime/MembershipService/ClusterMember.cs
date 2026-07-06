@@ -7,7 +7,7 @@ namespace Orleans.Runtime
     /// Represents a cluster member.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
-    public sealed class ClusterMember : IEquatable<ClusterMember>
+    public sealed class ClusterMember : IEquatable<ClusterMember>, ISpanFormattable
     {                
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterMember"/> class.
@@ -63,5 +63,10 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public override string ToString() => $"{this.SiloAddress}/{this.Name}/{this.Status}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"{this.SiloAddress}/{this.Name}/{this.Status}", out charsWritten);
     }
 }
