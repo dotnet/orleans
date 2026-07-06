@@ -1,4 +1,5 @@
-using System.Collections.Immutable;
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Metadata;
@@ -38,13 +39,13 @@ namespace Orleans.Runtime
         public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary()
         {
             var manifest = _clusterManifestProvider.Current;
-            var hashes = ImmutableDictionary.CreateBuilder<SiloAddress, ManifestHash>();
+            var hashes = new Dictionary<SiloAddress, ManifestHash>();
             foreach (var siloManifest in manifest.Silos)
             {
                 hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
             }
 
-            return new(new ClusterManifestHashSummary(manifest.Version, hashes.ToImmutable()));
+            return new(new ClusterManifestHashSummary(manifest.Version, hashes.ToFrozenDictionary()));
         }
 
         public ValueTask<ManifestHash> GetSiloManifestHash() => new(_siloManifestHash);
