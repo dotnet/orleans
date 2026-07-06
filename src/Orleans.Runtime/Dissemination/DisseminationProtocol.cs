@@ -624,9 +624,9 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private Dictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(IEnumerable<DisseminationDigest> digests)
+    private Dictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(ImmutableArray<DisseminationDigest> digests)
     {
-        var result = new Dictionary<DigestKey, DisseminationDigest>();
+        var result = new Dictionary<DigestKey, DisseminationDigest>(digests.Length);
         foreach (var digest in digests)
         {
             if (!TryGetEnabledTopic(digest.Topic, out var topic))
