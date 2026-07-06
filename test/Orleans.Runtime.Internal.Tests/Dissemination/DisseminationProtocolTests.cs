@@ -310,6 +310,35 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task ReceiveGossipWithMissingRootForwardsAfterMembershipRefresh()
+    {
+        var local = CreateSilo(11111);
+        var sender = CreateSilo(11112);
+        var peer = CreateSilo(11113);
+        var root = CreateSilo(11120);
+        var transport = new FakeTransport(local, sender, peer);
+        transport.RefreshMembershipHandler = _ =>
+        {
+            transport.Peers.Add(root);
+            return Task.CompletedTask;
+        };
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
+
+        await protocol.ReceiveGossip(new DisseminationGossipBatch
+        {
+            Sender = sender,
+            Values = [item],
+        }, CancellationToken.None);
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Equal(1, topic.GetVersion(FakeTopic.DefaultKey));
+        Assert.Equal(1, transport.RefreshMembershipCallCount);
+        Assert.Equal(new[] { peer }, transport.GossipBatches.Select(static batch => batch.Peer));
+    }
+
+    [Fact]
     public async Task TreeRoutingInvalidatesCachedTopologyWhenActivePeersChange()
     {
         var local = CreateSilo(11115);
@@ -1257,6 +1286,8 @@ public class DisseminationProtocolTests
         public Func<SiloAddress, DisseminationAntiEntropyRequest, ValueTask<DisseminationAntiEntropyResponse>> ExchangeAntiEntropyHandler { get; set; } =
             static (peer, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse { Sender = peer });
 
+        public Func<CancellationToken, Task>? RefreshMembershipHandler { get; set; }
+
         public SiloAddress LocalSilo => localSilo;
 
         public int RefreshMembershipCallCount { get; private set; }
@@ -1289,7 +1320,7 @@ public class DisseminationProtocolTests
         public Task RefreshMembership(CancellationToken cancellationToken)
         {
             RefreshMembershipCallCount++;
-            return Task.CompletedTask;
+            return RefreshMembershipHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
         }
 
         public Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken)
