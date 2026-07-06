@@ -23,7 +23,7 @@ public sealed class DisseminationOptions
     public TimeSpan FailureBackoff { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Gets or sets the maximum serialized bytes in one dissemination batch.
+    /// Gets or sets the maximum total payload bytes in one dissemination batch.
     /// </summary>
     public int MaxBatchBytes { get; set; } = 64 * 1024;
 
