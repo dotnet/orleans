@@ -43,13 +43,13 @@ internal sealed class MembershipDisseminationTopic(
         };
     }
 
-    public IReadOnlyList<DisseminationDigest> GetDigests()
+    public IReadOnlyList<DisseminationTopicDigest> GetDigests()
     {
         var snapshot = membershipManager.CurrentSnapshot;
         RememberSnapshot(snapshot);
         return new[]
         {
-            new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value),
+            new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
         };
     }
 
