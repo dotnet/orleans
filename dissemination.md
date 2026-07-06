@@ -286,8 +286,7 @@ Digest and value shapes:
 internal readonly record struct DisseminationDigest(
     string Topic,
     string Key,
-    long Version,
-    string PayloadKind);
+    long Version);
 
 internal sealed class DisseminationValue
 {
@@ -304,8 +303,7 @@ internal sealed class DisseminationValue
 |---|---|
 | `Topic` | Logical namespace and semantic owner, such as `load` or `membership`. |
 | `Key` | Topic-local string key. Membership uses `"cluster"`; load statistics use the source silo's `SiloAddress.ToParsableString()` value. |
-| `Version` | Monotonic version for this `(Topic, Key, PayloadKind)` stream. Higher versions supersede lower versions according to topic comparison rules. |
-| `PayloadKind` | Concrete payload shape within the topic, allowing one topic to support multiple wire formats or value types. |
+| `Version` | Monotonic version for this `(Topic, Key)` stream. Higher versions supersede lower versions according to topic comparison rules. |
 
 `DisseminationValue` carries a digest plus routing and payload data:
 
@@ -612,7 +610,6 @@ internal sealed class DisseminationValueEvent
     public SiloAddress? Peer { get; init; }
     public string Key { get; init; }
     public long Version { get; init; }
-    public string PayloadKind { get; init; }
     public string Result { get; init; }
     public int PayloadBytes { get; init; }
     public DateTimeOffset Timestamp { get; init; }
