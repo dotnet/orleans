@@ -521,6 +521,12 @@ public class TypeConverter
             }
         }
 
+        // Enums carry no behavior and are serialized via their underlying integral type, so allow them absent an explicit opinion.
+        if (result is null && type.IsEnum)
+        {
+            result = true;
+        }
+
         if (type.IsConstructedGenericType)
         {
             foreach (var parameter in type.GenericTypeArguments)

@@ -132,6 +132,42 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_AllowsEnums_WhenAllFiltersHaveNoOpinion()
+        {
+            var converter = CreateConverter();
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsEnum));
+        }
+
+        [Fact]
+        public void TypeConverter_AllowsEnums_AsGenericArguments_WhenAllFiltersHaveNoOpinion()
+        {
+            var converter = CreateConverter();
+
+            AssertRoundTrips(converter, typeof(List<TypeConverterTestsEnum>));
+        }
+
+        [Fact]
+        public void TypeConverter_AllowsEnums_AsArrayElements_WhenAllFiltersHaveNoOpinion()
+        {
+            var converter = CreateConverter();
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsEnum[]));
+        }
+
+        [Fact]
+        public void TypeConverter_RejectsEnums_WhenATypeFilterExplicitlyDeniesThem()
+        {
+            var converter = CreateConverter(
+                typeFilters:
+                [
+                    new DelegateTypeFilter(type => type == typeof(TypeConverterTestsEnum) ? false : null)
+                ]);
+
+            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsEnum));
+        }
+
+        [Fact]
         public void TypeConverter_AllowsMetadataRegisteredTypes()
         {
             var converter = CreateConverter(configureOptions: options => options.Activators.Add(typeof(TypeConverterTestsMetadataAllowedTypeActivator)));
@@ -251,6 +287,13 @@ namespace Orleans.Serialization.UnitTests
 
     internal sealed class TypeConverterTestsAliasedType
     {
+    }
+
+    internal enum TypeConverterTestsEnum
+    {
+        None,
+        First,
+        Second,
     }
 
     internal sealed class TypeConverterTestsCompoundAliasedType
