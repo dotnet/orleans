@@ -525,9 +525,7 @@ internal sealed partial class DisseminationProtocol(
                 }
 
                 (drainedPeers ??= []).Add(peer);
-                result.Add((peer, [.. pending.Values.Values
-                    .OrderBy(static value => value.Digest.Topic, StringComparer.Ordinal)
-                    .ThenBy(static value => value.Digest.Key, StringComparer.Ordinal)]));
+                result.Add((peer, [.. pending.Values.Values]));
             }
 
             if (drainedPeers is not null)
