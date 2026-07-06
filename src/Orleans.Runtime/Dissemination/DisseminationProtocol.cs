@@ -382,7 +382,7 @@ internal sealed partial class DisseminationProtocol(
             pending.AddOrReplace(key, item);
             if (pending.Values.Count >= _options.CurrentValue.MaxBatchItems
                 || pending.ByteCount >= _options.CurrentValue.MaxBatchBytes
-                || CountPendingTopicValues(pending, item.Digest.Topic) >= topic.Options.MaxPendingItemCount)
+                || pending.GetTopicCount(item.Digest.Topic) >= topic.Options.MaxPendingItemCount)
             {
                 pending.FlushAfter = now;
             }
@@ -510,23 +510,32 @@ internal sealed partial class DisseminationProtocol(
 
     private DateTimeOffset GetNextPendingGossipFlushUnsafe() => _pendingGossip.Values.Min(static pending => pending.FlushAfter);
 
-    private List<QueuedGossipBatch> DrainPendingGossip(bool force)
+    private List<(SiloAddress Peer, ImmutableArray<DisseminationValue> Values)> DrainPendingGossip(bool force)
     {
         var now = _timeProvider.GetUtcNow();
-        var result = new List<QueuedGossipBatch>();
+        var result = new List<(SiloAddress Peer, ImmutableArray<DisseminationValue> Values)>();
         lock (_gossipQueueLock)
         {
-            foreach (var (peer, pending) in _pendingGossip.ToArray())
+            List<SiloAddress>? drainedPeers = null;
+            foreach (var (peer, pending) in _pendingGossip)
             {
                 if (!force && pending.FlushAfter > now)
                 {
                     continue;
                 }
 
-                _pendingGossip.Remove(peer);
-                result.Add(new QueuedGossipBatch(peer, [.. pending.Values.Values
+                (drainedPeers ??= []).Add(peer);
+                result.Add((peer, [.. pending.Values.Values
                     .OrderBy(static value => value.Digest.Topic, StringComparer.Ordinal)
                     .ThenBy(static value => value.Digest.Key, StringComparer.Ordinal)]));
+            }
+
+            if (drainedPeers is not null)
+            {
+                foreach (var peer in drainedPeers)
+                {
+                    _pendingGossip.Remove(peer);
+                }
             }
         }
 
@@ -534,7 +543,7 @@ internal sealed partial class DisseminationProtocol(
         return result;
     }
 
-    private async Task SendGossipBatches(List<QueuedGossipBatch> batches, CancellationToken cancellationToken)
+    private async Task SendGossipBatches(List<(SiloAddress Peer, ImmutableArray<DisseminationValue> Values)> batches, CancellationToken cancellationToken)
     {
         foreach (var queued in batches)
         {
@@ -585,20 +594,6 @@ internal sealed partial class DisseminationProtocol(
         {
             DisseminationInstruments.OnGossipSent(values, "tree");
         }
-    }
-
-    private static int CountPendingTopicValues(PendingGossipBatch pending, string topic)
-    {
-        var result = 0;
-        foreach (var value in pending.Values.Values)
-        {
-            if (string.Equals(value.Digest.Topic, topic, StringComparison.Ordinal))
-            {
-                result++;
-            }
-        }
-
-        return result;
     }
 
     private async ValueTask<bool> SafeSend(SiloAddress peer, Func<SiloAddress, Task> send)
@@ -1213,21 +1208,27 @@ internal sealed partial class DisseminationProtocol(
 
     private readonly record struct ValueStreamKey(string Topic, string Key);
 
-    private readonly record struct QueuedGossipBatch(SiloAddress Peer, ImmutableArray<DisseminationValue> Values);
-
     private sealed class PendingGossipBatch(DateTimeOffset flushAfter)
     {
+        private readonly Dictionary<string, int> _topicCounts = new(StringComparer.Ordinal);
+
         public Dictionary<DigestKey, DisseminationValue> Values { get; } = [];
 
         public DateTimeOffset FlushAfter { get; set; } = flushAfter;
 
         public int ByteCount { get; private set; }
 
+        public int GetTopicCount(string topic) => _topicCounts.GetValueOrDefault(topic);
+
         public void AddOrReplace(DigestKey key, DisseminationValue value)
         {
             if (Values.Remove(key, out var previous))
             {
                 ByteCount -= previous.Payload.Length;
+            }
+            else
+            {
+                _topicCounts[key.Topic] = GetTopicCount(key.Topic) + 1;
             }
 
             Values[key] = value;
