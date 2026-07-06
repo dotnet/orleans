@@ -145,13 +145,13 @@ internal sealed partial class DisseminationProtocol(
         {
             var requestedTopics = state.Topics
                 .Where(topic => state.PeersByTopic.TryGetValue(topic, out var topicPeers) && topicPeers.Contains(peer))
-                .ToArray();
+                .ToImmutableArray();
             if (requestedTopics.Length == 0)
             {
                 continue;
             }
 
-            var digests = state.Digests.Where(digest => requestedTopics.Contains(digest.Topic, StringComparer.Ordinal)).ToArray();
+            var digests = state.Digests.Where(digest => requestedTopics.Contains(digest.Topic, StringComparer.Ordinal)).ToImmutableArray();
             if (digests.Length == 0)
             {
                 continue;
@@ -553,7 +553,7 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private async Task SendGossipBatchCore(SiloAddress peer, DisseminationValue[] values, CancellationToken cancellationToken)
+    private async Task SendGossipBatchCore(SiloAddress peer, ImmutableArray<DisseminationValue> values, CancellationToken cancellationToken)
     {
         var batch = new DisseminationGossipBatch
         {
@@ -1112,7 +1112,7 @@ internal sealed partial class DisseminationProtocol(
         DisseminationInstruments.OnValueApplied(item.Digest.Topic, result);
     }
 
-    private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(DisseminationValue[] values, bool truncated) => new()
+    private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(ImmutableArray<DisseminationValue> values, bool truncated) => new()
     {
         Sender = _transport.LocalSilo,
         Values = values,
