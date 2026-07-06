@@ -69,7 +69,7 @@ internal sealed partial class DisseminationProtocol(
         RecordRecentUpdate(item.Digest);
         foreach (var peer in GetOriginatorTreeTargets(topology, root))
         {
-            EnqueueGossip(peer, item);
+            EnqueueGossip(peer, item, topic);
         }
 
         return true;
@@ -342,7 +342,7 @@ internal sealed partial class DisseminationProtocol(
 
         foreach (var peer in GetForwardingTreeTargets(topology, root, sender))
         {
-            EnqueueGossip(peer, item);
+            EnqueueGossip(peer, item, topic);
         }
     }
 
@@ -353,13 +353,8 @@ internal sealed partial class DisseminationProtocol(
         await SendGossipBatches(batches, cancellationToken);
     }
 
-    private void EnqueueGossip(SiloAddress peer, DisseminationValue item)
+    private void EnqueueGossip(SiloAddress peer, DisseminationValue item, IDisseminationTopic topic)
     {
-        if (!_topics.TryGetValue(item.Digest.Topic, out var topic))
-        {
-            return;
-        }
-
         var now = _timeProvider.GetUtcNow();
         var key = new DigestKey(item.Digest.Topic, item.Digest.Key);
         lock (_gossipQueueLock)
