@@ -141,29 +141,49 @@ internal sealed partial class DisseminationProtocol(
             return [];
         }
 
-        var peers = state.PeersByTopic.Values.SelectMany(static value => value).Distinct().ToArray();
-        var responses = new List<DisseminationAntiEntropyResponse>(peers.Length);
-        foreach (var peer in peers)
+        var digestsByTopic = new Dictionary<string, List<DisseminationDigest>>(StringComparer.Ordinal);
+        foreach (var digest in state.Digests)
         {
-            var requestedTopics = state.Topics
-                .Where(topic => state.PeersByTopic.TryGetValue(topic, out var topicPeers) && topicPeers.Contains(peer))
-                .ToImmutableArray();
-            if (requestedTopics.Length == 0)
+            if (!digestsByTopic.TryGetValue(digest.Topic, out var topicDigests))
+            {
+                topicDigests = [];
+                digestsByTopic.Add(digest.Topic, topicDigests);
+            }
+
+            topicDigests.Add(digest);
+        }
+
+        var requestsByPeer = new Dictionary<SiloAddress, (List<string> Topics, List<DisseminationDigest> Digests)>();
+        foreach (var topicName in state.Topics)
+        {
+            if (!state.PeersByTopic.TryGetValue(topicName, out var peers)
+                || peers.Length == 0
+                || !digestsByTopic.TryGetValue(topicName, out var topicDigests))
             {
                 continue;
             }
 
-            var digests = state.Digests.Where(digest => requestedTopics.Contains(digest.Topic, StringComparer.Ordinal)).ToImmutableArray();
-            if (digests.Length == 0)
+            foreach (var peer in peers)
             {
-                continue;
-            }
+                if (!requestsByPeer.TryGetValue(peer, out var pendingRequest))
+                {
+                    pendingRequest = ([], []);
+                    requestsByPeer.Add(peer, pendingRequest);
+                }
 
+                pendingRequest.Topics.Add(topicName);
+                pendingRequest.Digests.AddRange(topicDigests);
+            }
+        }
+
+        var responses = new List<DisseminationAntiEntropyResponse>(requestsByPeer.Count);
+        foreach (var (peer, pendingRequest) in requestsByPeer)
+        {
             var request = new DisseminationAntiEntropyRequest
             {
                 Sender = _transport.LocalSilo,
-                Topics = requestedTopics,
-                Digests = digests,
+                Topics = [.. pendingRequest.Topics],
+                Digests = [.. pendingRequest.Digests],
             };
 
             var response = await SafeRequest(peer, target => _transport.ExchangeAntiEntropy(target, request, cancellationToken));
