@@ -62,6 +62,43 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task PublishRejectsInvalidValuesBeforeQueueing()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic);
+        topic.SetValue("obsolete", version: 10);
+
+        var unsupportedPayloadKind = new DisseminationValue
+        {
+            Digest = new DisseminationDigest(topic.Name, "unsupported", version: 1, payloadKind: "unsupported"),
+            Root = local,
+            ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
+            Payload = BitConverter.GetBytes(1L),
+        };
+        var expired = new DisseminationValue
+        {
+            Digest = new DisseminationDigest(topic.Name, "expired", version: 1, FakeTopic.PayloadKind),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UnixEpoch,
+            Payload = BitConverter.GetBytes(1L),
+        };
+        var obsolete = topic.CreateItem(local, "obsolete", sequence: 5);
+
+        Assert.False(await protocol.Publish(topic.Name, unsupportedPayloadKind, [peer], CancellationToken.None));
+        Assert.False(await protocol.Publish(topic.Name, expired, [peer], CancellationToken.None));
+        Assert.False(await protocol.Publish(topic.Name, obsolete, [peer], CancellationToken.None));
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Empty(transport.GossipBatches);
+        Assert.Equal(
+            new[] { unsupportedPayloadKind.Digest, expired.Digest, obsolete.Digest },
+            topic.FallbackDigests);
+    }
+
+    [Fact]
     public async Task PublishAttemptsJoiningParticipantAndReliesOnSendBackoff()
     {
         var local = CreateSilo(11111);
@@ -328,6 +365,46 @@ public class DisseminationProtocolTests
             Assert.DoesNotContain(local, peers);
             Assert.All(peers, peer => Assert.Contains(peer, expectedCandidates));
         });
+    }
+
+    [Fact]
+    public void AntiEntropyPeerSelectionUsesTopicSpecificSalt()
+    {
+        const int fanout = 3;
+        const int peerCount = 1;
+        for (var count = 6; count < 32; count++)
+        {
+            var silos = CreateSilos(count);
+            for (var localIndex = 0; localIndex < silos.Length; localIndex++)
+            {
+                var local = silos[localIndex];
+                var expectedFirst = GetExpectedAntiEntropyPeers("topic-a", silos, localIndex, fanout, peerCount, round: 1);
+                var expectedSecond = GetExpectedAntiEntropyPeers("topic-b", silos, localIndex, fanout, peerCount, round: 1);
+                if (expectedFirst.SequenceEqual(expectedSecond))
+                {
+                    continue;
+                }
+
+                var transport = new FakeTransport(local, silos.Where(silo => !Equals(silo, local)).ToArray());
+                var firstTopic = new FakeTopic(local, "topic-a");
+                var secondTopic = new FakeTopic(local, "topic-b");
+                firstTopic.ExpectedKeys.Add(FakeTopic.DefaultKey);
+                secondTopic.ExpectedKeys.Add(FakeTopic.DefaultKey);
+                var protocol = CreateProtocol(transport, new IDisseminationTopic[] { firstTopic, secondTopic }, options =>
+                {
+                    options.Overlay.FanOutFactor = static _ => fanout;
+                    options.Overlay.AntiEntropyPeerCount = peerCount;
+                });
+
+                var state = protocol.CreateAntiEntropyState();
+
+                Assert.Equal(expectedFirst, state.PeersByTopic[firstTopic.Name]);
+                Assert.Equal(expectedSecond, state.PeersByTopic[secondTopic.Name]);
+                return;
+            }
+        }
+
+        throw new InvalidOperationException("The test did not find a topology where topic salt changes peer selection.");
     }
 
     [Fact]
@@ -642,6 +719,13 @@ public class DisseminationProtocolTests
         FakeTransport transport,
         FakeTopic topic,
         Action<DisseminationOptions>? configure = null,
+        TimeProvider? timeProvider = null) =>
+        CreateProtocol(transport, new IDisseminationTopic[] { topic }, configure, timeProvider);
+
+    private static DisseminationProtocol CreateProtocol(
+        FakeTransport transport,
+        IReadOnlyList<IDisseminationTopic> topics,
+        Action<DisseminationOptions>? configure = null,
         TimeProvider? timeProvider = null)
     {
         var options = new DisseminationOptions { Enabled = true };
@@ -649,7 +733,7 @@ public class DisseminationProtocolTests
         return new DisseminationProtocol(
             transport,
             new TestOptionsMonitor<DisseminationOptions>(options),
-            new[] { topic },
+            topics,
             timeProvider ?? TimeProvider.System,
             NullLogger<DisseminationProtocol>.Instance);
     }
@@ -837,6 +921,21 @@ public class DisseminationProtocolTests
         return Enumerable.Range(windowStart, windowEnd - windowStart);
     }
 
+    private static IReadOnlyList<SiloAddress> GetExpectedAntiEntropyPeers(
+        string topicName,
+        IReadOnlyList<SiloAddress> participants,
+        int localIndex,
+        int fanout,
+        int peerCount,
+        long round) =>
+        GetAntiEntropyCandidateIndexes(localIndex, participants.Count, fanout)
+            .Where(index => index != localIndex)
+            .OrderBy(index => GetRepairPeerScore(participants[index], topicName, round, localIndex))
+            .ThenBy(index => participants[index])
+            .Take(peerCount)
+            .Select(index => participants[index])
+            .ToArray();
+
     private static (int Start, int End) GetLevelRange(int index, int participantCount, int fanout)
     {
         var start = 0L;
@@ -848,6 +947,41 @@ public class DisseminationProtocolTests
         }
 
         return ((int)start, (int)Math.Min(participantCount, start + width));
+    }
+
+    private static ulong GetRepairPeerScore(SiloAddress peer, string topicName, long round, int localIndex)
+    {
+        var value = (ulong)(uint)peer.GetConsistentHashCode();
+        value ^= Mix(GetStableStringHash(topicName));
+        value ^= (ulong)round * 0x9E3779B97F4A7C15UL;
+        value ^= (ulong)(uint)localIndex << 32;
+        return Mix(value);
+    }
+
+    private static ulong GetStableStringHash(string value)
+    {
+        const ulong offsetBasis = 14695981039346656037UL;
+        const ulong prime = 1099511628211UL;
+        var hash = offsetBasis;
+        foreach (var ch in value)
+        {
+            hash ^= (byte)ch;
+            hash *= prime;
+            hash ^= (byte)(ch >> 8);
+            hash *= prime;
+        }
+
+        return hash;
+    }
+
+    private static ulong Mix(ulong value)
+    {
+        value ^= value >> 30;
+        value *= 0xBF58476D1CE4E5B9UL;
+        value ^= value >> 27;
+        value *= 0x94D049BB133111EBUL;
+        value ^= value >> 31;
+        return value;
     }
 
     private static GrainManifest CreateManifest(params (string Grain, string Key, string Value)[] grains)
@@ -914,7 +1048,7 @@ public class DisseminationProtocolTests
         return spec;
     }
 
-    private sealed class FakeTopic(SiloAddress localSilo) : IDisseminationTopic
+    private sealed class FakeTopic(SiloAddress localSilo, string name = "fake-topic") : IDisseminationTopic
     {
         public const string PayloadKind = "fake";
         public const string DefaultKey = "value";
@@ -925,7 +1059,9 @@ public class DisseminationProtocolTests
 
         public HashSet<string> ExpectedKeys { get; } = new(StringComparer.Ordinal);
 
-        public string Name => "fake-topic";
+        public List<DisseminationDigest> FallbackDigests { get; } = new();
+
+        public string Name => name;
 
         public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.ActiveMembers;
 
@@ -1005,7 +1141,11 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(DisseminationApplyResult.Applied);
         }
 
-        public ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask OnFallbackRequired(SiloAddress peer, DisseminationDigest digest, CancellationToken cancellationToken)
+        {
+            FallbackDigests.Add(digest);
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class FakeTransport(SiloAddress localSilo, params SiloAddress[] peers) : IDisseminationTransport
