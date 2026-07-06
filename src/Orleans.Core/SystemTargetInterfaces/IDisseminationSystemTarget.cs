@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Threading;
 using Orleans.Concurrency;
 
 namespace Orleans.Runtime;
@@ -7,9 +8,9 @@ namespace Orleans.Runtime;
 internal interface IDisseminationSystemTarget : ISystemTarget
 {
     [OneWay]
-    Task PushGossip(DisseminationGossipBatch batch);
+    Task PushGossip(DisseminationGossipBatch batch, CancellationToken cancellationToken);
 
-    Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request);
+    Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request, CancellationToken cancellationToken);
 }
 
 [GenerateSerializer, Immutable]

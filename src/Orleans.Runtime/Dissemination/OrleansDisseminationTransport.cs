@@ -38,7 +38,7 @@ internal sealed class OrleansDisseminationTransport(
     public Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken)
     {
         var target = grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, peer);
-        return target.PushGossip(batch).WaitAsync(cancellationToken);
+        return target.PushGossip(batch, cancellationToken);
     }
 
     public async ValueTask<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
@@ -47,7 +47,7 @@ internal sealed class OrleansDisseminationTransport(
         CancellationToken cancellationToken)
     {
         var target = grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, peer);
-        return await target.ExchangeAntiEntropy(request).WaitAsync(cancellationToken);
+        return await target.ExchangeAntiEntropy(request, cancellationToken);
     }
 
     private static bool IsDisseminationParticipant(SiloStatus status) =>
