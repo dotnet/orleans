@@ -1573,9 +1573,9 @@ namespace Orleans.Metadata
     [Immutable]
     public sealed partial class ClusterManifest
     {
-        public ClusterManifest(MajorMinorVersion version, System.Collections.Immutable.ImmutableDictionary<Runtime.SiloAddress, GrainManifest> silos) { }
-
         public ClusterManifest(MajorMinorVersion version, System.Collections.Immutable.ImmutableDictionary<Runtime.SiloAddress, GrainManifest> silos, System.Collections.Immutable.ImmutableArray<GrainManifest> allGrainManifests) { }
+
+        public ClusterManifest(MajorMinorVersion version, System.Collections.Immutable.ImmutableDictionary<Runtime.SiloAddress, GrainManifest> silos) { }
 
         [Id(2)]
         public System.Collections.Immutable.ImmutableArray<GrainManifest> AllGrainManifests { get { throw null; } }
@@ -1601,14 +1601,14 @@ namespace Orleans.Metadata
     {
         public GrainInterfaceProperties(System.Collections.Immutable.ImmutableDictionary<string, string> values) { }
 
+        [Id(0)]
+        public System.Collections.Immutable.ImmutableDictionary<string, string> Properties { get { throw null; } }
+
         public bool Equals(GrainInterfaceProperties? other) { throw null; }
 
         public override bool Equals(object? obj) { throw null; }
 
         public override int GetHashCode() { throw null; }
-
-        [Id(0)]
-        public System.Collections.Immutable.ImmutableDictionary<string, string> Properties { get { throw null; } }
 
         public string ToDetailedString() { throw null; }
     }
@@ -1619,17 +1619,17 @@ namespace Orleans.Metadata
     {
         public GrainManifest(System.Collections.Immutable.ImmutableDictionary<Runtime.GrainType, GrainProperties> grains, System.Collections.Immutable.ImmutableDictionary<Runtime.GrainInterfaceType, GrainInterfaceProperties> interfaces) { }
 
-        public bool Equals(GrainManifest? other) { throw null; }
-
-        public override bool Equals(object? obj) { throw null; }
-
-        public override int GetHashCode() { throw null; }
-
         [Id(1)]
         public System.Collections.Immutable.ImmutableDictionary<Runtime.GrainType, GrainProperties> Grains { get { throw null; } }
 
         [Id(0)]
         public System.Collections.Immutable.ImmutableDictionary<Runtime.GrainInterfaceType, GrainInterfaceProperties> Interfaces { get { throw null; } }
+
+        public bool Equals(GrainManifest? other) { throw null; }
+
+        public override bool Equals(object? obj) { throw null; }
+
+        public override int GetHashCode() { throw null; }
     }
 
     [GenerateSerializer]
@@ -1638,14 +1638,14 @@ namespace Orleans.Metadata
     {
         public GrainProperties(System.Collections.Immutable.ImmutableDictionary<string, string> values) { }
 
+        [Id(0)]
+        public System.Collections.Immutable.ImmutableDictionary<string, string> Properties { get { throw null; } }
+
         public bool Equals(GrainProperties? other) { throw null; }
 
         public override bool Equals(object? obj) { throw null; }
 
         public override int GetHashCode() { throw null; }
-
-        [Id(0)]
-        public System.Collections.Immutable.ImmutableDictionary<string, string> Properties { get { throw null; } }
 
         public string ToDetailedString() { throw null; }
     }

@@ -1977,10 +1977,10 @@ namespace Orleans.Serialization.Codecs
     [GenerateSerializer]
     public partial struct ImmutableDictionarySurrogate<TKey, TValue>
     {
-        [Id(0)]
-        public System.Collections.Generic.Dictionary<TKey, TValue> Values;
         [Id(1)]
         public System.Collections.Generic.IEqualityComparer<TValue> ValueComparer;
+        [Id(0)]
+        public System.Collections.Generic.Dictionary<TKey, TValue> Values;
     }
 
     [RegisterSerializer]
