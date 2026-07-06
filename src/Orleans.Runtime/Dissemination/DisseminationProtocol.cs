@@ -1161,7 +1161,7 @@ internal sealed partial class DisseminationProtocol(
 
         public void AddOrReplace(DigestKey key, DisseminationValue value)
         {
-            if (Values.Remove(key, out var previous))
+            if (Values.TryGetValue(key, out var previous))
             {
                 ByteCount -= previous.Payload.Length;
             }
