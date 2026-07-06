@@ -192,7 +192,7 @@ public class DisseminationProtocolTests
         await protocol.ReceiveGossip(new DisseminationGossipBatch
         {
             Sender = root,
-            Values = new[] { item },
+            Values = [item],
         }, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
@@ -214,7 +214,7 @@ public class DisseminationProtocolTests
         var batch = new DisseminationGossipBatch
         {
             Sender = root,
-            Values = new[] { item },
+            Values = [item],
         };
 
         await protocol.ReceiveGossip(batch, CancellationToken.None);
@@ -421,10 +421,10 @@ public class DisseminationProtocolTests
         {
             Sender = peer,
             Topics = [topic.Name],
-            Digests = new[]
-            {
+            Digests =
+            [
                 new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 3, FakeTopic.PayloadKind),
-            },
+            ],
         }, CancellationToken.None);
 
         var item = Assert.Single(response.Values);
@@ -503,7 +503,7 @@ public class DisseminationProtocolTests
         transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
             Sender = target,
-            Values = new[] { repairItem },
+            Values = [repairItem],
         });
 
         var state = protocol.CreateAntiEntropyState();
@@ -542,7 +542,7 @@ public class DisseminationProtocolTests
             new DisseminationAntiEntropyResponse
             {
                 Sender = peer,
-                Values = new[] { badRepairItem, goodRepairItem },
+                Values = [badRepairItem, goodRepairItem],
             },
         }, CancellationToken.None);
 
@@ -576,9 +576,9 @@ public class DisseminationProtocolTests
                 Sender = target,
                 Values = count switch
                 {
-                    1 => new[] { badRepairItem },
-                    2 => new[] { goodRepairItem },
-                    _ => Array.Empty<DisseminationValue>(),
+                    1 => [badRepairItem],
+                    2 => [goodRepairItem],
+                    _ => [],
                 },
             });
         };
@@ -1132,7 +1132,7 @@ public class DisseminationProtocolTests
 
         public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
         {
-            var version = BitConverter.ToInt64(value.Payload);
+            var version = BitConverter.ToInt64(value.Payload.Span);
             if (_versions.TryGetValue(value.Digest.Key, out var current))
             {
                 if (current > version)

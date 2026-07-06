@@ -239,8 +239,8 @@ internal sealed class MembershipDisseminationTopic(
         return new MembershipTableSnapshotDiff(
             baseSnapshot.Version,
             snapshot.Version,
-            updated.ToArray(),
-            removed.ToArray());
+            updated.ToImmutable(),
+            removed.ToImmutable());
     }
 
     private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
@@ -316,8 +316,8 @@ internal sealed class MembershipTableSnapshotDiff
     public MembershipTableSnapshotDiff(
         MembershipVersion baseVersion,
         MembershipVersion version,
-        MembershipEntry[] updatedEntries,
-        SiloAddress[] removedSilos)
+        ImmutableArray<MembershipEntry> updatedEntries,
+        ImmutableArray<SiloAddress> removedSilos)
     {
         BaseVersion = baseVersion;
         Version = version;
@@ -332,8 +332,8 @@ internal sealed class MembershipTableSnapshotDiff
     public MembershipVersion Version { get; }
 
     [Id(2)]
-    public MembershipEntry[] UpdatedEntries { get; }
+    public ImmutableArray<MembershipEntry> UpdatedEntries { get; }
 
     [Id(3)]
-    public SiloAddress[] RemovedSilos { get; }
+    public ImmutableArray<SiloAddress> RemovedSilos { get; }
 }
