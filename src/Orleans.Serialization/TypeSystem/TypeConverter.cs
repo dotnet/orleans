@@ -579,17 +579,30 @@ public class TypeConverter
 
         if (type.IsConstructedGenericType)
         {
-            foreach (var parameter in type.GenericTypeArguments)
+            var genericArgumentsResult = InspectGenericArguments(type);
+            if (genericArgumentsResult != true)
             {
-                result = Combine(result, InspectTypeCore(parameter));
-                if (result == false)
-                {
-                    return false;
-                }
+                return genericArgumentsResult;
             }
+
+            result = Combine(result, genericArgumentsResult);
         }
 
         return result;
+    }
+
+    private bool? InspectGenericArguments(Type type)
+    {
+        foreach (var parameter in type.GenericTypeArguments)
+        {
+            var result = InspectTypeCore(parameter);
+            if (result != true)
+            {
+                return result;
+            }
+        }
+
+        return true;
     }
 
     private bool? IsTypeAllowedByConfiguration(Type type)

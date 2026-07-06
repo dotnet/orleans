@@ -148,6 +148,22 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_DoesNotAllowGenericArgumentsJustBecauseGenericTypeDefinitionAssemblyIsAllowed()
+        {
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType<>).Assembly));
+
+            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsAssemblyAllowedType<UriBuilder>));
+        }
+
+        [Fact]
+        public void TypeConverter_DoesNotAllowGenericArgumentsJustBecauseSiblingGenericArgumentAssemblyIsAllowed()
+        {
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
+
+            AssertTypeNotAllowed(converter, typeof(Dictionary<TypeConverterTestsAssemblyAllowedType, UriBuilder>));
+        }
+
+        [Fact]
         public void TypeConverter_AllowsBuiltInAliasesUnderFailClosedBehavior()
         {
             var converter = CreateConverter();
@@ -334,6 +350,10 @@ namespace Orleans.Serialization.UnitTests
     }
 
     internal sealed class TypeConverterTestsAssemblyAllowedType
+    {
+    }
+
+    internal sealed class TypeConverterTestsAssemblyAllowedType<T>
     {
     }
 
