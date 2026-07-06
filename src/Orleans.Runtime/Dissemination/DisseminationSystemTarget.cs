@@ -15,13 +15,15 @@ internal sealed class DisseminationSystemTarget : SystemTarget, IDisseminationSy
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
-    public Task PushGossip(DisseminationGossipBatch batch) =>
-        this.RunOrQueueTask(() => _service.ReceiveGossip(batch, CancellationToken.None));
+    public Task PushGossip(DisseminationGossipBatch batch, CancellationToken cancellationToken) =>
+        this.RunOrQueueTask(() => _service.ReceiveGossip(batch, cancellationToken));
 
-    public async Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request)
+    public async Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
+        DisseminationAntiEntropyRequest request,
+        CancellationToken cancellationToken)
     {
         DisseminationAntiEntropyResponse? response = null;
-        await this.RunOrQueueTask(async () => response = await _service.ReceiveAntiEntropy(request, CancellationToken.None));
+        await this.RunOrQueueTask(async () => response = await _service.ReceiveAntiEntropy(request, cancellationToken));
         return response!;
     }
 
