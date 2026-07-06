@@ -11,6 +11,8 @@ internal interface IDisseminationTransport
 
     DisseminationMembership GetMembership();
 
+    Task RefreshMembership(CancellationToken cancellationToken);
+
     Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken);
 
     ValueTask<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
