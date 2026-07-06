@@ -111,9 +111,9 @@ internal sealed partial class DisseminationProtocol(
             List<DisseminationTopicDigest>? topicDigests = null;
             foreach (var topicDigest in topic.GetDigests())
             {
-                var digest = CreateDigest(topic, topicDigest);
-                currentValueStreams.Add(GetDigestKey(digest));
-                if (ShouldRequestAntiEntropy(topic, digest, now))
+                var digestKey = new DigestKey(topic.Name, topicDigest.Key);
+                currentValueStreams.Add(digestKey);
+                if (ShouldRequestAntiEntropy(topic, digestKey, now))
                 {
                     (topicDigests ??= []).Add(topicDigest);
                 }
@@ -250,10 +250,14 @@ internal sealed partial class DisseminationProtocol(
 
             foreach (var topicDigest in requestedTopic.GetDigests())
             {
+                var digestKey = new DigestKey(requestedTopic.Name, topicDigest.Key);
+                if (!remoteDigests.TryGetValue(digestKey, out var remoteDigest))
+                {
+                    continue;
+                }
+
                 var localDigest = CreateDigest(requestedTopic, topicDigest);
-                var digestKey = GetDigestKey(localDigest);
-                if (!remoteDigests.TryGetValue(digestKey, out var remoteDigest)
-                    || requestedTopic.CompareVersion(localDigest, remoteDigest) <= 0)
+                if (requestedTopic.CompareVersion(localDigest, remoteDigest) <= 0)
                 {
                     continue;
                 }
@@ -357,7 +361,7 @@ internal sealed partial class DisseminationProtocol(
         }
 
         var now = _timeProvider.GetUtcNow();
-        var key = GetDigestKey(item.Digest);
+        var key = new DigestKey(item.Digest.Topic, item.Digest.Key);
         lock (_gossipQueueLock)
         {
             if (!_pendingGossip.TryGetValue(peer, out var pending))
@@ -635,7 +639,7 @@ internal sealed partial class DisseminationProtocol(
                 continue;
             }
 
-            var key = GetDigestKey(digest);
+            var key = new DigestKey(digest.Topic, digest.Key);
             if (!result.TryGetValue(key, out var existing) || topic.CompareVersion(digest, existing) > 0)
             {
                 result[key] = digest;
@@ -645,9 +649,8 @@ internal sealed partial class DisseminationProtocol(
         return result;
     }
 
-    private bool ShouldRequestAntiEntropy(IDisseminationTopic topic, DisseminationDigest digest, DateTimeOffset now)
+    private bool ShouldRequestAntiEntropy(IDisseminationTopic topic, DigestKey key, DateTimeOffset now)
     {
-        var key = GetDigestKey(digest);
         lock (_recentUpdateLock)
         {
             return !_lastUpdateReceivedAt.TryGetValue(key, out var lastReceived)
@@ -657,7 +660,7 @@ internal sealed partial class DisseminationProtocol(
 
     private void RecordRecentUpdate(DisseminationDigest digest)
     {
-        var key = GetDigestKey(digest);
+        var key = new DigestKey(digest.Topic, digest.Key);
         lock (_recentUpdateLock)
         {
             _lastUpdateReceivedAt[key] = _timeProvider.GetUtcNow();
@@ -1134,8 +1137,6 @@ internal sealed partial class DisseminationProtocol(
         Values = values,
         Truncated = truncated,
     };
-
-    private static DigestKey GetDigestKey(DisseminationDigest digest) => new(digest.Topic, digest.Key);
 
     private static DisseminationDigest CreateDigest(IDisseminationTopic topic, DisseminationTopicDigest digest) =>
         new(topic.Name, digest.Key, digest.Version);
