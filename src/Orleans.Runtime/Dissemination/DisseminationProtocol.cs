@@ -1030,9 +1030,13 @@ internal sealed partial class DisseminationProtocol(
         bool includeLocal,
         bool preserveOrder)
     {
-        List<SiloAddress> orderedParticipants = [..preserveOrder
-            ? participants.Distinct()
-            : participants.Distinct().OrderBy(static participant => participant)];
+        var orderedParticipants = new List<SiloAddress>();
+        var seen = new HashSet<SiloAddress>();
+        foreach (var participant in participants)
+        {
+            AddParticipant(participant);
+        }
+
         if (includeLocal)
         {
             AddParticipant(_transport.LocalSilo);
@@ -1052,7 +1056,7 @@ internal sealed partial class DisseminationProtocol(
 
         void AddParticipant(SiloAddress participant)
         {
-            if (!orderedParticipants.Contains(participant))
+            if (seen.Add(participant))
             {
                 orderedParticipants.Add(participant);
             }
