@@ -692,13 +692,35 @@ internal sealed partial class DisseminationProtocol(
         }
 
         var fanout = GetFanOutFactor(participants.Length);
-        var candidates = GetAntiEntropyCandidateIndexes(localIndex, participants.Length, fanout);
-        return [.. candidates
-            .Where(index => index != localIndex)
-            .OrderBy(index => GetRepairPeerScore(participants[index], topicName, round, localIndex))
-            .ThenBy(index => participants[index])
-            .Take(options.AntiEntropyPeerCount)
-            .Select(index => participants[index])];
+        var candidates = new List<(SiloAddress Peer, ulong Score)>();
+        foreach (var index in GetAntiEntropyCandidateIndexes(localIndex, participants.Length, fanout))
+        {
+            if (index != localIndex)
+            {
+                var peer = participants[index];
+                candidates.Add((peer, GetRepairPeerScore(peer, topicName, round, localIndex)));
+            }
+        }
+
+        var count = Math.Min(options.AntiEntropyPeerCount, candidates.Count);
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        candidates.Sort(static (left, right) =>
+        {
+            var result = left.Score.CompareTo(right.Score);
+            return result != 0 ? result : left.Peer.CompareTo(right.Peer);
+        });
+
+        var result = ImmutableArray.CreateBuilder<SiloAddress>(count);
+        for (var i = 0; i < count; i++)
+        {
+            result.Add(candidates[i].Peer);
+        }
+
+        return result.MoveToImmutable();
     }
 
     private static IEnumerable<int> GetAntiEntropyCandidateIndexes(int localIndex, int participantCount, int fanout)
