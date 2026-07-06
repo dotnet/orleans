@@ -50,10 +50,10 @@ internal sealed partial class DisseminationProtocol(
             return false;
         }
 
-        if (!ValidatePayloadSize(topic, item))
+        if (GetPublishValidationFailureReason(topic, item) is { } reason)
         {
             await topic.OnFallbackRequired(default!, item.Digest, cancellationToken);
-            DisseminationInstruments.OnFallback(item.Digest.Topic, "oversize");
+            DisseminationInstruments.OnFallback(item.Digest.Topic, reason);
             return false;
         }
 
@@ -702,14 +702,14 @@ internal sealed partial class DisseminationProtocol(
         {
             if (_topics.TryGetValue(topicName, out var topic) && topic.IsEnabled)
             {
-                result[topicName] = SelectAntiEntropyPeers(topic.MembershipScope, round);
+                result[topicName] = SelectAntiEntropyPeers(topicName, topic.MembershipScope, round);
             }
         }
 
         return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(DisseminationMembershipScope membershipScope, long round)
+    private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(string topicName, DisseminationMembershipScope membershipScope, long round)
     {
         var options = _options.CurrentValue.Overlay;
         var topology = GetParticipantTopology(membershipScope, root: null, includeLocal: true);
@@ -728,7 +728,7 @@ internal sealed partial class DisseminationProtocol(
         var candidates = GetAntiEntropyCandidateIndexes(localIndex, participants.Length, fanout);
         return [.. candidates
             .Where(index => index != localIndex)
-            .OrderBy(index => GetRepairPeerScore(participants[index], round, localIndex))
+            .OrderBy(index => GetRepairPeerScore(participants[index], topicName, round, localIndex))
             .ThenBy(index => participants[index])
             .Take(options.AntiEntropyPeerCount)
             .Select(index => participants[index])];
@@ -780,12 +780,29 @@ internal sealed partial class DisseminationProtocol(
         return ((int)start, (int)Math.Min(participantCount, start + width));
     }
 
-    private static ulong GetRepairPeerScore(SiloAddress peer, long round, int localIndex)
+    private static ulong GetRepairPeerScore(SiloAddress peer, string topicName, long round, int localIndex)
     {
         var value = (ulong)(uint)peer.GetConsistentHashCode();
+        value ^= Mix(GetStableStringHash(topicName));
         value ^= (ulong)round * 0x9E3779B97F4A7C15UL;
         value ^= (ulong)(uint)localIndex << 32;
         return Mix(value);
+    }
+
+    private static ulong GetStableStringHash(string value)
+    {
+        const ulong offsetBasis = 14695981039346656037UL;
+        const ulong prime = 1099511628211UL;
+        var hash = offsetBasis;
+        foreach (var ch in value)
+        {
+            hash ^= (byte)ch;
+            hash *= prime;
+            hash ^= (byte)(ch >> 8);
+            hash *= prime;
+        }
+
+        return hash;
     }
 
     private static ulong Mix(ulong value)
@@ -1035,6 +1052,31 @@ internal sealed partial class DisseminationProtocol(
         }
 
         return true;
+    }
+
+    private string? GetPublishValidationFailureReason(IDisseminationTopic topic, DisseminationValue item)
+    {
+        if (!string.Equals(item.Digest.Topic, topic.Name, StringComparison.Ordinal))
+        {
+            return "topic";
+        }
+
+        if (!topic.PayloadKinds.Contains(item.Digest.PayloadKind))
+        {
+            return "payload-kind";
+        }
+
+        if (IsExpired(item))
+        {
+            return "expired";
+        }
+
+        if (topic.IsObsolete(item.Digest))
+        {
+            return "obsolete";
+        }
+
+        return ValidatePayloadSize(topic, item) ? null : "oversize";
     }
 
     private bool IsExpired(DisseminationValue item) => item.ExpiresAt <= _timeProvider.GetUtcNow();
