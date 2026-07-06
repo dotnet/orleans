@@ -184,7 +184,10 @@ internal sealed partial class DisseminationProtocol(
                 Digests = [.. pendingRequest.Digests],
             };
 
-            var response = await SafeRequest(peer, target => _transport.ExchangeAntiEntropy(target, request, cancellationToken));
+            var response = await SafeRequest(
+                peer,
+                cancellationToken,
+                target => _transport.ExchangeAntiEntropy(target, request, cancellationToken));
             if (response is null)
             {
                 continue;
@@ -573,15 +576,19 @@ internal sealed partial class DisseminationProtocol(
             Values = values,
         };
 
-        var sent = await SafeSend(peer, target => _transport.SendGossip(target, batch, cancellationToken));
+        var sent = await SafeSend(
+            peer,
+            cancellationToken,
+            target => _transport.SendGossip(target, batch, cancellationToken));
         if (sent)
         {
             DisseminationInstruments.OnGossipSent(values, "tree");
         }
     }
 
-    private async ValueTask<bool> SafeSend(SiloAddress peer, Func<SiloAddress, Task> send)
+    private async ValueTask<bool> SafeSend(SiloAddress peer, CancellationToken cancellationToken, Func<SiloAddress, Task> send)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (IsPeerBackedOff(peer))
         {
             return false;
@@ -593,6 +600,10 @@ internal sealed partial class DisseminationProtocol(
             ClearPeerBackoff(peer);
             return true;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             LogDebugDisseminationSendFailed(_logger, exception, peer);
@@ -603,8 +614,10 @@ internal sealed partial class DisseminationProtocol(
 
     private async ValueTask<DisseminationAntiEntropyResponse?> SafeRequest(
         SiloAddress peer,
+        CancellationToken cancellationToken,
         Func<SiloAddress, ValueTask<DisseminationAntiEntropyResponse>> request)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (IsPeerBackedOff(peer))
         {
             return null;
@@ -615,6 +628,10 @@ internal sealed partial class DisseminationProtocol(
             var response = await request(peer);
             ClearPeerBackoff(peer);
             return response;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
