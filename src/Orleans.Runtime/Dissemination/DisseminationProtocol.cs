@@ -150,7 +150,7 @@ internal sealed partial class DisseminationProtocol(
             return [];
         }
 
-        var requestsByPeer = new Dictionary<SiloAddress, (List<string> Topics, List<DisseminationDigest> Digests)>();
+        var requestsByPeer = new Dictionary<SiloAddress, Dictionary<string, ImmutableArray<DisseminationTopicDigest>>>();
         foreach (var (topicName, topicState) in state.Topics)
         {
             if (topicState.Peers.Length == 0 || topicState.Digests.Length == 0)
@@ -162,15 +162,11 @@ internal sealed partial class DisseminationProtocol(
             {
                 if (!requestsByPeer.TryGetValue(peer, out var pendingRequest))
                 {
-                    pendingRequest = ([], []);
+                    pendingRequest = new Dictionary<string, ImmutableArray<DisseminationTopicDigest>>(StringComparer.Ordinal);
                     requestsByPeer.Add(peer, pendingRequest);
                 }
 
-                pendingRequest.Topics.Add(topicName);
-                foreach (var digest in topicState.Digests)
-                {
-                    pendingRequest.Digests.Add(new DisseminationDigest(topicName, digest.Key, digest.Version));
-                }
+                pendingRequest[topicName] = topicState.Digests;
             }
         }
 
@@ -180,8 +176,7 @@ internal sealed partial class DisseminationProtocol(
             var request = new DisseminationAntiEntropyRequest
             {
                 Sender = _transport.LocalSilo,
-                Topics = [.. pendingRequest.Topics],
-                Digests = [.. pendingRequest.Digests],
+                DigestsByTopic = pendingRequest.ToFrozenDictionary(StringComparer.Ordinal),
             };
 
             var response = await SafeRequest(
@@ -193,7 +188,7 @@ internal sealed partial class DisseminationProtocol(
                 continue;
             }
 
-            DisseminationInstruments.OnAntiEntropyExchange("out", request.Digests.Length, response.Values.Length, response.Truncated);
+            DisseminationInstruments.OnAntiEntropyExchange("out", GetDigestCount(request.DigestsByTopic), response.Values.Length, response.Truncated);
             responses.Add(response);
         }
 
@@ -238,23 +233,28 @@ internal sealed partial class DisseminationProtocol(
             return CreateAntiEntropyResponse([], truncated: false);
         }
 
-        var remoteDigests = GetRemoteDigestMap(request.Digests);
+        var requestDigestCount = GetDigestCount(request.DigestsByTopic);
         var values = new List<DisseminationValue>();
         var byteCount = 0;
         var truncated = false;
         var options = _options.CurrentValue;
 
-        foreach (var topicName in request.Topics)
+        foreach (var (topicName, remoteTopicDigests) in request.DigestsByTopic)
         {
             if (!TryGetEnabledTopic(topicName, out var requestedTopic))
             {
                 continue;
             }
 
+            var remoteDigests = GetRemoteDigestMap(requestedTopic, remoteTopicDigests);
+            if (remoteDigests.Count == 0)
+            {
+                continue;
+            }
+
             foreach (var topicDigest in requestedTopic.GetDigests())
             {
-                var digestKey = new DigestKey(requestedTopic.Name, topicDigest.Key);
-                if (!remoteDigests.TryGetValue(digestKey, out var remoteDigest))
+                if (!remoteDigests.TryGetValue(topicDigest.Key, out var remoteDigest))
                 {
                     continue;
                 }
@@ -292,7 +292,7 @@ internal sealed partial class DisseminationProtocol(
             }
         }
 
-        DisseminationInstruments.OnAntiEntropyExchange("in", request.Digests.Length, values.Count, truncated);
+        DisseminationInstruments.OnAntiEntropyExchange("in", requestDigestCount, values.Count, truncated);
         return CreateAntiEntropyResponse([.. values], truncated);
     }
 
@@ -641,20 +641,17 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private Dictionary<DigestKey, DisseminationDigest> GetRemoteDigestMap(ImmutableArray<DisseminationDigest> digests)
+    private Dictionary<string, DisseminationDigest> GetRemoteDigestMap(
+        IDisseminationTopic topic,
+        ImmutableArray<DisseminationTopicDigest> digests)
     {
-        var result = new Dictionary<DigestKey, DisseminationDigest>(digests.Length);
-        foreach (var digest in digests)
+        var result = new Dictionary<string, DisseminationDigest>(digests.Length, StringComparer.Ordinal);
+        foreach (var topicDigest in digests)
         {
-            if (!TryGetEnabledTopic(digest.Topic, out var topic))
+            var digest = new DisseminationDigest(topic.Name, topicDigest.Key, topicDigest.Version);
+            if (!result.TryGetValue(topicDigest.Key, out var existing) || topic.CompareVersion(digest, existing) > 0)
             {
-                continue;
-            }
-
-            var key = new DigestKey(digest.Topic, digest.Key);
-            if (!result.TryGetValue(key, out var existing) || topic.CompareVersion(digest, existing) > 0)
-            {
-                result[key] = digest;
+                result[topicDigest.Key] = digest;
             }
         }
 
@@ -1171,6 +1168,17 @@ internal sealed partial class DisseminationProtocol(
         Values = values,
         Truncated = truncated,
     };
+
+    private static int GetDigestCount(FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>> digestsByTopic)
+    {
+        var result = 0;
+        foreach (var digests in digestsByTopic.Values)
+        {
+            result += digests.Length;
+        }
+
+        return result;
+    }
 
     public sealed record AntiEntropyState(FrozenDictionary<string, AntiEntropyTopicState> Topics)
     {
