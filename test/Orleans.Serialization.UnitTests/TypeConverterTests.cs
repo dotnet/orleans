@@ -126,6 +126,27 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_AddAllowedType_FormatsGenericArgumentsWithoutCompoundAliases()
+        {
+            var type = typeof(List<TypeConverterTestsAttributedCompoundAliasedType>);
+            var options = new TypeManifestOptions();
+            options.AddAllowedType(type);
+
+            Assert.DoesNotContain(options.AllowedTypes, allowedType => allowedType.Contains("type_converter_attributed_alias", StringComparison.Ordinal));
+
+            var converter = CreateConverter(
+                configureOptions: options =>
+                {
+                    options.AddAllowedType(type);
+                    options.CompoundTypeAliases
+                        .Add("type_converter_attributed_alias")
+                        .Add("v1", typeof(TypeConverterTestsAttributedCompoundAliasedType));
+                });
+
+            AssertRoundTrips(converter, type);
+        }
+
+        [Fact]
         public void TypeConverter_AllowsConfiguredAllowedAssemblies()
         {
             var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
@@ -145,6 +166,28 @@ namespace Orleans.Serialization.UnitTests
                 ]);
 
             AssertTypeNotAllowed(converter, typeof(TypeConverterTestsAssemblyAllowedType));
+        }
+
+        [Fact]
+        public void TypeConverter_RejectsAllowedAssemblyType_WhenTypeFilterDeniesIt()
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly),
+                typeFilters:
+                [
+                    new DelegateTypeFilter(type => type == typeof(TypeConverterTestsAssemblyAllowedType) ? false : null)
+                ]);
+
+            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsAssemblyAllowedType));
+        }
+
+        [Fact]
+        public void TypeConverter_DoesNotAllowTypesFromSpoofedAllowedAssemblyNames()
+        {
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
+            var formatted = $"{typeof(System.Text.StringBuilder).FullName},{CachedTypeResolver.GetName(typeof(TypeConverterTestsAssemblyAllowedType).Assembly)}";
+
+            Assert.Throws<InvalidOperationException>(() => converter.Parse(formatted));
         }
 
         [Fact]
@@ -396,6 +439,11 @@ namespace Orleans.Serialization.UnitTests
     }
 
     internal sealed class TypeConverterTestsCompoundAliasedWithComponentType
+    {
+    }
+
+    [global::Orleans.CompoundTypeAlias("type_converter_attributed_alias", "v1")]
+    internal sealed class TypeConverterTestsAttributedCompoundAliasedType
     {
     }
 

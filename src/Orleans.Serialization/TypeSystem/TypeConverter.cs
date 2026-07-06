@@ -385,11 +385,6 @@ public class TypeConverter
             return false;
         }
 
-        if (IsAssemblyAllowed(type.Assembly))
-        {
-            return true;
-        }
-
         foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
         {
             if (displayName.Equals(type.Type) || runtimeName.Equals(type.Type))
