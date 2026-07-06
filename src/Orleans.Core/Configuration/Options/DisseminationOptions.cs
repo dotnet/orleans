@@ -25,12 +25,12 @@ public sealed class DisseminationOptions
     /// <summary>
     /// Gets or sets the maximum total payload bytes in one dissemination batch.
     /// </summary>
-    public int MaxBatchBytes { get; set; } = 64 * 1024;
+    public int MaxBatchBytes { get; set; } = 1024 * 1024;
 
     /// <summary>
     /// Gets or sets the maximum number of items in one dissemination batch.
     /// </summary>
-    public int MaxBatchItems { get; set; } = 64;
+    public int MaxBatchItems { get; set; } = 8 * 1024;
 
     /// <summary>
     /// Gets or sets overlay-specific dissemination options.
@@ -120,5 +120,5 @@ public sealed class DisseminationTopicOptions
     /// <summary>
     /// Gets or sets the maximum serialized payload size for this topic.
     /// </summary>
-    public int MaxPayloadBytes { get; set; } = 64 * 1024;
+    public int MaxPayloadBytes { get; set; } = 1024 * 1024;
 }
