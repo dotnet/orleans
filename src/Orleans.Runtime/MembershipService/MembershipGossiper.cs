@@ -35,7 +35,7 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
     {
         try
         {
-            var dissemination = serviceProvider.GetService<DisseminationService>();
+            var dissemination = serviceProvider.GetService<IDisseminationService>();
             var topic = serviceProvider.GetService<MembershipDisseminationTopic>();
             if (dissemination is null || topic is null || !topic.IsEnabled)
             {

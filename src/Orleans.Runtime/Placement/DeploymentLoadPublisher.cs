@@ -163,7 +163,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var dissemination = _serviceProvider.GetService<DisseminationService>();
+                var dissemination = _serviceProvider.GetService<IDisseminationService>();
                 var topic = _serviceProvider.GetService<DeploymentLoadStatisticsDisseminationTopic>();
                 if (dissemination is null || topic is null || !topic.IsEnabled)
                 {
