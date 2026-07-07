@@ -175,8 +175,8 @@ namespace Orleans.Hosting
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
 
             services.AddSingleton<IDisseminationTransport, OrleansDisseminationTransport>();
-            services.AddSingleton<DisseminationService>();
             services.AddSingleton<DisseminationSystemTarget>();
+            services.AddFromExisting<IDisseminationService, DisseminationSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DisseminationSystemTarget>();
 
             services.TryAddSingleton<IMembershipManager, MembershipTableManager>();

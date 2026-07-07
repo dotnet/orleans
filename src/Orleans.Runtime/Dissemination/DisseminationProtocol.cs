@@ -1,10 +1,6 @@
-using System;
 using System.Collections.Frozen;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -20,7 +16,6 @@ internal sealed partial class DisseminationProtocol(
 {
     private readonly IDisseminationTransport _transport = transport;
     private readonly IOptionsMonitor<DisseminationOptions> _options = options;
-    private readonly FrozenDictionary<string, IDisseminationTopic> _topics = topics.ToFrozenDictionary(static topic => topic.Name, StringComparer.Ordinal);
     private readonly TimeProvider _timeProvider = timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger = logger;
     private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
@@ -30,14 +25,13 @@ internal sealed partial class DisseminationProtocol(
     private readonly object _topologyLock = new();
     private readonly Dictionary<SiloAddress, PendingGossipBatch> _pendingGossip = [];
     private readonly Dictionary<DigestKey, DateTimeOffset> _lastUpdateReceivedAt = [];
+    private readonly FrozenDictionary<string, IDisseminationTopic> _topics = topics.ToFrozenDictionary(static topic => topic.Name, StringComparer.Ordinal);
     private DateTimeOffset? _nextGossipFlushAt;
     private CancellationTokenSource? _gossipFlushWakeup;
     private bool _gossipFlushScheduled;
     private ParticipantTopology _activeMembersTopology = ParticipantTopology.Empty;
     private ParticipantTopology _allMembersTopology = ParticipantTopology.Empty;
     private long _antiEntropyRound;
-
-    public FrozenDictionary<string, IDisseminationTopic> Topics => _topics;
 
     public async ValueTask<bool> Publish(
         string topicName,
@@ -468,7 +462,7 @@ internal sealed partial class DisseminationProtocol(
         }
         finally
         {
-            var reschedule = false;
+            bool reschedule;
             lock (_gossipQueueLock)
             {
                 _gossipFlushScheduled = false;
@@ -1095,16 +1089,16 @@ internal sealed partial class DisseminationProtocol(
         return topology.Indices.ContainsKey(root) ? topology : null;
     }
 
-    private bool TryGetEnabledTopic(string topicName, out IDisseminationTopic topic)
+    private bool TryGetEnabledTopic(string topicName, [NotNullWhen(true)] out IDisseminationTopic? topic)
     {
         if (_options.CurrentValue.Enabled
-            && _topics.TryGetValue(topicName, out topic!)
+            && _topics.TryGetValue(topicName, out topic)
             && topic.IsEnabled)
         {
             return true;
         }
 
-        topic = default!;
+        topic = null;
         return false;
     }
 
@@ -1270,14 +1264,14 @@ internal sealed partial class DisseminationProtocol(
 
         public int GetTopicCount(string topic) => _valuesByTopic.TryGetValue(topic, out var values) ? values.Count : 0;
 
-        public bool TryGetValue(DigestKey key, out DisseminationValue value)
+        public bool TryGetValue(DigestKey key, [NotNullWhen(true)] out DisseminationValue? value)
         {
             if (_valuesByTopic.TryGetValue(key.Topic, out var topicValues))
             {
                 return topicValues.TryGetValue(key.Key, out value!);
             }
 
-            value = default!;
+            value = null;
             return false;
         }
 
