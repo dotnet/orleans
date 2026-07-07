@@ -44,7 +44,7 @@ public class DisseminationProtocolTests
         Assert.True(result);
         var expectedChildren = GetOriginatorTreeTargets(local, peers, fanout: 2);
         Assert.Equal(expectedChildren, transport.GossipBatches.Select(batch => batch.Peer));
-        Assert.All(transport.GossipBatches, batch => Assert.Equal(item.Digest, batch.Batch.Values.Single().Digest));
+        Assert.All(transport.GossipBatches, batch => Assert.Equal(item.Digest, GetGossipValues(batch.Batch).Single().Digest));
     }
 
     [Fact]
@@ -251,11 +251,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
 
-        await protocol.ReceiveGossip(new DisseminationGossipBatch
-        {
-            Sender = root,
-            Values = [item],
-        }, CancellationToken.None);
+        await protocol.ReceiveGossip(CreateGossipBatch(root, item), CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         var expectedChildren = GetForwardingTreeTargets(local, root, peers, fanout: 2, sender: root);
@@ -273,11 +269,7 @@ public class DisseminationProtocolTests
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
-        var batch = new DisseminationGossipBatch
-        {
-            Sender = root,
-            Values = [item],
-        };
+        var batch = CreateGossipBatch(root, item);
 
         await protocol.ReceiveGossip(batch, CancellationToken.None);
         await protocol.ReceiveGossip(batch, CancellationToken.None);
@@ -300,11 +292,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
 
-        await protocol.ReceiveGossip(new DisseminationGossipBatch
-        {
-            Sender = sender,
-            Values = [item],
-        }, CancellationToken.None);
+        await protocol.ReceiveGossip(CreateGossipBatch(sender, item), CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Equal(1, topic.GetVersion(FakeTopic.DefaultKey));
@@ -329,11 +317,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
 
-        await protocol.ReceiveGossip(new DisseminationGossipBatch
-        {
-            Sender = sender,
-            Values = [item],
-        }, CancellationToken.None);
+        await protocol.ReceiveGossip(CreateGossipBatch(sender, item), CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Equal(1, topic.GetVersion(FakeTopic.DefaultKey));
@@ -394,7 +378,7 @@ public class DisseminationProtocolTests
         Assert.True(second);
         var batch = Assert.Single(transport.GossipBatches);
         Assert.Equal(peer, batch.Peer);
-        var value = Assert.Single(batch.Batch.Values);
+        var value = Assert.Single(GetGossipValues(batch.Batch));
         Assert.Equal(2, value.Digest.Version);
     }
 
@@ -424,7 +408,7 @@ public class DisseminationProtocolTests
         Assert.True(first);
         Assert.True(second);
         var batch = Assert.Single(transport.GossipBatches);
-        Assert.Equal(new[] { "first", "second" }, batch.Batch.Values.Select(static value => value.Digest.Key));
+        Assert.Equal(new[] { "first", "second" }, GetGossipValues(batch.Batch).Select(static value => value.Digest.Key));
     }
 
     [Fact]
@@ -579,11 +563,9 @@ public class DisseminationProtocolTests
         topic.Options.ExpectedUpdateCadence = TimeSpan.FromSeconds(2);
         var protocol = CreateProtocol(transport, topic, timeProvider: timeProvider);
 
-        await protocol.ReceiveGossip(new DisseminationGossipBatch
-        {
-            Sender = peer,
-            Values = [topic.CreateItem(peer, FakeTopic.DefaultKey, sequence: 1)],
-        }, CancellationToken.None);
+        await protocol.ReceiveGossip(
+            CreateGossipBatch(peer, topic.CreateItem(peer, FakeTopic.DefaultKey, sequence: 1)),
+            CancellationToken.None);
 
         var recentState = protocol.CreateAntiEntropyState();
         Assert.Empty(recentState.Topics);
@@ -893,6 +875,20 @@ public class DisseminationProtocolTests
         {
             [topicName] = [.. digests],
         }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    private static DisseminationGossipBatch CreateGossipBatch(SiloAddress sender, params DisseminationValue[] values) => new()
+    {
+        Sender = sender,
+        ValuesByTopic = values
+            .GroupBy(static value => value.Digest.Topic, StringComparer.Ordinal)
+            .ToFrozenDictionary(
+                static group => group.Key,
+                static group => group.ToImmutableArray(),
+                StringComparer.Ordinal),
+    };
+
+    private static IEnumerable<DisseminationValue> GetGossipValues(DisseminationGossipBatch batch) =>
+        batch.ValuesByTopic.Values.SelectMany(static values => values);
 
     private static MembershipDisseminationTopic CreateMembershipTopic(
         SiloAddress local,

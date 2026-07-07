@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
 
@@ -46,16 +47,16 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnGossipSent(ImmutableArray<DisseminationValue> values, string kind)
+    public static void OnGossipSent(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
     {
         if (!GossipSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
         {
             return;
         }
 
-        foreach (var group in values.GroupBy(static item => item.Digest.Topic))
+        foreach (var (topic, values) in valuesByTopic)
         {
-            OnGossipSent(group.Key, kind, group.Count(), group.Sum(static item => item.Payload.Length));
+            OnGossipSent(topic, kind, values.Length, values.Sum(static item => item.Payload.Length));
         }
     }
 
@@ -80,16 +81,16 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnGossipReceived(ImmutableArray<DisseminationValue> values, string kind)
+    public static void OnGossipReceived(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
     {
         if (!GossipReceived.Enabled && !ValuesApplied.Enabled)
         {
             return;
         }
 
-        foreach (var group in values.GroupBy(static item => item.Digest.Topic))
+        foreach (var (topic, values) in valuesByTopic)
         {
-            OnGossipReceived(group.Key, kind, group.Count());
+            OnGossipReceived(topic, kind, values.Length);
         }
     }
 
