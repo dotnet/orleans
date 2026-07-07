@@ -14,44 +14,6 @@ internal interface IDisseminationSystemTarget : ISystemTarget
 }
 
 [GenerateSerializer, Immutable]
-internal readonly struct DisseminationDigest : IEquatable<DisseminationDigest>
-{
-    public DisseminationDigest(string topic, string key, long version)
-    {
-        Topic = topic ?? string.Empty;
-        Key = key ?? string.Empty;
-        Version = version;
-    }
-
-    [Id(0)]
-    public string Topic { get; }
-
-    [Id(1)]
-    public string Key { get; }
-
-    [Id(2)]
-    public long Version { get; }
-
-    public bool Equals(DisseminationDigest other) =>
-        string.Equals(Topic, other.Topic, StringComparison.Ordinal)
-        && string.Equals(Key, other.Key, StringComparison.Ordinal)
-        && Version == other.Version;
-
-    public override bool Equals(object? obj) => obj is DisseminationDigest other && Equals(other);
-
-    public override int GetHashCode() => HashCode.Combine(
-        StringComparer.Ordinal.GetHashCode(Topic ?? string.Empty),
-        StringComparer.Ordinal.GetHashCode(Key ?? string.Empty),
-        Version);
-
-    public override string ToString() => $"{Topic}/{Key}/{Version}";
-
-    public static bool operator ==(DisseminationDigest left, DisseminationDigest right) => left.Equals(right);
-
-    public static bool operator !=(DisseminationDigest left, DisseminationDigest right) => !left.Equals(right);
-}
-
-[GenerateSerializer, Immutable]
 internal readonly struct DisseminationTopicDigest : IEquatable<DisseminationTopicDigest>
 {
     public DisseminationTopicDigest(string key, long version)
@@ -87,7 +49,7 @@ internal readonly struct DisseminationTopicDigest : IEquatable<DisseminationTopi
 internal sealed class DisseminationValue
 {
     [Id(0)]
-    public DisseminationDigest Digest { get; init; }
+    public DisseminationTopicDigest Digest { get; init; }
 
     [Id(1)]
     public required SiloAddress Root { get; init; }
