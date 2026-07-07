@@ -30,4 +30,18 @@ internal static class JournalingAzureStorageTestConfiguration
 
         return options;
     }
+
+    public static AzureTableJournalStorageOptions ConfigureTestDefaults(this AzureTableJournalStorageOptions options)
+    {
+        if (TestDefaultConfiguration.UseAadAuthentication)
+        {
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential);
+        }
+        else
+        {
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+        }
+
+        return options;
+    }
 }
