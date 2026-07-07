@@ -8,29 +8,39 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
 
-internal sealed partial class DisseminationProtocol(
-    IDisseminationTransport transport,
-    DisseminationMembership membership,
-    IOptionsMonitor<DisseminationOptions> options,
-    IEnumerable<IDisseminationTopic> topics,
-    TimeProvider timeProvider,
-    ILogger<DisseminationProtocol> logger)
+internal sealed partial class DisseminationProtocol
 {
-    private readonly IDisseminationTransport _transport = transport;
-    private readonly DisseminationMembership _membership = membership;
-    private readonly IOptionsMonitor<DisseminationOptions> _options = options;
-    private readonly TimeProvider _timeProvider = timeProvider;
-    private readonly ILogger<DisseminationProtocol> _logger = logger;
+    private readonly IDisseminationTransport _transport;
+    private readonly DisseminationMembership _membership;
+    private readonly IOptionsMonitor<DisseminationOptions> _options;
+    private readonly TimeProvider _timeProvider;
+    private readonly ILogger<DisseminationProtocol> _logger;
+    private readonly DisseminationGossipQueue _gossipQueue;
     private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
     private readonly object _failureLock = new();
-    private readonly object _gossipQueueLock = new();
     private readonly object _recentUpdateLock = new();
-    private readonly Dictionary<SiloAddress, PendingGossipBatch> _pendingGossip = [];
     private readonly Dictionary<DigestKey, DateTimeOffset> _lastUpdateReceivedAt = [];
-    private readonly FrozenDictionary<string, IDisseminationTopic> _topics = topics.ToFrozenDictionary(static topic => topic.Name, StringComparer.Ordinal);
-    private DateTimeOffset? _nextGossipFlushAt;
-    private CancellationTokenSource? _gossipFlushWakeup;
-    private bool _gossipFlushScheduled;
+    private readonly FrozenDictionary<string, IDisseminationTopic> _topics;
+
+    public DisseminationProtocol(
+        IDisseminationTransport transport,
+        DisseminationMembership membership,
+        IOptionsMonitor<DisseminationOptions> options,
+        IEnumerable<IDisseminationTopic> topics,
+        TimeProvider timeProvider,
+        ILogger<DisseminationProtocol> logger)
+    {
+        _transport = transport;
+        _membership = membership;
+        _options = options;
+        _timeProvider = timeProvider;
+        _logger = logger;
+        _topics = topics.ToFrozenDictionary(static topic => topic.Name, StringComparer.Ordinal);
+        _gossipQueue = new DisseminationGossipQueue(
+            timeProvider,
+            SendGossipBatches,
+            exception => LogDebugGossipFlushFailed(_logger, exception));
+    }
 
     public async ValueTask<bool> Publish(
         string topicName,
@@ -359,195 +369,20 @@ internal sealed partial class DisseminationProtocol(
 
     internal async Task FlushPendingGossip(CancellationToken cancellationToken)
     {
-        var batches = DrainPendingGossip(force: true);
-        CancelScheduledGossipFlushDelay();
-        await SendGossipBatches(batches, cancellationToken);
+        await _gossipQueue.FlushPendingGossip(cancellationToken);
     }
 
     private void EnqueueGossip(SiloAddress peer, DisseminationValue item, IDisseminationTopic topic)
     {
-        var now = _timeProvider.GetUtcNow();
-        var key = new DigestKey(topic.Name, item.Digest.Key);
-        lock (_gossipQueueLock)
-        {
-            if (!_pendingGossip.TryGetValue(peer, out var pending))
-            {
-                pending = new PendingGossipBatch(now + topic.Options.MaxCoalescingDelay);
-                _pendingGossip.Add(peer, pending);
-            }
-            else if (pending.TryGetValue(key, out var existing)
-                && topic.CompareVersion(existing.Digest, item.Digest) >= 0)
-            {
-                return;
-            }
-            else if (now + topic.Options.MaxCoalescingDelay < pending.FlushAfter)
-            {
-                pending.FlushAfter = now + topic.Options.MaxCoalescingDelay;
-            }
-
-            pending.AddOrReplace(key, item);
-            if (pending.Count >= _options.CurrentValue.MaxBatchItems
-                || pending.ByteCount >= _options.CurrentValue.MaxBatchBytes
-                || pending.GetTopicCount(topic.Name) >= topic.Options.MaxPendingItemCount)
-            {
-                pending.FlushAfter = now;
-            }
-        }
-
-        ScheduleGossipFlush();
+        _gossipQueue.Enqueue(
+            peer,
+            item,
+            topic,
+            _options.CurrentValue.MaxBatchItems,
+            _options.CurrentValue.MaxBatchBytes);
     }
 
-    private void ScheduleGossipFlush()
-    {
-        var startFlushLoop = false;
-        lock (_gossipQueueLock)
-        {
-            if (_pendingGossip.Count == 0)
-            {
-                return;
-            }
-
-            var next = GetNextPendingGossipFlushUnsafe();
-            if (!_gossipFlushScheduled)
-            {
-                _gossipFlushScheduled = true;
-                _nextGossipFlushAt = next;
-                startFlushLoop = true;
-            }
-            else if (_nextGossipFlushAt is null || next < _nextGossipFlushAt.Value)
-            {
-                _nextGossipFlushAt = next;
-                _gossipFlushWakeup?.Cancel();
-            }
-        }
-
-        if (startFlushLoop)
-        {
-            _ = Task.Run(RunScheduledGossipFlush);
-        }
-    }
-
-    private async Task RunScheduledGossipFlush()
-    {
-        try
-        {
-            while (true)
-            {
-                var delay = GetDelayUntilNextGossipFlush(out var wakeupToken);
-                if (delay is null)
-                {
-                    return;
-                }
-
-                if (delay > TimeSpan.Zero)
-                {
-                    try
-                    {
-                        await Task.Delay(delay.Value, _timeProvider, wakeupToken);
-                    }
-                    catch (OperationCanceledException) when (wakeupToken.IsCancellationRequested)
-                    {
-                        continue;
-                    }
-                }
-
-                var batches = DrainPendingGossip(force: false);
-                await SendGossipBatches(batches, CancellationToken.None);
-            }
-        }
-        catch (Exception exception)
-        {
-            LogDebugGossipFlushFailed(_logger, exception);
-        }
-        finally
-        {
-            bool reschedule;
-            lock (_gossipQueueLock)
-            {
-                _gossipFlushScheduled = false;
-                _nextGossipFlushAt = null;
-                DisposeGossipFlushWakeupUnsafe();
-                reschedule = _pendingGossip.Count > 0;
-            }
-
-            if (reschedule)
-            {
-                ScheduleGossipFlush();
-            }
-        }
-    }
-
-    private TimeSpan? GetDelayUntilNextGossipFlush(out CancellationToken wakeupToken)
-    {
-        lock (_gossipQueueLock)
-        {
-            if (_pendingGossip.Count == 0)
-            {
-                _nextGossipFlushAt = null;
-                DisposeGossipFlushWakeupUnsafe();
-                wakeupToken = CancellationToken.None;
-                return null;
-            }
-
-            var now = _timeProvider.GetUtcNow();
-            var next = GetNextPendingGossipFlushUnsafe();
-            _nextGossipFlushAt = next;
-            if (next <= now)
-            {
-                DisposeGossipFlushWakeupUnsafe();
-                wakeupToken = CancellationToken.None;
-                return TimeSpan.Zero;
-            }
-
-            DisposeGossipFlushWakeupUnsafe();
-            _gossipFlushWakeup = new CancellationTokenSource();
-            wakeupToken = _gossipFlushWakeup.Token;
-            return next - now;
-        }
-    }
-
-    private void CancelScheduledGossipFlushDelay()
-    {
-        lock (_gossipQueueLock)
-        {
-            _gossipFlushWakeup?.Cancel();
-        }
-    }
-
-    private DateTimeOffset GetNextPendingGossipFlushUnsafe() => _pendingGossip.Values.Min(static pending => pending.FlushAfter);
-
-    private List<(SiloAddress Peer, ImmutableArray<PendingTopicValues> ValuesByTopic)> DrainPendingGossip(bool force)
-    {
-        var now = _timeProvider.GetUtcNow();
-        var result = new List<(SiloAddress Peer, ImmutableArray<PendingTopicValues> ValuesByTopic)>();
-        lock (_gossipQueueLock)
-        {
-            List<SiloAddress>? drainedPeers = null;
-            foreach (var (peer, pending) in _pendingGossip)
-            {
-                if (!force && pending.FlushAfter > now)
-                {
-                    continue;
-                }
-
-                (drainedPeers ??= []).Add(peer);
-                result.Add((peer, pending.ToImmutableValuesByTopic()));
-            }
-
-            if (drainedPeers is not null)
-            {
-                foreach (var peer in drainedPeers)
-                {
-                    _pendingGossip.Remove(peer);
-                }
-            }
-        }
-
-        result.Sort(static (left, right) => left.Peer.CompareTo(right.Peer));
-        return result;
-    }
-
-    private async Task SendGossipBatches(List<(SiloAddress Peer, ImmutableArray<PendingTopicValues> ValuesByTopic)> batches, CancellationToken cancellationToken)
+    private async Task SendGossipBatches(IReadOnlyList<DisseminationGossipQueue.Batch> batches, CancellationToken cancellationToken)
     {
         foreach (var queued in batches)
         {
@@ -555,7 +390,7 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private async Task SendGossipBatch(SiloAddress peer, IReadOnlyList<PendingTopicValues> valuesByTopic, CancellationToken cancellationToken)
+    private async Task SendGossipBatch(SiloAddress peer, IReadOnlyList<DisseminationGossipQueue.PendingTopicValues> valuesByTopic, CancellationToken cancellationToken)
     {
         var currentBatch = new Dictionary<string, ImmutableArray<DisseminationValue>.Builder>(StringComparer.Ordinal);
         var itemCount = 0;
@@ -786,42 +621,7 @@ internal sealed partial class DisseminationProtocol(
             }
         }
 
-        lock (_gossipQueueLock)
-        {
-            List<SiloAddress>? removedPeers = null;
-            foreach (var peer in _pendingGossip.Keys)
-            {
-                if (_transport.LocalSilo.Equals(peer))
-                {
-                    continue;
-                }
-
-                if (!membershipSnapshot.ContainsMember(peer))
-                {
-                    (removedPeers ??= []).Add(peer);
-                }
-            }
-
-            if (removedPeers is not null)
-            {
-                foreach (var peer in removedPeers)
-                {
-                    _pendingGossip.Remove(peer);
-                }
-            }
-
-            if (_pendingGossip.Count == 0)
-            {
-                _nextGossipFlushAt = null;
-                _gossipFlushWakeup?.Cancel();
-            }
-        }
-    }
-
-    private void DisposeGossipFlushWakeupUnsafe()
-    {
-        _gossipFlushWakeup?.Dispose();
-        _gossipFlushWakeup = null;
+        _gossipQueue.Prune(membershipSnapshot, _transport.LocalSilo);
     }
 
     private async ValueTask<DisseminationMembershipSnapshot?> GetMembershipSnapshotForRouting(
@@ -1003,64 +803,6 @@ internal sealed partial class DisseminationProtocol(
     private readonly record struct DigestKey(string Topic, string Key);
 
     private readonly record struct TopicValue(string Topic, DisseminationValue Value);
-
-    private readonly record struct PendingTopicValues(string Topic, ImmutableArray<DisseminationValue> Values);
-
-    private sealed class PendingGossipBatch(DateTimeOffset flushAfter)
-    {
-        private readonly Dictionary<string, Dictionary<string, DisseminationValue>> _valuesByTopic = new(StringComparer.Ordinal);
-
-        public DateTimeOffset FlushAfter { get; set; } = flushAfter;
-
-        public int Count { get; private set; }
-
-        public int ByteCount { get; private set; }
-
-        public int GetTopicCount(string topic) => _valuesByTopic.TryGetValue(topic, out var values) ? values.Count : 0;
-
-        public bool TryGetValue(DigestKey key, [NotNullWhen(true)] out DisseminationValue? value)
-        {
-            if (_valuesByTopic.TryGetValue(key.Topic, out var topicValues))
-            {
-                return topicValues.TryGetValue(key.Key, out value!);
-            }
-
-            value = null;
-            return false;
-        }
-
-        public void AddOrReplace(DigestKey key, DisseminationValue value)
-        {
-            if (!_valuesByTopic.TryGetValue(key.Topic, out var topicValues))
-            {
-                topicValues = new Dictionary<string, DisseminationValue>(StringComparer.Ordinal);
-                _valuesByTopic.Add(key.Topic, topicValues);
-            }
-
-            if (topicValues.TryGetValue(key.Key, out var previous))
-            {
-                ByteCount -= previous.Payload.Length;
-            }
-            else
-            {
-                Count++;
-            }
-
-            topicValues[key.Key] = value;
-            ByteCount += value.Payload.Length;
-        }
-
-        public ImmutableArray<PendingTopicValues> ToImmutableValuesByTopic()
-        {
-            var result = ImmutableArray.CreateBuilder<PendingTopicValues>(_valuesByTopic.Count);
-            foreach (var (topic, values) in _valuesByTopic)
-            {
-                result.Add(new PendingTopicValues(topic, [.. values.Values]));
-            }
-
-            return result.ToImmutable();
-        }
-    }
 
     [LoggerMessage(
         Level = LogLevel.Debug,
