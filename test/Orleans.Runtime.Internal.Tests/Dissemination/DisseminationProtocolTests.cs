@@ -636,13 +636,13 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task AntiEntropyLoopContinuesAfterApplyFailure()
+    public async Task AntiEntropyAppliesValidItemsAfterFailedRepairRound()
     {
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
         var transport = new FakeTransport(local, peer);
         var topic = new FakeTopic(local);
-        var service = CreateService(transport, topic, options => options.Overlay.AntiEntropyInterval = TimeSpan.FromMilliseconds(1));
+        var protocol = CreateProtocol(transport, topic);
         topic.SetValue(FakeTopic.DefaultKey, version: 1);
 
         var badRepairItem = new DisseminationValue
@@ -669,17 +669,15 @@ public class DisseminationProtocolTests
             });
         };
 
-        await service.StartAsync(CancellationToken.None);
-        try
-        {
-            await WaitUntil(() => topic.GetVersion(FakeTopic.DefaultKey) == 3);
+        var firstState = protocol.CreateAntiEntropyState();
+        var firstResponses = await protocol.ExchangeAntiEntropy(firstState, CancellationToken.None);
+        await protocol.ApplyAntiEntropyResponses(firstResponses, CancellationToken.None);
+        var secondState = protocol.CreateAntiEntropyState();
+        var secondResponses = await protocol.ExchangeAntiEntropy(secondState, CancellationToken.None);
+        await protocol.ApplyAntiEntropyResponses(secondResponses, CancellationToken.None);
 
-            Assert.True(Volatile.Read(ref exchangeCount) >= 2);
-        }
-        finally
-        {
-            await service.StopAsync(CancellationToken.None);
-        }
+        Assert.Equal(3, topic.GetVersion(FakeTopic.DefaultKey));
+        Assert.Equal(2, Volatile.Read(ref exchangeCount));
     }
 
 #if NET10_0_OR_GREATER
@@ -835,21 +833,6 @@ public class DisseminationProtocolTests
             new TestOptionsMonitor<DisseminationOptions>(options),
             topics,
             timeProvider ?? TimeProvider.System,
-            NullLogger<DisseminationProtocol>.Instance);
-    }
-
-    private static DisseminationService CreateService(
-        FakeTransport transport,
-        FakeTopic topic,
-        Action<DisseminationOptions>? configure = null)
-    {
-        var options = new DisseminationOptions { Enabled = true };
-        configure?.Invoke(options);
-        return new DisseminationService(
-            transport,
-            new TestOptionsMonitor<DisseminationOptions>(options),
-            new[] { topic },
-            TimeProvider.System,
             NullLogger<DisseminationProtocol>.Instance);
     }
 
