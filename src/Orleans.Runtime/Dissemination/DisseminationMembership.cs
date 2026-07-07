@@ -39,21 +39,24 @@ internal sealed class DisseminationMembership(IMembershipManager membershipManag
 
     private static DisseminationMembershipSnapshot ComputeMembership(MembershipTableSnapshot snapshot)
     {
-        var entries = snapshot.Entries.Values;
-        var allMembers = entries
+        var participants = snapshot.Entries.Values
             .Where(static entry => IsDisseminationParticipant(entry.Status))
             .OrderBy(static entry => GetStatusRank(entry.Status))
             .ThenBy(static entry => entry.StartTime)
             .ThenBy(static entry => entry.SiloAddress)
-            .Select(static entry => entry.SiloAddress)
-            .ToImmutableArray();
-        var activeMembers = entries
-            .Where(static entry => entry.Status == SiloStatus.Active)
-            .OrderBy(static entry => entry.StartTime)
-            .ThenBy(static entry => entry.SiloAddress)
-            .Select(static entry => entry.SiloAddress)
-            .ToImmutableArray();
-        return new DisseminationMembershipSnapshot(snapshot.Version, allMembers, activeMembers);
+            .ToArray();
+        var allMembers = ImmutableArray.CreateBuilder<SiloAddress>(participants.Length);
+        var activeMembers = ImmutableArray.CreateBuilder<SiloAddress>();
+        foreach (var participant in participants)
+        {
+            allMembers.Add(participant.SiloAddress);
+            if (participant.Status == SiloStatus.Active)
+            {
+                activeMembers.Add(participant.SiloAddress);
+            }
+        }
+
+        return new DisseminationMembershipSnapshot(snapshot.Version, allMembers.MoveToImmutable(), activeMembers.ToImmutable());
     }
 
     private static bool IsDisseminationParticipant(SiloStatus status) =>

@@ -16,8 +16,9 @@ internal sealed class DisseminationMembershipSnapshot
         MembershipVersion = membershipVersion;
         AllMembers = allMembers.IsDefault ? [] : allMembers;
         ActiveMembers = activeMembers.IsDefault ? [] : activeMembers;
-        _allMembers = new MemberSet(AllMembers);
-        _activeMembers = AllMembers.SequenceEqual(ActiveMembers) ? _allMembers : new MemberSet(ActiveMembers);
+        _allMembers = new MemberSet(AllMembers, nameof(allMembers));
+        ValidateActiveMembers(ActiveMembers, _allMembers);
+        _activeMembers = AllMembers.SequenceEqual(ActiveMembers) ? _allMembers : new MemberSet(ActiveMembers, nameof(activeMembers));
     }
 
     public MembershipVersion MembershipVersion { get; }
@@ -57,20 +58,35 @@ internal sealed class DisseminationMembershipSnapshot
     private MemberSet GetMemberSet(DisseminationMembershipScope membershipScope) =>
         membershipScope == DisseminationMembershipScope.AllMembers ? _allMembers : _activeMembers;
 
+    private static void ValidateActiveMembers(ImmutableArray<SiloAddress> activeMembers, MemberSet allMembers)
+    {
+        foreach (var activeMember in activeMembers)
+        {
+            if (!allMembers.Contains(activeMember))
+            {
+                throw new ArgumentException("Active members must be present in all members.", nameof(activeMembers));
+            }
+        }
+    }
+
     private sealed class MemberSet
     {
         private readonly ImmutableArray<SiloAddress> _participants;
         private readonly FrozenDictionary<SiloAddress, int> _indices;
 
-        public MemberSet(ImmutableArray<SiloAddress> participants)
+        public MemberSet(ImmutableArray<SiloAddress> participants, string parameterName)
         {
             _participants = participants.IsDefault ? [] : participants;
             var indices = new Dictionary<SiloAddress, int>(_participants.Length);
             for (var i = 0; i < _participants.Length; i++)
             {
-                indices[_participants[i]] = i;
+                if (!indices.TryAdd(_participants[i], i))
+                {
+                    throw new ArgumentException("Membership snapshot participants must be unique.", parameterName);
+                }
             }
 
+            // Participant arrays are already in tree order. The index map preserves that order for O(1) lookup.
             _indices = indices.ToFrozenDictionary();
         }
 
