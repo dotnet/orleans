@@ -8,13 +8,13 @@ internal static class DisseminationEvents
     public const string ListenerName = "Microsoft.Orleans.Dissemination";
     public static readonly DiagnosticListener Listener = new(ListenerName);
 
-    public static void EmitValue(DisseminationDigest digest, SiloAddress localSilo, SiloAddress? peer, DisseminationApplyResult result, int payloadBytes)
+    public static void EmitValue(string topic, DisseminationDigest digest, SiloAddress localSilo, SiloAddress? peer, DisseminationApplyResult result, int payloadBytes)
     {
         if (Listener.IsEnabled("Dissemination.ValueApply"))
         {
             Listener.Write("Dissemination.ValueApply", new DisseminationValueEvent
             {
-                Topic = digest.Topic,
+                Topic = topic,
                 LocalSilo = localSilo,
                 Peer = peer,
                 Key = digest.Key,
@@ -26,13 +26,13 @@ internal static class DisseminationEvents
         }
     }
 
-    public static void EmitPayloadDrop(DisseminationDigest digest, SiloAddress localSilo, string reason, int payloadBytes)
+    public static void EmitPayloadDrop(string topic, DisseminationDigest digest, SiloAddress localSilo, string reason, int payloadBytes)
     {
         if (Listener.IsEnabled("Dissemination.PayloadDrop"))
         {
             Listener.Write("Dissemination.PayloadDrop", new DisseminationValueEvent
             {
-                Topic = digest.Topic,
+                Topic = topic,
                 LocalSilo = localSilo,
                 Key = digest.Key,
                 Version = digest.Version,
