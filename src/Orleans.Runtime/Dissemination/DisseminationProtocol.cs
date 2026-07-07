@@ -57,8 +57,7 @@ internal sealed partial class DisseminationProtocol(
             return false;
         }
 
-        var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope));
-        var treeTargets = membership.GetOriginatorTreeTargets(topic.MembershipScope, root, fanout);
+        var treeTargets = membership.GetOriginatorTreeTargets(topic.MembershipScope, root, GetFanOutFactor);
         RecordRecentUpdate(topic.Name, item.Digest);
         foreach (var peer in treeTargets)
         {
@@ -350,8 +349,7 @@ internal sealed partial class DisseminationProtocol(
             return;
         }
 
-        var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope));
-        foreach (var peer in membership.GetForwardingTreeTargets(topic.MembershipScope, _transport.LocalSilo, root, sender, fanout))
+        foreach (var peer in membership.GetForwardingTreeTargets(topic.MembershipScope, _transport.LocalSilo, root, sender, GetFanOutFactor))
         {
             EnqueueGossip(peer, item, topic);
         }
@@ -711,11 +709,6 @@ internal sealed partial class DisseminationProtocol(
         var options = _options.CurrentValue.Overlay;
         var membership = _membership.CurrentSnapshot;
         PrunePeerState(membership);
-        var participantCount = membership.GetParticipantCount(membershipScope);
-        if (participantCount <= 1)
-        {
-            return [];
-        }
 
         return membership.SelectAntiEntropyPeers(
             membershipScope,
@@ -725,14 +718,8 @@ internal sealed partial class DisseminationProtocol(
 
     private int GetFanOutFactor(int participantCount)
     {
-        if (participantCount <= 1)
-        {
-            return 1;
-        }
-
         var overlay = _options.CurrentValue.Overlay;
-        var fanout = overlay.FanOutFactor?.Invoke(participantCount) ?? GetConfiguredFanOutFactor(overlay, participantCount);
-        return Math.Clamp(fanout, 1, participantCount);
+        return overlay.FanOutFactor?.Invoke(participantCount) ?? GetConfiguredFanOutFactor(overlay, participantCount);
     }
 
     private static int GetConfiguredFanOutFactor(DisseminationOverlayOptions options, int participantCount)
