@@ -847,6 +847,33 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void DisseminationMembershipSnapshotRejectsDuplicateMembers()
+    {
+        var local = CreateSilo(11111);
+
+        var exception = Assert.Throws<ArgumentException>(() => new DisseminationMembershipSnapshot(
+            new MembershipVersion(1),
+            [local, local],
+            [local]));
+
+        Assert.Equal("allMembers", exception.ParamName);
+    }
+
+    [Fact]
+    public void DisseminationMembershipSnapshotRejectsActiveMembersOutsideAllMembers()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+
+        var exception = Assert.Throws<ArgumentException>(() => new DisseminationMembershipSnapshot(
+            new MembershipVersion(1),
+            [local],
+            [local, peer]));
+
+        Assert.Equal("activeMembers", exception.ParamName);
+    }
+
+    [Fact]
     public void DisseminationMembershipSnapshotUsesStoredTreeOrderForOriginatorTargets()
     {
         var root = CreateSilo(11113);
