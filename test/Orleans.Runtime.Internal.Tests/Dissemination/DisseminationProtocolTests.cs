@@ -38,7 +38,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var result = await protocol.Publish(topic.Name, item, peers, CancellationToken.None);
+        var result = await protocol.Publish(topic.Name, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(result);
@@ -57,7 +57,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var result = await protocol.Publish(topic.Name, item, peers, CancellationToken.None);
+        var result = await protocol.Publish(topic.Name, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(result);
@@ -83,14 +83,33 @@ public class DisseminationProtocolTests
         };
         var obsolete = topic.CreateItem(local, "obsolete", sequence: 5);
 
-        Assert.False(await protocol.Publish(topic.Name, expired, [peer], CancellationToken.None));
-        Assert.False(await protocol.Publish(topic.Name, obsolete, [peer], CancellationToken.None));
+        Assert.False(await protocol.Publish(topic.Name, expired, CancellationToken.None));
+        Assert.False(await protocol.Publish(topic.Name, obsolete, CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
         Assert.Equal(
             new[] { expired.Digest, obsolete.Digest },
             topic.FallbackDigests);
+    }
+
+    [Fact]
+    public async Task PublishReturnsFalseWhenRootIsMissingFromMembershipScope()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        transport.PeerStatuses[local] = SiloStatus.Joining;
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic);
+        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+
+        var result = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.False(result);
+        Assert.Equal(1, transport.RefreshMembershipCallCount);
+        Assert.Empty(transport.GossipBatches);
     }
 
     [Fact]
@@ -123,7 +142,7 @@ public class DisseminationProtocolTests
         });
         var value = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var result = await protocol.Publish(topic.Name, value, targetPeers: null, CancellationToken.None);
+        var result = await protocol.Publish(topic.Name, value, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(result);
@@ -157,12 +176,12 @@ public class DisseminationProtocolTests
         }, timeProvider);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var firstResult = await protocol.Publish(topic.Name, item, new[] { peer }, CancellationToken.None);
+        var firstResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
-        var secondResult = await protocol.Publish(topic.Name, item, new[] { peer }, CancellationToken.None);
+        var secondResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
         timeProvider.Advance(TimeSpan.FromSeconds(5));
-        var thirdResult = await protocol.Publish(topic.Name, item, new[] { peer }, CancellationToken.None);
+        var thirdResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(firstResult);
@@ -197,15 +216,15 @@ public class DisseminationProtocolTests
             options.Overlay.FanOutFactor = static _ => 1;
         }, new TestTimeProvider());
 
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), targetPeers: null, CancellationToken.None));
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
         Assert.Equal(1, sendCount);
 
         transport.Peers.Remove(peer);
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), targetPeers: null, CancellationToken.None));
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
 
         transport.Peers.Add(peer);
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "after-return", sequence: 3), targetPeers: null, CancellationToken.None));
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "after-return", sequence: 3), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Equal(2, sendCount);
@@ -222,10 +241,10 @@ public class DisseminationProtocolTests
         topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 1);
 
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), targetPeers: null, CancellationToken.None));
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
 
         transport.Peers.Remove(peer);
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), targetPeers: null, CancellationToken.None));
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
@@ -327,7 +346,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var initialResult = await protocol.Publish(topic.Name, item, targetPeers: null, CancellationToken.None);
+        var initialResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
         var initialChildren = transport.GossipBatches.Select(batch => batch.Peer).ToArray();
 
@@ -340,7 +359,7 @@ public class DisseminationProtocolTests
                 transport.GossipBatches.Clear();
                 var updatedItem = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2);
 
-                var updatedResult = await protocol.Publish(topic.Name, updatedItem, targetPeers: null, CancellationToken.None);
+                var updatedResult = await protocol.Publish(topic.Name, updatedItem, CancellationToken.None);
                 await protocol.FlushPendingGossip(CancellationToken.None);
 
                 Assert.True(initialResult);
@@ -362,8 +381,8 @@ public class DisseminationProtocolTests
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic);
 
-        var first = await protocol.Publish(topic.Name, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1), [peer], CancellationToken.None);
-        var second = await protocol.Publish(topic.Name, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2), [peer], CancellationToken.None);
+        var first = await protocol.Publish(topic.Name, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1), CancellationToken.None);
+        var second = await protocol.Publish(topic.Name, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2), CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(first);
@@ -392,9 +411,9 @@ public class DisseminationProtocolTests
         topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
         var protocol = CreateProtocol(transport, topic, options => options.MaxBatchItems = 2);
 
-        var first = await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), [peer], CancellationToken.None);
+        var first = await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), CancellationToken.None);
         await Task.Delay(TimeSpan.FromMilliseconds(50));
-        var second = await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), [peer], CancellationToken.None);
+        var second = await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), CancellationToken.None);
 
         await sent.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(first);
@@ -426,12 +445,12 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public void AntiEntropyPeerSelectionUsesFixedTreeLevels()
+    public void AntiEntropyPeerSelectionSamplesDistinctMembers()
     {
-        Gen.Select(Gen.Int[2, 64], Gen.Int[1, 8], Gen.Int[0, 63], Gen.Int[1, 8], static (count, fanout, localSeed, peerCount) =>
+        Gen.Select(Gen.Int[2, 64], Gen.Int[0, 63], Gen.Int[1, 64], static (count, localSeed, peerCount) =>
         {
             var localIndex = localSeed % count;
-            return (Count: count, Fanout: fanout, LocalIndex: localIndex, PeerCount: peerCount);
+            return (Count: count, LocalIndex: localIndex, PeerCount: peerCount);
         }).Sample(testCase =>
         {
             var silos = CreateSilos(testCase.Count);
@@ -441,61 +460,17 @@ public class DisseminationProtocolTests
             topic.ExpectedKeys.Add(FakeTopic.DefaultKey);
             var protocol = CreateProtocol(transport, topic, options =>
             {
-                options.Overlay.FanOutFactor = _ => testCase.Fanout;
                 options.Overlay.AntiEntropyPeerCount = testCase.PeerCount;
             });
 
             var state = protocol.CreateAntiEntropyState();
             var peers = state.Topics[topic.Name].Peers;
-            var expectedCandidates = GetAntiEntropyCandidateIndexes(testCase.LocalIndex, testCase.Count, testCase.Fanout)
-                .Where(index => index != testCase.LocalIndex)
-                .Select(index => silos[index])
-                .ToHashSet();
 
-            Assert.True(peers.Length <= Math.Min(testCase.PeerCount, Math.Max(0, expectedCandidates.Count)));
+            Assert.Equal(Math.Min(testCase.PeerCount, testCase.Count - 1), peers.Length);
+            Assert.Equal(peers.Length, peers.Distinct().Count());
             Assert.DoesNotContain(local, peers);
-            Assert.All(peers, peer => Assert.Contains(peer, expectedCandidates));
+            Assert.All(peers, peer => Assert.Contains(peer, silos));
         });
-    }
-
-    [Fact]
-    public void AntiEntropyPeerSelectionUsesTopicSpecificSalt()
-    {
-        const int fanout = 3;
-        const int peerCount = 1;
-        for (var count = 6; count < 32; count++)
-        {
-            var silos = CreateSilos(count);
-            for (var localIndex = 0; localIndex < silos.Length; localIndex++)
-            {
-                var local = silos[localIndex];
-                var expectedFirst = GetExpectedAntiEntropyPeers("topic-a", silos, localIndex, fanout, peerCount, round: 1);
-                var expectedSecond = GetExpectedAntiEntropyPeers("topic-b", silos, localIndex, fanout, peerCount, round: 1);
-                if (expectedFirst.SequenceEqual(expectedSecond))
-                {
-                    continue;
-                }
-
-                var transport = new FakeTransport(local, silos.Where(silo => !Equals(silo, local)).ToArray());
-                var firstTopic = new FakeTopic(local, "topic-a");
-                var secondTopic = new FakeTopic(local, "topic-b");
-                firstTopic.ExpectedKeys.Add(FakeTopic.DefaultKey);
-                secondTopic.ExpectedKeys.Add(FakeTopic.DefaultKey);
-                var protocol = CreateProtocol(transport, new IDisseminationTopic[] { firstTopic, secondTopic }, options =>
-                {
-                    options.Overlay.FanOutFactor = static _ => fanout;
-                    options.Overlay.AntiEntropyPeerCount = peerCount;
-                });
-
-                var state = protocol.CreateAntiEntropyState();
-
-                Assert.Equal(expectedFirst, state.Topics[firstTopic.Name].Peers);
-                Assert.Equal(expectedSecond, state.Topics[secondTopic.Name].Peers);
-                return;
-            }
-        }
-
-        throw new InvalidOperationException("The test did not find a topology where topic salt changes peer selection.");
     }
 
     [Fact]
@@ -885,7 +860,6 @@ public class DisseminationProtocolTests
 
         var targets = snapshot.GetOriginatorTreeTargets(
             DisseminationMembershipScope.ActiveMembers,
-            local,
             root,
             fanout: 2);
 
@@ -915,7 +889,7 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public void DisseminationMembershipSnapshotTreatsLocalSiloAsParticipantWhenMissing()
+    public void DisseminationMembershipSnapshotDoesNotAddLocalSiloWhenMissing()
     {
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
@@ -926,39 +900,24 @@ public class DisseminationProtocolTests
 
         var targets = snapshot.GetOriginatorTreeTargets(
             DisseminationMembershipScope.ActiveMembers,
-            local,
             root: local,
             fanout: 1);
-
-        Assert.True(snapshot.ContainsParticipant(DisseminationMembershipScope.ActiveMembers, local, local));
-        Assert.Equal(2, snapshot.GetParticipantCount(DisseminationMembershipScope.ActiveMembers, local));
-        Assert.Equal(new[] { peer }, targets);
-    }
-
-    [Fact]
-    public void DisseminationMembershipSnapshotSortsExplicitPublishTargets()
-    {
-        var root = CreateSilo(11111);
-        var first = CreateSilo(11112);
-        var second = CreateSilo(11114);
-        var local = CreateSilo(11115);
-
-        var targets = DisseminationMembershipSnapshot.GetOriginatorTreeTargets(
-            [second, first, second],
+        var antiEntropyPeers = snapshot.SelectAntiEntropyPeers(
+            DisseminationMembershipScope.ActiveMembers,
             local,
-            root,
-            static _ => 2);
+            peerCount: 1);
 
-        Assert.Equal(new[] { first, second, local }, targets);
+        Assert.False(snapshot.ContainsParticipant(DisseminationMembershipScope.ActiveMembers, local));
+        Assert.Equal(1, snapshot.GetParticipantCount(DisseminationMembershipScope.ActiveMembers));
+        Assert.Empty(targets);
+        Assert.Empty(antiEntropyPeers);
     }
 
     [Fact]
-    public void DisseminationMembershipSnapshotSelectsAntiEntropyPeersDeterministically()
+    public void DisseminationMembershipSnapshotSelectsDistinctAntiEntropyPeers()
     {
-        const int fanout = 3;
-        const int peerCount = 2;
+        const int peerCount = 20;
         const int localIndex = 7;
-        const long round = 2;
         var silos = CreateSilos(12);
         var snapshot = new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
@@ -968,12 +927,12 @@ public class DisseminationProtocolTests
         var peers = snapshot.SelectAntiEntropyPeers(
             DisseminationMembershipScope.ActiveMembers,
             silos[localIndex],
-            "topic-a",
-            round,
-            fanout,
             peerCount);
 
-        Assert.Equal(GetExpectedAntiEntropyPeers("topic-a", silos, localIndex, fanout, peerCount, round), peers);
+        Assert.Equal(silos.Length - 1, peers.Length);
+        Assert.Equal(peers.Length, peers.Distinct().Count());
+        Assert.DoesNotContain(silos[localIndex], peers);
+        Assert.All(peers, peer => Assert.Contains(peer, silos));
     }
 
     private static DisseminationProtocol CreateProtocol(
@@ -1180,84 +1139,6 @@ public class DisseminationProtocolTests
         }
 
         return reached;
-    }
-
-    private static IEnumerable<int> GetAntiEntropyCandidateIndexes(int localIndex, int participantCount, int fanout)
-    {
-        var topLevelEnd = Math.Min(fanout, participantCount);
-        if (localIndex < topLevelEnd)
-        {
-            return Enumerable.Range(0, topLevelEnd);
-        }
-
-        var parentIndex = (localIndex / fanout) - 1;
-        var (previousLevelStart, previousLevelEnd) = GetLevelRange(parentIndex, participantCount, fanout);
-        var windowStart = previousLevelStart + (((parentIndex - previousLevelStart) / fanout) * fanout);
-        var windowEnd = Math.Min(previousLevelEnd, windowStart + fanout);
-        return Enumerable.Range(windowStart, windowEnd - windowStart);
-    }
-
-    private static IReadOnlyList<SiloAddress> GetExpectedAntiEntropyPeers(
-        string topicName,
-        IReadOnlyList<SiloAddress> participants,
-        int localIndex,
-        int fanout,
-        int peerCount,
-        long round) =>
-        GetAntiEntropyCandidateIndexes(localIndex, participants.Count, fanout)
-            .Where(index => index != localIndex)
-            .OrderBy(index => GetRepairPeerScore(participants[index], topicName, round, localIndex))
-            .ThenBy(index => participants[index])
-            .Take(peerCount)
-            .Select(index => participants[index])
-            .ToArray();
-
-    private static (int Start, int End) GetLevelRange(int index, int participantCount, int fanout)
-    {
-        var start = 0L;
-        var width = (long)fanout;
-        while (index >= start + width && start + width < participantCount)
-        {
-            start += width;
-            width = Math.Min(width * fanout, participantCount - start);
-        }
-
-        return ((int)start, (int)Math.Min(participantCount, start + width));
-    }
-
-    private static ulong GetRepairPeerScore(SiloAddress peer, string topicName, long round, int localIndex)
-    {
-        var value = (ulong)(uint)peer.GetConsistentHashCode();
-        value ^= Mix(GetStableStringHash(topicName));
-        value ^= (ulong)round * 0x9E3779B97F4A7C15UL;
-        value ^= (ulong)(uint)localIndex << 32;
-        return Mix(value);
-    }
-
-    private static ulong GetStableStringHash(string value)
-    {
-        const ulong offsetBasis = 14695981039346656037UL;
-        const ulong prime = 1099511628211UL;
-        var hash = offsetBasis;
-        foreach (var ch in value)
-        {
-            hash ^= (byte)ch;
-            hash *= prime;
-            hash ^= (byte)(ch >> 8);
-            hash *= prime;
-        }
-
-        return hash;
-    }
-
-    private static ulong Mix(ulong value)
-    {
-        value ^= value >> 30;
-        value *= 0xBF58476D1CE4E5B9UL;
-        value ^= value >> 27;
-        value *= 0x94D049BB133111EBUL;
-        value ^= value >> 31;
-        return value;
     }
 
     private static GrainManifest CreateManifest(params (string Grain, string Key, string Value)[] grains)
