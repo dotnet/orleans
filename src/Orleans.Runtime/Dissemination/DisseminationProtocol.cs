@@ -190,10 +190,11 @@ internal sealed partial class DisseminationProtocol
                 DigestsByTopic = pendingRequest.ToFrozenDictionary(StringComparer.Ordinal),
             };
 
-            var response = await SafeRequest(
+            var response = await ExecutePeerOperation<DisseminationAntiEntropyResponse?>(
                 peer,
                 cancellationToken,
-                target => _transport.ExchangeAntiEntropy(target, request, cancellationToken));
+                async target => await _transport.ExchangeAntiEntropy(target, request, cancellationToken),
+                failureResult: null);
             if (response is null)
             {
                 continue;
@@ -437,58 +438,38 @@ internal sealed partial class DisseminationProtocol
             ValuesByTopic = valuesByTopic,
         };
 
-        var sent = await SafeSend(
+        var sent = await ExecutePeerOperation(
             peer,
             cancellationToken,
-            target => _transport.SendGossip(target, batch, cancellationToken));
+            async target =>
+            {
+                await _transport.SendGossip(target, batch, cancellationToken);
+                return true;
+            },
+            failureResult: false);
         if (sent)
         {
             DisseminationInstruments.OnGossipSent(batch.ValuesByTopic, "tree");
         }
     }
 
-    private async ValueTask<bool> SafeSend(SiloAddress peer, CancellationToken cancellationToken, Func<SiloAddress, Task> send)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (IsPeerBackedOff(peer))
-        {
-            return false;
-        }
-
-        try
-        {
-            await send(peer);
-            ClearPeerBackoff(peer);
-            return true;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            LogDebugDisseminationSendFailed(_logger, exception, peer);
-            SetPeerBackoff(peer);
-            return false;
-        }
-    }
-
-    private async ValueTask<DisseminationAntiEntropyResponse?> SafeRequest(
+    private async ValueTask<T> ExecutePeerOperation<T>(
         SiloAddress peer,
         CancellationToken cancellationToken,
-        Func<SiloAddress, ValueTask<DisseminationAntiEntropyResponse>> request)
+        Func<SiloAddress, ValueTask<T>> operation,
+        T failureResult)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (IsPeerBackedOff(peer))
         {
-            return null;
+            return failureResult;
         }
 
         try
         {
-            var response = await request(peer);
+            var result = await operation(peer);
             ClearPeerBackoff(peer);
-            return response;
+            return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -498,7 +479,7 @@ internal sealed partial class DisseminationProtocol
         {
             LogDebugDisseminationSendFailed(_logger, exception, peer);
             SetPeerBackoff(peer);
-            return null;
+            return failureResult;
         }
     }
 
