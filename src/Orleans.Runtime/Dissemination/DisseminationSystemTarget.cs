@@ -16,6 +16,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
     public DisseminationSystemTarget(
         IDisseminationTransport transport,
+        DisseminationMembership membership,
         IOptionsMonitor<DisseminationOptions> options,
         IEnumerable<IDisseminationTopic> topics,
         TimeProvider timeProvider,
@@ -25,7 +26,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
     {
         _options = options;
         _logger = logger;
-        _protocol = new DisseminationProtocol(transport, options, topics, timeProvider, logger);
+        _protocol = new DisseminationProtocol(transport, membership, options, topics, timeProvider, logger);
         _timer = new PeriodicTimer(_options.CurrentValue.Overlay.AntiEntropyInterval, timeProvider);
         shared.ActivationDirectory.RecordNewTarget(this);
     }

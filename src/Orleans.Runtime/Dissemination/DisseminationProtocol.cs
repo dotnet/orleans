@@ -9,12 +9,14 @@ namespace Orleans.Runtime.Dissemination;
 
 internal sealed partial class DisseminationProtocol(
     IDisseminationTransport transport,
+    DisseminationMembership membership,
     IOptionsMonitor<DisseminationOptions> options,
     IEnumerable<IDisseminationTopic> topics,
     TimeProvider timeProvider,
     ILogger<DisseminationProtocol> logger)
 {
     private readonly IDisseminationTransport _transport = transport;
+    private readonly DisseminationMembership _membership = membership;
     private readonly IOptionsMonitor<DisseminationOptions> _options = options;
     private readonly TimeProvider _timeProvider = timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger = logger;
@@ -22,15 +24,12 @@ internal sealed partial class DisseminationProtocol(
     private readonly object _failureLock = new();
     private readonly object _gossipQueueLock = new();
     private readonly object _recentUpdateLock = new();
-    private readonly object _topologyLock = new();
     private readonly Dictionary<SiloAddress, PendingGossipBatch> _pendingGossip = [];
     private readonly Dictionary<DigestKey, DateTimeOffset> _lastUpdateReceivedAt = [];
     private readonly FrozenDictionary<string, IDisseminationTopic> _topics = topics.ToFrozenDictionary(static topic => topic.Name, StringComparer.Ordinal);
     private DateTimeOffset? _nextGossipFlushAt;
     private CancellationTokenSource? _gossipFlushWakeup;
     private bool _gossipFlushScheduled;
-    private ParticipantTopology _activeMembersTopology = ParticipantTopology.Empty;
-    private ParticipantTopology _allMembersTopology = ParticipantTopology.Empty;
     private long _antiEntropyRound;
 
     public async ValueTask<bool> Publish(
@@ -52,16 +51,29 @@ internal sealed partial class DisseminationProtocol(
         }
 
         var root = item.Root;
-        var topology = targetPeers is { Count: > 0 }
-            ? BuildParticipantTopology(targetPeers, root, includeLocal: true)
-            : await GetParticipantTopologyForRouting(topic.MembershipScope, root, cancellationToken);
-        if (topology is null)
+        IReadOnlyList<SiloAddress> treeTargets;
+        if (targetPeers is { Count: > 0 })
         {
-            return false;
+            treeTargets = DisseminationMembershipSnapshot.GetOriginatorTreeTargets(
+                targetPeers,
+                _transport.LocalSilo,
+                root,
+                GetFanOutFactor);
+        }
+        else
+        {
+            var membership = await GetMembershipSnapshotForRouting(topic.MembershipScope, root, cancellationToken);
+            if (membership is null)
+            {
+                return false;
+            }
+
+            var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope, _transport.LocalSilo));
+            treeTargets = membership.GetOriginatorTreeTargets(topic.MembershipScope, _transport.LocalSilo, root, fanout);
         }
 
         RecordRecentUpdate(topic.Name, item.Digest);
-        foreach (var peer in GetOriginatorTreeTargets(topology, root))
+        foreach (var peer in treeTargets)
         {
             EnqueueGossip(peer, item, topic);
         }
@@ -346,13 +358,14 @@ internal sealed partial class DisseminationProtocol(
     private async Task Forward(DisseminationValue item, IDisseminationTopic topic, SiloAddress sender, CancellationToken cancellationToken)
     {
         var root = item.Root;
-        var topology = await GetParticipantTopologyForRouting(topic.MembershipScope, root, cancellationToken);
-        if (topology is null)
+        var membership = await GetMembershipSnapshotForRouting(topic.MembershipScope, root, cancellationToken);
+        if (membership is null)
         {
             return;
         }
 
-        foreach (var peer in GetForwardingTreeTargets(topology, root, sender))
+        var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope, _transport.LocalSilo));
+        foreach (var peer in membership.GetForwardingTreeTargets(topic.MembershipScope, _transport.LocalSilo, root, sender, fanout))
         {
             EnqueueGossip(peer, item, topic);
         }
@@ -710,129 +723,21 @@ internal sealed partial class DisseminationProtocol(
     private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(string topicName, DisseminationMembershipScope membershipScope, long round)
     {
         var options = _options.CurrentValue.Overlay;
-        var topology = GetParticipantTopology(membershipScope);
-        var participants = topology.Participants;
-        if (participants.Length <= 1)
-        {
-            return [];
-        }
-
-        if (!topology.Indices.TryGetValue(_transport.LocalSilo, out var localIndex))
-        {
-            return [];
-        }
-
-        var fanout = GetFanOutFactor(participants.Length);
-        var candidates = new List<(SiloAddress Peer, ulong Score)>();
-        foreach (var index in GetAntiEntropyCandidateIndexes(localIndex, participants.Length, fanout))
-        {
-            if (index != localIndex)
-            {
-                var peer = participants[index];
-                candidates.Add((peer, GetRepairPeerScore(peer, topicName, round, localIndex)));
-            }
-        }
-
-        var count = Math.Min(options.AntiEntropyPeerCount, candidates.Count);
-        if (count <= 0)
-        {
-            return [];
-        }
-
-        candidates.Sort(static (left, right) =>
-        {
-            var result = left.Score.CompareTo(right.Score);
-            return result != 0 ? result : left.Peer.CompareTo(right.Peer);
-        });
-
-        var result = ImmutableArray.CreateBuilder<SiloAddress>(count);
-        for (var i = 0; i < count; i++)
-        {
-            result.Add(candidates[i].Peer);
-        }
-
-        return result.MoveToImmutable();
-    }
-
-    private static IEnumerable<int> GetAntiEntropyCandidateIndexes(int localIndex, int participantCount, int fanout)
-    {
+        var membership = _membership.CurrentSnapshot;
+        PrunePeerState(membership);
+        var participantCount = membership.GetParticipantCount(membershipScope, _transport.LocalSilo);
         if (participantCount <= 1)
         {
-            yield break;
+            return [];
         }
 
-        var topLevelEnd = Math.Min(fanout, participantCount);
-        if (localIndex < topLevelEnd)
-        {
-            for (var i = 0; i < topLevelEnd; i++)
-            {
-                yield return i;
-            }
-
-            yield break;
-        }
-
-        var parentIndex = localIndex / fanout - 1;
-        if (parentIndex < 0)
-        {
-            yield break;
-        }
-
-        var (previousLevelStart, previousLevelEnd) = GetLevelRange(parentIndex, participantCount, fanout);
-        var windowStart = previousLevelStart + (parentIndex - previousLevelStart) / fanout * fanout;
-        var windowEnd = Math.Min(previousLevelEnd, windowStart + fanout);
-        for (var i = windowStart; i < windowEnd; i++)
-        {
-            yield return i;
-        }
-    }
-
-    private static (int Start, int End) GetLevelRange(int index, int participantCount, int fanout)
-    {
-        var start = 0L;
-        var width = (long)fanout;
-        while (index >= start + width && start + width < participantCount)
-        {
-            start += width;
-            width = Math.Min(width * fanout, participantCount - start);
-        }
-
-        return ((int)start, (int)Math.Min(participantCount, start + width));
-    }
-
-    private static ulong GetRepairPeerScore(SiloAddress peer, string topicName, long round, int localIndex)
-    {
-        var value = (ulong)(uint)peer.GetConsistentHashCode();
-        value ^= Mix(GetStableStringHash(topicName));
-        value ^= (ulong)round * 0x9E3779B97F4A7C15UL;
-        value ^= (ulong)(uint)localIndex << 32;
-        return Mix(value);
-    }
-
-    private static ulong GetStableStringHash(string value)
-    {
-        const ulong offsetBasis = 14695981039346656037UL;
-        const ulong prime = 1099511628211UL;
-        var hash = offsetBasis;
-        foreach (var ch in value)
-        {
-            hash ^= (byte)ch;
-            hash *= prime;
-            hash ^= (byte)(ch >> 8);
-            hash *= prime;
-        }
-
-        return hash;
-    }
-
-    private static ulong Mix(ulong value)
-    {
-        value ^= value >> 30;
-        value *= 0xBF58476D1CE4E5B9UL;
-        value ^= value >> 27;
-        value *= 0x94D049BB133111EBUL;
-        value ^= value >> 31;
-        return value;
+        return membership.SelectAntiEntropyPeers(
+            membershipScope,
+            _transport.LocalSilo,
+            topicName,
+            round,
+            GetFanOutFactor(participantCount),
+            options.AntiEntropyPeerCount);
     }
 
     private int GetFanOutFactor(int participantCount)
@@ -863,89 +768,8 @@ internal sealed partial class DisseminationProtocol(
         return (int)Math.Ceiling(Math.Max(min, Math.Min(scaled, max)));
     }
 
-    private IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(ParticipantTopology topology, SiloAddress root)
+    private void PrunePeerState(DisseminationMembershipSnapshot membershipSnapshot)
     {
-        if (!topology.Indices.TryGetValue(root, out var rootIndex))
-        {
-            return [];
-        }
-
-        var fanout = GetFanOutFactor(topology.Participants.Length);
-        var result = new List<SiloAddress>(Math.Min(fanout * 2, topology.Participants.Length));
-        AddTopLevelTargets(topology, fanout, root, result);
-        AddFixedChildren(topology, rootIndex, fanout, root, except: null, result);
-        return result;
-    }
-
-    private IReadOnlyList<SiloAddress> GetForwardingTreeTargets(ParticipantTopology topology, SiloAddress root, SiloAddress sender)
-    {
-        if (!topology.Indices.TryGetValue(_transport.LocalSilo, out var localIndex))
-        {
-            return [];
-        }
-
-        var fanout = GetFanOutFactor(topology.Participants.Length);
-        var result = new List<SiloAddress>(Math.Min(fanout, topology.Participants.Length));
-        AddFixedChildren(topology, localIndex, fanout, root, sender, result);
-        return result;
-    }
-
-    private static void AddTopLevelTargets(
-        ParticipantTopology topology,
-        int fanout,
-        SiloAddress root,
-        List<SiloAddress> result)
-    {
-        var count = Math.Min(fanout, topology.Participants.Length);
-        for (var i = 0; i < count; i++)
-        {
-            AddTarget(topology.Participants[i], root, except: null, result);
-        }
-    }
-
-    private static void AddFixedChildren(
-        ParticipantTopology topology,
-        int index,
-        int fanout,
-        SiloAddress root,
-        SiloAddress? except,
-        List<SiloAddress> result)
-    {
-        var firstChild = (long)fanout * (index + 1);
-        for (var i = 0; i < fanout; i++)
-        {
-            var childIndex = firstChild + i;
-            if (childIndex >= topology.Participants.Length)
-            {
-                break;
-            }
-
-            AddTarget(topology.Participants[(int)childIndex], root, except, result);
-        }
-    }
-
-    private static void AddTarget(SiloAddress peer, SiloAddress root, SiloAddress? except, List<SiloAddress> result)
-    {
-        if (Equals(peer, root) || except is { } excluded && Equals(peer, excluded) || result.Contains(peer))
-        {
-            return;
-        }
-
-        result.Add(peer);
-    }
-
-    private ParticipantTopology GetParticipantTopology(DisseminationMembershipScope membershipScope)
-    {
-        var membership = _transport.GetMembership();
-        PrunePeerState(membership);
-        return membershipScope == DisseminationMembershipScope.AllMembers
-            ? GetCachedParticipantTopology(membership.AllMembers, ref _allMembersTopology)
-            : GetCachedParticipantTopology(membership.ActiveMembers, ref _activeMembersTopology);
-    }
-
-    private void PrunePeerState(DisseminationMembership membership)
-    {
-        HashSet<SiloAddress>? currentParticipants = null;
         var now = _timeProvider.GetUtcNow();
 
         lock (_failureLock)
@@ -978,16 +802,7 @@ internal sealed partial class DisseminationProtocol(
 
         bool IsCurrentParticipant(SiloAddress peer)
         {
-            currentParticipants ??= CreateCurrentParticipantSet();
-            return currentParticipants.Contains(peer);
-        }
-
-        HashSet<SiloAddress> CreateCurrentParticipantSet()
-        {
-            var result = new HashSet<SiloAddress>(membership.AllMembers);
-            result.UnionWith(membership.ActiveMembers);
-            result.Add(_transport.LocalSilo);
-            return result;
+            return membershipSnapshot.ContainsCurrentParticipant(_transport.LocalSilo, peer);
         }
     }
 
@@ -997,96 +812,23 @@ internal sealed partial class DisseminationProtocol(
         _gossipFlushWakeup = null;
     }
 
-    private ParticipantTopology GetCachedParticipantTopology(
-        IEnumerable<SiloAddress> participants,
-        ref ParticipantTopology cachedTopology)
-    {
-        var orderedParticipants = GetOrderedParticipants(participants, root: null, includeLocal: true, preserveOrder: true);
-
-        lock (_topologyLock)
-        {
-            if (cachedTopology.Participants.SequenceEqual(orderedParticipants))
-            {
-                return cachedTopology;
-            }
-
-            var updated = BuildParticipantTopology(orderedParticipants);
-            cachedTopology = updated;
-            return updated;
-        }
-    }
-
-    private ParticipantTopology BuildParticipantTopology(
-        IEnumerable<SiloAddress> participants,
-        SiloAddress? root,
-        bool includeLocal) =>
-        BuildParticipantTopology(GetOrderedParticipants(participants, root, includeLocal, preserveOrder: false));
-
-    private ImmutableArray<SiloAddress> GetOrderedParticipants(
-        IEnumerable<SiloAddress> participants,
-        SiloAddress? root,
-        bool includeLocal,
-        bool preserveOrder)
-    {
-        var orderedParticipants = new List<SiloAddress>();
-        var seen = new HashSet<SiloAddress>();
-        foreach (var participant in participants)
-        {
-            AddParticipant(participant);
-        }
-
-        if (includeLocal)
-        {
-            AddParticipant(_transport.LocalSilo);
-        }
-
-        if (root is { } rootAddress)
-        {
-            AddParticipant(rootAddress);
-        }
-
-        if (!preserveOrder)
-        {
-            orderedParticipants.Sort(static (left, right) => left.CompareTo(right));
-        }
-
-        return [.. orderedParticipants];
-
-        void AddParticipant(SiloAddress participant)
-        {
-            if (seen.Add(participant))
-            {
-                orderedParticipants.Add(participant);
-            }
-        }
-    }
-
-    private static ParticipantTopology BuildParticipantTopology(ImmutableArray<SiloAddress> participants)
-    {
-        var indices = new Dictionary<SiloAddress, int>(participants.Length);
-        for (var i = 0; i < participants.Length; i++)
-        {
-            indices[participants[i]] = i;
-        }
-
-        return new ParticipantTopology(participants, indices.ToFrozenDictionary());
-    }
-
-    private async ValueTask<ParticipantTopology?> GetParticipantTopologyForRouting(
+    private async ValueTask<DisseminationMembershipSnapshot?> GetMembershipSnapshotForRouting(
         DisseminationMembershipScope membershipScope,
         SiloAddress root,
         CancellationToken cancellationToken)
     {
-        var topology = GetParticipantTopology(membershipScope);
-        if (topology.Indices.ContainsKey(root))
+        var membership = _membership.CurrentSnapshot;
+        PrunePeerState(membership);
+        if (membership.ContainsParticipant(membershipScope, root, _transport.LocalSilo))
         {
-            return topology;
+            return membership;
         }
 
         LogDebugDisseminationRootMissing(_logger, root);
-        await _transport.RefreshMembership(cancellationToken);
-        topology = GetParticipantTopology(membershipScope);
-        return topology.Indices.ContainsKey(root) ? topology : null;
+        await _membership.RefreshMembership(cancellationToken);
+        membership = _membership.CurrentSnapshot;
+        PrunePeerState(membership);
+        return membership.ContainsParticipant(membershipScope, root, _transport.LocalSilo) ? membership : null;
     }
 
     private bool TryGetEnabledTopic(string topicName, [NotNullWhen(true)] out IDisseminationTopic? topic)
@@ -1306,15 +1048,6 @@ internal sealed partial class DisseminationProtocol(
 
             return result.ToImmutable();
         }
-    }
-
-    private sealed record ParticipantTopology(
-        ImmutableArray<SiloAddress> Participants,
-        FrozenDictionary<SiloAddress, int> Indices)
-    {
-        public static readonly ParticipantTopology Empty = new(
-            [],
-            FrozenDictionary<SiloAddress, int>.Empty);
     }
 
     [LoggerMessage(
