@@ -74,30 +74,22 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic);
         topic.SetValue("obsolete", version: 10);
 
-        var mismatchedTopic = new DisseminationValue
-        {
-            Digest = new DisseminationDigest("other-topic", "unsupported", version: 1),
-            Root = local,
-            ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
-            Payload = BitConverter.GetBytes(1L),
-        };
         var expired = new DisseminationValue
         {
-            Digest = new DisseminationDigest(topic.Name, "expired", version: 1),
+            Digest = new DisseminationTopicDigest("expired", version: 1),
             Root = local,
             ExpiresAt = DateTimeOffset.UnixEpoch,
             Payload = BitConverter.GetBytes(1L),
         };
         var obsolete = topic.CreateItem(local, "obsolete", sequence: 5);
 
-        Assert.False(await protocol.Publish(topic.Name, mismatchedTopic, [peer], CancellationToken.None));
         Assert.False(await protocol.Publish(topic.Name, expired, [peer], CancellationToken.None));
         Assert.False(await protocol.Publish(topic.Name, obsolete, [peer], CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
         Assert.Equal(
-            new[] { mismatchedTopic.Digest, expired.Digest, obsolete.Digest },
+            new[] { expired.Digest, obsolete.Digest },
             topic.FallbackDigests);
     }
 
@@ -624,7 +616,7 @@ public class DisseminationProtocolTests
         topic.SetValue(FakeTopic.DefaultKey, version: 1);
         var badRepairItem = new DisseminationValue
         {
-            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2),
+            Digest = new DisseminationTopicDigest(FakeTopic.DefaultKey, version: 2),
             Root = peer,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = Array.Empty<byte>(),
@@ -655,7 +647,7 @@ public class DisseminationProtocolTests
 
         var badRepairItem = new DisseminationValue
         {
-            Digest = new DisseminationDigest(topic.Name, FakeTopic.DefaultKey, version: 2),
+            Digest = new DisseminationTopicDigest(FakeTopic.DefaultKey, version: 2),
             Root = peer,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = Array.Empty<byte>(),
@@ -750,11 +742,9 @@ public class DisseminationProtocolTests
         var serializer = serviceProvider.GetRequiredService<Serializer>();
         var sourceManager = new FakeMembershipManager(baseSnapshot);
         var sourceTopic = CreateMembershipTopic(local, sourceManager, serializer);
-        var peerTopicDigest = Assert.Single(sourceTopic.GetDigests());
-        var peerDigest = new DisseminationDigest(sourceTopic.Name, peerTopicDigest.Key, peerTopicDigest.Version);
+        var peerDigest = Assert.Single(sourceTopic.GetDigests());
         sourceManager.CurrentSnapshot = updatedSnapshot;
-        var localTopicDigest = Assert.Single(sourceTopic.GetDigests());
-        var localDigest = new DisseminationDigest(sourceTopic.Name, localTopicDigest.Key, localTopicDigest.Version);
+        var localDigest = Assert.Single(sourceTopic.GetDigests());
 
         var value = await sourceTopic.GetValue(
             localDigest,
@@ -889,12 +879,13 @@ public class DisseminationProtocolTests
         response.ValuesByTopic.Values.SelectMany(static values => values);
 
     private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(params DisseminationValue[] values) =>
-        values
-            .GroupBy(static value => value.Digest.Topic, StringComparer.Ordinal)
-            .ToFrozenDictionary(
-                static group => group.Key,
-                static group => group.ToImmutableArray(),
-                StringComparer.Ordinal);
+        CreateValueGroups(FakeTopic.DefaultName, values);
+
+    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(string topicName, params DisseminationValue[] values) =>
+        new Dictionary<string, ImmutableArray<DisseminationValue>>(StringComparer.Ordinal)
+        {
+            [topicName] = [.. values],
+        }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static MembershipDisseminationTopic CreateMembershipTopic(
         SiloAddress local,
@@ -1188,8 +1179,9 @@ public class DisseminationProtocolTests
     }
 #endif
 
-    private sealed class FakeTopic(SiloAddress localSilo, string name = "fake-topic") : IDisseminationTopic
+    private sealed class FakeTopic(SiloAddress localSilo, string name = FakeTopic.DefaultName) : IDisseminationTopic
     {
+        public const string DefaultName = "fake-topic";
         public const string DefaultKey = "value";
         private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
 
@@ -1197,7 +1189,7 @@ public class DisseminationProtocolTests
 
         public HashSet<string> ExpectedKeys { get; } = new(StringComparer.Ordinal);
 
-        public List<DisseminationDigest> FallbackDigests { get; } = new();
+        public List<DisseminationTopicDigest> FallbackDigests { get; } = new();
 
         public string Name => name;
 
@@ -1209,7 +1201,7 @@ public class DisseminationProtocolTests
 
         public DisseminationValue CreateItem(SiloAddress root, string key, long sequence) => new()
         {
-            Digest = new DisseminationDigest(Name, key, sequence),
+            Digest = new DisseminationTopicDigest(key, sequence),
             Root = root,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
             Payload = BitConverter.GetBytes(sequence),
@@ -1237,14 +1229,14 @@ public class DisseminationProtocolTests
             return [.. digests.OrderBy(static digest => digest.Key, StringComparer.Ordinal)];
         }
 
-        public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
+        public int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Version.CompareTo(right.Version);
 
-        public bool IsObsolete(DisseminationDigest digest) =>
+        public bool IsObsolete(DisseminationTopicDigest digest) =>
             _versions.TryGetValue(digest.Key, out var version) && version > digest.Version;
 
         public ValueTask<DisseminationValue?> GetValue(
-            DisseminationDigest digest,
-            DisseminationDigest? peerDigest,
+            DisseminationTopicDigest digest,
+            DisseminationTopicDigest? peerDigest,
             CancellationToken cancellationToken)
         {
             if (!_versions.TryGetValue(digest.Key, out var version) || version < digest.Version)
@@ -1276,7 +1268,7 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(DisseminationApplyResult.Applied);
         }
 
-        public ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken)
+        public ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken)
         {
             FallbackDigests.Add(digest);
             return ValueTask.CompletedTask;
@@ -1391,15 +1383,14 @@ public class DisseminationProtocolTests
                 return new ModelRepairResponse(false, 0);
             }
 
-            var fullLocalDigest = new DisseminationDigest(_topic.Name, localDigest.Key, localDigest.Version);
-            var peerDigest = new DisseminationDigest(_topic.Name, FakeTopic.DefaultKey, peerVersion);
-            if (_topic.CompareVersion(fullLocalDigest, peerDigest) <= 0)
+            var peerDigest = new DisseminationTopicDigest(FakeTopic.DefaultKey, peerVersion);
+            if (_topic.CompareVersion(localDigest, peerDigest) <= 0)
             {
                 return new ModelRepairResponse(false, 0);
             }
 
             var value = await _topic.GetValue(
-                fullLocalDigest,
+                localDigest,
                 peerDigest,
                 CancellationToken.None);
             return value is null
