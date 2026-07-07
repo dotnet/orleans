@@ -935,7 +935,7 @@ public class DisseminationProtocolTests
             peerCount: 1);
 
         Assert.False(snapshot.ContainsParticipant(DisseminationMembershipScope.ActiveMembers, local));
-        Assert.Equal(1, snapshot.GetParticipantCount(DisseminationMembershipScope.ActiveMembers));
+        Assert.Single(snapshot.ActiveMembers);
         Assert.Empty(targets);
         Assert.Empty(antiEntropyPeers);
     }
