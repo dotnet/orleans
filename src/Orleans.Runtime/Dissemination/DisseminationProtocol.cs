@@ -53,7 +53,7 @@ internal sealed partial class DisseminationProtocol(
         if (GetPublishValidationFailureReason(topic, item) is { } reason)
         {
             await topic.OnFallbackRequired(peer: null, item.Digest, cancellationToken);
-            DisseminationInstruments.OnFallback(item.Digest.Topic, reason);
+            DisseminationInstruments.OnFallback(topic.Name, reason);
             return false;
         }
 
@@ -66,7 +66,7 @@ internal sealed partial class DisseminationProtocol(
             return false;
         }
 
-        RecordRecentUpdate(item.Digest);
+        RecordRecentUpdate(topic.Name, item.Digest);
         foreach (var peer in GetOriginatorTreeTargets(topology, root))
         {
             EnqueueGossip(peer, item, topic);
@@ -86,11 +86,16 @@ internal sealed partial class DisseminationProtocol(
 
         foreach (var (topicName, values) in batch.ValuesByTopic)
         {
+            if (!TryGetEnabledTopic(topicName, out var topic))
+            {
+                continue;
+            }
+
             foreach (var item in values)
             {
                 if (string.Equals(item.Digest.Topic, topicName, StringComparison.Ordinal))
                 {
-                    await ApplyReceivedValue(item, batch.Sender, forward: true, cancellationToken);
+                    await ApplyReceivedValue(topicName, topic, item, batch.Sender, forward: true, cancellationToken);
                 }
             }
         }
@@ -218,6 +223,11 @@ internal sealed partial class DisseminationProtocol(
         {
             foreach (var (topicName, values) in response.ValuesByTopic)
             {
+                if (!TryGetEnabledTopic(topicName, out var topic))
+                {
+                    continue;
+                }
+
                 foreach (var item in values)
                 {
                     if (!string.Equals(item.Digest.Topic, topicName, StringComparison.Ordinal))
@@ -227,7 +237,7 @@ internal sealed partial class DisseminationProtocol(
 
                     try
                     {
-                        await ApplyReceivedValue(item, response.Sender, forward: false, cancellationToken);
+                        await ApplyReceivedValue(topicName, topic, item, response.Sender, forward: false, cancellationToken);
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -235,7 +245,7 @@ internal sealed partial class DisseminationProtocol(
                     }
                     catch (Exception exception)
                     {
-                        LogDebugAntiEntropyRepairValueFailed(_logger, exception, response.Sender, item.Digest.Topic, item.Digest.Key, item.Digest.Version);
+                        LogDebugAntiEntropyRepairValueFailed(_logger, exception, response.Sender, topicName, item.Digest.Key, item.Digest.Version);
                     }
                 }
             }
@@ -289,7 +299,7 @@ internal sealed partial class DisseminationProtocol(
                     cancellationToken);
                 if (item is null
                     || !string.Equals(item.Digest.Topic, requestedTopic.Name, StringComparison.Ordinal)
-                    || !ValidatePayloadSize(requestedTopic, item))
+                    || !ValidatePayloadSize(requestedTopic.Name, requestedTopic, item))
                 {
                     continue;
                 }
@@ -315,33 +325,29 @@ internal sealed partial class DisseminationProtocol(
     }
 
     private async ValueTask<DisseminationApplyResult> ApplyReceivedValue(
+        string topicName,
+        IDisseminationTopic topic,
         DisseminationValue value,
         SiloAddress sender,
         bool forward,
         CancellationToken cancellationToken)
     {
-        if (!TryGetEnabledTopic(value.Digest.Topic, out var topic))
-        {
-            EmitApplyResult(value, sender, DisseminationApplyResult.Rejected);
-            return DisseminationApplyResult.Rejected;
-        }
-
-        if (!ValidatePayloadSize(topic, value))
+        if (!ValidatePayloadSize(topicName, topic, value))
         {
             return DisseminationApplyResult.Rejected;
         }
 
         if (IsExpired(value) || topic.IsObsolete(value.Digest))
         {
-            EmitApplyResult(value, sender, DisseminationApplyResult.Obsolete);
+            EmitApplyResult(topicName, value, sender, DisseminationApplyResult.Obsolete);
             return DisseminationApplyResult.Obsolete;
         }
 
         var result = await topic.ApplyValue(value, cancellationToken);
-        EmitApplyResult(value, sender, result);
+        EmitApplyResult(topicName, value, sender, result);
         if (result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate)
         {
-            RecordRecentUpdate(value.Digest);
+            RecordRecentUpdate(topicName, value.Digest);
         }
 
         if (result == DisseminationApplyResult.Applied && forward)
@@ -377,7 +383,7 @@ internal sealed partial class DisseminationProtocol(
     private void EnqueueGossip(SiloAddress peer, DisseminationValue item, IDisseminationTopic topic)
     {
         var now = _timeProvider.GetUtcNow();
-        var key = new DigestKey(item.Digest.Topic, item.Digest.Key);
+        var key = new DigestKey(topic.Name, item.Digest.Key);
         lock (_gossipQueueLock)
         {
             if (!_pendingGossip.TryGetValue(peer, out var pending))
@@ -398,7 +404,7 @@ internal sealed partial class DisseminationProtocol(
             pending.AddOrReplace(key, item);
             if (pending.Values.Count >= _options.CurrentValue.MaxBatchItems
                 || pending.ByteCount >= _options.CurrentValue.MaxBatchBytes
-                || pending.GetTopicCount(item.Digest.Topic) >= topic.Options.MaxPendingItemCount)
+                || pending.GetTopicCount(topic.Name) >= topic.Options.MaxPendingItemCount)
             {
                 pending.FlushAfter = now;
             }
@@ -685,9 +691,9 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private void RecordRecentUpdate(DisseminationDigest digest)
+    private void RecordRecentUpdate(string topicName, DisseminationDigest digest)
     {
-        var key = new DigestKey(digest.Topic, digest.Key);
+        var key = new DigestKey(topicName, digest.Key);
         lock (_recentUpdateLock)
         {
             _lastUpdateReceivedAt[key] = _timeProvider.GetUtcNow();
@@ -1103,13 +1109,13 @@ internal sealed partial class DisseminationProtocol(
         return false;
     }
 
-    private bool ValidatePayloadSize(IDisseminationTopic topic, DisseminationValue item)
+    private bool ValidatePayloadSize(string topicName, IDisseminationTopic topic, DisseminationValue item)
     {
         var options = _options.CurrentValue;
         if (item.Payload.Length > topic.Options.MaxPayloadBytes || item.Payload.Length > options.MaxBatchBytes)
         {
-            DisseminationEvents.EmitPayloadDrop(item.Digest, _transport.LocalSilo, "oversize", item.Payload.Length);
-            DisseminationInstruments.OnPayloadDropped(item.Digest.Topic, "oversize");
+            DisseminationEvents.EmitPayloadDrop(topicName, item.Digest, _transport.LocalSilo, "oversize", item.Payload.Length);
+            DisseminationInstruments.OnPayloadDropped(topicName, "oversize");
             return false;
         }
 
@@ -1133,7 +1139,7 @@ internal sealed partial class DisseminationProtocol(
             return "obsolete";
         }
 
-        return ValidatePayloadSize(topic, item) ? null : "oversize";
+        return ValidatePayloadSize(topic.Name, topic, item) ? null : "oversize";
     }
 
     private bool IsExpired(DisseminationValue item) => item.ExpiresAt <= _timeProvider.GetUtcNow();
@@ -1174,10 +1180,10 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private void EmitApplyResult(DisseminationValue item, SiloAddress sender, DisseminationApplyResult result)
+    private void EmitApplyResult(string topicName, DisseminationValue item, SiloAddress sender, DisseminationApplyResult result)
     {
-        DisseminationEvents.EmitValue(item.Digest, _transport.LocalSilo, sender, result, item.Payload.Length);
-        DisseminationInstruments.OnValueApplied(item.Digest.Topic, result);
+        DisseminationEvents.EmitValue(topicName, item.Digest, _transport.LocalSilo, sender, result, item.Payload.Length);
+        DisseminationInstruments.OnValueApplied(topicName, result);
     }
 
     private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(
