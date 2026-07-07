@@ -18,18 +18,18 @@ internal interface IDisseminationTopic
 
     IReadOnlyList<DisseminationTopicDigest> GetDigests();
 
-    int CompareVersion(DisseminationDigest left, DisseminationDigest right);
+    int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right);
 
-    bool IsObsolete(DisseminationDigest digest);
+    bool IsObsolete(DisseminationTopicDigest digest);
 
     ValueTask<DisseminationValue?> GetValue(
-        DisseminationDigest digest,
-        DisseminationDigest? peerDigest,
+        DisseminationTopicDigest digest,
+        DisseminationTopicDigest? peerDigest,
         CancellationToken cancellationToken);
 
     ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken);
 
-    ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken);
+    ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken);
 }
 
 internal enum DisseminationMembershipScope

@@ -27,7 +27,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         var payload = serializer.SerializeToArray(statistics);
         return new DisseminationValue
         {
-            Digest = new DisseminationDigest(Name, origin.ToParsableString(), statistics.DateTime.Ticks),
+            Digest = new DisseminationTopicDigest(origin.ToParsableString(), statistics.DateTime.Ticks),
             Root = origin,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
             Payload = payload,
@@ -52,15 +52,15 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         return digests;
     }
 
-    public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
+    public int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Version.CompareTo(right.Version);
 
-    public bool IsObsolete(DisseminationDigest digest) =>
+    public bool IsObsolete(DisseminationTopicDigest digest) =>
         !TryGetSiloAddress(digest.Key, out var siloAddress)
         || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, digest.Version);
 
     public ValueTask<DisseminationValue?> GetValue(
-        DisseminationDigest digest,
-        DisseminationDigest? peerDigest,
+        DisseminationTopicDigest digest,
+        DisseminationTopicDigest? peerDigest,
         CancellationToken cancellationToken)
     {
         if (!TryGetSiloAddress(digest.Key, out var siloAddress)
@@ -84,7 +84,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         return ValueTask.FromResult(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken)
+    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken)
     {
         if (Options.FallbackEnabled && TryGetSiloAddress(digest.Key, out var siloAddress))
         {

@@ -93,10 +93,7 @@ internal sealed partial class DisseminationProtocol(
 
             foreach (var item in values)
             {
-                if (string.Equals(item.Digest.Topic, topicName, StringComparison.Ordinal))
-                {
-                    await ApplyReceivedValue(topicName, topic, item, batch.Sender, forward: true, cancellationToken);
-                }
+                await ApplyReceivedValue(topicName, topic, item, batch.Sender, forward: true, cancellationToken);
             }
         }
     }
@@ -230,11 +227,6 @@ internal sealed partial class DisseminationProtocol(
 
                 foreach (var item in values)
                 {
-                    if (!string.Equals(item.Digest.Topic, topicName, StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
                     try
                     {
                         await ApplyReceivedValue(topicName, topic, item, response.Sender, forward: false, cancellationToken);
@@ -262,7 +254,7 @@ internal sealed partial class DisseminationProtocol(
         }
 
         var requestDigestCount = GetDigestCount(request.DigestsByTopic);
-        var values = new List<DisseminationValue>();
+        var values = new List<TopicValue>();
         var byteCount = 0;
         var truncated = false;
         var options = _options.CurrentValue;
@@ -287,7 +279,7 @@ internal sealed partial class DisseminationProtocol(
                     continue;
                 }
 
-                var localDigest = new DisseminationDigest(requestedTopic.Name, topicDigest.Key, topicDigest.Version);
+                var localDigest = topicDigest;
                 if (requestedTopic.CompareVersion(localDigest, remoteDigest) <= 0)
                 {
                     continue;
@@ -298,7 +290,6 @@ internal sealed partial class DisseminationProtocol(
                     remoteDigest,
                     cancellationToken);
                 if (item is null
-                    || !string.Equals(item.Digest.Topic, requestedTopic.Name, StringComparison.Ordinal)
                     || !ValidatePayloadSize(requestedTopic.Name, requestedTopic, item))
                 {
                     continue;
@@ -310,7 +301,7 @@ internal sealed partial class DisseminationProtocol(
                     break;
                 }
 
-                values.Add(item);
+                values.Add(new TopicValue(requestedTopic.Name, item));
                 byteCount += item.Payload.Length;
             }
 
@@ -532,10 +523,10 @@ internal sealed partial class DisseminationProtocol(
 
     private DateTimeOffset GetNextPendingGossipFlushUnsafe() => _pendingGossip.Values.Min(static pending => pending.FlushAfter);
 
-    private List<(SiloAddress Peer, ImmutableArray<DisseminationValue> Values)> DrainPendingGossip(bool force)
+    private List<(SiloAddress Peer, ImmutableArray<TopicValue> Values)> DrainPendingGossip(bool force)
     {
         var now = _timeProvider.GetUtcNow();
-        var result = new List<(SiloAddress Peer, ImmutableArray<DisseminationValue> Values)>();
+        var result = new List<(SiloAddress Peer, ImmutableArray<TopicValue> Values)>();
         lock (_gossipQueueLock)
         {
             foreach (var (peer, pending) in _pendingGossip)
@@ -546,7 +537,7 @@ internal sealed partial class DisseminationProtocol(
                 }
 
                 _pendingGossip.Remove(peer);
-                result.Add((peer, [.. pending.Values.Values]));
+                result.Add((peer, [.. pending.Values.Select(static item => new TopicValue(item.Key.Topic, item.Value))]));
             }
         }
 
@@ -554,7 +545,7 @@ internal sealed partial class DisseminationProtocol(
         return result;
     }
 
-    private async Task SendGossipBatches(List<(SiloAddress Peer, ImmutableArray<DisseminationValue> Values)> batches, CancellationToken cancellationToken)
+    private async Task SendGossipBatches(List<(SiloAddress Peer, ImmutableArray<TopicValue> Values)> batches, CancellationToken cancellationToken)
     {
         foreach (var queued in batches)
         {
@@ -562,20 +553,20 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private async Task SendGossipBatch(SiloAddress peer, IReadOnlyList<DisseminationValue> values, CancellationToken cancellationToken)
+    private async Task SendGossipBatch(SiloAddress peer, IReadOnlyList<TopicValue> values, CancellationToken cancellationToken)
     {
-        var currentBatch = new List<DisseminationValue>();
+        var currentBatch = new List<TopicValue>();
         var byteCount = 0;
         foreach (var item in values)
         {
-            if (!TryGetEnabledTopic(item.Digest.Topic, out var topic))
+            if (!TryGetEnabledTopic(item.Topic, out var topic))
             {
                 continue;
             }
 
             if (currentBatch.Count > 0
                 && (currentBatch.Count >= _options.CurrentValue.MaxBatchItems
-                    || byteCount + item.Payload.Length > _options.CurrentValue.MaxBatchBytes))
+                    || byteCount + item.Value.Payload.Length > _options.CurrentValue.MaxBatchBytes))
             {
                 await SendGossipBatchCore(peer, [.. currentBatch], cancellationToken);
                 currentBatch.Clear();
@@ -583,7 +574,7 @@ internal sealed partial class DisseminationProtocol(
             }
 
             currentBatch.Add(item);
-            byteCount += item.Payload.Length;
+            byteCount += item.Value.Payload.Length;
         }
 
         if (currentBatch.Count > 0)
@@ -592,7 +583,7 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private async Task SendGossipBatchCore(SiloAddress peer, ImmutableArray<DisseminationValue> values, CancellationToken cancellationToken)
+    private async Task SendGossipBatchCore(SiloAddress peer, ImmutableArray<TopicValue> values, CancellationToken cancellationToken)
     {
         var batch = new DisseminationGossipBatch
         {
@@ -665,17 +656,16 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private Dictionary<string, DisseminationDigest> GetRemoteDigestMap(
+    private Dictionary<string, DisseminationTopicDigest> GetRemoteDigestMap(
         IDisseminationTopic topic,
         ImmutableArray<DisseminationTopicDigest> digests)
     {
-        var result = new Dictionary<string, DisseminationDigest>(digests.Length, StringComparer.Ordinal);
+        var result = new Dictionary<string, DisseminationTopicDigest>(digests.Length, StringComparer.Ordinal);
         foreach (var topicDigest in digests)
         {
-            var digest = new DisseminationDigest(topic.Name, topicDigest.Key, topicDigest.Version);
-            if (!result.TryGetValue(topicDigest.Key, out var existing) || topic.CompareVersion(digest, existing) > 0)
+            if (!result.TryGetValue(topicDigest.Key, out var existing) || topic.CompareVersion(topicDigest, existing) > 0)
             {
-                result[topicDigest.Key] = digest;
+                result[topicDigest.Key] = topicDigest;
             }
         }
 
@@ -691,7 +681,7 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private void RecordRecentUpdate(string topicName, DisseminationDigest digest)
+    private void RecordRecentUpdate(string topicName, DisseminationTopicDigest digest)
     {
         var key = new DigestKey(topicName, digest.Key);
         lock (_recentUpdateLock)
@@ -1124,11 +1114,6 @@ internal sealed partial class DisseminationProtocol(
 
     private string? GetPublishValidationFailureReason(IDisseminationTopic topic, DisseminationValue item)
     {
-        if (!string.Equals(item.Digest.Topic, topic.Name, StringComparison.Ordinal))
-        {
-            return "topic";
-        }
-
         if (IsExpired(item))
         {
             return "expired";
@@ -1217,15 +1202,15 @@ internal sealed partial class DisseminationProtocol(
         return result;
     }
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> GroupValuesByTopic(IReadOnlyList<DisseminationValue> values)
+    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> GroupValuesByTopic(IReadOnlyList<TopicValue> values)
     {
         var result = new Dictionary<string, ImmutableArray<DisseminationValue>.Builder>(StringComparer.Ordinal);
-        foreach (var value in values)
+        foreach (var (topic, value) in values)
         {
-            if (!result.TryGetValue(value.Digest.Topic, out var topicValues))
+            if (!result.TryGetValue(topic, out var topicValues))
             {
                 topicValues = ImmutableArray.CreateBuilder<DisseminationValue>();
-                result.Add(value.Digest.Topic, topicValues);
+                result.Add(topic, topicValues);
             }
 
             topicValues.Add(value);
@@ -1247,6 +1232,8 @@ internal sealed partial class DisseminationProtocol(
         ImmutableArray<DisseminationTopicDigest> Digests);
 
     private readonly record struct DigestKey(string Topic, string Key);
+
+    private readonly record struct TopicValue(string Topic, DisseminationValue Value);
 
     private sealed class PendingGossipBatch(DateTimeOffset flushAfter)
     {
