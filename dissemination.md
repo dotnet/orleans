@@ -259,14 +259,15 @@ internal interface IDisseminationTopic
 
     DisseminationTopicOptions Options { get; }
 
-    IReadOnlyList<DisseminationDigest> GetDigests();
+    IReadOnlyList<DisseminationTopicDigest> GetDigests();
 
-    int CompareVersion(DisseminationDigest left, DisseminationDigest right);
+    int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right);
 
-    bool IsObsolete(DisseminationDigest digest);
+    bool IsObsolete(DisseminationTopicDigest digest);
 
     ValueTask<DisseminationValue?> GetValue(
-        DisseminationDigest digest,
+        DisseminationTopicDigest digest,
+        DisseminationTopicDigest? peerDigest,
         CancellationToken cancellationToken);
 
     ValueTask<DisseminationApplyResult> ApplyValue(
@@ -274,8 +275,8 @@ internal interface IDisseminationTopic
         CancellationToken cancellationToken);
 
     ValueTask OnFallbackRequired(
-        SiloAddress peer,
-        DisseminationDigest digest,
+        SiloAddress? peer,
+        DisseminationTopicDigest digest,
         CancellationToken cancellationToken);
 }
 ```
@@ -283,33 +284,31 @@ internal interface IDisseminationTopic
 Digest and value shapes:
 
 ```csharp
-internal readonly record struct DisseminationDigest(
-    string Topic,
+internal readonly record struct DisseminationTopicDigest(
     string Key,
     long Version);
 
 internal sealed class DisseminationValue
 {
-    public DisseminationDigest Digest { get; init; }
+    public DisseminationTopicDigest Digest { get; init; }
     public SiloAddress Root { get; init; }
     public DateTimeOffset ExpiresAt { get; init; }
-    public byte[] Payload { get; init; }
+    public ReadOnlyMemory<byte> Payload { get; init; }
 }
 ```
 
-`DisseminationDigest` is the payload-free summary exchanged during anti-entropy. It identifies one version of one logical value:
+`DisseminationTopicDigest` is the topic-local payload-free summary exchanged during anti-entropy. It identifies one version of one logical value within the enclosing topic:
 
 | Property | Meaning |
 |---|---|
-| `Topic` | Logical namespace and semantic owner, such as `load` or `membership`. |
 | `Key` | Topic-local string key. Membership uses `"cluster"`; load statistics use the source silo's `SiloAddress.ToParsableString()` value. |
-| `Version` | Monotonic version for this `(Topic, Key)` stream. Higher versions supersede lower versions according to topic comparison rules. |
+| `Version` | Monotonic version for this topic/key stream. Higher versions supersede lower versions according to topic comparison rules. |
 
-`DisseminationValue` carries a digest plus routing and payload data:
+`DisseminationValue` carries a topic-local digest plus routing and payload data. Gossip and repair responses group values by topic, so the topic is not repeated on each value:
 
 | Property | Meaning |
 |---|---|
-| `Digest` | The `DisseminationDigest` for the value being sent. |
+| `Digest` | The `DisseminationTopicDigest` for the value being sent. |
 | `Root` | Silo which rooted this tree broadcast. This is routing metadata and is not necessarily the same as the value key. |
 | `ExpiresAt` | Time after which the value should not be applied or forwarded. |
 | `Payload` | Serialized topic-specific value. The topic owns deserialization, validation, version comparison, and application. |

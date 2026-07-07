@@ -16,7 +16,7 @@ The goal is to reduce routine fanout while preserving correctness backstops. The
 |---|---|
 | Relevant silos can address each other directly | Dissemination can build trees from cluster membership. |
 | Membership and fault detection are authoritative | Dissemination uses membership to choose peers and relies on existing liveness logic to remove failed silos. |
-| Values are monotonic per `(topic, key, payloadKind)` | Topic version comparison provides duplicate suppression. |
+| Values are monotonic per `(topic, key)` | Topic version comparison provides duplicate suppression. |
 | Topics own value semantics | The protocol handles routing, validation, and batching. Topics compare versions, materialize values, apply values, and perform fallback. |
 | Rolling upgrades are best-effort | New dissemination messages are attempted directly. Peers which cannot process them fail or reject them, and anti-entropy plus existing authoritative refresh paths repair after the temporary mismatch clears. |
 | Payloads are bounded | Oversize payloads are rejected and topic fallback is used during publication. Gossip and anti-entropy batches are bounded by item count and total payload bytes. |
@@ -37,17 +37,16 @@ The key distinguishing factors are value cardinality, update rate, payload size,
 
 ## Value model
 
-Each disseminated value is summarized by a payload-free `DisseminationDigest`:
+Each disseminated value is summarized by a payload-free `DisseminationTopicDigest`. The topic comes from the enclosing grouped batch or topic API:
 
 ```text
-(topic, key, version, payloadKind)
+(key, version)
 ```
 
-`DisseminationDigest` properties:
+`DisseminationTopicDigest` properties:
 
 | Property | Meaning |
 |---|---|
-| `Topic` | Logical dissemination topic, such as membership or deployment load. |
 | `Key` | Topic-defined string identifying one monotonic value stream within the topic. Examples: `"cluster"` for membership and `SiloAddress.ToParsableString()` for load statistics. |
 | `Version` | Topic-defined monotonic version. The protocol treats it as opaque except for sorting; topics decide whether one digest is newer than another. |
 
@@ -195,7 +194,7 @@ Implemented repair design:
 
 - Anti-entropy pull can exchange diffs when a topic can produce and apply them.
 - The source of truth for a topic should be able to accept a peer digest and produce the smallest useful payload for that peer.
-- `DisseminationDigest.Version` remains the target value version after the payload is applied.
+- `DisseminationTopicDigest.Version` remains the target value version after the payload is applied.
 - Membership diff and snapshot payloads are self-describing, so receivers can validate and reject unsupported payloads without widening the digest identity.
 - A diff payload must include enough topic-specific base information for the receiver to decide whether it can apply the diff. If the receiver's local base is too old, too new, or missing, the topic rejects the diff and relies on anti-entropy or fallback to obtain a full value.
 
@@ -240,11 +239,11 @@ Important structures:
 
 | Structure | Purpose |
 |---|---|
-| `DisseminationDigest` | Payload-free summary used for identity, version comparison, receiver validation, and anti-entropy. |
+| `DisseminationTopicDigest` | Topic-local payload-free summary used for key identity, version comparison, receiver validation, and anti-entropy. |
 | `DisseminationValue` | Payload envelope used by tree gossip and anti-entropy responses. |
 | `DisseminationMembership` | Transport snapshot containing ordered `AllMembers` and `ActiveMembers`. |
 | `ParticipantTopology` | Cached ordered participants, index map, and participant set for one membership scope. |
-| `DigestKey` | Protocol comparison key `(topic, key, payloadKind)` used to compare versions for the same value stream. |
+| `DigestKey` | Protocol comparison key `(topic, key)` used to compare versions for the same value stream. |
 | `AntiEntropyState` | Per-round local topics, digests, and selected peers grouped by topic. |
 | `_failureBackoffUntil` | Short backoff for failed sends and anti-entropy requests. |
 
@@ -329,7 +328,7 @@ Integration points:
 
 7. Per-peer outbound gossip coalescing.
    - Queue tree sends per peer before transport.
-   - Coalesce pending values by `(topic, key, payloadKind)` and keep the newest version.
+   - Coalesce pending values by `(topic, key)` and keep the newest version.
    - Flush by earliest topic coalescing delay, batch item/byte limits, or per-topic pending item limits.
 
 ## Future work, shortcomings, and trade-offs
