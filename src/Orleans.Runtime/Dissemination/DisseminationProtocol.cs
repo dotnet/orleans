@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -30,12 +31,10 @@ internal sealed partial class DisseminationProtocol(
     private DateTimeOffset? _nextGossipFlushAt;
     private CancellationTokenSource? _gossipFlushWakeup;
     private bool _gossipFlushScheduled;
-    private long _antiEntropyRound;
 
     public async ValueTask<bool> Publish(
         string topicName,
         DisseminationValue item,
-        IReadOnlyCollection<SiloAddress>? targetPeers,
         CancellationToken cancellationToken)
     {
         if (!TryGetEnabledTopic(topicName, out var topic))
@@ -51,27 +50,15 @@ internal sealed partial class DisseminationProtocol(
         }
 
         var root = item.Root;
-        IReadOnlyList<SiloAddress> treeTargets;
-        if (targetPeers is { Count: > 0 })
+        Debug.Assert(Equals(root, _transport.LocalSilo), "Published dissemination values should originate from the local silo.");
+        var membership = await GetMembershipSnapshotForRouting(topic.MembershipScope, root, cancellationToken);
+        if (membership is null)
         {
-            treeTargets = DisseminationMembershipSnapshot.GetOriginatorTreeTargets(
-                targetPeers,
-                _transport.LocalSilo,
-                root,
-                GetFanOutFactor);
-        }
-        else
-        {
-            var membership = await GetMembershipSnapshotForRouting(topic.MembershipScope, root, cancellationToken);
-            if (membership is null)
-            {
-                return false;
-            }
-
-            var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope, _transport.LocalSilo));
-            treeTargets = membership.GetOriginatorTreeTargets(topic.MembershipScope, _transport.LocalSilo, root, fanout);
+            return false;
         }
 
+        var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope));
+        var treeTargets = membership.GetOriginatorTreeTargets(topic.MembershipScope, root, fanout);
         RecordRecentUpdate(topic.Name, item.Digest);
         foreach (var peer in treeTargets)
         {
@@ -114,7 +101,6 @@ internal sealed partial class DisseminationProtocol(
         var topics = new Dictionary<string, AntiEntropyTopicState>(StringComparer.Ordinal);
         var currentValueStreams = new HashSet<DigestKey>();
         var now = _timeProvider.GetUtcNow();
-        var round = Interlocked.Increment(ref _antiEntropyRound);
         foreach (var topic in _topics.Values)
         {
             if (!topic.IsEnabled)
@@ -145,7 +131,7 @@ internal sealed partial class DisseminationProtocol(
             });
 
             topics.Add(topic.Name, new AntiEntropyTopicState(
-                SelectAntiEntropyPeers(topic.Name, topic.MembershipScope, round),
+                SelectAntiEntropyPeers(topic.MembershipScope),
                 [.. topicDigests]));
         }
 
@@ -364,7 +350,7 @@ internal sealed partial class DisseminationProtocol(
             return;
         }
 
-        var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope, _transport.LocalSilo));
+        var fanout = GetFanOutFactor(membership.GetParticipantCount(topic.MembershipScope));
         foreach (var peer in membership.GetForwardingTreeTargets(topic.MembershipScope, _transport.LocalSilo, root, sender, fanout))
         {
             EnqueueGossip(peer, item, topic);
@@ -720,12 +706,12 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(string topicName, DisseminationMembershipScope membershipScope, long round)
+    private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(DisseminationMembershipScope membershipScope)
     {
         var options = _options.CurrentValue.Overlay;
         var membership = _membership.CurrentSnapshot;
         PrunePeerState(membership);
-        var participantCount = membership.GetParticipantCount(membershipScope, _transport.LocalSilo);
+        var participantCount = membership.GetParticipantCount(membershipScope);
         if (participantCount <= 1)
         {
             return [];
@@ -734,9 +720,6 @@ internal sealed partial class DisseminationProtocol(
         return membership.SelectAntiEntropyPeers(
             membershipScope,
             _transport.LocalSilo,
-            topicName,
-            round,
-            GetFanOutFactor(participantCount),
             options.AntiEntropyPeerCount);
     }
 
@@ -776,7 +759,8 @@ internal sealed partial class DisseminationProtocol(
         {
             foreach (var (peer, until) in _failureBackoffUntil)
             {
-                if (until <= now || !IsCurrentParticipant(peer))
+                if (_transport.LocalSilo.Equals(peer)) continue;
+                if (until <= now || !membershipSnapshot.ContainsMember(peer))
                 {
                     _failureBackoffUntil.Remove(peer);
                 }
@@ -787,7 +771,8 @@ internal sealed partial class DisseminationProtocol(
         {
             foreach (var peer in _pendingGossip.Keys)
             {
-                if (!IsCurrentParticipant(peer))
+                if (_transport.LocalSilo.Equals(peer)) continue;
+                if (!membershipSnapshot.ContainsMember(peer))
                 {
                     _pendingGossip.Remove(peer);
                 }
@@ -798,11 +783,6 @@ internal sealed partial class DisseminationProtocol(
                 _nextGossipFlushAt = null;
                 _gossipFlushWakeup?.Cancel();
             }
-        }
-
-        bool IsCurrentParticipant(SiloAddress peer)
-        {
-            return membershipSnapshot.ContainsCurrentParticipant(_transport.LocalSilo, peer);
         }
     }
 
@@ -818,9 +798,9 @@ internal sealed partial class DisseminationProtocol(
         CancellationToken cancellationToken)
     {
         var membership = _membership.CurrentSnapshot;
-        PrunePeerState(membership);
-        if (membership.ContainsParticipant(membershipScope, root, _transport.LocalSilo))
+        if (membership.ContainsParticipant(membershipScope, root))
         {
+            PrunePeerState(membership);
             return membership;
         }
 
@@ -828,7 +808,7 @@ internal sealed partial class DisseminationProtocol(
         await _membership.RefreshMembership(cancellationToken);
         membership = _membership.CurrentSnapshot;
         PrunePeerState(membership);
-        return membership.ContainsParticipant(membershipScope, root, _transport.LocalSilo) ? membership : null;
+        return membership.ContainsParticipant(membershipScope, root) ? membership : null;
     }
 
     private bool TryGetEnabledTopic(string topicName, [NotNullWhen(true)] out IDisseminationTopic? topic)
