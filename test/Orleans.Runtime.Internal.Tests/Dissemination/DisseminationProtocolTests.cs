@@ -524,7 +524,7 @@ public class DisseminationProtocolTests
                 new DisseminationTopicDigest(FakeTopic.DefaultKey, version: 3)),
         }, CancellationToken.None);
 
-        var item = Assert.Single(response.Values);
+        var item = Assert.Single(GetAntiEntropyResponseValues(response));
         Assert.Equal(5, item.Digest.Version);
         Assert.False(response.Truncated);
     }
@@ -548,7 +548,7 @@ public class DisseminationProtocolTests
                 new DisseminationTopicDigest("requested", version: 3)),
         }, CancellationToken.None);
 
-        var item = Assert.Single(response.Values);
+        var item = Assert.Single(GetAntiEntropyResponseValues(response));
         Assert.Equal("requested", item.Digest.Key);
     }
 
@@ -596,7 +596,7 @@ public class DisseminationProtocolTests
         transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
             Sender = target,
-            Values = [repairItem],
+            ValuesByTopic = CreateValueGroups(repairItem),
         });
 
         var state = protocol.CreateAntiEntropyState();
@@ -636,7 +636,7 @@ public class DisseminationProtocolTests
             new DisseminationAntiEntropyResponse
             {
                 Sender = peer,
-                Values = [badRepairItem, goodRepairItem],
+                ValuesByTopic = CreateValueGroups(badRepairItem, goodRepairItem),
             },
         }, CancellationToken.None);
 
@@ -668,11 +668,11 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(new DisseminationAntiEntropyResponse
             {
                 Sender = target,
-                Values = count switch
+                ValuesByTopic = count switch
                 {
-                    1 => [badRepairItem],
-                    2 => [goodRepairItem],
-                    _ => [],
+                    1 => CreateValueGroups(badRepairItem),
+                    2 => CreateValueGroups(goodRepairItem),
+                    _ => FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty,
                 },
             });
         };
@@ -879,16 +879,22 @@ public class DisseminationProtocolTests
     private static DisseminationGossipBatch CreateGossipBatch(SiloAddress sender, params DisseminationValue[] values) => new()
     {
         Sender = sender,
-        ValuesByTopic = values
-            .GroupBy(static value => value.Digest.Topic, StringComparer.Ordinal)
-            .ToFrozenDictionary(
-                static group => group.Key,
-                static group => group.ToImmutableArray(),
-                StringComparer.Ordinal),
+        ValuesByTopic = CreateValueGroups(values),
     };
 
     private static IEnumerable<DisseminationValue> GetGossipValues(DisseminationGossipBatch batch) =>
         batch.ValuesByTopic.Values.SelectMany(static values => values);
+
+    private static IEnumerable<DisseminationValue> GetAntiEntropyResponseValues(DisseminationAntiEntropyResponse response) =>
+        response.ValuesByTopic.Values.SelectMany(static values => values);
+
+    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(params DisseminationValue[] values) =>
+        values
+            .GroupBy(static value => value.Digest.Topic, StringComparer.Ordinal)
+            .ToFrozenDictionary(
+                static group => group.Key,
+                static group => group.ToImmutableArray(),
+                StringComparer.Ordinal);
 
     private static MembershipDisseminationTopic CreateMembershipTopic(
         SiloAddress local,
