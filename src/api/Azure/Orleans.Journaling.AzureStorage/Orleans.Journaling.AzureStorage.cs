@@ -54,6 +54,54 @@ namespace Orleans.Journaling
         public static Hosting.ISiloBuilder AddAzureBlobJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
+    public sealed partial class AzureTableJournalStorageOptions
+    {
+        public const long DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD = 10000L;
+        public const long DEFAULT_COMPACTION_SIZE_THRESHOLD = 33554432L;
+        public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
+        public static readonly System.TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
+        public static readonly System.TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
+        public const string DEFAULT_TABLE_NAME = "journal";
+        public Azure.Data.Tables.TableClientOptions? ClientOptions { get { throw null; } set { } }
+
+        public long CompactionRowCountThreshold { get { throw null; } set { } }
+
+        public long CompactionSizeThreshold { get { throw null; } set { } }
+
+        public bool DeleteOldGenerations { get { throw null; } set { } }
+
+        public System.Func<JournalId, string> GetPartitionKey { get { throw null; } set { } }
+
+        public int MaxMetadataOnlyConflictRetries { get { throw null; } set { } }
+
+        public System.TimeSpan MetadataOnlyConflictInitialBackoff { get { throw null; } set { } }
+
+        public System.TimeSpan MetadataOnlyConflictMaxBackoff { get { throw null; } set { } }
+
+        public string TableName { get { throw null; } set { } }
+
+        public Azure.Data.Tables.TableServiceClient? TableServiceClient { get { throw null; } set { } }
+
+        public void ConfigureTableServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) { }
+
+        public void ConfigureTableServiceClient(string connectionString) { }
+
+        public void ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) { }
+
+        public void ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) { }
+
+        public void ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) { }
+
+        public void ConfigureTableServiceClient(System.Uri serviceUri) { }
+    }
+
+    public static partial class AzureTableStorageHostingExtensions
+    {
+        public static Hosting.ISiloBuilder AddAzureTableJournalStorage(this Hosting.ISiloBuilder builder, System.Action<AzureTableJournalStorageOptions>? configure) { throw null; }
+
+        public static Hosting.ISiloBuilder AddAzureTableJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
+    }
+
     public partial interface IBlobContainerFactory
     {
         Azure.Storage.Blobs.BlobContainerClient GetBlobContainerClient(JournalId journalId);
