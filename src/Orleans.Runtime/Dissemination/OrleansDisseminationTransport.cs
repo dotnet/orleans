@@ -11,11 +11,31 @@ internal sealed class OrleansDisseminationTransport(
     IMembershipManager membershipManager,
     IInternalGrainFactory grainFactory) : IDisseminationTransport
 {
+    private readonly object _membershipLock = new();
+    private MembershipVersion? _membershipVersion;
+    private DisseminationMembership _membership;
+
     public SiloAddress LocalSilo => localSiloDetails.SiloAddress;
 
     public DisseminationMembership GetMembership()
     {
-        var entries = membershipManager.CurrentSnapshot.Entries.Values;
+        var snapshot = membershipManager.CurrentSnapshot;
+        lock (_membershipLock)
+        {
+            if (_membershipVersion == snapshot.Version)
+            {
+                return _membership;
+            }
+
+            _membership = ComputeMembership(snapshot);
+            _membershipVersion = snapshot.Version;
+            return _membership;
+        }
+    }
+
+    private static DisseminationMembership ComputeMembership(MembershipTableSnapshot snapshot)
+    {
+        var entries = snapshot.Entries.Values;
         var allMembers = entries
             .Where(static entry => IsDisseminationParticipant(entry.Status))
             .OrderBy(static entry => GetStatusRank(entry.Status))
