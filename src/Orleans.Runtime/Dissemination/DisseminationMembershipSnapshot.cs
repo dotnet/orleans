@@ -27,9 +27,6 @@ internal sealed class DisseminationMembershipSnapshot
 
     public ImmutableArray<SiloAddress> ActiveMembers { get; }
 
-    public int GetParticipantCount(DisseminationMembershipScope membershipScope) =>
-        GetMemberSet(membershipScope).Count;
-
     public bool ContainsParticipant(DisseminationMembershipScope membershipScope, SiloAddress silo) =>
         GetMemberSet(membershipScope).Contains(silo);
 
@@ -89,8 +86,6 @@ internal sealed class DisseminationMembershipSnapshot
             // Participant arrays are already in tree order. The index map preserves that order for O(1) lookup.
             _indices = indices.ToFrozenDictionary();
         }
-
-        public int Count => _participants.Length;
 
         public bool Contains(SiloAddress silo) => _indices.ContainsKey(silo);
 
@@ -197,7 +192,7 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         private int GetFanOut(Func<int, int> selectFanOut) =>
-            Count <= 1 ? 1 : Math.Clamp(selectFanOut(Count), 1, Count);
+            _participants.Length <= 1 ? 1 : Math.Clamp(selectFanOut(_participants.Length), 1, _participants.Length);
 
         private static long GetFirstChildIndex(int index, int fanout) =>
             (long)fanout * (index + 1);

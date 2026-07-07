@@ -114,7 +114,7 @@ namespace Orleans.Runtime
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
-                if (!await TryPublishStatisticsViaDissemination(myStats, members))
+                if (!await TryPublishStatisticsViaDissemination(myStats))
                 {
                     await PublishStatisticsDirectly(myStats, members);
                 }
@@ -151,7 +151,7 @@ namespace Orleans.Runtime
         internal IReadOnlyCollection<SiloAddress> GetActiveSilosForDissemination() =>
             _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
 
-        private async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats, IReadOnlyCollection<SiloAddress> members)
+        private async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
         {
             try
             {
