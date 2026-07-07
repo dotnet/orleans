@@ -100,6 +100,8 @@ internal sealed partial class DisseminationProtocol(
         var topics = new Dictionary<string, AntiEntropyTopicState>(StringComparer.Ordinal);
         var currentValueStreams = new HashSet<DigestKey>();
         var now = _timeProvider.GetUtcNow();
+        var membership = _membership.CurrentSnapshot;
+        PrunePeerState(membership);
         foreach (var topic in _topics.Values)
         {
             if (!topic.IsEnabled)
@@ -130,7 +132,7 @@ internal sealed partial class DisseminationProtocol(
             });
 
             topics.Add(topic.Name, new AntiEntropyTopicState(
-                SelectAntiEntropyPeers(topic.MembershipScope),
+                SelectAntiEntropyPeers(membership, topic.MembershipScope),
                 [.. topicDigests]));
         }
 
@@ -704,12 +706,11 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
-    private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(DisseminationMembershipScope membershipScope)
+    private ImmutableArray<SiloAddress> SelectAntiEntropyPeers(
+        DisseminationMembershipSnapshot membership,
+        DisseminationMembershipScope membershipScope)
     {
         var options = _options.CurrentValue.Overlay;
-        var membership = _membership.CurrentSnapshot;
-        PrunePeerState(membership);
-
         return membership.SelectAntiEntropyPeers(
             membershipScope,
             _transport.LocalSilo,
