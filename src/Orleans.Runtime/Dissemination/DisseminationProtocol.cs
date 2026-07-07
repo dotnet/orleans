@@ -194,7 +194,11 @@ internal sealed partial class DisseminationProtocol(
                 continue;
             }
 
-            DisseminationInstruments.OnAntiEntropyExchange("out", GetDigestCount(request.DigestsByTopic), response.Values.Length, response.Truncated);
+            DisseminationInstruments.OnAntiEntropyExchange(
+                "out",
+                GetDigestCount(request.DigestsByTopic),
+                GetValueCount(response.ValuesByTopic),
+                response.Truncated);
             responses.Add(response);
         }
 
@@ -212,19 +216,27 @@ internal sealed partial class DisseminationProtocol(
 
         foreach (var response in responses)
         {
-            foreach (var item in response.Values)
+            foreach (var (topicName, values) in response.ValuesByTopic)
             {
-                try
+                foreach (var item in values)
                 {
-                    await ApplyReceivedValue(item, response.Sender, forward: false, cancellationToken);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception exception)
-                {
-                    LogDebugAntiEntropyRepairValueFailed(_logger, exception, response.Sender, item.Digest.Topic, item.Digest.Key, item.Digest.Version);
+                    if (!string.Equals(item.Digest.Topic, topicName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        await ApplyReceivedValue(item, response.Sender, forward: false, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        LogDebugAntiEntropyRepairValueFailed(_logger, exception, response.Sender, item.Digest.Topic, item.Digest.Key, item.Digest.Version);
+                    }
                 }
             }
         }
@@ -236,7 +248,7 @@ internal sealed partial class DisseminationProtocol(
     {
         if (!_options.CurrentValue.Enabled)
         {
-            return CreateAntiEntropyResponse([], truncated: false);
+            return CreateAntiEntropyResponse(FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty, truncated: false);
         }
 
         var requestDigestCount = GetDigestCount(request.DigestsByTopic);
@@ -299,7 +311,7 @@ internal sealed partial class DisseminationProtocol(
         }
 
         DisseminationInstruments.OnAntiEntropyExchange("in", requestDigestCount, values.Count, truncated);
-        return CreateAntiEntropyResponse([.. values], truncated);
+        return CreateAntiEntropyResponse(GroupValuesByTopic(values), truncated);
     }
 
     private async ValueTask<DisseminationApplyResult> ApplyReceivedValue(
@@ -1168,10 +1180,12 @@ internal sealed partial class DisseminationProtocol(
         DisseminationInstruments.OnValueApplied(item.Digest.Topic, result);
     }
 
-    private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(ImmutableArray<DisseminationValue> values, bool truncated) => new()
+    private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(
+        FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic,
+        bool truncated) => new()
     {
         Sender = _transport.LocalSilo,
-        Values = values,
+        ValuesByTopic = valuesByTopic,
         Truncated = truncated,
     };
 
@@ -1181,6 +1195,17 @@ internal sealed partial class DisseminationProtocol(
         foreach (var digests in digestsByTopic.Values)
         {
             result += digests.Length;
+        }
+
+        return result;
+    }
+
+    private static int GetValueCount(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic)
+    {
+        var result = 0;
+        foreach (var values in valuesByTopic.Values)
+        {
+            result += values.Length;
         }
 
         return result;
