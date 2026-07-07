@@ -888,7 +888,7 @@ public class DisseminationProtocolTests
         var targets = snapshot.GetOriginatorTreeTargets(
             DisseminationMembershipScope.ActiveMembers,
             root,
-            fanout: 2);
+            static _ => 2);
 
         Assert.Equal(new[] { first, second, local }, targets);
     }
@@ -910,7 +910,7 @@ public class DisseminationProtocolTests
             local,
             root,
             sender,
-            fanout: 2);
+            static _ => 2);
 
         Assert.Equal(new[] { child }, targets);
     }
@@ -928,7 +928,7 @@ public class DisseminationProtocolTests
         var targets = snapshot.GetOriginatorTreeTargets(
             DisseminationMembershipScope.ActiveMembers,
             root: local,
-            fanout: 1);
+            static _ => 1);
         var antiEntropyPeers = snapshot.SelectAntiEntropyPeers(
             DisseminationMembershipScope.ActiveMembers,
             local,
