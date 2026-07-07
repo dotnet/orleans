@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,10 +7,6 @@ internal interface IDisseminationTransport
 {
     SiloAddress LocalSilo { get; }
 
-    DisseminationMembership GetMembership();
-
-    Task RefreshMembership(CancellationToken cancellationToken);
-
     Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken);
 
     ValueTask<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
@@ -20,7 +14,3 @@ internal interface IDisseminationTransport
         DisseminationAntiEntropyRequest request,
         CancellationToken cancellationToken);
 }
-
-internal readonly record struct DisseminationMembership(
-    ImmutableArray<SiloAddress> AllMembers,
-    ImmutableArray<SiloAddress> ActiveMembers);

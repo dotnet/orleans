@@ -813,6 +813,169 @@ public class DisseminationProtocolTests
         Assert.Equal(options.MaxBatchBytes, new DisseminationTopicOptions().MaxPayloadBytes);
     }
 
+    [Fact]
+    public void DisseminationMembershipReturnsCachedSnapshotForSameMembershipVersion()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var membershipManager = new FakeMembershipManager(CreateMembershipSnapshot(
+            version: 1,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch),
+            CreateMembershipEntry(peer, SiloStatus.Joining, DateTime.UnixEpoch.AddSeconds(1))));
+        var membership = new DisseminationMembership(membershipManager);
+
+        var first = membership.CurrentSnapshot;
+        var second = membership.CurrentSnapshot;
+
+        Assert.Same(first, second);
+        Assert.Equal(new MembershipVersion(1), first.MembershipVersion);
+        Assert.Equal(new[] { local, peer }, first.AllMembers);
+        Assert.Equal(new[] { local }, first.ActiveMembers);
+    }
+
+    [Fact]
+    public void DisseminationMembershipRecomputesSnapshotWhenMembershipVersionChanges()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var membershipManager = new FakeMembershipManager(CreateMembershipSnapshot(
+            version: 1,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch)));
+        var membership = new DisseminationMembership(membershipManager);
+        var first = membership.CurrentSnapshot;
+
+        membershipManager.CurrentSnapshot = CreateMembershipSnapshot(
+            version: 2,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch),
+            CreateMembershipEntry(peer, SiloStatus.Active, DateTime.UnixEpoch.AddSeconds(1)));
+
+        var second = membership.CurrentSnapshot;
+
+        Assert.NotSame(first, second);
+        Assert.Equal(new MembershipVersion(2), second.MembershipVersion);
+        Assert.Equal(new[] { local, peer }, second.ActiveMembers);
+    }
+
+    [Fact]
+    public async Task DisseminationMembershipRefreshDelegatesToMembershipManager()
+    {
+        var local = CreateSilo(11111);
+        var membershipManager = new FakeMembershipManager(CreateMembershipSnapshot(
+            version: 1,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch)));
+        var membership = new DisseminationMembership(membershipManager);
+
+        await membership.RefreshMembership(CancellationToken.None);
+
+        Assert.Equal(1, membershipManager.RefreshCallCount);
+        Assert.Null(Assert.Single(membershipManager.RefreshTargetVersions));
+    }
+
+    [Fact]
+    public void DisseminationMembershipSnapshotUsesStoredTreeOrderForOriginatorTargets()
+    {
+        var root = CreateSilo(11113);
+        var first = CreateSilo(11115);
+        var second = CreateSilo(11112);
+        var local = CreateSilo(11111);
+        var snapshot = new DisseminationMembershipSnapshot(
+            new MembershipVersion(1),
+            [root, first, second, local],
+            [root, first, second, local]);
+
+        var targets = snapshot.GetOriginatorTreeTargets(
+            DisseminationMembershipScope.ActiveMembers,
+            local,
+            root,
+            fanout: 2);
+
+        Assert.Equal(new[] { first, second, local }, targets);
+    }
+
+    [Fact]
+    public void DisseminationMembershipSnapshotUsesStoredTreeOrderForForwardingTargets()
+    {
+        var local = CreateSilo(11111);
+        var root = CreateSilo(11112);
+        var sender = CreateSilo(11113);
+        var child = CreateSilo(11114);
+        var snapshot = new DisseminationMembershipSnapshot(
+            new MembershipVersion(1),
+            [local, root, sender, child],
+            [local, root, sender, child]);
+
+        var targets = snapshot.GetForwardingTreeTargets(
+            DisseminationMembershipScope.ActiveMembers,
+            local,
+            root,
+            sender,
+            fanout: 2);
+
+        Assert.Equal(new[] { child }, targets);
+    }
+
+    [Fact]
+    public void DisseminationMembershipSnapshotTreatsLocalSiloAsParticipantWhenMissing()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var snapshot = new DisseminationMembershipSnapshot(
+            new MembershipVersion(1),
+            [peer],
+            [peer]);
+
+        var targets = snapshot.GetOriginatorTreeTargets(
+            DisseminationMembershipScope.ActiveMembers,
+            local,
+            root: local,
+            fanout: 1);
+
+        Assert.True(snapshot.ContainsParticipant(DisseminationMembershipScope.ActiveMembers, local, local));
+        Assert.Equal(2, snapshot.GetParticipantCount(DisseminationMembershipScope.ActiveMembers, local));
+        Assert.Equal(new[] { peer }, targets);
+    }
+
+    [Fact]
+    public void DisseminationMembershipSnapshotSortsExplicitPublishTargets()
+    {
+        var root = CreateSilo(11111);
+        var first = CreateSilo(11112);
+        var second = CreateSilo(11114);
+        var local = CreateSilo(11115);
+
+        var targets = DisseminationMembershipSnapshot.GetOriginatorTreeTargets(
+            [second, first, second],
+            local,
+            root,
+            static _ => 2);
+
+        Assert.Equal(new[] { first, second, local }, targets);
+    }
+
+    [Fact]
+    public void DisseminationMembershipSnapshotSelectsAntiEntropyPeersDeterministically()
+    {
+        const int fanout = 3;
+        const int peerCount = 2;
+        const int localIndex = 7;
+        const long round = 2;
+        var silos = CreateSilos(12);
+        var snapshot = new DisseminationMembershipSnapshot(
+            new MembershipVersion(1),
+            [.. silos],
+            [.. silos]);
+
+        var peers = snapshot.SelectAntiEntropyPeers(
+            DisseminationMembershipScope.ActiveMembers,
+            silos[localIndex],
+            "topic-a",
+            round,
+            fanout,
+            peerCount);
+
+        Assert.Equal(GetExpectedAntiEntropyPeers("topic-a", silos, localIndex, fanout, peerCount, round), peers);
+    }
+
     private static DisseminationProtocol CreateProtocol(
         FakeTransport transport,
         FakeTopic topic,
@@ -830,6 +993,7 @@ public class DisseminationProtocolTests
         configure?.Invoke(options);
         return new DisseminationProtocol(
             transport,
+            new DisseminationMembership(transport.MembershipManager),
             new TestOptionsMonitor<DisseminationOptions>(options),
             topics,
             timeProvider ?? TimeProvider.System,
@@ -1258,13 +1422,23 @@ public class DisseminationProtocolTests
         }
     }
 
-    private sealed class FakeTransport(SiloAddress localSilo, params SiloAddress[] peers) : IDisseminationTransport
+    private sealed class FakeTransport : IDisseminationTransport
     {
-        private readonly List<SiloAddress> _peers = peers.ToList();
+        private readonly SiloAddress _localSilo;
+        private readonly List<SiloAddress> _peers;
+
+        public FakeTransport(SiloAddress localSilo, params SiloAddress[] peers)
+        {
+            _localSilo = localSilo;
+            _peers = peers.ToList();
+            MembershipManager = new FakeMembershipManager(GetMembershipSnapshot, RefreshMembership);
+        }
 
         public List<(SiloAddress Peer, DisseminationGossipBatch Batch)> GossipBatches { get; } = new();
 
         public List<(SiloAddress Peer, DisseminationAntiEntropyRequest Request)> AntiEntropyRequests { get; } = new();
+
+        public FakeMembershipManager MembershipManager { get; }
 
         public List<SiloAddress> Peers => _peers;
 
@@ -1279,36 +1453,25 @@ public class DisseminationProtocolTests
 
         public Func<CancellationToken, Task>? RefreshMembershipHandler { get; set; }
 
-        public SiloAddress LocalSilo => localSilo;
+        public SiloAddress LocalSilo => _localSilo;
 
         public int RefreshMembershipCallCount { get; private set; }
 
-        public DisseminationMembership GetMembership()
+        private MembershipTableSnapshot GetMembershipSnapshot()
         {
-            var members = _peers.Append(localSilo).Distinct().Select(peer =>
+            var entries = _peers.Append(_localSilo).Distinct().Select(peer =>
             {
                 var status = PeerStatuses.TryGetValue(peer, out var peerStatus) ? peerStatus : SiloStatus.Active;
                 var startTime = StartTimes.TryGetValue(peer, out var value) ? value : DateTime.UnixEpoch;
-                return (Peer: peer, Status: status, StartTime: startTime);
+                return CreateMembershipEntry(peer, status, startTime);
             }).ToArray();
 
-            var allMembers = members
-                .Where(static member => member.Status is SiloStatus.Joining or SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping)
-                .OrderBy(static member => GetStatusRank(member.Status))
-                .ThenBy(static member => member.StartTime)
-                .ThenBy(static member => member.Peer)
-                .Select(static member => member.Peer)
-                .ToImmutableArray();
-            var activeMembers = members
-                .Where(static member => member.Status == SiloStatus.Active)
-                .OrderBy(static member => member.StartTime)
-                .ThenBy(static member => member.Peer)
-                .Select(static member => member.Peer)
-                .ToImmutableArray();
-            return new DisseminationMembership(allMembers, activeMembers);
+            return new MembershipTableSnapshot(
+                new MembershipVersion(ComputeMembershipVersion(entries)),
+                entries.ToImmutableDictionary(static entry => entry.SiloAddress));
         }
 
-        public Task RefreshMembership(CancellationToken cancellationToken)
+        private Task RefreshMembership(CancellationToken cancellationToken)
         {
             RefreshMembershipCallCount++;
             return RefreshMembershipHandler?.Invoke(cancellationToken) ?? Task.CompletedTask;
@@ -1334,14 +1497,18 @@ public class DisseminationProtocolTests
             return ExchangeAntiEntropyHandler(peer, request);
         }
 
-        private static int GetStatusRank(SiloStatus status) => status switch
+        private static long ComputeMembershipVersion(IEnumerable<MembershipEntry> entries)
         {
-            SiloStatus.Active => 0,
-            SiloStatus.Joining => 1,
-            SiloStatus.ShuttingDown => 2,
-            SiloStatus.Stopping => 3,
-            _ => 4,
-        };
+            var result = 17L;
+            foreach (var entry in entries.OrderBy(static entry => entry.SiloAddress))
+            {
+                result = unchecked((result * 31) + entry.SiloAddress.GetConsistentHashCode());
+                result = unchecked((result * 31) + (int)entry.Status);
+                result = unchecked((result * 31) + entry.StartTime.Ticks);
+            }
+
+            return result == MembershipVersion.MinValue.Value ? result + 1 : result;
+        }
     }
 
 #if NET10_0_OR_GREATER
@@ -1391,9 +1558,35 @@ public class DisseminationProtocolTests
     }
 #endif
 
-    private sealed class FakeMembershipManager(MembershipTableSnapshot currentSnapshot) : IMembershipManager
+    private sealed class FakeMembershipManager : IMembershipManager
     {
-        public MembershipTableSnapshot CurrentSnapshot { get; set; } = currentSnapshot;
+        private readonly Func<MembershipTableSnapshot>? _getCurrentSnapshot;
+        private readonly Func<CancellationToken, Task>? _refresh;
+        private MembershipTableSnapshot _currentSnapshot;
+
+        public FakeMembershipManager(MembershipTableSnapshot currentSnapshot)
+        {
+            _currentSnapshot = currentSnapshot;
+        }
+
+        public FakeMembershipManager(
+            Func<MembershipTableSnapshot> getCurrentSnapshot,
+            Func<CancellationToken, Task> refresh)
+        {
+            _getCurrentSnapshot = getCurrentSnapshot;
+            _refresh = refresh;
+            _currentSnapshot = getCurrentSnapshot();
+        }
+
+        public MembershipTableSnapshot CurrentSnapshot
+        {
+            get => _getCurrentSnapshot?.Invoke() ?? _currentSnapshot;
+            set => _currentSnapshot = value;
+        }
+
+        public int RefreshCallCount { get; private set; }
+
+        public List<MembershipVersion?> RefreshTargetVersions { get; } = new();
 
         public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => EmptyUpdates();
 
@@ -1405,7 +1598,12 @@ public class DisseminationProtocolTests
 
         public Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => Task.FromResult(false);
 
-        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken)
+        {
+            RefreshCallCount++;
+            RefreshTargetVersions.Add(targetVersion);
+            return _refresh?.Invoke(cancellationToken) ?? Task.CompletedTask;
+        }
 
         public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken)
         {
