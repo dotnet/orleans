@@ -163,7 +163,7 @@ namespace Orleans.Runtime
                 }
 
                 var item = topic.CreateItem(_siloDetails.SiloAddress, myStats);
-                return await dissemination.Publish(topic.Name, item, targetPeers: null, CancellationToken.None);
+                return await dissemination.Publish(topic.Name, item, CancellationToken.None);
             }
             catch (Exception exception)
             {

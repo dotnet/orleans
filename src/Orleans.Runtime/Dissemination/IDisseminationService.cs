@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,6 +8,5 @@ internal interface IDisseminationService
     ValueTask<bool> Publish(
         string topicName,
         DisseminationValue value,
-        IReadOnlyCollection<SiloAddress>? targetPeers,
         CancellationToken cancellationToken);
 }

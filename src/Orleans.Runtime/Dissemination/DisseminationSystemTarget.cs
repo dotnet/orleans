@@ -34,9 +34,8 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
     async ValueTask<bool> IDisseminationService.Publish(
         string topicName,
         DisseminationValue value,
-        IReadOnlyCollection<SiloAddress>? targetPeers,
         CancellationToken cancellationToken) =>
-        await this.RunOrQueueTask(async () => await _protocol.Publish(topicName, value, targetPeers, cancellationToken));
+        await this.RunOrQueueTask(async () => await _protocol.Publish(topicName, value, cancellationToken));
 
     Task IDisseminationSystemTarget.PushGossip(DisseminationGossipBatch batch, CancellationToken cancellationToken) =>
         _protocol.ReceiveGossip(batch, cancellationToken);
