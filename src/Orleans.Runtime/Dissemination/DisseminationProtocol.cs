@@ -82,11 +82,17 @@ internal sealed partial class DisseminationProtocol(
             return;
         }
 
-        DisseminationInstruments.OnGossipReceived(batch.Values, "tree");
+        DisseminationInstruments.OnGossipReceived(batch.ValuesByTopic, "tree");
 
-        foreach (var item in batch.Values)
+        foreach (var (topicName, values) in batch.ValuesByTopic)
         {
-            await ApplyReceivedValue(item, batch.Sender, forward: true, cancellationToken);
+            foreach (var item in values)
+            {
+                if (string.Equals(item.Digest.Topic, topicName, StringComparison.Ordinal))
+                {
+                    await ApplyReceivedValue(item, batch.Sender, forward: true, cancellationToken);
+                }
+            }
         }
     }
 
@@ -573,7 +579,7 @@ internal sealed partial class DisseminationProtocol(
         var batch = new DisseminationGossipBatch
         {
             Sender = _transport.LocalSilo,
-            Values = values,
+            ValuesByTopic = GroupValuesByTopic(values),
         };
 
         var sent = await SafeSend(
@@ -582,7 +588,7 @@ internal sealed partial class DisseminationProtocol(
             target => _transport.SendGossip(target, batch, cancellationToken));
         if (sent)
         {
-            DisseminationInstruments.OnGossipSent(values, "tree");
+            DisseminationInstruments.OnGossipSent(batch.ValuesByTopic, "tree");
         }
     }
 
@@ -1178,6 +1184,26 @@ internal sealed partial class DisseminationProtocol(
         }
 
         return result;
+    }
+
+    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> GroupValuesByTopic(IReadOnlyList<DisseminationValue> values)
+    {
+        var result = new Dictionary<string, ImmutableArray<DisseminationValue>.Builder>(StringComparer.Ordinal);
+        foreach (var value in values)
+        {
+            if (!result.TryGetValue(value.Digest.Topic, out var topicValues))
+            {
+                topicValues = ImmutableArray.CreateBuilder<DisseminationValue>();
+                result.Add(value.Digest.Topic, topicValues);
+            }
+
+            topicValues.Add(value);
+        }
+
+        return result.ToFrozenDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value.ToImmutable(),
+            StringComparer.Ordinal);
     }
 
     public sealed record AntiEntropyState(FrozenDictionary<string, AntiEntropyTopicState> Topics)

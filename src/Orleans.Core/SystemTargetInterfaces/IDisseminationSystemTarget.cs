@@ -106,7 +106,8 @@ internal sealed class DisseminationGossipBatch
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public ImmutableArray<DisseminationValue> Values { get; init; } = [];
+    public FrozenDictionary<string, ImmutableArray<DisseminationValue>> ValuesByTopic { get; init; } =
+        FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty;
 }
 
 [GenerateSerializer, Immutable]
