@@ -128,7 +128,8 @@ internal sealed class DisseminationAntiEntropyResponse
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public ImmutableArray<DisseminationValue> Values { get; init; } = [];
+    public FrozenDictionary<string, ImmutableArray<DisseminationValue>> ValuesByTopic { get; init; } =
+        FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty;
 
     [Id(2)]
     public bool Truncated { get; init; }

@@ -165,7 +165,7 @@ Current branch behavior:
 3. Send `DisseminationAntiEntropyRequest` containing a per-topic map of stale local digests. If no stale digests remain for a peer, skip that peer for the round.
 4. The receiver maps remote digests by key within each requested topic.
 5. For each requested local digest key, if local state is newer than the requester digest, materialize a value.
-6. Return values up to `MaxBatchItems` and `MaxBatchBytes`, where `MaxBatchBytes` is the sum of payload byte lengths rather than exact serialized envelope size, setting `Truncated` if more values remain.
+6. Return topic-grouped values up to `MaxBatchItems` and `MaxBatchBytes`, where `MaxBatchBytes` is the sum of payload byte lengths rather than exact serialized envelope size, setting `Truncated` if more values remain.
 7. The requester applies returned values locally.
 
 Each topic has an `ExpectedUpdateCadence` used to decide when a `(topic, key)` stream is stale enough to probe. Deployment load statistics default to 2 seconds and membership snapshots default to 10 seconds. Recent tree or repair updates suppress digest probes for that stream until the cadence elapses. Omitted digests mean "not probing this stream in this round" rather than "missing this stream", which keeps anti-entropy from returning values for streams that are already receiving regular fast-path updates. When a topic knows that a stream should exist but has no local value, it can send an explicit low-watermark digest for that key; deployment load does this for active silos with missing local statistics.
