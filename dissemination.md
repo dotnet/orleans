@@ -380,7 +380,7 @@ Batching is orthogonal to Plumtree. A batch is a transport envelope; correctness
 ```text
 DisseminationGossipBatch
   Sender
-  Items[]
+  ValuesByTopic[topic][]
 
 DisseminationAdvertisementBatch
   Sender

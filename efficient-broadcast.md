@@ -114,7 +114,7 @@ originatorTargets = topLevel + children(index(root))
 
 This gives every participant the same fixed topology when their membership view agrees. The originator sends to at most `2 * fanout` distinct peers, and every other forwarding participant sends to at most `fanout` peers.
 
-Outbound tree sends are queued per peer before transport. The queue coalesces values by `(topic, key, payloadKind)` and keeps only the newest version for each stream, then flushes when the earliest topic `MaxCoalescingDelay` expires or when batch/item limits are reached. This preserves monotonic latest-wins semantics while allowing different originators' values to share the same `DisseminationGossipBatch` on relay nodes.
+Outbound tree sends are queued per peer before transport. The queue coalesces values by `(topic, key)` and keeps only the newest version for each stream, then flushes when the earliest topic `MaxCoalescingDelay` expires or when batch/item limits are reached. This preserves monotonic latest-wins semantics while allowing different originators' values to share the same topic-grouped `DisseminationGossipBatch` on relay nodes.
 
 ### Critique of the fixed-tree fast path
 
