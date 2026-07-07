@@ -36,7 +36,7 @@ internal sealed class MembershipDisseminationTopic(
         RememberSnapshot(snapshot);
         return new DisseminationValue
         {
-            Digest = new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value),
+            Digest = new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
             Root = origin,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
             Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }),
@@ -53,15 +53,15 @@ internal sealed class MembershipDisseminationTopic(
         };
     }
 
-    public int CompareVersion(DisseminationDigest left, DisseminationDigest right) => left.Version.CompareTo(right.Version);
+    public int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Version.CompareTo(right.Version);
 
-    public bool IsObsolete(DisseminationDigest digest) =>
+    public bool IsObsolete(DisseminationTopicDigest digest) =>
         digest.Key != MembershipKey
         || membershipManager.CurrentSnapshot.Version.Value > digest.Version;
 
     public ValueTask<DisseminationValue?> GetValue(
-        DisseminationDigest digest,
-        DisseminationDigest? peerDigest,
+        DisseminationTopicDigest digest,
+        DisseminationTopicDigest? peerDigest,
         CancellationToken cancellationToken)
     {
         if (digest.Key != MembershipKey)
@@ -122,7 +122,7 @@ internal sealed class MembershipDisseminationTopic(
         return DisseminationApplyResult.Applied;
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationDigest digest, CancellationToken cancellationToken)
+    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken)
     {
         if (Options.FallbackEnabled)
         {
@@ -146,7 +146,7 @@ internal sealed class MembershipDisseminationTopic(
         var diff = CreateDiff(baseSnapshot, snapshot);
         value = new DisseminationValue
         {
-            Digest = new DisseminationDigest(Name, MembershipKey, snapshot.Version.Value),
+            Digest = new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
             Root = localSiloDetails.SiloAddress,
             ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
             Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }),
