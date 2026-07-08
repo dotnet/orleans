@@ -18,8 +18,8 @@ internal sealed partial class DisseminationProtocol
     private readonly DisseminationGossipQueue _gossipQueue;
     private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
     private readonly object _failureLock = new();
-    private readonly object _recentUpdateLock = new();
-    private readonly Dictionary<DigestKey, DateTimeOffset> _lastUpdateReceivedAt = [];
+    private readonly object _seenValueLock = new();
+    private readonly Dictionary<DigestKey, DateTimeOffset> _lastValueSeenAt = [];
     private readonly FrozenDictionary<string, IDisseminationTopic> _topics;
 
     public DisseminationProtocol(
@@ -68,7 +68,7 @@ internal sealed partial class DisseminationProtocol
         }
 
         var treeTargets = membership.GetOriginatorTreeTargets(topic.MembershipScope, root, GetFanOutFactor);
-        RecordRecentUpdate(topic.Name, item.Digest);
+        RecordSeenValue(topic.Name, item.Digest);
         foreach (var peer in treeTargets)
         {
             EnqueueGossip(peer, item, topic);
@@ -108,10 +108,22 @@ internal sealed partial class DisseminationProtocol
         }
 
         var topics = new Dictionary<string, AntiEntropyTopicState>(StringComparer.Ordinal);
-        var currentValueStreams = new HashSet<DigestKey>();
-        var now = _timeProvider.GetUtcNow();
         var membership = _membership.CurrentSnapshot;
         PrunePeerState(membership);
+        var peersByScope = new Dictionary<DisseminationMembershipScope, ImmutableArray<SiloAddress>>();
+        ImmutableArray<SiloAddress> GetAntiEntropyPeers(DisseminationMembershipScope membershipScope)
+        {
+            if (!peersByScope.TryGetValue(membershipScope, out var peers))
+            {
+                peers = SelectAntiEntropyPeers(membership, membershipScope);
+                peersByScope.Add(membershipScope, peers);
+            }
+
+            return peers;
+        }
+
+        var currentValueStreams = new HashSet<DigestKey>();
+        var now = _timeProvider.GetUtcNow();
         foreach (var topic in _topics.Values)
         {
             if (!topic.IsEnabled)
@@ -142,11 +154,11 @@ internal sealed partial class DisseminationProtocol
             });
 
             topics.Add(topic.Name, new AntiEntropyTopicState(
-                SelectAntiEntropyPeers(membership, topic.MembershipScope),
+                GetAntiEntropyPeers(topic.MembershipScope),
                 [.. topicDigests]));
         }
 
-        PruneRecentUpdates(currentValueStreams);
+        PruneSeenValues(currentValueStreams);
         return topics.Count == 0
             ? AntiEntropyState.Empty
             : new AntiEntropyState(topics.ToFrozenDictionary(StringComparer.Ordinal));
@@ -342,7 +354,7 @@ internal sealed partial class DisseminationProtocol
         EmitApplyResult(topicName, value, sender, result);
         if (result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate)
         {
-            RecordRecentUpdate(topicName, value.Digest);
+            RecordSeenValue(topicName, value.Digest);
         }
 
         if (result == DisseminationApplyResult.Applied && forward)
@@ -501,28 +513,28 @@ internal sealed partial class DisseminationProtocol
 
     private bool ShouldRequestAntiEntropy(IDisseminationTopic topic, DigestKey key, DateTimeOffset now)
     {
-        lock (_recentUpdateLock)
+        lock (_seenValueLock)
         {
-            return !_lastUpdateReceivedAt.TryGetValue(key, out var lastReceived)
-                || now - lastReceived >= topic.Options.ExpectedUpdateCadence;
+            return !_lastValueSeenAt.TryGetValue(key, out var lastSeen)
+                || now - lastSeen >= topic.Options.ExpectedUpdateCadence;
         }
     }
 
-    private void RecordRecentUpdate(string topicName, DisseminationTopicDigest digest)
+    private void RecordSeenValue(string topicName, DisseminationTopicDigest digest)
     {
         var key = new DigestKey(topicName, digest.Key);
-        lock (_recentUpdateLock)
+        lock (_seenValueLock)
         {
-            _lastUpdateReceivedAt[key] = _timeProvider.GetUtcNow();
+            _lastValueSeenAt[key] = _timeProvider.GetUtcNow();
         }
     }
 
-    private void PruneRecentUpdates(HashSet<DigestKey> currentValueStreams)
+    private void PruneSeenValues(HashSet<DigestKey> currentValueStreams)
     {
-        lock (_recentUpdateLock)
+        lock (_seenValueLock)
         {
             List<DigestKey>? removedKeys = null;
-            foreach (var key in _lastUpdateReceivedAt.Keys)
+            foreach (var key in _lastValueSeenAt.Keys)
             {
                 if (!currentValueStreams.Contains(key))
                 {
@@ -534,7 +546,7 @@ internal sealed partial class DisseminationProtocol
             {
                 foreach (var key in removedKeys)
                 {
-                    _lastUpdateReceivedAt.Remove(key);
+                    _lastValueSeenAt.Remove(key);
                 }
             }
         }
