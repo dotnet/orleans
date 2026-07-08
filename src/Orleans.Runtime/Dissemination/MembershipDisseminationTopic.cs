@@ -111,16 +111,6 @@ internal sealed class MembershipDisseminationTopic(
         return DisseminationApplyResult.Applied;
     }
 
-    public async ValueTask RecoverAsync(
-        DisseminationTopicDigest digest,
-        CancellationToken cancellationToken)
-    {
-        if (Options.FallbackEnabled)
-        {
-            await membershipManager.Refresh(new MembershipVersion(digest.Version), cancellationToken);
-        }
-    }
-
     private bool TryCreateDiffValue(long peerVersion, MembershipTableSnapshot snapshot, out DisseminationTopicValue value)
     {
         MembershipTableSnapshot? baseSnapshot;

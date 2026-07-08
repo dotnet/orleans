@@ -171,9 +171,6 @@ public class DisseminationProtocolTests
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
-        Assert.Equal(
-            new[] { oversized.Digest, obsolete.Digest },
-            topic.FallbackDigests);
     }
 
     [Fact]
@@ -1352,8 +1349,6 @@ public class DisseminationProtocolTests
 
         public HashSet<string> ExpectedKeys { get; } = new(StringComparer.Ordinal);
 
-        public List<DisseminationTopicDigest> FallbackDigests { get; } = new();
-
         public string Name => _name;
 
         public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.ActiveMembers;
@@ -1432,11 +1427,6 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(DisseminationApplyResult.Applied);
         }
 
-        public ValueTask RecoverAsync(DisseminationTopicDigest digest, CancellationToken cancellationToken)
-        {
-            FallbackDigests.Add(digest);
-            return ValueTask.CompletedTask;
-        }
     }
 
     private sealed class FakeTransport : IDisseminationTransport

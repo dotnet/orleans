@@ -113,11 +113,6 @@ public sealed class DisseminationTopicOptions
     public TimeSpan ExpectedUpdateCadence { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Gets or sets a value indicating whether topic-specific fallback is enabled.
-    /// </summary>
-    public bool FallbackEnabled { get; set; } = true;
-
-    /// <summary>
     /// Gets or sets the maximum serialized payload size for this topic.
     /// </summary>
     public int MaxPayloadBytes { get; set; } = 1024 * 1024;
