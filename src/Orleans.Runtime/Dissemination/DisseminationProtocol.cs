@@ -501,7 +501,11 @@ internal sealed partial class DisseminationProtocol
         try
         {
             var result = await operation(peer);
-            ClearPeerBackoff(peer);
+            lock (_failureLock)
+            {
+                _failureBackoffUntil.Remove(peer);
+            }
+
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -511,7 +515,11 @@ internal sealed partial class DisseminationProtocol
         catch (Exception exception)
         {
             LogDebugDisseminationSendFailed(_logger, exception, peer);
-            SetPeerBackoff(peer);
+            lock (_failureLock)
+            {
+                _failureBackoffUntil[peer] = _timeProvider.GetUtcNow() + _options.CurrentValue.FailureBackoff;
+            }
+
             return failureResult;
         }
     }
@@ -711,14 +719,6 @@ internal sealed partial class DisseminationProtocol
 
     private bool IsExpired(DisseminationValue item) => item.ExpiresAt <= _timeProvider.GetUtcNow();
 
-    private bool IsPeerBackedOff(SiloAddress peer)
-    {
-        var now = _timeProvider.GetUtcNow();
-        lock (_failureLock)
-        {
-            if (!_failureBackoffUntil.TryGetValue(peer, out var until))
-            {
-                return false;
     private DisseminationValue CreateDisseminationValue(
         IDisseminationTopic topic,
         DisseminationTopicValue value,
@@ -730,6 +730,14 @@ internal sealed partial class DisseminationProtocol
         Payload = value.Payload,
     };
 
+    private bool IsPeerBackedOff(SiloAddress peer)
+    {
+        var now = _timeProvider.GetUtcNow();
+        lock (_failureLock)
+        {
+            if (!_failureBackoffUntil.TryGetValue(peer, out var until))
+            {
+                return false;
             }
 
             if (until > now)
@@ -739,22 +747,6 @@ internal sealed partial class DisseminationProtocol
 
             _failureBackoffUntil.Remove(peer);
             return false;
-        }
-    }
-
-    private void ClearPeerBackoff(SiloAddress peer)
-    {
-        lock (_failureLock)
-        {
-            _failureBackoffUntil.Remove(peer);
-        }
-    }
-
-    private void SetPeerBackoff(SiloAddress peer)
-    {
-        lock (_failureLock)
-        {
-            _failureBackoffUntil[peer] = _timeProvider.GetUtcNow() + _options.CurrentValue.FailureBackoff;
         }
     }
 
