@@ -193,34 +193,49 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        var responses = new List<DisseminationAntiEntropyResponse>(requestsByPeer.Count);
-        foreach (var (peer, pendingRequest) in requestsByPeer)
+        var localSilo = _transport.LocalSilo;
+        var requests = requestsByPeer.Select(pair => (
+            Peer: pair.Key,
+            Request: new DisseminationAntiEntropyRequest
+            {
+                Sender = localSilo,
+                DigestsByTopic = pair.Value.ToFrozenDictionary(StringComparer.Ordinal),
+            })).ToArray();
+        var responses = new DisseminationAntiEntropyResponse?[requests.Length];
+        await ExecuteBoundedPeerOperations(
+            Enumerable.Range(0, requests.Length),
+            cancellationToken,
+            async (index, operationCancellationToken) =>
+            {
+                var (peer, request) = requests[index];
+                var response = await ExecutePeerOperation<DisseminationAntiEntropyResponse?>(
+                    peer,
+                    operationCancellationToken,
+                    async target => await _transport.ExchangeAntiEntropy(target, request, operationCancellationToken),
+                    failureResult: null);
+                if (response is null)
+                {
+                    return;
+                }
+
+                DisseminationInstruments.OnAntiEntropyExchange(
+                    "out",
+                    GetDigestCount(request.DigestsByTopic),
+                    GetValueCount(response.ValuesByTopic),
+                    response.Truncated);
+                responses[index] = response;
+            });
+
+        var result = new List<DisseminationAntiEntropyResponse>(responses.Length);
+        foreach (var response in responses)
         {
-            var request = new DisseminationAntiEntropyRequest
+            if (response is not null)
             {
-                Sender = _transport.LocalSilo,
-                DigestsByTopic = pendingRequest.ToFrozenDictionary(StringComparer.Ordinal),
-            };
-
-            var response = await ExecutePeerOperation<DisseminationAntiEntropyResponse?>(
-                peer,
-                cancellationToken,
-                async target => await _transport.ExchangeAntiEntropy(target, request, cancellationToken),
-                failureResult: null);
-            if (response is null)
-            {
-                continue;
+                result.Add(response);
             }
-
-            DisseminationInstruments.OnAntiEntropyExchange(
-                "out",
-                GetDigestCount(request.DigestsByTopic),
-                GetValueCount(response.ValuesByTopic),
-                response.Truncated);
-            responses.Add(response);
         }
 
-        return responses;
+        return result;
     }
 
     public async Task ApplyAntiEntropyResponses(
@@ -397,10 +412,11 @@ internal sealed partial class DisseminationProtocol
 
     private async Task SendGossipBatches(IReadOnlyList<DisseminationGossipQueue.Batch> batches, CancellationToken cancellationToken)
     {
-        foreach (var queued in batches)
-        {
-            await SendGossipBatch(queued.Peer, queued.ValuesByTopic, cancellationToken);
-        }
+        await ExecuteBoundedPeerOperations(
+            batches,
+            cancellationToken,
+            async (queued, operationCancellationToken) =>
+                await SendGossipBatch(queued.Peer, queued.ValuesByTopic, operationCancellationToken));
     }
 
     private async Task SendGossipBatch(SiloAddress peer, IReadOnlyList<DisseminationGossipQueue.PendingTopicValues> valuesByTopic, CancellationToken cancellationToken)
@@ -493,6 +509,21 @@ internal sealed partial class DisseminationProtocol
             SetPeerBackoff(peer);
             return failureResult;
         }
+    }
+
+    private async Task ExecuteBoundedPeerOperations<T>(
+        IEnumerable<T> operations,
+        CancellationToken cancellationToken,
+        Func<T, CancellationToken, ValueTask> operation)
+    {
+        await Parallel.ForEachAsync(
+            operations,
+            new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = _options.CurrentValue.MaxConcurrentSends,
+            },
+            operation);
     }
 
     private Dictionary<string, DisseminationTopicDigest> GetRemoteDigestMap(
