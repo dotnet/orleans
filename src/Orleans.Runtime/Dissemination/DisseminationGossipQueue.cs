@@ -31,7 +31,7 @@ internal sealed class DisseminationGossipQueue(
                 _pendingGossip.Add(peer, pending);
             }
             else if (pending.TryGetValue(key, out var existing)
-                && topic.CompareVersion(existing.Digest, item.Digest) >= 0)
+                && existing.Digest.Version >= item.Digest.Version)
             {
                 return;
             }

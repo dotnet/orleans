@@ -157,7 +157,7 @@ namespace Orleans.Runtime
             {
                 var dissemination = _serviceProvider.GetService<IDisseminationService>();
                 var topic = _serviceProvider.GetService<DeploymentLoadStatisticsDisseminationTopic>();
-                if (dissemination is null || topic is null || !topic.IsEnabled)
+                if (dissemination is null || topic is null || !topic.Options.Enabled)
                 {
                     return false;
                 }

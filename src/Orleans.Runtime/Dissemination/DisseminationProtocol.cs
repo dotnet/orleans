@@ -46,7 +46,7 @@ internal sealed partial class DisseminationProtocol
         DisseminationTopicValue value,
         CancellationToken cancellationToken)
     {
-        if (!_options.CurrentValue.Enabled || !topic.IsEnabled)
+        if (!_options.CurrentValue.Enabled || !topic.Options.Enabled)
         {
             return false;
         }
@@ -54,7 +54,7 @@ internal sealed partial class DisseminationProtocol
         var item = CreateDisseminationValue(topic, value, _transport.LocalSilo);
         if (GetPublishValidationFailureReason(topic, item) is { } reason)
         {
-            await topic.OnFallbackRequired(peer: null, item.Digest, cancellationToken);
+            await topic.RecoverAsync(item.Digest, cancellationToken);
             DisseminationInstruments.OnFallback(topic.Name, reason);
             return false;
         }
@@ -125,7 +125,7 @@ internal sealed partial class DisseminationProtocol
         var now = _timeProvider.GetUtcNow();
         foreach (var topic in _topics.Values)
         {
-            if (!topic.IsEnabled)
+            if (!topic.Options.Enabled)
             {
                 continue;
             }
@@ -296,7 +296,7 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
-            var remoteDigests = GetRemoteDigestMap(requestedTopic, remoteTopicDigests);
+            var remoteDigests = GetRemoteDigestMap(remoteTopicDigests);
             if (remoteDigests.Count == 0)
             {
                 continue;
@@ -310,21 +310,20 @@ internal sealed partial class DisseminationProtocol
                 }
 
                 var localDigest = topicDigest;
-                if (requestedTopic.CompareVersion(localDigest, remoteDigest) <= 0)
+                if (localDigest.Version <= remoteDigest.Version)
                 {
                     continue;
                 }
 
-                var value = await requestedTopic.GetValue(
+                if (!requestedTopic.TryCreateRepairValue(
                     localDigest,
                     remoteDigest,
-                    cancellationToken);
-                if (value is null)
+                    out var value))
                 {
                     continue;
                 }
 
-                var item = CreateDisseminationValue(requestedTopic, value.Value, _transport.LocalSilo);
+                var item = CreateDisseminationValue(requestedTopic, value, _transport.LocalSilo);
                 if (!ValidatePayloadSize(requestedTopic, item))
                 {
                     continue;
@@ -369,7 +368,9 @@ internal sealed partial class DisseminationProtocol
             return DisseminationApplyResult.Obsolete;
         }
 
-        var result = await topic.ApplyValue(value, cancellationToken);
+        var result = await topic.ApplyValueAsync(
+            new DisseminationTopicValue(value.Digest, value.Payload),
+            cancellationToken);
         EmitApplyResult(topicName, value, sender, result);
         if (result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate)
         {
@@ -530,14 +531,13 @@ internal sealed partial class DisseminationProtocol
             operation);
     }
 
-    private Dictionary<string, DisseminationTopicDigest> GetRemoteDigestMap(
-        IDisseminationTopic topic,
+    private static Dictionary<string, DisseminationTopicDigest> GetRemoteDigestMap(
         ImmutableArray<DisseminationTopicDigest> digests)
     {
         var result = new Dictionary<string, DisseminationTopicDigest>(digests.Length, StringComparer.Ordinal);
         foreach (var topicDigest in digests)
         {
-            if (!result.TryGetValue(topicDigest.Key, out var existing) || topic.CompareVersion(topicDigest, existing) > 0)
+            if (!result.TryGetValue(topicDigest.Key, out var existing) || topicDigest.Version > existing.Version)
             {
                 result[topicDigest.Key] = topicDigest;
             }
@@ -671,7 +671,7 @@ internal sealed partial class DisseminationProtocol
     {
         if (_options.CurrentValue.Enabled
             && _topics.TryGetValue(topicName, out topic)
-            && topic.IsEnabled)
+            && topic.Options.Enabled)
         {
             return true;
         }

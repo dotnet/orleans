@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,22 +13,22 @@ internal interface IDisseminationTopic
 
     DisseminationTopicOptions Options { get; }
 
-    bool IsEnabled { get; }
-
     IReadOnlyList<DisseminationTopicDigest> GetDigests();
-
-    int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right);
 
     bool IsObsolete(DisseminationTopicDigest digest);
 
-    ValueTask<DisseminationTopicValue?> GetValue(
-        DisseminationTopicDigest digest,
-        DisseminationTopicDigest? peerDigest,
+    bool TryCreateRepairValue(
+        DisseminationTopicDigest localDigest,
+        DisseminationTopicDigest peerDigest,
+        out DisseminationTopicValue value);
+
+    ValueTask<DisseminationApplyResult> ApplyValueAsync(
+        DisseminationTopicValue value,
         CancellationToken cancellationToken);
 
-    ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken);
-
-    ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken);
+    ValueTask RecoverAsync(
+        DisseminationTopicDigest digest,
+        CancellationToken cancellationToken);
 }
 
 internal enum DisseminationMembershipScope

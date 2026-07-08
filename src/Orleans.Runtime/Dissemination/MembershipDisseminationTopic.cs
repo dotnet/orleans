@@ -22,8 +22,6 @@ internal sealed class MembershipDisseminationTopic(
 
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
 
-    public bool IsEnabled => Options.Enabled;
-
     public DisseminationTopicValue CreateValue(MembershipTableSnapshot snapshot)
     {
         RememberSnapshot(snapshot);
@@ -42,40 +40,42 @@ internal sealed class MembershipDisseminationTopic(
         };
     }
 
-    public int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Version.CompareTo(right.Version);
-
     public bool IsObsolete(DisseminationTopicDigest digest) =>
         digest.Key != MembershipKey
         || membershipManager.CurrentSnapshot.Version.Value > digest.Version;
 
-    public ValueTask<DisseminationTopicValue?> GetValue(
-        DisseminationTopicDigest digest,
-        DisseminationTopicDigest? peerDigest,
-        CancellationToken cancellationToken)
+    public bool TryCreateRepairValue(
+        DisseminationTopicDigest localDigest,
+        DisseminationTopicDigest peerDigest,
+        out DisseminationTopicValue value)
     {
-        if (digest.Key != MembershipKey)
+        if (localDigest.Key != MembershipKey || peerDigest.Key != MembershipKey)
         {
-            return ValueTask.FromResult<DisseminationTopicValue?>(null);
+            value = default;
+            return false;
         }
 
         var snapshot = membershipManager.CurrentSnapshot;
         RememberSnapshot(snapshot);
-        if (snapshot.Version.Value < digest.Version)
+        if (snapshot.Version.Value < localDigest.Version)
         {
-            return ValueTask.FromResult<DisseminationTopicValue?>(null);
+            value = default;
+            return false;
         }
 
-        if (peerDigest is { } remote
-            && remote.Version < snapshot.Version.Value
-            && TryCreateDiffValue(remote.Version, snapshot, out var diffValue))
+        if (peerDigest.Version < snapshot.Version.Value
+            && TryCreateDiffValue(peerDigest.Version, snapshot, out value))
         {
-            return ValueTask.FromResult<DisseminationTopicValue?>(diffValue);
+            return true;
         }
 
-        return ValueTask.FromResult<DisseminationTopicValue?>(CreateValue(snapshot));
+        value = CreateValue(snapshot);
+        return true;
     }
 
-    public async ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
+    public async ValueTask<DisseminationApplyResult> ApplyValueAsync(
+        DisseminationTopicValue value,
+        CancellationToken cancellationToken)
     {
         if (value.Digest.Key != MembershipKey)
         {
@@ -111,7 +111,9 @@ internal sealed class MembershipDisseminationTopic(
         return DisseminationApplyResult.Applied;
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken)
+    public async ValueTask RecoverAsync(
+        DisseminationTopicDigest digest,
+        CancellationToken cancellationToken)
     {
         if (Options.FallbackEnabled)
         {
