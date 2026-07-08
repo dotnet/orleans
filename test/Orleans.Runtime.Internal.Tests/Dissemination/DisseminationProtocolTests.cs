@@ -728,6 +728,40 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task AntiEntropySendsOneMergedDigestRequestPerPeer()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        DisseminationKey activeKey = new("active");
+        DisseminationKey allKey = new("all");
+        var activeNamespace = new FakeNamespace(local, new DisseminationNamespace("active-namespace"));
+        activeNamespace.ExpectedKeys.Add(activeKey);
+        var allNamespace = new FakeNamespace(local, new DisseminationNamespace("all-namespace"))
+        {
+            Group = DisseminationGroup.AllMembers,
+        };
+        allNamespace.ExpectedKeys.Add(allKey);
+        var protocol = CreateProtocol(transport, new IDisseminationNamespace[] { activeNamespace, allNamespace }, options =>
+        {
+            options.Overlay.AntiEntropyPeerCount = 1;
+        });
+
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+
+        var request = Assert.Single(transport.AntiEntropyRequests).Request;
+        Assert.Equal(
+            new[] { activeNamespace.Name, allNamespace.Name }.OrderBy(static name => name),
+            request.Digests.Keys.OrderBy(static name => name));
+        var activeDigest = Assert.Single(request.Digests[activeNamespace.Name]);
+        Assert.Equal(activeKey, activeDigest.Key);
+        Assert.Equal(0, activeDigest.Version);
+        var allDigest = Assert.Single(request.Digests[allNamespace.Name]);
+        Assert.Equal(allKey, allDigest.Key);
+        Assert.Equal(0, allDigest.Version);
+    }
+
+    [Fact]
     public async Task AntiEntropyAppliesReturnedRepairItemsWithoutForwarding()
     {
         var local = CreateSilo(11111);
@@ -1150,13 +1184,12 @@ public class DisseminationProtocolTests
 
         var targets = snapshot.GetOriginatorTreeTargets(
             DisseminationGroup.ActiveMembers);
-        Span<SiloAddress> antiEntropyPeers = new SiloAddress[1];
-        snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, ref antiEntropyPeers);
+        var antiEntropyPeers = snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, 1);
 
         Assert.False(snapshot.ContainsMember(local, DisseminationGroup.ActiveMembers));
         Assert.Single(snapshot.ActiveMembers);
         Assert.Empty(targets);
-        Assert.Equal(0, antiEntropyPeers.Length);
+        Assert.Empty(antiEntropyPeers);
     }
 
     [Fact]
@@ -1174,9 +1207,7 @@ public class DisseminationProtocolTests
             [.. silos],
             new DisseminationOverlayOptions());
 
-        Span<SiloAddress> peers = new SiloAddress[peerCount];
-        snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, ref peers);
-        var selectedPeers = peers.ToArray();
+        var selectedPeers = snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, peerCount);
 
         Assert.Equal(silos.Length - 1, selectedPeers.Length);
         Assert.Equal(selectedPeers.Length, selectedPeers.Distinct().Count());
