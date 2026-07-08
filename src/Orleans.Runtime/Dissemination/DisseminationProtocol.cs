@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -44,7 +43,7 @@ internal sealed partial class DisseminationProtocol
 
     public async ValueTask<bool> Publish(
         IDisseminationTopic topic,
-        DisseminationValue item,
+        DisseminationTopicValue value,
         CancellationToken cancellationToken)
     {
         if (!_options.CurrentValue.Enabled || !topic.IsEnabled)
@@ -52,6 +51,7 @@ internal sealed partial class DisseminationProtocol
             return false;
         }
 
+        var item = CreateDisseminationValue(topic, value, _transport.LocalSilo);
         if (GetPublishValidationFailureReason(topic, item) is { } reason)
         {
             await topic.OnFallbackRequired(peer: null, item.Digest, cancellationToken);
@@ -60,7 +60,6 @@ internal sealed partial class DisseminationProtocol
         }
 
         var root = item.Root;
-        Debug.Assert(Equals(root, _transport.LocalSilo), "Published dissemination values should originate from the local silo.");
         var membership = await GetMembershipSnapshotForRouting(topic.MembershipScope, root, cancellationToken);
         if (membership is null)
         {
@@ -316,12 +315,17 @@ internal sealed partial class DisseminationProtocol
                     continue;
                 }
 
-                var item = await requestedTopic.GetValue(
+                var value = await requestedTopic.GetValue(
                     localDigest,
                     remoteDigest,
                     cancellationToken);
-                if (item is null
-                    || !ValidatePayloadSize(requestedTopic, item))
+                if (value is null)
+                {
+                    continue;
+                }
+
+                var item = CreateDisseminationValue(requestedTopic, value.Value, _transport.LocalSilo);
+                if (!ValidatePayloadSize(requestedTopic, item))
                 {
                     continue;
                 }
@@ -715,6 +719,17 @@ internal sealed partial class DisseminationProtocol
             if (!_failureBackoffUntil.TryGetValue(peer, out var until))
             {
                 return false;
+    private DisseminationValue CreateDisseminationValue(
+        IDisseminationTopic topic,
+        DisseminationTopicValue value,
+        SiloAddress root) => new()
+    {
+        Digest = value.Digest,
+        Root = root,
+        ExpiresAt = _timeProvider.GetUtcNow() + topic.Options.StaleItemTtl,
+        Payload = value.Payload,
+    };
+
             }
 
             if (until > now)

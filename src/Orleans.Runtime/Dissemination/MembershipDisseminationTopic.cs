@@ -9,9 +9,7 @@ namespace Orleans.Runtime.Dissemination;
 internal sealed class MembershipDisseminationTopic(
     IMembershipManager membershipManager,
     IOptionsMonitor<ClusterMembershipOptions> options,
-    Serializer serializer,
-    TimeProvider timeProvider,
-    ILocalSiloDetails localSiloDetails) : IDisseminationTopic
+    Serializer serializer) : IDisseminationTopic
 {
     private const string MembershipKey = "cluster";
     private const int MaxSnapshotHistory = 32;
@@ -26,16 +24,12 @@ internal sealed class MembershipDisseminationTopic(
 
     public bool IsEnabled => Options.Enabled;
 
-    public DisseminationValue CreateItem(SiloAddress origin, MembershipTableSnapshot snapshot)
+    public DisseminationTopicValue CreateValue(MembershipTableSnapshot snapshot)
     {
         RememberSnapshot(snapshot);
-        return new DisseminationValue
-        {
-            Digest = new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
-            Root = origin,
-            ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
-            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }),
-        };
+        return new DisseminationTopicValue(
+            new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
+            serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }));
     }
 
     public IReadOnlyList<DisseminationTopicDigest> GetDigests()
@@ -54,31 +48,31 @@ internal sealed class MembershipDisseminationTopic(
         digest.Key != MembershipKey
         || membershipManager.CurrentSnapshot.Version.Value > digest.Version;
 
-    public ValueTask<DisseminationValue?> GetValue(
+    public ValueTask<DisseminationTopicValue?> GetValue(
         DisseminationTopicDigest digest,
         DisseminationTopicDigest? peerDigest,
         CancellationToken cancellationToken)
     {
         if (digest.Key != MembershipKey)
         {
-            return ValueTask.FromResult<DisseminationValue?>(null);
+            return ValueTask.FromResult<DisseminationTopicValue?>(null);
         }
 
         var snapshot = membershipManager.CurrentSnapshot;
         RememberSnapshot(snapshot);
         if (snapshot.Version.Value < digest.Version)
         {
-            return ValueTask.FromResult<DisseminationValue?>(null);
+            return ValueTask.FromResult<DisseminationTopicValue?>(null);
         }
 
         if (peerDigest is { } remote
             && remote.Version < snapshot.Version.Value
             && TryCreateDiffValue(remote.Version, snapshot, out var diffValue))
         {
-            return ValueTask.FromResult<DisseminationValue?>(diffValue);
+            return ValueTask.FromResult<DisseminationTopicValue?>(diffValue);
         }
 
-        return ValueTask.FromResult<DisseminationValue?>(CreateItem(localSiloDetails.SiloAddress, snapshot));
+        return ValueTask.FromResult<DisseminationTopicValue?>(CreateValue(snapshot));
     }
 
     public async ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
@@ -125,7 +119,7 @@ internal sealed class MembershipDisseminationTopic(
         }
     }
 
-    private bool TryCreateDiffValue(long peerVersion, MembershipTableSnapshot snapshot, out DisseminationValue value)
+    private bool TryCreateDiffValue(long peerVersion, MembershipTableSnapshot snapshot, out DisseminationTopicValue value)
     {
         MembershipTableSnapshot? baseSnapshot;
         lock (_historyLock)
@@ -139,13 +133,9 @@ internal sealed class MembershipDisseminationTopic(
             return false;
         }
         var diff = CreateDiff(baseSnapshot, snapshot);
-        value = new DisseminationValue
-        {
-            Digest = new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
-            Root = localSiloDetails.SiloAddress,
-            ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
-            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }),
-        };
+        value = new DisseminationTopicValue(
+            new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
+            serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }));
         return true;
     }
 
