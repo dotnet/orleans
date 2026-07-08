@@ -35,7 +35,11 @@ public class DisseminationProtocolTests
         var peers = Enumerable.Range(11112, 6).Select(CreateSilo).ToArray();
         var transport = new FakeTransport(local, peers);
         var topic = new FakeTopic(local);
-        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.FanOutFactor = static _ => 2;
+        });
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
         var result = await protocol.Publish(topic, item, CancellationToken.None);
@@ -54,7 +58,11 @@ public class DisseminationProtocolTests
         var peers = Enumerable.Range(11112, 6).Select(CreateSilo).ToArray();
         var transport = new FakeTransport(local, peers);
         var topic = new FakeTopic(local);
-        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.FanOutFactor = static _ => 2;
+        });
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
         var result = await protocol.Publish(topic, item, CancellationToken.None);
@@ -62,6 +70,84 @@ public class DisseminationProtocolTests
 
         Assert.True(result);
         Assert.Equal(GetOriginatorTreeTargets(local, peers, fanout: 2), transport.GossipBatches.Select(batch => batch.Peer));
+    }
+
+    [Fact]
+    public async Task GossipSendsHonorMaxConcurrentSends()
+    {
+        const int maxConcurrentSends = 2;
+        var local = CreateSilo(11111);
+        var peers = Enumerable.Range(11112, 6).Select(CreateSilo).ToArray();
+        var transport = new FakeTransport(local, peers);
+        var topic = new FakeTopic(local);
+        var gate = new object();
+        var limitReached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSends = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var inFlight = 0;
+        var started = 0;
+        var observedMax = 0;
+        var sentPeers = new List<SiloAddress>();
+        transport.SendGossipHandler = async (target, batch, cancellationToken) =>
+        {
+            lock (gate)
+            {
+                inFlight++;
+                started++;
+                observedMax = Math.Max(observedMax, inFlight);
+                if (started == maxConcurrentSends)
+                {
+                    limitReached.TrySetResult(true);
+                }
+            }
+
+            try
+            {
+                await releaseSends.Task.WaitAsync(cancellationToken);
+                lock (gate)
+                {
+                    sentPeers.Add(target);
+                }
+            }
+            finally
+            {
+                lock (gate)
+                {
+                    inFlight--;
+                }
+            }
+        };
+
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = maxConcurrentSends;
+            options.Overlay.FanOutFactor = static _ => 10;
+        });
+        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+
+        Assert.True(await protocol.Publish(topic, item, CancellationToken.None));
+        var flushTask = protocol.FlushPendingGossip(CancellationToken.None);
+        try
+        {
+            await limitReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            lock (gate)
+            {
+                Assert.Equal(maxConcurrentSends, started);
+                Assert.Equal(maxConcurrentSends, inFlight);
+                Assert.Equal(maxConcurrentSends, observedMax);
+            }
+        }
+        finally
+        {
+            releaseSends.TrySetResult(true);
+        }
+
+        await flushTask.WaitAsync(TimeSpan.FromSeconds(5));
+        lock (gate)
+        {
+            Assert.Equal(peers.OrderBy(static peer => peer), sentPeers.OrderBy(static peer => peer));
+            Assert.True(observedMax <= maxConcurrentSends);
+        }
     }
 
     [Fact]
@@ -259,7 +345,11 @@ public class DisseminationProtocolTests
         var peers = silos.Where(silo => !Equals(silo, local)).ToArray();
         var transport = new FakeTransport(local, peers);
         var topic = new FakeTopic(local);
-        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.FanOutFactor = static _ => 2;
+        });
         var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
 
         await protocol.ReceiveGossip(CreateGossipBatch(root, item), CancellationToken.None);
@@ -278,7 +368,11 @@ public class DisseminationProtocolTests
         var peers = silos.Where(silo => !Equals(silo, local)).ToArray();
         var transport = new FakeTransport(local, peers);
         var topic = new FakeTopic(local);
-        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.FanOutFactor = static _ => 2;
+        });
         var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
         var batch = CreateGossipBatch(root, item);
 
@@ -300,7 +394,11 @@ public class DisseminationProtocolTests
         var peer = CreateSilo(11114);
         var transport = new FakeTransport(local, sender, peer);
         var topic = new FakeTopic(local);
-        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.FanOutFactor = static _ => 2;
+        });
         var item = topic.CreateItem(root, FakeTopic.DefaultKey, sequence: 1);
 
         await protocol.ReceiveGossip(CreateGossipBatch(sender, item), CancellationToken.None);
@@ -343,7 +441,11 @@ public class DisseminationProtocolTests
         var initialPeers = Enumerable.Range(11112, 3).Select(CreateSilo).ToList();
         var transport = new FakeTransport(local, initialPeers.ToArray());
         var topic = new FakeTopic(local);
-        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.FanOutFactor = static _ => 2;
+        });
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
         var initialResult = await protocol.Publish(topic, item, CancellationToken.None);
@@ -1394,7 +1496,11 @@ public class DisseminationProtocolTests
                 return SendGossipHandler(peer, batch, cancellationToken);
             }
 
-            GossipBatches.Add((peer, batch));
+            lock (GossipBatches)
+            {
+                GossipBatches.Add((peer, batch));
+            }
+
             return Task.CompletedTask;
         }
 
@@ -1403,7 +1509,11 @@ public class DisseminationProtocolTests
             DisseminationAntiEntropyRequest request,
             CancellationToken cancellationToken)
         {
-            AntiEntropyRequests.Add((peer, request));
+            lock (AntiEntropyRequests)
+            {
+                AntiEntropyRequests.Add((peer, request));
+            }
+
             return ExchangeAntiEntropyHandler(peer, request);
         }
 
