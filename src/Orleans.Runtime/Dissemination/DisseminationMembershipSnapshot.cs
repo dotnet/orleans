@@ -63,12 +63,9 @@ internal sealed class DisseminationMembershipSnapshot
     private sealed class MemberSet
     {
         private readonly ImmutableArray<SiloAddress> _members;
-        private readonly FrozenDictionary<SiloAddress, int> _indices;
-        private readonly SiloAddress _localSilo;
-        private readonly int _localIndex;
-        private readonly int _fanout;
-        private readonly SiloAddress[] _peers;
-        private readonly object _antiEntropyLock = new();
+        private readonly FrozenSet<SiloAddress> _set;
+        private readonly SiloAddress[] _shuffledPeers;
+        private readonly object _shuffledPeersLock = new();
 
         public MemberSet(
             ImmutableArray<SiloAddress> members,
@@ -77,14 +74,13 @@ internal sealed class DisseminationMembershipSnapshot
             string parameterName)
         {
             _members = members.IsDefault ? [] : members;
-            _localSilo = localSilo;
-            _fanout = _members.Length <= 1 ? 1 : overlayOptions.GetFanOutFactor(_members.Length);
-            var indices = new Dictionary<SiloAddress, int>(_members.Length);
+            var fanout = _members.Length <= 1 ? 1 : overlayOptions.GetFanOutFactor(_members.Length);
+            var memberSet = new HashSet<SiloAddress>(_members.Length);
             var localIndex = -1;
             for (var i = 0; i < _members.Length; i++)
             {
                 var member = _members[i];
-                if (!indices.TryAdd(member, i))
+                if (!memberSet.Add(member))
                 {
                     throw new ArgumentException("Membership snapshot members must be unique.", parameterName);
                 }
@@ -95,50 +91,48 @@ internal sealed class DisseminationMembershipSnapshot
                 }
             }
 
-            _localIndex = localIndex;
-            // Member arrays are already in tree order. The index map preserves that order for O(1) lookup.
-            _indices = indices.ToFrozenDictionary();
-            ForwardingTreeTargets = _localIndex < 0 ? [] : ComputeForwardingTreeTargets(_localIndex);
+            _set = memberSet.ToFrozenSet();
+            ForwardingTreeTargets = localIndex < 0 ? [] : ComputeForwardingTreeTargets(localIndex, fanout);
 
-            if (_localIndex < 0)
+            if (localIndex < 0)
             {
-                _peers = [];
+                _shuffledPeers = [];
             }
             else
             {
-                _peers = new SiloAddress[_members.Length - 1];
+                _shuffledPeers = new SiloAddress[_members.Length - 1];
                 var candidateIndex = 0;
                 for (var i = 0; i < _members.Length; i++)
                 {
-                    if (i != _localIndex)
+                    if (i != localIndex)
                     {
-                        _peers[candidateIndex++] = _members[i];
+                        _shuffledPeers[candidateIndex++] = _members[i];
                     }
                 }
             }
 
-            OriginatorTreeTargets = ComputeOriginatorTreeTargets();
+            OriginatorTreeTargets = ComputeOriginatorTreeTargets(localSilo, localIndex, fanout);
         }
 
-        public bool Contains(SiloAddress silo) => _indices.ContainsKey(silo);
+        public bool Contains(SiloAddress silo) => _set.Contains(silo);
 
         public ImmutableArray<SiloAddress> OriginatorTreeTargets { get; }
 
         public ImmutableArray<SiloAddress> ForwardingTreeTargets { get; }
 
-        private ImmutableArray<SiloAddress> ComputeOriginatorTreeTargets()
+        private ImmutableArray<SiloAddress> ComputeOriginatorTreeTargets(SiloAddress localSilo, int localIndex, int fanout)
         {
-            if (_localIndex < 0)
+            if (localIndex < 0)
             {
                 return [];
             }
 
-            var result = ImmutableArray.CreateBuilder<SiloAddress>(Math.Min(_fanout * 2, _members.Length));
-            var count = Math.Min(_fanout, _members.Length);
+            var result = ImmutableArray.CreateBuilder<SiloAddress>(Math.Min(fanout * 2, _members.Length));
+            var count = Math.Min(fanout, _members.Length);
             for (var i = 0; i < count; i++)
             {
                 var member = _members[i];
-                if (!Equals(member, _localSilo))
+                if (!Equals(member, localSilo))
                 {
                     result.Add(member);
                 }
@@ -150,7 +144,7 @@ internal sealed class DisseminationMembershipSnapshot
 
         public void SelectRandomPeers(ref Span<SiloAddress> peers)
         {
-            var candidates = _peers;
+            var candidates = _shuffledPeers;
             var count = Math.Min(peers.Length, candidates.Length);
             if (count <= 0)
             {
@@ -158,7 +152,7 @@ internal sealed class DisseminationMembershipSnapshot
                 return;
             }
 
-            lock (_antiEntropyLock)
+            lock (_shuffledPeersLock)
             {
                 for (var i = 0; i < count; i++)
                 {
@@ -175,11 +169,11 @@ internal sealed class DisseminationMembershipSnapshot
             peers = peers[..count];
         }
 
-        private ImmutableArray<SiloAddress> ComputeForwardingTreeTargets(int index)
+        private ImmutableArray<SiloAddress> ComputeForwardingTreeTargets(int index, int fanout)
         {
-            var result = ImmutableArray.CreateBuilder<SiloAddress>(Math.Min(_fanout, _members.Length));
-            var firstChild = (long)_fanout * (index + 1);
-            for (var i = 0; i < _fanout; i++)
+            var result = ImmutableArray.CreateBuilder<SiloAddress>(Math.Min(fanout, _members.Length));
+            var firstChild = (long)fanout * (index + 1);
+            for (var i = 0; i < fanout; i++)
             {
                 var childIndex = firstChild + i;
                 if (childIndex >= _members.Length)
