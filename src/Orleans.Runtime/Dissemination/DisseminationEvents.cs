@@ -8,7 +8,7 @@ internal static class DisseminationEvents
     public const string ListenerName = "Microsoft.Orleans.Dissemination";
     public static readonly DiagnosticListener Listener = new(ListenerName);
 
-    public static void EmitValue(string namespaceName, DisseminationValue value, SiloAddress localSilo, SiloAddress? peer, DisseminationApplyResult result, int payloadBytes)
+    public static void EmitValue(DisseminationNamespace namespaceName, DisseminationValue value, SiloAddress localSilo, SiloAddress? peer, DisseminationApplyResult result, int payloadBytes)
     {
         if (Listener.IsEnabled("Dissemination.ValueApply"))
         {
@@ -27,7 +27,7 @@ internal static class DisseminationEvents
         }
     }
 
-    public static void EmitPayloadDrop(string namespaceName, DisseminationValue value, SiloAddress localSilo, string reason, int payloadBytes)
+    public static void EmitPayloadDrop(DisseminationNamespace namespaceName, DisseminationValue value, SiloAddress localSilo, string reason, int payloadBytes)
     {
         if (Listener.IsEnabled("Dissemination.PayloadDrop"))
         {
@@ -49,13 +49,13 @@ internal static class DisseminationEvents
 
 internal sealed class DisseminationValueEvent
 {
-    public string Namespace { get; init; } = string.Empty;
+    public DisseminationNamespace Namespace { get; init; }
 
     public required SiloAddress LocalSilo { get; init; }
 
     public SiloAddress? Peer { get; init; }
 
-    public string Key { get; init; } = string.Empty;
+    public DisseminationKey Key { get; init; }
 
     public long FromVersion { get; init; }
 

@@ -1,9 +1,14 @@
 using System.Collections.Immutable;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime.Dissemination;
 
-internal sealed class DisseminationMembership(IMembershipManager membershipManager)
+internal sealed class DisseminationMembership(
+    IMembershipManager membershipManager,
+    ILocalSiloDetails localSiloDetails,
+    IOptions<DisseminationOptions> options)
 {
     private readonly object _membershipLock = new();
 
@@ -27,7 +32,7 @@ internal sealed class DisseminationMembership(IMembershipManager membershipManag
                     return current;
                 }
 
-                current = ComputeMembership(membershipSnapshot);
+                current = ComputeMembership(membershipSnapshot, localSiloDetails.SiloAddress, options.Value.Overlay);
                 Volatile.Write(ref field, current);
                 return current;
             }
@@ -53,7 +58,10 @@ internal sealed class DisseminationMembership(IMembershipManager membershipManag
         return snapshot.ContainsMember(member, scope) ? snapshot : null;
     }
 
-    private static DisseminationMembershipSnapshot ComputeMembership(MembershipTableSnapshot snapshot)
+    private static DisseminationMembershipSnapshot ComputeMembership(
+        MembershipTableSnapshot snapshot,
+        SiloAddress localSilo,
+        DisseminationOverlayOptions overlayOptions)
     {
         var members = snapshot.Entries.Values
             .Where(static entry => IsDisseminationMember(entry.Status))
@@ -72,7 +80,12 @@ internal sealed class DisseminationMembership(IMembershipManager membershipManag
             }
         }
 
-        return new DisseminationMembershipSnapshot(snapshot.Version, allMembers.MoveToImmutable(), activeMembers.ToImmutable());
+        return new DisseminationMembershipSnapshot(
+            snapshot.Version,
+            localSilo,
+            allMembers.MoveToImmutable(),
+            activeMembers.ToImmutable(),
+            overlayOptions);
     }
 
     private static bool IsDisseminationMember(SiloStatus status) =>
