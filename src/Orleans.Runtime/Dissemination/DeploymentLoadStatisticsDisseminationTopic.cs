@@ -78,12 +78,4 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
             deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }
 
-    public async ValueTask RecoverAsync(DisseminationTopicDigest digest,
-        CancellationToken cancellationToken)
-    {
-        if (Options.FallbackEnabled && SiloAddress.TryParse(digest.Key, out var siloAddress))
-        {
-            await deploymentLoadPublisher.RefreshSiloStatisticsForDissemination(siloAddress);
-        }
-    }
 }

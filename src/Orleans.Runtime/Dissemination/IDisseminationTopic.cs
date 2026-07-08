@@ -25,10 +25,6 @@ internal interface IDisseminationTopic
     ValueTask<DisseminationApplyResult> ApplyValueAsync(
         DisseminationTopicValue value,
         CancellationToken cancellationToken);
-
-    ValueTask RecoverAsync(
-        DisseminationTopicDigest digest,
-        CancellationToken cancellationToken);
 }
 
 internal enum DisseminationMembershipScope
