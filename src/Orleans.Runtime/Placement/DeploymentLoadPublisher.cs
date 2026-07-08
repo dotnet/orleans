@@ -146,7 +146,7 @@ namespace Orleans.Runtime
             return _periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime.Ticks > timestampTicks;
         }
 
-        internal IReadOnlyCollection<SiloAddress> GetActiveSilosForDissemination() =>
+        internal IReadOnlyCollection<SiloAddress> GetActiveSilosForStatisticsDigest() =>
             _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
 
         private async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
