@@ -52,9 +52,8 @@ internal sealed partial class DisseminationProtocol
         }
 
         var item = CreateDisseminationValue(topic, value, _transport.LocalSilo);
-        if (GetPublishValidationFailureReason(topic, item) is { } reason)
+        if (!TryValidatePublishValue(topic, item, out var reason))
         {
-            await topic.RecoverAsync(item.Digest, cancellationToken);
             DisseminationInstruments.OnFallback(topic.Name, reason);
             return false;
         }
@@ -702,19 +701,31 @@ internal sealed partial class DisseminationProtocol
         return true;
     }
 
-    private string? GetPublishValidationFailureReason(IDisseminationTopic topic, DisseminationValue item)
+    private bool TryValidatePublishValue(
+        IDisseminationTopic topic,
+        DisseminationValue item,
+        [NotNullWhen(false)] out string? failureReason)
     {
         if (IsExpired(item))
         {
-            return "expired";
+            failureReason = "expired";
+            return false;
         }
 
         if (topic.IsObsolete(item.Digest))
         {
-            return "obsolete";
+            failureReason = "obsolete";
+            return false;
         }
 
-        return ValidatePayloadSize(topic, item) ? null : "oversize";
+        if (!ValidatePayloadSize(topic, item))
+        {
+            failureReason = "oversize";
+            return false;
+        }
+
+        failureReason = null;
+        return true;
     }
 
     private bool IsExpired(DisseminationValue item) => item.ExpiresAt <= _timeProvider.GetUtcNow();
