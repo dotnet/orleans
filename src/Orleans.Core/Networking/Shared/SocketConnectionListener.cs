@@ -89,7 +89,7 @@ namespace Orleans.Networking.Shared
             {
                 try
                 {
-                    var acceptSocket = await _listenSocket.AcceptAsync();
+                    var acceptSocket = await _listenSocket.AcceptAsync(cancellationToken);
                     acceptSocket.NoDelay = _options.NoDelay;
                     if (_options.KeepAlive)
                     {
