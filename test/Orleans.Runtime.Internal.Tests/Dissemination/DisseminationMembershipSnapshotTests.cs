@@ -83,10 +83,10 @@ public class DisseminationMembershipSnapshotTests
                 var effectiveFanout = GetEffectiveFanout(groupMembers.Length, testCase.RawFanout);
                 var maxTargets = Math.Max(0, groupMembers.Length - 1);
                 Assert.True(
-                    originatorTargets.Count <= Math.Min(effectiveFanout * 2, maxTargets),
+                    originatorTargets.Length <= Math.Min(effectiveFanout * 2, maxTargets),
                     $"{group} originator target count exceeded the expected bound.");
                 Assert.True(
-                    forwardingTargets.Count <= Math.Min(effectiveFanout, maxTargets),
+                    forwardingTargets.Length <= Math.Min(effectiveFanout, maxTargets),
                     $"{group} forwarding target count exceeded the expected bound.");
             }
         });
@@ -115,9 +115,7 @@ public class DisseminationMembershipSnapshotTests
             foreach (var group in Groups)
             {
                 var groupMembers = GetMembers(snapshot, group);
-                Span<SiloAddress> peers = new SiloAddress[testCase.RequestedCount];
-                snapshot.SelectAntiEntropyPeers(group, ref peers);
-                var selectedPeers = peers.ToArray();
+                var selectedPeers = snapshot.SelectAntiEntropyPeers(group, testCase.RequestedCount);
 
                 AssertNoDuplicates($"{group} anti-entropy peers", selectedPeers);
                 AssertSubset($"{group} anti-entropy peers", selectedPeers, groupMembers);

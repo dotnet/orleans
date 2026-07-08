@@ -135,7 +135,6 @@ internal sealed partial class DisseminationProtocol
 
     public async Task RunAntiEntropyRound(CancellationToken cancellationToken)
     {
-        (SiloAddress Peer, DisseminationAntiEntropyRequest Request)[]? requests = [];
         if (!_options.CurrentValue.Enabled)
         {
             return;
@@ -143,8 +142,7 @@ internal sealed partial class DisseminationProtocol
 
         var membership = _membership.CurrentSnapshot;
         PrunePeerState(membership);
-        var peersByGroup = new Dictionary<DisseminationGroup, (SiloAddress[] Peers, int Count)>();
-        var requestsByPeer = new Dictionary<SiloAddress, Dictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>>();
+        var digestsByGroup = new Dictionary<DisseminationGroup, Dictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>>();
         var currentValueStreams = new HashSet<DigestKey>();
         var now = _timeProvider.GetUtcNow();
         foreach (var disseminationNamespace in _namespaces.Values)
@@ -154,136 +152,178 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
-            ImmutableArray<DigestEntry>.Builder? digests = null;
-            foreach (var (key, version) in disseminationNamespace.GetDigest().OrderBy(static entry => entry.Key))
+            var digestEntries = CreateAntiEntropyDigest(disseminationNamespace, currentValueStreams, now);
+            if (digestEntries.IsDefaultOrEmpty)
             {
-                var digestKey = new DigestKey(disseminationNamespace.Name, key);
-                currentValueStreams.Add(digestKey);
-                if (ShouldRequestAntiEntropy(disseminationNamespace, digestKey, now))
+                continue;
+            }
+
+            ref var groupDigests = ref CollectionsMarshal.GetValueRefOrAddDefault(digestsByGroup, disseminationNamespace.Group, out _);
+            (groupDigests ??= [])[disseminationNamespace.Name] = digestEntries;
+        }
+
+        PruneSeenValues(currentValueStreams);
+        if (digestsByGroup.Count == 0)
+        {
+            return;
+        }
+
+        var requests = CreateAntiEntropyRequests(
+            membership,
+            digestsByGroup,
+            _options.CurrentValue.Overlay.AntiEntropyPeerCount);
+        if (requests.Length == 0)
+        {
+            return;
+        }
+
+        var responses = await ExchangeAntiEntropyRequests(requests, cancellationToken);
+        await ApplyAntiEntropyResponses(responses, cancellationToken);
+    }
+
+    private ImmutableArray<DigestEntry> CreateAntiEntropyDigest(
+        IDisseminationNamespace disseminationNamespace,
+        HashSet<DigestKey> currentValueStreams,
+        DateTimeOffset now)
+    {
+        ImmutableArray<DigestEntry>.Builder? digests = null;
+        foreach (var (key, version) in disseminationNamespace.GetDigest())
+        {
+            var digestKey = new DigestKey(disseminationNamespace.Name, key);
+            currentValueStreams.Add(digestKey);
+            if (ShouldRequestAntiEntropy(disseminationNamespace, digestKey, now))
+            {
+                (digests ??= ImmutableArray.CreateBuilder<DigestEntry>()).Add(new DigestEntry(key, version));
+            }
+        }
+
+        return digests?.ToImmutable() ?? [];
+    }
+
+    private static (SiloAddress Peer, DisseminationAntiEntropyRequest Request)[] CreateAntiEntropyRequests(
+        DisseminationMembershipSnapshot membership,
+        Dictionary<DisseminationGroup, Dictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>> digestsByGroup,
+        int peerCount)
+    {
+        var requests = new List<(SiloAddress Peer, DisseminationAntiEntropyRequest Request)>();
+        var requestIndexes = new Dictionary<SiloAddress, int>();
+        foreach (var (group, digests) in digestsByGroup)
+        {
+            var peers = membership.SelectAntiEntropyPeers(group, peerCount);
+            if (peers.IsDefaultOrEmpty)
+            {
+                continue;
+            }
+
+            var request = new DisseminationAntiEntropyRequest { Digests = digests.ToFrozenDictionary() };
+            foreach (var peer in peers)
+            {
+                if (requestIndexes.TryGetValue(peer, out var existingIndex))
                 {
-                    (digests ??= ImmutableArray.CreateBuilder<DigestEntry>()).Add(new DigestEntry(key, version));
+                    var existing = requests[existingIndex];
+                    requests[existingIndex] = (peer, MergeAntiEntropyRequests(existing.Request.Digests, request.Digests));
+                    continue;
                 }
+
+                requestIndexes[peer] = requests.Count;
+                requests.Add((peer, request));
             }
+        }
 
-            if (digests is null)
+        return [.. requests];
+    }
+
+    private async Task<DisseminationAntiEntropyResponse?[]> ExchangeAntiEntropyRequests(
+        (SiloAddress Peer, DisseminationAntiEntropyRequest Request)[] requests,
+        CancellationToken cancellationToken)
+    {
+        var responses = new DisseminationAntiEntropyResponse?[requests.Length];
+        await Parallel.ForAsync(
+            0,
+            requests.Length,
+            new ParallelOptions
             {
-                continue;
-            }
-
-            ref var peers = ref CollectionsMarshal.GetValueRefOrAddDefault(peersByGroup, disseminationNamespace.Group, out var exists);
-            if (!exists)
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = _options.CurrentValue.MaxConcurrentSends,
+            },
+            async (index, operationCancellationToken) =>
             {
-                peers = SelectAntiEntropyPeers(
-                    membership,
-                    disseminationNamespace.Group,
-                    _options.CurrentValue.Overlay.AntiEntropyPeerCount);
-            }
-
-            if (peers.Count == 0)
-            {
-                continue;
-            }
-
-            var digestEntries = digests.ToImmutable();
-            for (var i = 0; i < peers.Count; i++)
-            {
-                var peer = peers.Peers[i];
-                ref var pendingRequest = ref CollectionsMarshal.GetValueRefOrAddDefault(requestsByPeer, peer, out _);
-                (pendingRequest ??= [])[disseminationNamespace.Name] = digestEntries;
-            }
-
-            PruneSeenValues(currentValueStreams);
-            if (requestsByPeer.Count == 0)
-            {
-                return;
-            }
-
-            requests = new (SiloAddress Peer, DisseminationAntiEntropyRequest Request)[requestsByPeer.Count];
-            var index = 0;
-            foreach (var (peer, digest) in requestsByPeer)
-            {
-                requests[index++] = (peer, new DisseminationAntiEntropyRequest { Digests = digest.ToFrozenDictionary(), });
-            }
-
-            if (requests.Length == 0)
-            {
-                return;
-            }
-
-            var responses = new DisseminationAntiEntropyResponse?[requests.Length];
-            await Parallel.ForAsync(
-                0,
-                requests.Length,
-                new ParallelOptions
-                {
-                    CancellationToken = cancellationToken,
-                    MaxDegreeOfParallelism = _options.CurrentValue.MaxConcurrentSends,
-                },
-                async (index, operationCancellationToken) =>
-                {
-                    var (peer, request) = requests[index];
-                    var response = await ExecutePeerOperation(
-                        peer,
-                        async target =>
-                            await _transport.ExchangeAntiEntropy(target, request, operationCancellationToken),
-                        failureResult: null, cancellationToken: operationCancellationToken);
-                    if (response is null)
-                    {
-                        return;
-                    }
-
-                    DisseminationInstruments.OnAntiEntropyExchange(
-                        "out",
-                        GetDigestCount(request.Digests),
-                        GetValueCount(response.Values),
-                        response.Truncated);
-                    responses[index] = response;
-                });
-
-            foreach (var response in responses)
-            {
+                var (peer, request) = requests[index];
+                var response = await ExecutePeerOperation(
+                    peer,
+                    async target =>
+                        await _transport.ExchangeAntiEntropy(target, request, operationCancellationToken),
+                    failureResult: null, cancellationToken: operationCancellationToken);
                 if (response is null)
+                {
+                    return;
+                }
+
+                DisseminationInstruments.OnAntiEntropyExchange(
+                    "out",
+                    GetDigestCount(request.Digests),
+                    GetValueCount(response.Values),
+                    response.Truncated);
+                responses[index] = response;
+            });
+
+        return responses;
+    }
+
+    private async Task ApplyAntiEntropyResponses(
+        DisseminationAntiEntropyResponse?[] responses,
+        CancellationToken cancellationToken)
+    {
+        foreach (var response in responses)
+        {
+            if (response is null)
+            {
+                continue;
+            }
+
+            foreach (var (namespaceName, values) in response.Values)
+            {
+                if (!TryGetEnabledNamespace(namespaceName, out var ns))
                 {
                     continue;
                 }
 
-                foreach (var (namespaceName, values) in response.Values)
+                foreach (var item in values)
                 {
-                    if (!TryGetEnabledNamespace(namespaceName, out var ns))
+                    try
                     {
-                        continue;
+                        await ApplyReceivedValue(ns, item, response.Sender, cancellationToken);
                     }
-
-                    foreach (var item in values)
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
-                        try
-                        {
-                            await ApplyReceivedValue(ns, item, response.Sender, cancellationToken);
-                        }
-                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                        {
-                            throw;
-                        }
-                        catch (Exception exception)
-                        {
-                            LogDebugAntiEntropyRepairValueFailed(_logger, exception, response.Sender, namespaceName,
-                                item.Value.Key, item.Value.ToVersion);
-                        }
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        LogDebugAntiEntropyRepairValueFailed(_logger, exception, response.Sender, namespaceName,
+                            item.Value.Key, item.Value.ToVersion);
                     }
                 }
             }
         }
     }
 
-    private static (SiloAddress[] Peers, int Count) SelectAntiEntropyPeers(
-        DisseminationMembershipSnapshot membership,
-        DisseminationGroup group,
-        int peerCount)
+    private static DisseminationAntiEntropyRequest MergeAntiEntropyRequests(
+        FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> existingDigests,
+        FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> additionalDigests)
     {
-        var result = new SiloAddress[peerCount];
-        var peers = result.AsSpan();
-        membership.SelectAntiEntropyPeers(group, ref peers);
-        return (result, peers.Length);
+        var mergedDigests = new Dictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>(existingDigests.Count + additionalDigests.Count);
+        foreach (var digest in existingDigests)
+        {
+            mergedDigests[digest.Key] = digest.Value;
+        }
+
+        foreach (var digest in additionalDigests)
+        {
+            mergedDigests[digest.Key] = digest.Value;
+        }
+
+        return new DisseminationAntiEntropyRequest { Digests = mergedDigests.ToFrozenDictionary() };
     }
 
     public ValueTask<DisseminationAntiEntropyResponse> ReceiveAntiEntropy(

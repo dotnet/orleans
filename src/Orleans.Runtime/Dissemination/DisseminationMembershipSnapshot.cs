@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
@@ -33,18 +34,21 @@ internal sealed class DisseminationMembershipSnapshot
     public bool ContainsMember(SiloAddress silo, DisseminationGroup membershipScope = DisseminationGroup.AllMembers) =>
         GetMemberSet(membershipScope).Contains(silo);
 
-    public IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(
+    public ImmutableArray<SiloAddress> GetOriginatorTreeTargets(
         DisseminationGroup membershipScope) =>
         GetMemberSet(membershipScope).OriginatorTreeTargets;
 
-    public IReadOnlyList<SiloAddress> GetForwardingTreeTargets(
+    public ImmutableArray<SiloAddress> GetForwardingTreeTargets(
         DisseminationGroup membershipScope) =>
         GetMemberSet(membershipScope).ForwardingTreeTargets;
 
-    public void SelectAntiEntropyPeers(
+    public ImmutableArray<SiloAddress> SelectAntiEntropyPeers(
         DisseminationGroup membershipScope,
-        ref Span<SiloAddress> peers) =>
-        GetMemberSet(membershipScope).SelectRandomPeers(ref peers);
+        int peerCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(peerCount);
+        return GetMemberSet(membershipScope).SelectRandomPeers(peerCount);
+    }
 
     private MemberSet GetMemberSet(DisseminationGroup membershipScope) =>
         membershipScope == DisseminationGroup.AllMembers ? _allMembers : _activeMembers;
@@ -142,16 +146,16 @@ internal sealed class DisseminationMembershipSnapshot
             return result.ToImmutable();
         }
 
-        public void SelectRandomPeers(ref Span<SiloAddress> peers)
+        public ImmutableArray<SiloAddress> SelectRandomPeers(int peerCount)
         {
             var candidates = _shuffledPeers;
-            var count = Math.Min(peers.Length, candidates.Length);
+            var count = Math.Min(peerCount, candidates.Length);
             if (count <= 0)
             {
-                peers = peers[..0];
-                return;
+                return [];
             }
 
+            var peers = new SiloAddress[count];
             lock (_shuffledPeersLock)
             {
                 for (var i = 0; i < count; i++)
@@ -166,7 +170,7 @@ internal sealed class DisseminationMembershipSnapshot
                 }
             }
 
-            peers = peers[..count];
+            return ImmutableCollectionsMarshal.AsImmutableArray(peers);
         }
 
         private ImmutableArray<SiloAddress> ComputeForwardingTreeTargets(int index, int fanout)
