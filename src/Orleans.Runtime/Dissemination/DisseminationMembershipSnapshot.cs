@@ -27,31 +27,31 @@ internal sealed class DisseminationMembershipSnapshot
 
     public ImmutableArray<SiloAddress> ActiveMembers { get; }
 
-    public bool ContainsParticipant(SiloAddress silo, DisseminationMembershipScope membershipScope = DisseminationMembershipScope.AllMembers) =>
+    public bool ContainsMember(SiloAddress silo, DisseminationGroup membershipScope = DisseminationGroup.AllMembers) =>
         GetMemberSet(membershipScope).Contains(silo);
 
     public IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(
-        DisseminationMembershipScope membershipScope,
-        SiloAddress root,
+        DisseminationGroup membershipScope,
+        SiloAddress originator,
         Func<int, int> selectFanOut) =>
-        GetMemberSet(membershipScope).GetOriginatorTreeTargets(root, selectFanOut);
+        GetMemberSet(membershipScope).GetOriginatorTreeTargets(originator, selectFanOut);
 
     public IReadOnlyList<SiloAddress> GetForwardingTreeTargets(
-        DisseminationMembershipScope membershipScope,
+        DisseminationGroup membershipScope,
         SiloAddress localSilo,
-        SiloAddress root,
+        SiloAddress originator,
         SiloAddress sender,
         Func<int, int> selectFanOut) =>
-        GetMemberSet(membershipScope).GetForwardingTreeTargets(localSilo, root, sender, selectFanOut);
+        GetMemberSet(membershipScope).GetForwardingTreeTargets(localSilo, originator, sender, selectFanOut);
 
     public ImmutableArray<SiloAddress> SelectAntiEntropyPeers(
-        DisseminationMembershipScope membershipScope,
+        DisseminationGroup membershipScope,
         SiloAddress localSilo,
         int peerCount) =>
         GetMemberSet(membershipScope).SelectAntiEntropyPeers(localSilo, peerCount);
 
-    private MemberSet GetMemberSet(DisseminationMembershipScope membershipScope) =>
-        membershipScope == DisseminationMembershipScope.AllMembers ? _allMembers : _activeMembers;
+    private MemberSet GetMemberSet(DisseminationGroup membershipScope) =>
+        membershipScope == DisseminationGroup.AllMembers ? _allMembers : _activeMembers;
 
     private static void ValidateActiveMembers(ImmutableArray<SiloAddress> activeMembers, MemberSet allMembers)
     {
@@ -66,44 +66,44 @@ internal sealed class DisseminationMembershipSnapshot
 
     private sealed class MemberSet
     {
-        private readonly ImmutableArray<SiloAddress> _participants;
+        private readonly ImmutableArray<SiloAddress> _members;
         private readonly FrozenDictionary<SiloAddress, int> _indices;
 
-        public MemberSet(ImmutableArray<SiloAddress> participants, string parameterName)
+        public MemberSet(ImmutableArray<SiloAddress> members, string parameterName)
         {
-            _participants = participants.IsDefault ? [] : participants;
-            var indices = new Dictionary<SiloAddress, int>(_participants.Length);
-            for (var i = 0; i < _participants.Length; i++)
+            _members = members.IsDefault ? [] : members;
+            var indices = new Dictionary<SiloAddress, int>(_members.Length);
+            for (var i = 0; i < _members.Length; i++)
             {
-                if (!indices.TryAdd(_participants[i], i))
+                if (!indices.TryAdd(_members[i], i))
                 {
-                    throw new ArgumentException("Membership snapshot participants must be unique.", parameterName);
+                    throw new ArgumentException("Membership snapshot members must be unique.", parameterName);
                 }
             }
 
-            // Participant arrays are already in tree order. The index map preserves that order for O(1) lookup.
+            // Member arrays are already in tree order. The index map preserves that order for O(1) lookup.
             _indices = indices.ToFrozenDictionary();
         }
 
         public bool Contains(SiloAddress silo) => _indices.ContainsKey(silo);
 
-        public IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(SiloAddress root, Func<int, int> selectFanOut)
+        public IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(SiloAddress originator, Func<int, int> selectFanOut)
         {
-            if (!_indices.TryGetValue(root, out var rootIndex))
+            if (!_indices.TryGetValue(originator, out var originatorIndex))
             {
                 return [];
             }
 
             var fanout = GetFanOut(selectFanOut);
-            var result = new List<SiloAddress>(Math.Min(fanout * 2, _participants.Length));
-            AddTopLevelTargets(fanout, root, result);
-            AddFixedChildren(rootIndex, fanout, root, except: null, result);
+            var result = new List<SiloAddress>(Math.Min(fanout * 2, _members.Length));
+            AddTopLevelTargets(fanout, originator, result);
+            AddFixedChildren(originatorIndex, fanout, originator, except: null, result);
             return result;
         }
 
         public IReadOnlyList<SiloAddress> GetForwardingTreeTargets(
             SiloAddress localSilo,
-            SiloAddress root,
+            SiloAddress originator,
             SiloAddress sender,
             Func<int, int> selectFanOut)
         {
@@ -113,8 +113,8 @@ internal sealed class DisseminationMembershipSnapshot
             }
 
             var fanout = GetFanOut(selectFanOut);
-            var result = new List<SiloAddress>(Math.Min(fanout, _participants.Length));
-            AddFixedChildren(localIndex, fanout, root, sender, result);
+            var result = new List<SiloAddress>(Math.Min(fanout, _members.Length));
+            AddFixedChildren(localIndex, fanout, originator, sender, result);
             return result;
         }
 
@@ -127,13 +127,13 @@ internal sealed class DisseminationMembershipSnapshot
                 return [];
             }
 
-            var candidates = new SiloAddress[_participants.Length - 1];
+            var candidates = new SiloAddress[_members.Length - 1];
             var candidateIndex = 0;
-            for (var i = 0; i < _participants.Length; i++)
+            for (var i = 0; i < _members.Length; i++)
             {
                 if (i != localIndex)
                 {
-                    candidates[candidateIndex++] = _participants[i];
+                    candidates[candidateIndex++] = _members[i];
                 }
             }
 
@@ -160,20 +160,20 @@ internal sealed class DisseminationMembershipSnapshot
 
         private void AddTopLevelTargets(
             int fanout,
-            SiloAddress root,
+            SiloAddress originator,
             List<SiloAddress> result)
         {
-            var count = Math.Min(fanout, _participants.Length);
+            var count = Math.Min(fanout, _members.Length);
             for (var i = 0; i < count; i++)
             {
-                AddTarget(_participants[i], root, except: null, result);
+                AddTarget(_members[i], originator, except: null, result);
             }
         }
 
         private void AddFixedChildren(
             int index,
             int fanout,
-            SiloAddress root,
+            SiloAddress originator,
             SiloAddress? except,
             List<SiloAddress> result)
         {
@@ -181,18 +181,18 @@ internal sealed class DisseminationMembershipSnapshot
             for (var i = 0; i < fanout; i++)
             {
                 var childIndex = firstChild + i;
-                if (childIndex >= _participants.Length)
+                if (childIndex >= _members.Length)
                 {
                     break;
                 }
 
-                AddTarget(_participants[(int)childIndex], root, except, result);
+                AddTarget(_members[(int)childIndex], originator, except, result);
             }
         }
 
-        private static void AddTarget(SiloAddress peer, SiloAddress root, SiloAddress? except, List<SiloAddress> result)
+        private static void AddTarget(SiloAddress peer, SiloAddress originator, SiloAddress? except, List<SiloAddress> result)
         {
-            if (Equals(peer, root) || except != null && Equals(peer, except))
+            if (Equals(peer, originator) || except != null && Equals(peer, except))
             {
                 return;
             }
@@ -201,7 +201,7 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         private int GetFanOut(Func<int, int> selectFanOut) =>
-            _participants.Length <= 1 ? 1 : Math.Clamp(selectFanOut(_participants.Length), 1, _participants.Length);
+            _members.Length <= 1 ? 1 : Math.Clamp(selectFanOut(_members.Length), 1, _members.Length);
 
         private static long GetFirstChildIndex(int index, int fanout) =>
             (long)fanout * (index + 1);

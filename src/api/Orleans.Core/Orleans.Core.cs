@@ -433,7 +433,7 @@ namespace Orleans.Configuration
 
         public System.TimeSpan DefunctSiloExpiration { get { throw null; } set { } }
 
-        public DisseminationTopicOptions Dissemination { get { throw null; } set { } }
+        public DisseminationNamespaceOptions Dissemination { get { throw null; } set { } }
 
         public bool EnableIndirectProbes { get { throw null; } set { } }
 
@@ -524,7 +524,7 @@ namespace Orleans.Configuration
         public int TargetHopCount { get { throw null; } set { } }
     }
 
-    public sealed partial class DisseminationTopicOptions
+    public sealed partial class DisseminationNamespaceOptions
     {
         public bool Enabled { get { throw null; } set { } }
 

@@ -155,14 +155,14 @@ namespace Orleans.Runtime
             try
             {
                 var dissemination = _serviceProvider.GetService<IDisseminationService>();
-                var topic = _serviceProvider.GetService<DeploymentLoadStatisticsDisseminationTopic>();
-                if (dissemination is null || topic is null || !topic.Options.Enabled)
+                var disseminationNamespace = _serviceProvider.GetService<DeploymentLoadStatisticsDisseminationNamespace>();
+                if (dissemination is null || disseminationNamespace is null || !disseminationNamespace.Options.Enabled)
                 {
                     return false;
                 }
 
-                var item = topic.CreateValue(_siloDetails.SiloAddress, myStats);
-                return await dissemination.Publish(topic, item, CancellationToken.None);
+                var item = disseminationNamespace.CreateValue(_siloDetails.SiloAddress, myStats);
+                return await dissemination.Publish(disseminationNamespace, item, CancellationToken.None);
             }
             catch (Exception exception)
             {

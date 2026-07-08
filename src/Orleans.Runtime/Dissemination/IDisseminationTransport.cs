@@ -7,7 +7,7 @@ internal interface IDisseminationTransport
 {
     SiloAddress LocalSilo { get; }
 
-    Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken);
+    Task SendBroadcast(SiloAddress peer, DisseminationBroadcastBatch batch, CancellationToken cancellationToken);
 
     ValueTask<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
         SiloAddress peer,

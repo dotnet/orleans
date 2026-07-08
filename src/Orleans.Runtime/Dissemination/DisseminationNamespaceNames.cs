@@ -1,6 +1,6 @@
 namespace Orleans.Runtime.Dissemination;
 
-internal static class DisseminationTopicNames
+internal static class DisseminationNamespaceNames
 {
     public const string DeploymentLoad = "load";
     public const string Membership = "membership";

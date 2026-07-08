@@ -8,8 +8,8 @@ namespace Orleans.Runtime.Dissemination;
 internal static class DisseminationInstruments
 {
     private static readonly Meter Meter = new("Microsoft.Orleans.Dissemination");
-    private static readonly Counter<long> GossipSent = Meter.CreateCounter<long>("orleans.dissemination.gossip.sent", "messages");
-    private static readonly Counter<long> GossipReceived = Meter.CreateCounter<long>("orleans.dissemination.gossip.received", "messages");
+    private static readonly Counter<long> BroadcastSent = Meter.CreateCounter<long>("orleans.dissemination.broadcast.sent", "messages");
+    private static readonly Counter<long> BroadcastReceived = Meter.CreateCounter<long>("orleans.dissemination.broadcast.received", "messages");
     private static readonly Counter<long> ValuesSent = Meter.CreateCounter<long>("orleans.dissemination.values.sent", "values");
     private static readonly Counter<long> ValuesApplied = Meter.CreateCounter<long>("orleans.dissemination.values.applied", "values");
     private static readonly Counter<long> BytesSent = Meter.CreateCounter<long>("orleans.dissemination.bytes.sent", "bytes");
@@ -19,89 +19,89 @@ internal static class DisseminationInstruments
     private static readonly Counter<long> Fallbacks = Meter.CreateCounter<long>("orleans.dissemination.fallbacks", "operations");
     private static readonly Counter<long> PayloadDropped = Meter.CreateCounter<long>("orleans.dissemination.payload.dropped", "values");
 
-    public static void OnGossipSent(string topic, string kind, int itemCount, int byteCount)
+    public static void OnBroadcastSent(string namespaceName, string kind, int itemCount, int byteCount)
     {
-        var gossipSentEnabled = GossipSent.Enabled;
+        var broadcastSentEnabled = BroadcastSent.Enabled;
         var valuesSentEnabled = ValuesSent.Enabled;
         var bytesSentEnabled = BytesSent.Enabled;
-        if (!gossipSentEnabled && !valuesSentEnabled && !bytesSentEnabled)
+        if (!broadcastSentEnabled && !valuesSentEnabled && !bytesSentEnabled)
         {
             return;
         }
 
-        var topicTag = Tag("topic", topic);
+        var namespaceTag = Tag("namespace", namespaceName);
         var kindTag = Tag("kind", kind);
-        if (gossipSentEnabled)
+        if (broadcastSentEnabled)
         {
-            GossipSent.Add(1, topicTag, kindTag);
+            BroadcastSent.Add(1, namespaceTag, kindTag);
         }
 
         if (valuesSentEnabled)
         {
-            ValuesSent.Add(itemCount, topicTag, kindTag);
+            ValuesSent.Add(itemCount, namespaceTag, kindTag);
         }
 
         if (bytesSentEnabled)
         {
-            BytesSent.Add(byteCount, topicTag, kindTag);
+            BytesSent.Add(byteCount, namespaceTag, kindTag);
         }
     }
 
-    public static void OnGossipSent(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
+    public static void OnBroadcastSent(FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
     {
-        if (!GossipSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
+        if (!BroadcastSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
         {
             return;
         }
 
-        foreach (var (topic, values) in valuesByTopic)
+        foreach (var (namespaceName, values) in valuesByNamespace)
         {
-            OnGossipSent(topic, kind, values.Length, values.Sum(static item => item.Payload.Length));
+            OnBroadcastSent(namespaceName, kind, values.Length, values.Sum(static item => item.Value.Payload.Length));
         }
     }
 
-    public static void OnGossipReceived(string topic, string kind, int itemCount)
+    public static void OnBroadcastReceived(string namespaceName, string kind, int itemCount)
     {
-        var gossipReceivedEnabled = GossipReceived.Enabled;
+        var broadcastReceivedEnabled = BroadcastReceived.Enabled;
         var valuesAppliedEnabled = ValuesApplied.Enabled;
-        if (!gossipReceivedEnabled && !valuesAppliedEnabled)
+        if (!broadcastReceivedEnabled && !valuesAppliedEnabled)
         {
             return;
         }
 
-        var topicTag = Tag("topic", topic);
-        if (gossipReceivedEnabled)
+        var namespaceTag = Tag("namespace", namespaceName);
+        if (broadcastReceivedEnabled)
         {
-            GossipReceived.Add(1, topicTag, Tag("kind", kind));
+            BroadcastReceived.Add(1, namespaceTag, Tag("kind", kind));
         }
 
         if (valuesAppliedEnabled)
         {
-            ValuesApplied.Add(itemCount, topicTag, Tag("result", "received"));
+            ValuesApplied.Add(itemCount, namespaceTag, Tag("result", "received"));
         }
     }
 
-    public static void OnGossipReceived(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
+    public static void OnBroadcastReceived(FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
     {
-        if (!GossipReceived.Enabled && !ValuesApplied.Enabled)
+        if (!BroadcastReceived.Enabled && !ValuesApplied.Enabled)
         {
             return;
         }
 
-        foreach (var (topic, values) in valuesByTopic)
+        foreach (var (namespaceName, values) in valuesByNamespace)
         {
-            OnGossipReceived(topic, kind, values.Length);
+            OnBroadcastReceived(namespaceName, kind, values.Length);
         }
     }
 
-    public static void OnValueApplied(string topic, DisseminationApplyResult result)
+    public static void OnValueApplied(string namespaceName, DisseminationApplyResult result)
     {
         if (!ValuesApplied.Enabled)
         {
             return;
         }
 
-        ValuesApplied.Add(1, Tag("topic", topic), Tag("result", result.ToString()));
+        ValuesApplied.Add(1, Tag("namespace", namespaceName), Tag("result", result.ToString()));
     }
 
     public static void OnAntiEntropyExchange(string direction, int digestCount, int itemCount, bool truncated)
@@ -131,19 +131,19 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnFallback(string topic, string reason)
+    public static void OnFallback(string namespaceName, string reason)
     {
         if (Fallbacks.Enabled)
         {
-            Fallbacks.Add(1, Tag("topic", topic), Tag("reason", reason));
+            Fallbacks.Add(1, Tag("namespace", namespaceName), Tag("reason", reason));
         }
     }
 
-    public static void OnPayloadDropped(string topic, string reason)
+    public static void OnPayloadDropped(string namespaceName, string reason)
     {
         if (PayloadDropped.Enabled)
         {
-            PayloadDropped.Add(1, Tag("topic", topic), Tag("reason", reason));
+            PayloadDropped.Add(1, Tag("namespace", namespaceName), Tag("reason", reason));
         }
     }
 
