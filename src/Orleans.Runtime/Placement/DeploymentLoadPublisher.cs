@@ -163,7 +163,7 @@ namespace Orleans.Runtime
                     return false;
                 }
 
-                var item = topic.CreateItem(_siloDetails.SiloAddress, myStats);
+                var item = topic.CreateValue(_siloDetails.SiloAddress, myStats);
                 return await dissemination.Publish(topic, item, CancellationToken.None);
             }
             catch (Exception exception)

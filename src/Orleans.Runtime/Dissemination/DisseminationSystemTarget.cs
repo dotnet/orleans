@@ -33,7 +33,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
     async ValueTask<bool> IDisseminationService.Publish(
         IDisseminationTopic topic,
-        DisseminationValue value,
+        DisseminationTopicValue value,
         CancellationToken cancellationToken) =>
         await this.RunOrQueueTask(async () => await _protocol.Publish(topic, value, cancellationToken));
 

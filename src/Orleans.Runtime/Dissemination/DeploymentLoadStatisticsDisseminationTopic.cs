@@ -11,8 +11,7 @@ namespace Orleans.Runtime.Dissemination;
 internal sealed class DeploymentLoadStatisticsDisseminationTopic(
     DeploymentLoadPublisher deploymentLoadPublisher,
     IOptionsMonitor<DeploymentLoadPublisherOptions> options,
-    Serializer serializer,
-    TimeProvider timeProvider) : IDisseminationTopic
+    Serializer serializer) : IDisseminationTopic
 {
     public string Name => DisseminationTopicNames.DeploymentLoad;
 
@@ -22,16 +21,12 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
 
     public bool IsEnabled => Options.Enabled;
 
-    public DisseminationValue CreateItem(SiloAddress origin, SiloRuntimeStatistics statistics)
+    public DisseminationTopicValue CreateValue(SiloAddress origin, SiloRuntimeStatistics statistics)
     {
         var payload = serializer.SerializeToArray(statistics);
-        return new DisseminationValue
-        {
-            Digest = new DisseminationTopicDigest(origin.ToParsableString(), statistics.DateTime.Ticks),
-            Root = origin,
-            ExpiresAt = timeProvider.GetUtcNow() + Options.StaleItemTtl,
-            Payload = payload,
-        };
+        return new DisseminationTopicValue(
+            new DisseminationTopicDigest(origin.ToParsableString(), statistics.DateTime.Ticks),
+            payload);
     }
 
     public IReadOnlyList<DisseminationTopicDigest> GetDigests()
@@ -58,7 +53,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         !TryGetSiloAddress(digest.Key, out var siloAddress)
         || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, digest.Version);
 
-    public ValueTask<DisseminationValue?> GetValue(
+    public ValueTask<DisseminationTopicValue?> GetValue(
         DisseminationTopicDigest digest,
         DisseminationTopicDigest? peerDigest,
         CancellationToken cancellationToken)
@@ -67,10 +62,10 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
             || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
             || statistics.DateTime.Ticks < digest.Version)
         {
-            return ValueTask.FromResult<DisseminationValue?>(null);
+            return ValueTask.FromResult<DisseminationTopicValue?>(null);
         }
 
-        return ValueTask.FromResult<DisseminationValue?>(CreateItem(siloAddress, statistics));
+        return ValueTask.FromResult<DisseminationTopicValue?>(CreateValue(siloAddress, statistics));
     }
 
     public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
