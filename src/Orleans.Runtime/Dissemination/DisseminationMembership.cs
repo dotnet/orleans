@@ -43,14 +43,14 @@ internal sealed class DisseminationMembership(IMembershipManager membershipManag
         CancellationToken cancellationToken)
     {
         var snapshot = CurrentSnapshot;
-        if (snapshot.ContainsParticipant(scope, participant))
+        if (snapshot.ContainsParticipant(participant, scope))
         {
             return snapshot;
         }
 
         await RefreshMembership(cancellationToken);
         snapshot = CurrentSnapshot;
-        return snapshot.ContainsParticipant(scope, participant) ? snapshot : null;
+        return snapshot.ContainsParticipant(participant, scope) ? snapshot : null;
     }
 
     private static DisseminationMembershipSnapshot ComputeMembership(MembershipTableSnapshot snapshot)

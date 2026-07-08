@@ -71,7 +71,7 @@ internal sealed class DisseminationGossipQueue(
                     continue;
                 }
 
-                if (!membershipSnapshot.ContainsMember(peer))
+                if (!membershipSnapshot.ContainsParticipant(peer))
                 {
                     (removedPeers ??= []).Add(peer);
                 }
