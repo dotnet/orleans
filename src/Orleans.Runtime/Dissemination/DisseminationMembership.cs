@@ -43,19 +43,18 @@ internal sealed class DisseminationMembership(
         membershipManager.Refresh(targetVersion: null, cancellationToken);
 
     public async ValueTask<DisseminationMembershipSnapshot?> GetSnapshotContainingMember(
-        DisseminationGroup scope,
         SiloAddress member,
         CancellationToken cancellationToken)
     {
         var snapshot = CurrentSnapshot;
-        if (snapshot.ContainsMember(member, scope))
+        if (snapshot.ContainsMember(member))
         {
             return snapshot;
         }
 
         await RefreshMembership(cancellationToken);
         snapshot = CurrentSnapshot;
-        return snapshot.ContainsMember(member, scope) ? snapshot : null;
+        return snapshot.ContainsMember(member) ? snapshot : null;
     }
 
     private static DisseminationMembershipSnapshot ComputeMembership(
@@ -69,22 +68,16 @@ internal sealed class DisseminationMembership(
             .ThenBy(static entry => entry.StartTime)
             .ThenBy(static entry => entry.SiloAddress)
             .ToArray();
-        var allMembers = ImmutableArray.CreateBuilder<SiloAddress>(members.Length);
-        var activeMembers = ImmutableArray.CreateBuilder<SiloAddress>();
+        var builder = ImmutableArray.CreateBuilder<SiloAddress>(members.Length);
         foreach (var member in members)
         {
-            allMembers.Add(member.SiloAddress);
-            if (member.Status == SiloStatus.Active)
-            {
-                activeMembers.Add(member.SiloAddress);
-            }
+            builder.Add(member.SiloAddress);
         }
 
         return new DisseminationMembershipSnapshot(
             snapshot.Version,
             localSilo,
-            allMembers.MoveToImmutable(),
-            activeMembers.ToImmutable(),
+            builder.MoveToImmutable(),
             overlayOptions);
     }
 

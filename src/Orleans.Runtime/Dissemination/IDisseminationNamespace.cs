@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
@@ -9,11 +6,9 @@ internal interface IDisseminationNamespace
 {
     DisseminationNamespace Name { get; }
 
-    DisseminationGroup Group { get; }
-
     DisseminationNamespaceOptions Options { get; }
 
-    IReadOnlyDictionary<DisseminationKey, long> GetDigest();
+    IEnumerable<DigestEntry> Digests { get; }
 
     long GetVersion(DisseminationKey key);
 
@@ -25,10 +20,4 @@ internal interface IDisseminationNamespace
     ValueTask<DisseminationApplyResult> ApplyValueAsync(
         DisseminationValue value,
         CancellationToken cancellationToken);
-}
-
-internal enum DisseminationGroup
-{
-    ActiveMembers,
-    AllMembers,
 }

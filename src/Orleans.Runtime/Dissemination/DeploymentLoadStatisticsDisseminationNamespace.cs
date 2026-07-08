@@ -11,8 +11,6 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
 {
     public DisseminationNamespace Name => DisseminationNamespaceNames.DeploymentLoad;
 
-    public DisseminationGroup Group => DisseminationGroup.ActiveMembers;
-
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public DisseminationValue CreateValue(SiloAddress origin, SiloRuntimeStatistics statistics)
@@ -25,20 +23,15 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
             payload);
     }
 
-    public IReadOnlyDictionary<DisseminationKey, long> GetDigest()
+    public IEnumerable<DigestEntry> Digests
     {
-        var digest = new Dictionary<DisseminationKey, long>();
-        foreach (var siloAddress in deploymentLoadPublisher.GetActiveSilosForDissemination())
+        get
         {
-            var version = deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
-                          && !deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress,
-                              statistics.DateTime.Ticks)
-                ? statistics.DateTime.Ticks
-                : 0;
-            digest[siloAddress] = version;
+            foreach (var siloAddress in deploymentLoadPublisher.GetActiveSilosForStatisticsDigest())
+            {
+                yield return new DigestEntry(siloAddress, GetVersion(siloAddress));
+            }
         }
-
-        return digest;
     }
 
     public long GetVersion(DisseminationKey key) =>
