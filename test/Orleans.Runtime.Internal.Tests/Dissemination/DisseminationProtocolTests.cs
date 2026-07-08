@@ -356,6 +356,38 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task ReceiveBroadcastAppliesAllValuesBeforeForwarding()
+    {
+        var root = CreateSilo(11111);
+        var local = CreateSilo(11112);
+        var sender = CreateSilo(11113);
+        var peer = CreateSilo(11114);
+        var transport = new FakeTransport(local, sender, peer);
+        DisseminationKey firstKey = new("first");
+        DisseminationKey secondKey = new("second");
+        var ns = new FakeNamespace(local);
+        var refreshObserved = false;
+        transport.RefreshMembershipHandler = _ =>
+        {
+            refreshObserved = true;
+            Assert.Equal(1, ns.GetVersion(firstKey));
+            Assert.Equal(2, ns.GetVersion(secondKey));
+            transport.Peers.Add(root);
+            return Task.CompletedTask;
+        };
+
+        var protocol = CreateProtocol(transport, ns, options => options.Overlay.FanOutFactor = static _ => 2);
+        var first = ns.CreateItem(root, firstKey, sequence: 1);
+        var second = ns.CreateItem(root, secondKey, sequence: 2);
+
+        await protocol.ReceiveBroadcast(CreateBroadcastBatch(sender, first, second), CancellationToken.None);
+
+        Assert.True(refreshObserved);
+        Assert.Equal(1, ns.GetVersion(firstKey));
+        Assert.Equal(2, ns.GetVersion(secondKey));
+    }
+
+    [Fact]
     public async Task DuplicateBroadcastDoesNotForwardAgain()
     {
         var silos = Enumerable.Range(11111, 8).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
