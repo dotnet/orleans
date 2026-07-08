@@ -6,7 +6,7 @@ namespace Orleans.Runtime.Dissemination;
 internal interface IDisseminationService
 {
     ValueTask<bool> Publish(
-        string topicName,
+        IDisseminationTopic topic,
         DisseminationValue value,
         CancellationToken cancellationToken);
 }

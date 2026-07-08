@@ -43,11 +43,11 @@ internal sealed partial class DisseminationProtocol
     }
 
     public async ValueTask<bool> Publish(
-        string topicName,
+        IDisseminationTopic topic,
         DisseminationValue item,
         CancellationToken cancellationToken)
     {
-        if (!TryGetEnabledTopic(topicName, out var topic))
+        if (!_options.CurrentValue.Enabled || !topic.IsEnabled)
         {
             return false;
         }
@@ -95,7 +95,7 @@ internal sealed partial class DisseminationProtocol
 
             foreach (var item in values)
             {
-                await ApplyReceivedValue(topicName, topic, item, batch.Sender, forward: true, cancellationToken);
+                await ApplyReceivedValue(topic, item, batch.Sender, forward: true, cancellationToken);
             }
         }
     }
@@ -233,7 +233,7 @@ internal sealed partial class DisseminationProtocol
                 {
                     try
                     {
-                        await ApplyReceivedValue(topicName, topic, item, response.Sender, forward: false, cancellationToken);
+                        await ApplyReceivedValue(topic, item, response.Sender, forward: false, cancellationToken);
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -294,7 +294,7 @@ internal sealed partial class DisseminationProtocol
                     remoteDigest,
                     cancellationToken);
                 if (item is null
-                    || !ValidatePayloadSize(requestedTopic.Name, requestedTopic, item))
+                    || !ValidatePayloadSize(requestedTopic, item))
                 {
                     continue;
                 }
@@ -320,14 +320,14 @@ internal sealed partial class DisseminationProtocol
     }
 
     private async ValueTask<DisseminationApplyResult> ApplyReceivedValue(
-        string topicName,
         IDisseminationTopic topic,
         DisseminationValue value,
         SiloAddress sender,
         bool forward,
         CancellationToken cancellationToken)
     {
-        if (!ValidatePayloadSize(topicName, topic, value))
+        var topicName = topic.Name;
+        if (!ValidatePayloadSize(topic, value))
         {
             return DisseminationApplyResult.Rejected;
         }
@@ -637,11 +637,12 @@ internal sealed partial class DisseminationProtocol
         return false;
     }
 
-    private bool ValidatePayloadSize(string topicName, IDisseminationTopic topic, DisseminationValue item)
+    private bool ValidatePayloadSize(IDisseminationTopic topic, DisseminationValue item)
     {
         var options = _options.CurrentValue;
         if (item.Payload.Length > topic.Options.MaxPayloadBytes || item.Payload.Length > options.MaxBatchBytes)
         {
+            var topicName = topic.Name;
             DisseminationEvents.EmitPayloadDrop(topicName, item.Digest, _transport.LocalSilo, "oversize", item.Payload.Length);
             DisseminationInstruments.OnPayloadDropped(topicName, "oversize");
             return false;
@@ -662,7 +663,7 @@ internal sealed partial class DisseminationProtocol
             return "obsolete";
         }
 
-        return ValidatePayloadSize(topic.Name, topic, item) ? null : "oversize";
+        return ValidatePayloadSize(topic, item) ? null : "oversize";
     }
 
     private bool IsExpired(DisseminationValue item) => item.ExpiresAt <= _timeProvider.GetUtcNow();
