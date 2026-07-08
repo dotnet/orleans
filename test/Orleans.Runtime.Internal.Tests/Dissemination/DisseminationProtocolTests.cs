@@ -568,7 +568,7 @@ public class DisseminationProtocolTests
         Assert.True(first);
         Assert.True(second);
         var batch = Assert.Single(transport.BroadcastBatches);
-        Assert.Equal(new[] { "first", "second" }, GetBroadcastValues(batch.Batch).Select(static value => value.Value.Key));
+        Assert.Equal(new DisseminationKey[] { "first", "second" }, GetBroadcastValues(batch.Batch).Select(static value => value.Value.Key));
     }
 
     [Fact]
@@ -612,8 +612,8 @@ public class DisseminationProtocolTests
                 options.Overlay.AntiEntropyPeerCount = testCase.PeerCount;
             });
 
-            var state = protocol.CreateAntiEntropyState();
-            var peers = state.Namespaces[ns.Name].Peers;
+            protocol.RunAntiEntropyRound(CancellationToken.None).GetAwaiter().GetResult();
+            var peers = transport.AntiEntropyRequests.Select(static request => request.Peer).ToArray();
 
             Assert.Equal(Math.Min(testCase.PeerCount, testCase.Count - 1), peers.Length);
             Assert.Equal(peers.Length, peers.Distinct().Count());
@@ -634,8 +634,7 @@ public class DisseminationProtocolTests
 
         var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
         {
-            Sender = peer,
-            Digest = CreateAntiEntropyRequestDigest(
+            Digests = CreateAntiEntropyRequestDigest(
                 ns.Name,
                 (FakeNamespace.DefaultKey, 3)),
         }, CancellationToken.None);
@@ -658,14 +657,13 @@ public class DisseminationProtocolTests
 
         var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
         {
-            Sender = peer,
-            Digest = CreateAntiEntropyRequestDigest(
+            Digests = CreateAntiEntropyRequestDigest(
                 ns.Name,
                 ("requested", 3)),
         }, CancellationToken.None);
 
         var item = Assert.Single(GetAntiEntropyResponseValues(response));
-        Assert.Equal("requested", item.Value.Key);
+        Assert.Equal(new DisseminationKey("requested"), item.Value.Key);
     }
 
     [Fact]
@@ -683,19 +681,17 @@ public class DisseminationProtocolTests
             CreateBroadcastBatch(peer, ns.CreateItem(peer, FakeNamespace.DefaultKey, sequence: 1)),
             CancellationToken.None);
 
-        var recentState = protocol.CreateAntiEntropyState();
-        Assert.Empty(recentState.Namespaces);
-        var recentResponses = await protocol.ExchangeAntiEntropy(recentState, CancellationToken.None);
-        Assert.Empty(recentResponses);
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
         Assert.Empty(transport.AntiEntropyRequests);
 
         timeProvider.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromMilliseconds(1));
-        var beforeCadenceState = protocol.CreateAntiEntropyState();
-        Assert.Empty(beforeCadenceState.Namespaces);
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+        Assert.Empty(transport.AntiEntropyRequests);
 
         timeProvider.Advance(TimeSpan.FromMilliseconds(1));
-        var staleState = protocol.CreateAntiEntropyState();
-        var digest = Assert.Single(staleState.Namespaces[ns.Name].Digest);
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+        var request = Assert.Single(transport.AntiEntropyRequests).Request;
+        var digest = Assert.Single(request.Digests[ns.Name]);
         Assert.Equal(FakeNamespace.DefaultKey, digest.Key);
     }
 
@@ -712,21 +708,19 @@ public class DisseminationProtocolTests
         transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
             Sender = target,
-            ValuesByNamespace = CreateValueGroups(repairItem),
+            Values = CreateValueGroups(repairItem),
         });
 
-        var state = protocol.CreateAntiEntropyState();
-        var responses = await protocol.ExchangeAntiEntropy(state, CancellationToken.None);
-        await protocol.ApplyAntiEntropyResponses(responses, CancellationToken.None);
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
 
         Assert.Equal(7, ns.GetVersion(FakeNamespace.DefaultKey));
         Assert.Empty(transport.BroadcastBatches);
         Assert.Single(transport.AntiEntropyRequests);
-        var digestByNamespace = Assert.Single(transport.AntiEntropyRequests[0].Request.Digest);
+        var digestByNamespace = Assert.Single(transport.AntiEntropyRequests[0].Request.Digests);
         Assert.Equal(ns.Name, digestByNamespace.Key);
         var digest = Assert.Single(digestByNamespace.Value);
         Assert.Equal(FakeNamespace.DefaultKey, digest.Key);
-        Assert.Equal(0, digest.Value);
+        Assert.Equal(0, digest.Version);
     }
 
     [Fact]
@@ -745,15 +739,13 @@ public class DisseminationProtocolTests
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
         };
         var goodRepairItem = ns.CreateItem(peer, FakeNamespace.DefaultKey, sequence: 3);
-
-        await protocol.ApplyAntiEntropyResponses(new[]
+        transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
-            new DisseminationAntiEntropyResponse
-            {
-                Sender = peer,
-                ValuesByNamespace = CreateValueGroups(badRepairItem, goodRepairItem),
-            },
-        }, CancellationToken.None);
+            Sender = target,
+            Values = CreateValueGroups(badRepairItem, goodRepairItem),
+        });
+
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
 
         Assert.Equal(3, ns.GetVersion(FakeNamespace.DefaultKey));
     }
@@ -782,21 +774,17 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(new DisseminationAntiEntropyResponse
             {
                 Sender = target,
-                ValuesByNamespace = count switch
+                Values = count switch
                 {
                     1 => CreateValueGroups(badRepairItem),
                     2 => CreateValueGroups(goodRepairItem),
-                    _ => FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>>.Empty,
+                    _ => FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>.Empty,
                 },
             });
         };
 
-        var firstState = protocol.CreateAntiEntropyState();
-        var firstResponses = await protocol.ExchangeAntiEntropy(firstState, CancellationToken.None);
-        await protocol.ApplyAntiEntropyResponses(firstResponses, CancellationToken.None);
-        var secondState = protocol.CreateAntiEntropyState();
-        var secondResponses = await protocol.ExchangeAntiEntropy(secondState, CancellationToken.None);
-        await protocol.ApplyAntiEntropyResponses(secondResponses, CancellationToken.None);
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
 
         Assert.Equal(3, ns.GetVersion(FakeNamespace.DefaultKey));
         Assert.Equal(2, Volatile.Read(ref exchangeCount));
@@ -882,6 +870,53 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void DisseminationKeyRoundTripsDefaultAndSiloAddressKeys()
+    {
+        var earlierPeer = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var membershipValue = new DisseminationValue(DisseminationKey.Default, fromVersion: 0, toVersion: 7, Array.Empty<byte>());
+        var deploymentLoadValue = new DisseminationValue(peer, fromVersion: 0, toVersion: 11, Array.Empty<byte>());
+
+        var roundTripMembershipValue = serializer.Deserialize<DisseminationValue>(serializer.SerializeToArray(membershipValue));
+        var roundTripDeploymentLoadValue = serializer.Deserialize<DisseminationValue>(serializer.SerializeToArray(deploymentLoadValue));
+
+        Assert.Equal(DisseminationKey.Default, roundTripMembershipValue.Key);
+        Assert.Equal(new DisseminationKey(peer), roundTripDeploymentLoadValue.Key);
+
+        Span<char> expected = stackalloc char[128];
+        Span<char> actual = stackalloc char[128];
+        Assert.True(((ISpanFormattable)peer).TryFormat(expected, out var expectedLength, "H", null));
+        Assert.True(roundTripDeploymentLoadValue.Key.TryFormat(actual, out var actualLength, "H", null));
+        Assert.Equal(expected[..expectedLength].ToString(), actual[..actualLength].ToString());
+        Assert.True(roundTripMembershipValue.Key.TryFormat(Span<char>.Empty, out var nullKeyLength, default, null));
+        Assert.Equal(0, nullKeyLength);
+        Assert.Equal(
+            Math.Sign(earlierPeer.CompareTo(peer)),
+            Math.Sign(Comparer<object>.Default.Compare(earlierPeer, peer)));
+        Assert.Equal(
+            Math.Sign(earlierPeer.CompareTo(peer)),
+            Math.Sign(new DisseminationKey(earlierPeer).CompareTo(new DisseminationKey(peer))));
+    }
+
+    [Fact]
+    public void DisseminationNamespaceWrapsNonEmptyStringsForDictionaryKeys()
+    {
+        DisseminationNamespace namespaceName = "load";
+        var namespaces = new Dictionary<DisseminationNamespace, int>
+        {
+            [namespaceName] = 1,
+        };
+
+        Assert.Equal("load", (string)namespaceName);
+        Assert.True(namespaces.TryGetValue(new DisseminationNamespace("load"), out var value));
+        Assert.Equal(1, value);
+        Assert.True(namespaceName.CompareTo(new DisseminationNamespace("membership")) < 0);
+        Assert.ThrowsAny<ArgumentException>(() => new DisseminationNamespace(string.Empty));
+    }
+
+    [Fact]
     public void ManifestHashIsIndependentOfDictionaryOrdering()
     {
         var manifest1 = CreateManifest(
@@ -941,7 +976,10 @@ public class DisseminationProtocolTests
             version: 1,
             CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch),
             CreateMembershipEntry(peer, SiloStatus.Joining, DateTime.UnixEpoch.AddSeconds(1))));
-        var membership = new DisseminationMembership(membershipManager);
+        var membership = new DisseminationMembership(
+            membershipManager,
+            new FakeLocalSiloDetails(local),
+            Options.Create(new DisseminationOptions()));
 
         var first = membership.CurrentSnapshot;
         var second = membership.CurrentSnapshot;
@@ -960,7 +998,10 @@ public class DisseminationProtocolTests
         var membershipManager = new FakeMembershipManager(CreateMembershipSnapshot(
             version: 1,
             CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch)));
-        var membership = new DisseminationMembership(membershipManager);
+        var membership = new DisseminationMembership(
+            membershipManager,
+            new FakeLocalSiloDetails(local),
+            Options.Create(new DisseminationOptions()));
         var first = membership.CurrentSnapshot;
 
         membershipManager.CurrentSnapshot = CreateMembershipSnapshot(
@@ -982,7 +1023,10 @@ public class DisseminationProtocolTests
         var membershipManager = new FakeMembershipManager(CreateMembershipSnapshot(
             version: 1,
             CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch)));
-        var membership = new DisseminationMembership(membershipManager);
+        var membership = new DisseminationMembership(
+            membershipManager,
+            new FakeLocalSiloDetails(local),
+            Options.Create(new DisseminationOptions()));
 
         await membership.RefreshMembership(CancellationToken.None);
 
@@ -997,8 +1041,10 @@ public class DisseminationProtocolTests
 
         var exception = Assert.Throws<ArgumentException>(() => new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
+            local,
             [local, local],
-            [local]));
+            [local],
+            new DisseminationOverlayOptions()));
 
         Assert.Equal("allMembers", exception.ParamName);
     }
@@ -1011,8 +1057,10 @@ public class DisseminationProtocolTests
 
         var exception = Assert.Throws<ArgumentException>(() => new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
+            local,
             [local],
-            [local, peer]));
+            [local, peer],
+            new DisseminationOverlayOptions()));
 
         Assert.Equal("activeMembers", exception.ParamName);
     }
@@ -1023,18 +1071,17 @@ public class DisseminationProtocolTests
         var root = CreateSilo(11113);
         var first = CreateSilo(11115);
         var second = CreateSilo(11112);
-        var local = CreateSilo(11111);
         var snapshot = new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
-            [root, first, second, local],
-            [root, first, second, local]);
+            root,
+            [root, first, second],
+            [root, first, second],
+            CreateOverlayOptions(fanout: 2));
 
         var targets = snapshot.GetOriginatorTreeTargets(
-            DisseminationGroup.ActiveMembers,
-            root,
-            static _ => 2);
+            DisseminationGroup.ActiveMembers);
 
-        Assert.Equal(new[] { first, second, local }, targets);
+        Assert.Equal(new[] { first, second }, targets);
     }
 
     [Fact]
@@ -1046,17 +1093,15 @@ public class DisseminationProtocolTests
         var child = CreateSilo(11114);
         var snapshot = new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
+            local,
             [local, root, sender, child],
-            [local, root, sender, child]);
+            [local, root, sender, child],
+            CreateOverlayOptions(fanout: 2));
 
         var targets = snapshot.GetForwardingTreeTargets(
-            DisseminationGroup.ActiveMembers,
-            local,
-            root,
-            sender,
-            static _ => 2);
+            DisseminationGroup.ActiveMembers);
 
-        Assert.Equal(new[] { child }, targets);
+        Assert.Equal(new[] { sender, child }, targets);
     }
 
     [Fact]
@@ -1066,22 +1111,20 @@ public class DisseminationProtocolTests
         var peer = CreateSilo(11112);
         var snapshot = new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
+            local,
             [peer],
-            [peer]);
+            [peer],
+            CreateOverlayOptions(fanout: 1));
 
         var targets = snapshot.GetOriginatorTreeTargets(
-            DisseminationGroup.ActiveMembers,
-            originator: local,
-            static _ => 1);
-        var antiEntropyPeers = snapshot.SelectAntiEntropyPeers(
-            DisseminationGroup.ActiveMembers,
-            local,
-            peerCount: 1);
+            DisseminationGroup.ActiveMembers);
+        Span<SiloAddress> antiEntropyPeers = new SiloAddress[1];
+        snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, ref antiEntropyPeers);
 
         Assert.False(snapshot.ContainsMember(local, DisseminationGroup.ActiveMembers));
         Assert.Single(snapshot.ActiveMembers);
         Assert.Empty(targets);
-        Assert.Empty(antiEntropyPeers);
+        Assert.Equal(0, antiEntropyPeers.Length);
     }
 
     [Fact]
@@ -1094,18 +1137,19 @@ public class DisseminationProtocolTests
         var expected = silos.Where(silo => !Equals(silo, local)).OrderBy(static silo => silo);
         var snapshot = new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
-            [.. silos],
-            [.. silos]);
-
-        var peers = snapshot.SelectAntiEntropyPeers(
-            DisseminationGroup.ActiveMembers,
             local,
-            peerCount);
+            [.. silos],
+            [.. silos],
+            new DisseminationOverlayOptions());
 
-        Assert.Equal(silos.Length - 1, peers.Length);
-        Assert.Equal(peers.Length, peers.Distinct().Count());
-        Assert.DoesNotContain(local, peers);
-        Assert.Equal(expected, peers.OrderBy(static silo => silo));
+        Span<SiloAddress> peers = new SiloAddress[peerCount];
+        snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, ref peers);
+        var selectedPeers = peers.ToArray();
+
+        Assert.Equal(silos.Length - 1, selectedPeers.Length);
+        Assert.Equal(selectedPeers.Length, selectedPeers.Distinct().Count());
+        Assert.DoesNotContain(local, selectedPeers);
+        Assert.Equal(expected, selectedPeers.OrderBy(static silo => silo));
     }
 
     private static DisseminationProtocol CreateProtocol(
@@ -1125,48 +1169,56 @@ public class DisseminationProtocolTests
         configure?.Invoke(options);
         return new DisseminationProtocol(
             transport,
-            new DisseminationMembership(transport.MembershipManager),
+            new DisseminationMembership(
+                transport.MembershipManager,
+                new FakeLocalSiloDetails(transport.LocalSilo),
+                Options.Create(options)),
             new TestOptionsMonitor<DisseminationOptions>(options),
             namespaces,
             timeProvider ?? TimeProvider.System,
             NullLogger<DisseminationProtocol>.Instance);
     }
 
+    private static DisseminationOverlayOptions CreateOverlayOptions(int fanout) => new()
+    {
+        FanOutFactor = _ => fanout,
+    };
+
     private static SiloAddress CreateSilo(int port) => SiloAddress.New(new IPEndPoint(IPAddress.Loopback, port), port);
 
     private static SiloAddress[] CreateSilos(int count) =>
         Enumerable.Range(11111, count).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
 
-    private static FrozenDictionary<string, FrozenDictionary<string, long>> CreateAntiEntropyRequestDigest(
-        string namespaceName,
-        params (string Key, long Version)[] versions) =>
-        new Dictionary<string, FrozenDictionary<string, long>>(StringComparer.Ordinal)
+    private static FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> CreateAntiEntropyRequestDigest(
+        DisseminationNamespace namespaceName,
+        params (DisseminationKey Key, long Version)[] versions) =>
+        new Dictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>
         {
             [namespaceName] = versions
-                .ToDictionary(static entry => entry.Key, static entry => entry.Version, StringComparer.Ordinal)
-                .ToFrozenDictionary(StringComparer.Ordinal),
-        }.ToFrozenDictionary(StringComparer.Ordinal);
+                .Select(static entry => new DigestEntry(entry.Key, entry.Version))
+                .ToImmutableArray(),
+        }.ToFrozenDictionary();
 
     private static DisseminationBroadcastBatch CreateBroadcastBatch(SiloAddress sender, params DisseminationBroadcastValue[] values) => new()
     {
         Sender = sender,
-        ValuesByNamespace = CreateValueGroups(values),
+        Values = CreateValueGroups(values),
     };
 
     private static IEnumerable<DisseminationBroadcastValue> GetBroadcastValues(DisseminationBroadcastBatch batch) =>
-        batch.ValuesByNamespace.Values.SelectMany(static values => values);
+        batch.Values.Values.SelectMany(static values => values);
 
     private static IEnumerable<DisseminationBroadcastValue> GetAntiEntropyResponseValues(DisseminationAntiEntropyResponse response) =>
-        response.ValuesByNamespace.Values.SelectMany(static values => values);
+        response.Values.Values.SelectMany(static values => values);
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> CreateValueGroups(params DisseminationBroadcastValue[] values) =>
+    private static FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> CreateValueGroups(params DisseminationBroadcastValue[] values) =>
         CreateValueGroups(FakeNamespace.DefaultName, values);
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> CreateValueGroups(string namespaceName, params DisseminationBroadcastValue[] values) =>
-        new Dictionary<string, ImmutableArray<DisseminationBroadcastValue>>(StringComparer.Ordinal)
+    private static FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> CreateValueGroups(DisseminationNamespace namespaceName, params DisseminationBroadcastValue[] values) =>
+        new Dictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>
         {
             [namespaceName] = [.. values],
-        }.ToFrozenDictionary(StringComparer.Ordinal);
+        }.ToFrozenDictionary();
 
     private static MembershipDisseminationNamespace CreateMembershipNamespace(
         FakeMembershipManager membershipManager,
@@ -1388,45 +1440,45 @@ public class DisseminationProtocolTests
 
     private sealed class FakeNamespace : IDisseminationNamespace
     {
-        public const string DefaultName = "fake-namespace";
-        public const string DefaultKey = "value";
-        private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
-        private readonly string _name;
+        public static readonly DisseminationNamespace DefaultName = new("fake-namespace");
+        public static readonly DisseminationKey DefaultKey = new("value");
+        private readonly Dictionary<DisseminationKey, long> _versions = new();
+        private readonly DisseminationNamespace _name;
 
-        public FakeNamespace(SiloAddress localSilo, string name = DefaultName)
+        public FakeNamespace(SiloAddress localSilo, DisseminationNamespace? name = null)
         {
             _ = localSilo;
-            _name = name;
+            _name = name ?? DefaultName;
         }
 
-        public Dictionary<string, int> ApplyCounts { get; } = new(StringComparer.Ordinal);
+        public Dictionary<DisseminationKey, int> ApplyCounts { get; } = new();
 
-        public HashSet<string> ExpectedKeys { get; } = new(StringComparer.Ordinal);
+        public HashSet<DisseminationKey> ExpectedKeys { get; } = new();
 
-        public string Name => _name;
+        public DisseminationNamespace Name => _name;
 
         public DisseminationGroup Group { get; set; } = DisseminationGroup.ActiveMembers;
 
         public DisseminationNamespaceOptions Options { get; } = new() { Enabled = true };
 
-        public DisseminationValue CreateValue(string key, long sequence, long fromVersion = 0) => new(
+        public DisseminationValue CreateValue(DisseminationKey key, long sequence, long fromVersion = 0) => new(
             key,
             fromVersion,
             sequence,
             BitConverter.GetBytes(sequence));
 
-        public DisseminationBroadcastValue CreateItem(SiloAddress originator, string key, long sequence, long fromVersion = 0) =>
+        public DisseminationBroadcastValue CreateItem(SiloAddress originator, DisseminationKey key, long sequence, long fromVersion = 0) =>
             CreateDisseminationValue(originator, CreateValue(key, sequence, fromVersion));
 
-        public void SetValue(string key, long version) => _versions[key] = version;
+        public void SetValue(DisseminationKey key, long version) => _versions[key] = version;
 
         public void Clear() => _versions.Clear();
 
-        public long GetVersion(string key) => _versions.TryGetValue(key, out var version) ? version : 0;
+        public long GetVersion(DisseminationKey key) => _versions.TryGetValue(key, out var version) ? version : 0;
 
-        public IReadOnlyDictionary<string, long> GetDigest()
+        public IReadOnlyDictionary<DisseminationKey, long> GetDigest()
         {
-            var digest = new Dictionary<string, long>(_versions, StringComparer.Ordinal);
+            var digest = new Dictionary<DisseminationKey, long>(_versions);
             foreach (var key in ExpectedKeys)
             {
                 digest.TryAdd(key, 0);
@@ -1436,7 +1488,7 @@ public class DisseminationProtocolTests
         }
 
         public bool TryCreateRepairValue(
-            string key,
+            DisseminationKey key,
             long peerVersion,
             out DisseminationValue value)
         {
@@ -1576,6 +1628,19 @@ public class DisseminationProtocolTests
 
             return result == MembershipVersion.MinValue.Value ? result + 1 : result;
         }
+    }
+
+    private sealed class FakeLocalSiloDetails(SiloAddress siloAddress) : ILocalSiloDetails
+    {
+        public string Name => "test";
+
+        public string ClusterId => "test";
+
+        public string DnsHostName => "localhost";
+
+        public SiloAddress SiloAddress => siloAddress;
+
+        public SiloAddress GatewayAddress => siloAddress;
     }
 
 #if NET10_0_OR_GREATER

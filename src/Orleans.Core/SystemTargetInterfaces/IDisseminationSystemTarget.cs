@@ -14,18 +14,193 @@ internal interface IDisseminationSystemTarget : ISystemTarget
 }
 
 [GenerateSerializer, Immutable]
+internal readonly struct DisseminationNamespace : IEquatable<DisseminationNamespace>, IComparable<DisseminationNamespace>, IComparable, ISpanFormattable
+{
+    [Id(0)]
+    private readonly string? _value;
+
+    public DisseminationNamespace(string value)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(value);
+        _value = value;
+    }
+
+    public string Value => _value ?? throw new InvalidOperationException($"A default {nameof(DisseminationNamespace)} value is invalid.");
+
+    public static implicit operator DisseminationNamespace(string value) => new(value);
+
+    public static implicit operator string(DisseminationNamespace value) => value.Value;
+
+    public static bool operator ==(DisseminationNamespace left, DisseminationNamespace right) => left.Equals(right);
+
+    public static bool operator !=(DisseminationNamespace left, DisseminationNamespace right) => !left.Equals(right);
+
+    public bool Equals(DisseminationNamespace other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    public override bool Equals(object? obj) => obj is DisseminationNamespace other && Equals(other);
+
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    public int CompareTo(DisseminationNamespace other) => string.Compare(Value, other.Value, StringComparison.Ordinal);
+
+    public int CompareTo(object? obj)
+    {
+        if (obj is null)
+        {
+            return 1;
+        }
+
+        return obj is DisseminationNamespace other
+            ? CompareTo(other)
+            : throw new ArgumentException($"Object must be of type {nameof(DisseminationNamespace)}.", nameof(obj));
+    }
+
+    public override string ToString() => Value;
+
+    public string ToString(string? format, IFormatProvider? formatProvider) => Value;
+
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? formatProvider)
+    {
+        if (Value.AsSpan().TryCopyTo(destination))
+        {
+            charsWritten = Value.Length;
+            return true;
+        }
+
+        charsWritten = 0;
+        return false;
+    }
+}
+
+[GenerateSerializer, Immutable]
+internal readonly struct DisseminationKey(object? value) : IEquatable<DisseminationKey>, IComparable<DisseminationKey>, IComparable, ISpanFormattable
+{
+    public static readonly DisseminationKey Default = default;
+
+    [Id(0)]
+    public readonly object? Value = value;
+
+    public static implicit operator DisseminationKey(SiloAddress? value) => new(value);
+
+    public static implicit operator DisseminationKey(string? value) => new(value);
+
+    public static bool operator ==(DisseminationKey left, DisseminationKey right) => left.Equals(right);
+
+    public static bool operator !=(DisseminationKey left, DisseminationKey right) => !left.Equals(right);
+
+    public bool Equals(DisseminationKey other) => Equals(Value, other.Value);
+
+    public override bool Equals(object? obj) => obj is DisseminationKey other && Equals(other);
+
+    public override int GetHashCode() => Value?.GetHashCode() ?? 0;
+
+    public int CompareTo(DisseminationKey other) => Compare(Value, other.Value);
+
+    public int CompareTo(object? obj)
+    {
+        if (obj is null)
+        {
+            return 1;
+        }
+
+        return obj is DisseminationKey other
+            ? CompareTo(other)
+            : throw new ArgumentException($"Object must be of type {nameof(DisseminationKey)}.", nameof(obj));
+    }
+
+    public override string ToString() => ToString(null, null);
+
+    public string ToString(string? format, IFormatProvider? formatProvider) => Value switch
+    {
+        null => string.Empty,
+        IFormattable formattable => formattable.ToString(format, formatProvider),
+        _ => Value.ToString() ?? string.Empty,
+    };
+
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? formatProvider)
+    {
+        if (Value is null)
+        {
+            charsWritten = 0;
+            return true;
+        }
+
+        if (Value is ISpanFormattable spanFormattable)
+        {
+            return spanFormattable.TryFormat(destination, out charsWritten, format, formatProvider);
+        }
+
+        var text = ToString(format.IsEmpty ? null : format.ToString(), formatProvider);
+        if (text.AsSpan().TryCopyTo(destination))
+        {
+            charsWritten = text.Length;
+            return true;
+        }
+
+        charsWritten = 0;
+        return false;
+    }
+
+    private static int Compare(object? left, object? right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return 0;
+        }
+
+        if (left is null)
+        {
+            return -1;
+        }
+
+        if (right is null)
+        {
+            return 1;
+        }
+
+        if (Equals(left, right))
+        {
+            return 0;
+        }
+
+        return left switch
+        {
+            string leftString when right is string rightString => StringComparer.Ordinal.Compare(leftString, rightString),
+            SiloAddress leftSilo when right is SiloAddress rightSilo => leftSilo.CompareTo(rightSilo),
+            _ => Comparer<object>.Default.Compare(left, right),
+        };
+    }
+}
+
+[GenerateSerializer, Immutable]
+internal readonly struct DigestEntry
+{
+    public DigestEntry(DisseminationKey key, long version)
+    {
+        Key = key;
+        Version = version;
+    }
+
+    [Id(0)]
+    public DisseminationKey Key { get; }
+
+    [Id(1)]
+    public long Version { get; }
+}
+
+[GenerateSerializer, Immutable]
 internal readonly struct DisseminationValue
 {
-    public DisseminationValue(string key, long fromVersion, long toVersion, ReadOnlyMemory<byte> payload)
+    public DisseminationValue(DisseminationKey key, long fromVersion, long toVersion, ReadOnlyMemory<byte> payload)
     {
-        Key = key ?? string.Empty;
+        Key = key;
         FromVersion = fromVersion;
         ToVersion = toVersion;
         Payload = payload;
     }
 
     [Id(0)]
-    public string Key { get; }
+    public DisseminationKey Key { get; }
 
     [Id(1)]
     public long FromVersion { get; }
@@ -57,19 +232,16 @@ internal sealed class DisseminationBroadcastBatch
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> ValuesByNamespace { get; init; } =
-        FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>>.Empty;
+    public FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> Values { get; init; } =
+        FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>.Empty;
 }
 
 [GenerateSerializer, Immutable]
 internal sealed class DisseminationAntiEntropyRequest
 {
     [Id(0)]
-    public required SiloAddress Sender { get; init; }
-
-    [Id(1)]
-    public FrozenDictionary<string, FrozenDictionary<string, long>> Digest { get; init; } =
-        FrozenDictionary<string, FrozenDictionary<string, long>>.Empty;
+    public FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> Digests { get; init; } =
+        FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>.Empty;
 }
 
 [GenerateSerializer, Immutable]
@@ -79,8 +251,8 @@ internal sealed class DisseminationAntiEntropyResponse
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> ValuesByNamespace { get; init; } =
-        FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>>.Empty;
+    public FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> Values { get; init; } =
+        FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>.Empty;
 
     [Id(2)]
     public bool Truncated { get; init; }

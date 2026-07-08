@@ -9,7 +9,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
     IOptionsMonitor<DeploymentLoadPublisherOptions> options,
     Serializer serializer) : IDisseminationNamespace
 {
-    public string Name => DisseminationNamespaceNames.DeploymentLoad;
+    public DisseminationNamespace Name => DisseminationNamespaceNames.DeploymentLoad;
 
     public DisseminationGroup Group => DisseminationGroup.ActiveMembers;
 
@@ -19,15 +19,15 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
     {
         var payload = serializer.SerializeToArray(statistics);
         return new DisseminationValue(
-            origin.ToParsableString(),
+            origin,
             fromVersion: 0,
             toVersion: statistics.DateTime.Ticks,
             payload);
     }
 
-    public IReadOnlyDictionary<string, long> GetDigest()
+    public IReadOnlyDictionary<DisseminationKey, long> GetDigest()
     {
-        var digest = new Dictionary<string, long>(StringComparer.Ordinal);
+        var digest = new Dictionary<DisseminationKey, long>();
         foreach (var siloAddress in deploymentLoadPublisher.GetActiveSilosForDissemination())
         {
             var version = deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
@@ -35,25 +35,25 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
                               statistics.DateTime.Ticks)
                 ? statistics.DateTime.Ticks
                 : 0;
-            digest[siloAddress.ToParsableString()] = version;
+            digest[siloAddress] = version;
         }
 
         return digest;
     }
 
-    public long GetVersion(string key) =>
-        SiloAddress.TryParse(key, out var siloAddress)
+    public long GetVersion(DisseminationKey key) =>
+        key.Value is SiloAddress siloAddress
             && deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
             && !deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, statistics.DateTime.Ticks)
                 ? statistics.DateTime.Ticks
                 : 0;
 
     public bool TryCreateRepairValue(
-        string key,
+        DisseminationKey key,
         long peerVersion,
         out DisseminationValue value)
     {
-        if (!SiloAddress.TryParse(key, out var siloAddress)
+        if (key.Value is not SiloAddress siloAddress
             || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
             || statistics.DateTime.Ticks <= peerVersion)
         {
@@ -69,7 +69,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
         DisseminationValue value,
         CancellationToken cancellationToken)
     {
-        if (!SiloAddress.TryParse(value.Key, out var siloAddress))
+        if (value.Key.Value is not SiloAddress siloAddress)
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
