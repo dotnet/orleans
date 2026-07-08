@@ -38,7 +38,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var result = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        var result = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(result);
@@ -57,7 +57,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var result = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        var result = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(result);
@@ -83,8 +83,8 @@ public class DisseminationProtocolTests
         };
         var obsolete = topic.CreateItem(local, "obsolete", sequence: 5);
 
-        Assert.False(await protocol.Publish(topic.Name, expired, CancellationToken.None));
-        Assert.False(await protocol.Publish(topic.Name, obsolete, CancellationToken.None));
+        Assert.False(await protocol.Publish(topic, expired, CancellationToken.None));
+        Assert.False(await protocol.Publish(topic, obsolete, CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
@@ -104,7 +104,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var result = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        var result = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.False(result);
@@ -142,7 +142,7 @@ public class DisseminationProtocolTests
         });
         var value = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var result = await protocol.Publish(topic.Name, value, CancellationToken.None);
+        var result = await protocol.Publish(topic, value, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(result);
@@ -176,12 +176,12 @@ public class DisseminationProtocolTests
         }, timeProvider);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var firstResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        var firstResult = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
-        var secondResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        var secondResult = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
         timeProvider.Advance(TimeSpan.FromSeconds(5));
-        var thirdResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        var thirdResult = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(firstResult);
@@ -216,15 +216,15 @@ public class DisseminationProtocolTests
             options.Overlay.FanOutFactor = static _ => 1;
         }, new TestTimeProvider());
 
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
         Assert.Equal(1, sendCount);
 
         transport.Peers.Remove(peer);
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
 
         transport.Peers.Add(peer);
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "after-return", sequence: 3), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "after-return", sequence: 3), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Equal(2, sendCount);
@@ -241,10 +241,10 @@ public class DisseminationProtocolTests
         topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 1);
 
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
 
         transport.Peers.Remove(peer);
-        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
@@ -346,7 +346,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
 
-        var initialResult = await protocol.Publish(topic.Name, item, CancellationToken.None);
+        var initialResult = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
         var initialChildren = transport.GossipBatches.Select(batch => batch.Peer).ToArray();
 
@@ -359,7 +359,7 @@ public class DisseminationProtocolTests
                 transport.GossipBatches.Clear();
                 var updatedItem = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2);
 
-                var updatedResult = await protocol.Publish(topic.Name, updatedItem, CancellationToken.None);
+                var updatedResult = await protocol.Publish(topic, updatedItem, CancellationToken.None);
                 await protocol.FlushPendingGossip(CancellationToken.None);
 
                 Assert.True(initialResult);
@@ -381,8 +381,8 @@ public class DisseminationProtocolTests
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic);
 
-        var first = await protocol.Publish(topic.Name, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1), CancellationToken.None);
-        var second = await protocol.Publish(topic.Name, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2), CancellationToken.None);
+        var first = await protocol.Publish(topic, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1), CancellationToken.None);
+        var second = await protocol.Publish(topic, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2), CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(first);
@@ -411,9 +411,9 @@ public class DisseminationProtocolTests
         topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
         var protocol = CreateProtocol(transport, topic, options => options.MaxBatchItems = 2);
 
-        var first = await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), CancellationToken.None);
+        var first = await protocol.Publish(topic, topic.CreateItem(local, "first", sequence: 1), CancellationToken.None);
         await Task.Delay(TimeSpan.FromMilliseconds(50));
-        var second = await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), CancellationToken.None);
+        var second = await protocol.Publish(topic, topic.CreateItem(local, "second", sequence: 1), CancellationToken.None);
 
         await sent.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(first);

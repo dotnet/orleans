@@ -44,7 +44,7 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
 
             var localSilo = serviceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress;
             var item = topic.CreateItem(localSilo, snapshot);
-            return await dissemination.Publish(topic.Name, item, CancellationToken.None);
+            return await dissemination.Publish(topic, item, CancellationToken.None);
         }
         catch (Exception exception)
         {
