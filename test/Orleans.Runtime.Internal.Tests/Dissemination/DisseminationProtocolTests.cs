@@ -818,18 +818,13 @@ public class DisseminationProtocolTests
         sourceManager.CurrentSnapshot = updatedSnapshot;
         var localDigest = Assert.Single(sourceTopic.GetDigests());
 
-        var value = await sourceTopic.GetValue(
-            localDigest,
-            peerDigest,
-            CancellationToken.None);
-
-        var topicValue = Assert.NotNull(value);
+        Assert.True(sourceTopic.TryCreateRepairValue(localDigest, peerDigest, out var topicValue));
         var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(topicValue.Payload);
         Assert.NotNull(update.Diff);
         Assert.Null(update.Snapshot);
         var receiverManager = new FakeMembershipManager(baseSnapshot);
         var receiverTopic = CreateMembershipTopic(receiverManager, serializer);
-        var result = await receiverTopic.ApplyValue(CreateDisseminationValue(local, topicValue), CancellationToken.None);
+        var result = await receiverTopic.ApplyValueAsync(topicValue, CancellationToken.None);
 
         Assert.Equal(DisseminationApplyResult.Applied, result);
         Assert.Equal(updatedSnapshot.Version, receiverManager.CurrentSnapshot.Version);
@@ -1365,8 +1360,6 @@ public class DisseminationProtocolTests
 
         public DisseminationTopicOptions Options { get; } = new() { Enabled = true };
 
-        public bool IsEnabled => true;
-
         public DisseminationTopicValue CreateValue(string key, long sequence) => new(
             new DisseminationTopicDigest(key, sequence),
             BitConverter.GetBytes(sequence));
@@ -1396,25 +1389,29 @@ public class DisseminationProtocolTests
             return [.. digests.OrderBy(static digest => digest.Key, StringComparer.Ordinal)];
         }
 
-        public int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Version.CompareTo(right.Version);
-
         public bool IsObsolete(DisseminationTopicDigest digest) =>
             _versions.TryGetValue(digest.Key, out var version) && version > digest.Version;
 
-        public ValueTask<DisseminationTopicValue?> GetValue(
-            DisseminationTopicDigest digest,
-            DisseminationTopicDigest? peerDigest,
-            CancellationToken cancellationToken)
+        public bool TryCreateRepairValue(
+            DisseminationTopicDigest localDigest,
+            DisseminationTopicDigest peerDigest,
+            out DisseminationTopicValue value)
         {
-            if (!_versions.TryGetValue(digest.Key, out var version) || version < digest.Version)
+            if (localDigest.Key != peerDigest.Key
+                || !_versions.TryGetValue(localDigest.Key, out var version)
+                || version < localDigest.Version)
             {
-                return ValueTask.FromResult<DisseminationTopicValue?>(null);
+                value = default;
+                return false;
             }
 
-            return ValueTask.FromResult<DisseminationTopicValue?>(CreateValue(digest.Key, version));
+            value = CreateValue(localDigest.Key, version);
+            return true;
         }
 
-        public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
+        public ValueTask<DisseminationApplyResult> ApplyValueAsync(
+            DisseminationTopicValue value,
+            CancellationToken cancellationToken)
         {
             var version = BitConverter.ToInt64(value.Payload.Span);
             if (_versions.TryGetValue(value.Digest.Key, out var current))
@@ -1435,7 +1432,7 @@ public class DisseminationProtocolTests
             return ValueTask.FromResult(DisseminationApplyResult.Applied);
         }
 
-        public ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken)
+        public ValueTask RecoverAsync(DisseminationTopicDigest digest, CancellationToken cancellationToken)
         {
             FallbackDigests.Add(digest);
             return ValueTask.CompletedTask;
@@ -1548,8 +1545,8 @@ public class DisseminationProtocolTests
 
         public async Task<ModelApplyResponse> Receive(long version)
         {
-            var value = _topic.CreateItem(localSilo, FakeTopic.DefaultKey, version);
-            var result = await _topic.ApplyValue(value, CancellationToken.None);
+            var value = _topic.CreateValue(FakeTopic.DefaultKey, version);
+            var result = await _topic.ApplyValueAsync(value, CancellationToken.None);
             return new ModelApplyResponse(ToModelResult(result), _topic.GetVersion(FakeTopic.DefaultKey));
         }
 
@@ -1562,18 +1559,17 @@ public class DisseminationProtocolTests
             }
 
             var peerDigest = new DisseminationTopicDigest(FakeTopic.DefaultKey, peerVersion);
-            if (_topic.CompareVersion(localDigest, peerDigest) <= 0)
+            if (localDigest.Version <= peerDigest.Version)
             {
                 return new ModelRepairResponse(false, 0);
             }
 
-            var value = await _topic.GetValue(
+            return _topic.TryCreateRepairValue(
                 localDigest,
                 peerDigest,
-                CancellationToken.None);
-            return value is null
-                ? new ModelRepairResponse(false, 0)
-                : new ModelRepairResponse(true, value.Value.Digest.Version);
+                out var value)
+                ? new ModelRepairResponse(true, value.Digest.Version)
+                : new ModelRepairResponse(false, 0);
         }
 
         private static ModelApplyResult ToModelResult(DisseminationApplyResult result) => result switch
