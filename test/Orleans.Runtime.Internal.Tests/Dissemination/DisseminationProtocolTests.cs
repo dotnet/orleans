@@ -934,18 +934,20 @@ public class DisseminationProtocolTests
             local,
             peerCount: 1);
 
-        Assert.False(snapshot.ContainsParticipant(DisseminationMembershipScope.ActiveMembers, local));
+        Assert.False(snapshot.ContainsParticipant(local, DisseminationMembershipScope.ActiveMembers));
         Assert.Single(snapshot.ActiveMembers);
         Assert.Empty(targets);
         Assert.Empty(antiEntropyPeers);
     }
 
     [Fact]
-    public void DisseminationMembershipSnapshotSelectsDistinctAntiEntropyPeers()
+    public void DisseminationMembershipSnapshotReturnsAllAntiEntropyCandidatesWhenRequestedCountIsLarge()
     {
         const int peerCount = 20;
         const int localIndex = 7;
         var silos = CreateSilos(12);
+        var local = silos[localIndex];
+        var expected = silos.Where(silo => !Equals(silo, local)).OrderBy(static silo => silo);
         var snapshot = new DisseminationMembershipSnapshot(
             new MembershipVersion(1),
             [.. silos],
@@ -953,13 +955,13 @@ public class DisseminationProtocolTests
 
         var peers = snapshot.SelectAntiEntropyPeers(
             DisseminationMembershipScope.ActiveMembers,
-            silos[localIndex],
+            local,
             peerCount);
 
         Assert.Equal(silos.Length - 1, peers.Length);
         Assert.Equal(peers.Length, peers.Distinct().Count());
-        Assert.DoesNotContain(silos[localIndex], peers);
-        Assert.All(peers, peer => Assert.Contains(peer, silos));
+        Assert.DoesNotContain(local, peers);
+        Assert.Equal(expected, peers.OrderBy(static silo => silo));
     }
 
     private static DisseminationProtocol CreateProtocol(

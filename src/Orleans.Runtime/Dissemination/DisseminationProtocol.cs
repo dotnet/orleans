@@ -599,7 +599,7 @@ internal sealed partial class DisseminationProtocol
                     continue;
                 }
 
-                if (until <= now || !membershipSnapshot.ContainsMember(peer))
+                if (until <= now || !membershipSnapshot.ContainsParticipant(peer))
                 {
                     (removedPeers ??= []).Add(peer);
                 }
@@ -622,7 +622,7 @@ internal sealed partial class DisseminationProtocol
         SiloAddress root,
         CancellationToken cancellationToken)
     {
-        if (!_membership.CurrentSnapshot.ContainsParticipant(membershipScope, root))
+        if (!_membership.CurrentSnapshot.ContainsParticipant(root, membershipScope))
         {
             LogDebugDisseminationRootMissing(_logger, root);
         }

@@ -18,7 +18,7 @@ internal sealed class DisseminationMembershipSnapshot
         ActiveMembers = activeMembers.IsDefault ? [] : activeMembers;
         _allMembers = new MemberSet(AllMembers, nameof(allMembers));
         ValidateActiveMembers(ActiveMembers, _allMembers);
-        _activeMembers = AllMembers.SequenceEqual(ActiveMembers) ? _allMembers : new MemberSet(ActiveMembers, nameof(activeMembers));
+        _activeMembers = new MemberSet(ActiveMembers, nameof(activeMembers));
     }
 
     public MembershipVersion MembershipVersion { get; }
@@ -27,10 +27,8 @@ internal sealed class DisseminationMembershipSnapshot
 
     public ImmutableArray<SiloAddress> ActiveMembers { get; }
 
-    public bool ContainsParticipant(DisseminationMembershipScope membershipScope, SiloAddress silo) =>
+    public bool ContainsParticipant(SiloAddress silo, DisseminationMembershipScope membershipScope = DisseminationMembershipScope.AllMembers) =>
         GetMemberSet(membershipScope).Contains(silo);
-
-    public bool ContainsMember(SiloAddress peer) => _allMembers.Contains(peer);
 
     public IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(
         DisseminationMembershipScope membershipScope,
@@ -124,26 +122,37 @@ internal sealed class DisseminationMembershipSnapshot
             SiloAddress localSilo,
             int peerCount)
         {
-            if (_participants.Length <= 1 || !_indices.TryGetValue(localSilo, out var localIndex))
+            if (!_indices.TryGetValue(localSilo, out var localIndex))
             {
                 return [];
             }
 
-            var count = Math.Min(peerCount, _participants.Length - 1);
+            var candidates = new SiloAddress[_participants.Length - 1];
+            var candidateIndex = 0;
+            for (var i = 0; i < _participants.Length; i++)
+            {
+                if (i != localIndex)
+                {
+                    candidates[candidateIndex++] = _participants[i];
+                }
+            }
+
+            var count = Math.Min(peerCount, candidates.Length);
             if (count <= 0)
             {
                 return [];
             }
 
-            var selected = new HashSet<int>(count);
             var result = ImmutableArray.CreateBuilder<SiloAddress>(count);
-            while (result.Count < count)
+            for (var i = 0; i < count; i++)
             {
-                var index = Random.Shared.Next(_participants.Length);
-                if (index != localIndex && selected.Add(index))
+                var index = Random.Shared.Next(i, candidates.Length);
+                if (index != i)
                 {
-                    result.Add(_participants[index]);
+                    (candidates[i], candidates[index]) = (candidates[index], candidates[i]);
                 }
+
+                result.Add(candidates[i]);
             }
 
             return result.MoveToImmutable();
