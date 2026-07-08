@@ -610,18 +610,14 @@ internal sealed partial class DisseminationProtocol
         SiloAddress root,
         CancellationToken cancellationToken)
     {
-        var membership = _membership.CurrentSnapshot;
-        if (membership.ContainsParticipant(membershipScope, root))
+        if (!_membership.CurrentSnapshot.ContainsParticipant(membershipScope, root))
         {
-            PrunePeerState(membership);
-            return membership;
+            LogDebugDisseminationRootMissing(_logger, root);
         }
 
-        LogDebugDisseminationRootMissing(_logger, root);
-        await _membership.RefreshMembership(cancellationToken);
-        membership = _membership.CurrentSnapshot;
-        PrunePeerState(membership);
-        return membership.ContainsParticipant(membershipScope, root) ? membership : null;
+        var membership = await _membership.GetSnapshotContainingParticipant(membershipScope, root, cancellationToken);
+        PrunePeerState(membership ?? _membership.CurrentSnapshot);
+        return membership;
     }
 
     private bool TryGetEnabledTopic(string topicName, [NotNullWhen(true)] out IDisseminationTopic? topic)
