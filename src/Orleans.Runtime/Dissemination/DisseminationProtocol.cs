@@ -91,6 +91,7 @@ internal sealed partial class DisseminationProtocol
 
         DisseminationInstruments.OnBroadcastReceived(batch.Values, "tree");
 
+        List<(IDisseminationNamespace Namespace, DisseminationBroadcastValue Item)>? pendingForwards = null;
         foreach (var (namespaceName, values) in batch.Values)
         {
             if (!TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
@@ -100,7 +101,34 @@ internal sealed partial class DisseminationProtocol
 
             foreach (var item in values)
             {
-                await ApplyReceivedValue(disseminationNamespace, item, batch.Sender, forward: true, cancellationToken);
+                var applyResult = await ApplyReceivedValue(disseminationNamespace, item, batch.Sender, cancellationToken);
+                if (applyResult is DisseminationApplyResult.Applied)
+                {
+                    (pendingForwards ??= []).Add((disseminationNamespace, item));
+                }
+            }
+        }
+
+        if (pendingForwards is not null)
+        {
+            foreach (var (disseminationNamespace, item) in pendingForwards)
+            {
+                var originator = item.Originator;
+                var membership = await GetMembershipSnapshotForRouting(disseminationNamespace.Group, originator, cancellationToken);
+                if (membership is null)
+                {
+                    continue;
+                }
+
+                foreach (var peer in membership.GetForwardingTreeTargets(disseminationNamespace.Group))
+                {
+                    if (Equals(peer, originator) || Equals(peer, batch.Sender))
+                    {
+                        continue;
+                    }
+
+                    EnqueueBroadcast(peer, item, disseminationNamespace);
+                }
             }
         }
     }
@@ -230,7 +258,7 @@ internal sealed partial class DisseminationProtocol
                     {
                         try
                         {
-                            await ApplyReceivedValue(ns, item, response.Sender, forward: false, cancellationToken);
+                            await ApplyReceivedValue(ns, item, response.Sender, cancellationToken);
                         }
                         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                         {
@@ -352,7 +380,6 @@ internal sealed partial class DisseminationProtocol
         IDisseminationNamespace disseminationNamespace,
         DisseminationBroadcastValue item,
         SiloAddress sender,
-        bool forward,
         CancellationToken cancellationToken)
     {
         var namespaceName = disseminationNamespace.Name;
@@ -385,32 +412,7 @@ internal sealed partial class DisseminationProtocol
             RecordSeenValue(namespaceName, item.Value.Key);
         }
 
-        if (result == DisseminationApplyResult.Applied && forward)
-        {
-            await Forward(item, disseminationNamespace, sender, cancellationToken);
-        }
-
         return result;
-    }
-
-    private async Task Forward(DisseminationBroadcastValue item, IDisseminationNamespace disseminationNamespace, SiloAddress sender, CancellationToken cancellationToken)
-    {
-        var originator = item.Originator;
-        var membership = await GetMembershipSnapshotForRouting(disseminationNamespace.Group, originator, cancellationToken);
-        if (membership is null)
-        {
-            return;
-        }
-
-        foreach (var peer in membership.GetForwardingTreeTargets(disseminationNamespace.Group))
-        {
-            if (Equals(peer, originator) || Equals(peer, sender))
-            {
-                continue;
-            }
-
-            EnqueueBroadcast(peer, item, disseminationNamespace);
-        }
     }
 
     internal async Task FlushPendingBroadcast(CancellationToken cancellationToken)
