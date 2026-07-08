@@ -7,18 +7,18 @@ namespace Orleans.Runtime.Dissemination;
 
 internal interface IDisseminationNamespace
 {
-    string Name { get; }
+    DisseminationNamespace Name { get; }
 
     DisseminationGroup Group { get; }
 
     DisseminationNamespaceOptions Options { get; }
 
-    IReadOnlyDictionary<string, long> GetDigest();
+    IReadOnlyDictionary<DisseminationKey, long> GetDigest();
 
-    long GetVersion(string key);
+    long GetVersion(DisseminationKey key);
 
     bool TryCreateRepairValue(
-        string key,
+        DisseminationKey key,
         long peerVersion,
         out DisseminationValue value);
 

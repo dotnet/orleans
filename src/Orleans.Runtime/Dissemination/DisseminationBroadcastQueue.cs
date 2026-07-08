@@ -252,13 +252,13 @@ internal sealed class DisseminationBroadcastQueue(
 
     public readonly record struct Batch(SiloAddress Peer, ImmutableArray<PendingNamespaceValues> ValuesByNamespace);
 
-    public readonly record struct PendingNamespaceValues(string Namespace, ImmutableArray<DisseminationBroadcastValue> Values);
+    public readonly record struct PendingNamespaceValues(DisseminationNamespace Namespace, ImmutableArray<DisseminationBroadcastValue> Values);
 
-    private readonly record struct DigestKey(string Namespace, string Key);
+    private readonly record struct DigestKey(DisseminationNamespace Namespace, DisseminationKey Key);
 
     private sealed class PendingBroadcastBatch(DateTimeOffset flushAfter)
     {
-        private readonly Dictionary<string, Dictionary<string, DisseminationBroadcastValue>> _valuesByNamespace = new(StringComparer.Ordinal);
+        private readonly Dictionary<DisseminationNamespace, Dictionary<DisseminationKey, DisseminationBroadcastValue>> _valuesByNamespace = new();
 
         public DateTimeOffset FlushAfter { get; set; } = flushAfter;
 
@@ -266,7 +266,7 @@ internal sealed class DisseminationBroadcastQueue(
 
         public int ByteCount { get; private set; }
 
-        public int GetNamespaceCount(string namespaceName) => _valuesByNamespace.TryGetValue(namespaceName, out var values) ? values.Count : 0;
+        public int GetNamespaceCount(DisseminationNamespace namespaceName) => _valuesByNamespace.TryGetValue(namespaceName, out var values) ? values.Count : 0;
 
         public bool TryGetValue(DigestKey key, [NotNullWhen(true)] out DisseminationBroadcastValue? value)
         {
@@ -283,7 +283,7 @@ internal sealed class DisseminationBroadcastQueue(
         {
             if (!_valuesByNamespace.TryGetValue(key.Namespace, out var namespaceValues))
             {
-                namespaceValues = new Dictionary<string, DisseminationBroadcastValue>(StringComparer.Ordinal);
+                namespaceValues = new Dictionary<DisseminationKey, DisseminationBroadcastValue>();
                 _valuesByNamespace.Add(key.Namespace, namespaceValues);
             }
 

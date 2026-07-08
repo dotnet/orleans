@@ -100,9 +100,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
                 _timer.Period = _options.CurrentValue.Overlay.AntiEntropyInterval;
                 try
                 {
-                    var state = _protocol.CreateAntiEntropyState();
-                    var responses = await _protocol.ExchangeAntiEntropy(state, cancellationToken);
-                    await _protocol.ApplyAntiEntropyResponses(responses, cancellationToken);
+                    await _protocol.RunAntiEntropyRound(cancellationToken);
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {

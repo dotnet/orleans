@@ -19,7 +19,7 @@ internal static class DisseminationInstruments
     private static readonly Counter<long> Fallbacks = Meter.CreateCounter<long>("orleans.dissemination.fallbacks", "operations");
     private static readonly Counter<long> PayloadDropped = Meter.CreateCounter<long>("orleans.dissemination.payload.dropped", "values");
 
-    public static void OnBroadcastSent(string namespaceName, string kind, int itemCount, int byteCount)
+    public static void OnBroadcastSent(DisseminationNamespace namespaceName, string kind, int itemCount, int byteCount)
     {
         var broadcastSentEnabled = BroadcastSent.Enabled;
         var valuesSentEnabled = ValuesSent.Enabled;
@@ -47,7 +47,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnBroadcastSent(FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
+    public static void OnBroadcastSent(FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
     {
         if (!BroadcastSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
         {
@@ -60,7 +60,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnBroadcastReceived(string namespaceName, string kind, int itemCount)
+    public static void OnBroadcastReceived(DisseminationNamespace namespaceName, string kind, int itemCount)
     {
         var broadcastReceivedEnabled = BroadcastReceived.Enabled;
         var valuesAppliedEnabled = ValuesApplied.Enabled;
@@ -81,7 +81,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnBroadcastReceived(FrozenDictionary<string, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
+    public static void OnBroadcastReceived(FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
     {
         if (!BroadcastReceived.Enabled && !ValuesApplied.Enabled)
         {
@@ -94,7 +94,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnValueApplied(string namespaceName, DisseminationApplyResult result)
+    public static void OnValueApplied(DisseminationNamespace namespaceName, DisseminationApplyResult result)
     {
         if (!ValuesApplied.Enabled)
         {
@@ -131,7 +131,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnFallback(string namespaceName, string reason)
+    public static void OnFallback(DisseminationNamespace namespaceName, string reason)
     {
         if (Fallbacks.Enabled)
         {
@@ -139,7 +139,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnPayloadDropped(string namespaceName, string reason)
+    public static void OnPayloadDropped(DisseminationNamespace namespaceName, string reason)
     {
         if (PayloadDropped.Enabled)
         {

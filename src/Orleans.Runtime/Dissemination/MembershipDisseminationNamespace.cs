@@ -11,12 +11,11 @@ internal sealed class MembershipDisseminationNamespace(
     IOptionsMonitor<ClusterMembershipOptions> options,
     Serializer serializer) : IDisseminationNamespace
 {
-    private const string MembershipKey = "cluster";
     private const int MaxSnapshotHistory = 32;
     private readonly object _historyLock = new();
     private readonly SortedDictionary<long, MembershipTableSnapshot> _snapshotHistory = new();
 
-    public string Name => DisseminationNamespaceNames.Membership;
+    public DisseminationNamespace Name => DisseminationNamespaceNames.Membership;
 
     public DisseminationGroup Group => DisseminationGroup.AllMembers;
 
@@ -26,33 +25,33 @@ internal sealed class MembershipDisseminationNamespace(
     {
         RememberSnapshot(snapshot);
         return new DisseminationValue(
-            MembershipKey,
+            DisseminationKey.Default,
             fromVersion: 0,
             toVersion: snapshot.Version.Value,
             serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }));
     }
 
-    public IReadOnlyDictionary<string, long> GetDigest()
+    public IReadOnlyDictionary<DisseminationKey, long> GetDigest()
     {
         var snapshot = membershipManager.CurrentSnapshot;
         RememberSnapshot(snapshot);
-        return new Dictionary<string, long>(StringComparer.Ordinal)
+        return new Dictionary<DisseminationKey, long>
         {
-            [MembershipKey] = snapshot.Version.Value,
+            [DisseminationKey.Default] = snapshot.Version.Value,
         };
     }
 
-    public long GetVersion(string key) =>
-        string.Equals(key, MembershipKey, StringComparison.Ordinal)
+    public long GetVersion(DisseminationKey key) =>
+        key == DisseminationKey.Default
             ? membershipManager.CurrentSnapshot.Version.Value
             : 0;
 
     public bool TryCreateRepairValue(
-        string key,
+        DisseminationKey key,
         long peerVersion,
         out DisseminationValue value)
     {
-        if (!string.Equals(key, MembershipKey, StringComparison.Ordinal))
+        if (key != DisseminationKey.Default)
         {
             value = default;
             return false;
@@ -79,7 +78,7 @@ internal sealed class MembershipDisseminationNamespace(
         DisseminationValue value,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(value.Key, MembershipKey, StringComparison.Ordinal))
+        if (value.Key != DisseminationKey.Default)
         {
             return DisseminationApplyResult.Rejected;
         }
@@ -135,7 +134,7 @@ internal sealed class MembershipDisseminationNamespace(
         }
         var diff = CreateDiff(baseSnapshot, snapshot);
         value = new DisseminationValue(
-            MembershipKey,
+            DisseminationKey.Default,
             fromVersion: peerVersion,
             toVersion: snapshot.Version.Value,
             serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }));

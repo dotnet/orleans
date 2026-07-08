@@ -77,6 +77,29 @@ public sealed class DisseminationOverlayOptions
     /// Gets or sets the number of peers contacted during each anti-entropy repair round.
     /// </summary>
     public int AntiEntropyPeerCount { get; set; } = 3;
+
+    internal int GetFanOutFactor(int memberCount)
+    {
+        var count = Math.Max(1, memberCount);
+        var selectedFanOut = FanOutFactor?.Invoke(count) ?? GetConfiguredFanOutFactor(count);
+        return Math.Clamp(selectedFanOut, 1, count);
+    }
+
+    internal int GetConfiguredFanOutFactor(int memberCount)
+    {
+        var count = Math.Max(1, memberCount);
+        var targetHopCount = Math.Max(1, TargetHopCount);
+        var scaled = targetHopCount switch
+        {
+            1 => count,
+            2 => Math.Sqrt(count),
+            3 => Math.Cbrt(count),
+            _ => Math.Pow(count, 1d / targetHopCount),
+        };
+        var min = Math.Max(1, MinFanOutFactor);
+        var max = Math.Max(min, MaxFanOutFactor);
+        return (int)Math.Ceiling(Math.Max(min, Math.Min(scaled, max)));
+    }
 }
 
 /// <summary>
