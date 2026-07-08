@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Serialization;
@@ -19,8 +15,6 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
 
     public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
 
-    public bool IsEnabled => Options.Enabled;
-
     public DisseminationTopicValue CreateValue(SiloAddress origin, SiloRuntimeStatistics statistics)
     {
         var payload = serializer.SerializeToArray(statistics);
@@ -35,9 +29,10 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         foreach (var siloAddress in deploymentLoadPublisher.GetActiveSilosForDissemination())
         {
             var version = deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
-                && !deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, statistics.DateTime.Ticks)
-                    ? statistics.DateTime.Ticks
-                    : long.MinValue;
+                          && !deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress,
+                              statistics.DateTime.Ticks)
+                ? statistics.DateTime.Ticks
+                : long.MinValue;
             digests.Add(new DisseminationTopicDigest(
                 siloAddress.ToParsableString(),
                 version));
@@ -47,62 +42,48 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         return digests;
     }
 
-    public int CompareVersion(DisseminationTopicDigest left, DisseminationTopicDigest right) => left.Version.CompareTo(right.Version);
-
     public bool IsObsolete(DisseminationTopicDigest digest) =>
-        !TryGetSiloAddress(digest.Key, out var siloAddress)
+        !SiloAddress.TryParse(digest.Key, out var siloAddress)
         || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, digest.Version);
 
-    public ValueTask<DisseminationTopicValue?> GetValue(
-        DisseminationTopicDigest digest,
-        DisseminationTopicDigest? peerDigest,
-        CancellationToken cancellationToken)
+    public bool TryCreateRepairValue(
+        DisseminationTopicDigest localDigest,
+        DisseminationTopicDigest peerDigest,
+        out DisseminationTopicValue value)
     {
-        if (!TryGetSiloAddress(digest.Key, out var siloAddress)
+        if (localDigest.Key != peerDigest.Key
+            || !SiloAddress.TryParse(localDigest.Key, out var siloAddress)
             || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
-            || statistics.DateTime.Ticks < digest.Version)
+            || statistics.DateTime.Ticks < localDigest.Version)
         {
-            return ValueTask.FromResult<DisseminationTopicValue?>(null);
+            value = default;
+            return false;
         }
 
-        return ValueTask.FromResult<DisseminationTopicValue?>(CreateValue(siloAddress, statistics));
+        value = CreateValue(siloAddress, statistics);
+        return true;
     }
 
-    public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
+    public ValueTask<DisseminationApplyResult> ApplyValueAsync(
+        DisseminationTopicValue value,
+        CancellationToken cancellationToken)
     {
-        if (!TryGetSiloAddress(value.Digest.Key, out var siloAddress))
+        if (!SiloAddress.TryParse(value.Digest.Key, out var siloAddress))
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
 
         var statistics = serializer.Deserialize<SiloRuntimeStatistics>(value.Payload);
-        return ValueTask.FromResult(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
+        return ValueTask.FromResult(
+            deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }
 
-    public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken)
+    public async ValueTask RecoverAsync(DisseminationTopicDigest digest,
+        CancellationToken cancellationToken)
     {
-        if (Options.FallbackEnabled && TryGetSiloAddress(digest.Key, out var siloAddress))
+        if (Options.FallbackEnabled && SiloAddress.TryParse(digest.Key, out var siloAddress))
         {
             await deploymentLoadPublisher.RefreshSiloStatisticsForDissemination(siloAddress);
-        }
-    }
-
-    private static bool TryGetSiloAddress(string key, out SiloAddress siloAddress)
-    {
-        try
-        {
-            siloAddress = SiloAddress.FromParsableString(key);
-            return true;
-        }
-        catch (FormatException)
-        {
-            siloAddress = default!;
-            return false;
-        }
-        catch (OverflowException)
-        {
-            siloAddress = default!;
-            return false;
         }
     }
 }
