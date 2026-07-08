@@ -119,7 +119,7 @@ namespace Orleans.Configuration
     public partial class DeploymentLoadPublisherOptions
     {
         public static readonly System.TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
-        public DisseminationTopicOptions Dissemination { get { throw null; } set { } }
+        public DisseminationNamespaceOptions Dissemination { get { throw null; } set { } }
 
         public System.TimeSpan DeploymentLoadPublisherRefreshTime { get { throw null; } set { } }
     }

@@ -36,14 +36,14 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
         try
         {
             var dissemination = serviceProvider.GetService<IDisseminationService>();
-            var topic = serviceProvider.GetService<MembershipDisseminationTopic>();
-            if (dissemination is null || topic is null || !topic.Options.Enabled)
+            var disseminationNamespace = serviceProvider.GetService<MembershipDisseminationNamespace>();
+            if (dissemination is null || disseminationNamespace is null || !disseminationNamespace.Options.Enabled)
             {
                 return false;
             }
 
-            var item = topic.CreateValue(snapshot);
-            return await dissemination.Publish(topic, item, CancellationToken.None);
+            var item = disseminationNamespace.CreateValue(snapshot);
+            return await dissemination.Publish(disseminationNamespace, item, CancellationToken.None);
         }
         catch (Exception exception)
         {

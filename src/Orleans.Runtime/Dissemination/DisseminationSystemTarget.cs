@@ -18,7 +18,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         IDisseminationTransport transport,
         DisseminationMembership membership,
         IOptionsMonitor<DisseminationOptions> options,
-        IEnumerable<IDisseminationTopic> topics,
+        IEnumerable<IDisseminationNamespace> disseminationNamespaces,
         TimeProvider timeProvider,
         ILogger<DisseminationProtocol> logger,
         SystemTargetShared shared)
@@ -26,19 +26,19 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
     {
         _options = options;
         _logger = logger;
-        _protocol = new DisseminationProtocol(transport, membership, options, topics, timeProvider, logger);
+        _protocol = new DisseminationProtocol(transport, membership, options, disseminationNamespaces, timeProvider, logger);
         _timer = new PeriodicTimer(_options.CurrentValue.Overlay.AntiEntropyInterval, timeProvider);
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     async ValueTask<bool> IDisseminationService.Publish(
-        IDisseminationTopic topic,
-        DisseminationTopicValue value,
+        IDisseminationNamespace disseminationNamespace,
+        DisseminationValue value,
         CancellationToken cancellationToken) =>
-        await this.RunOrQueueTask(async () => await _protocol.Publish(topic, value, cancellationToken));
+        await this.RunOrQueueTask(async () => await _protocol.Publish(disseminationNamespace, value, cancellationToken));
 
-    Task IDisseminationSystemTarget.PushGossip(DisseminationGossipBatch batch, CancellationToken cancellationToken) =>
-        _protocol.ReceiveGossip(batch, cancellationToken);
+    Task IDisseminationSystemTarget.PushBroadcast(DisseminationBroadcastBatch batch, CancellationToken cancellationToken) =>
+        _protocol.ReceiveBroadcast(batch, cancellationToken);
 
     async Task<DisseminationAntiEntropyResponse> IDisseminationSystemTarget.ExchangeAntiEntropy(
         DisseminationAntiEntropyRequest request,
@@ -68,7 +68,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
     private async Task StopAsync(CancellationToken cancellationToken)
     {
         _timer.Dispose();
-        await this.RunOrQueueTask(() => _protocol.FlushPendingGossip(cancellationToken));
+        await this.RunOrQueueTask(() => _protocol.FlushPendingBroadcast(cancellationToken));
         await _shutdownCts.CancelAsync();
         if (_antiEntropyTask is not null)
         {

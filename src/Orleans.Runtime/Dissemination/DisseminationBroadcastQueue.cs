@@ -3,47 +3,47 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime.Dissemination;
 
-internal sealed class DisseminationGossipQueue(
+internal sealed class DisseminationBroadcastQueue(
     TimeProvider timeProvider,
-    Func<IReadOnlyList<DisseminationGossipQueue.Batch>, CancellationToken, Task> sendBatches,
+    Func<IReadOnlyList<DisseminationBroadcastQueue.Batch>, CancellationToken, Task> sendBatches,
     Action<Exception> logFlushFailed)
 {
     private readonly object _lock = new();
-    private readonly Dictionary<SiloAddress, PendingGossipBatch> _pendingGossip = [];
+    private readonly Dictionary<SiloAddress, PendingBroadcastBatch> _pendingBroadcast = [];
     private DateTimeOffset? _nextFlushAt;
     private CancellationTokenSource? _flushWakeup;
     private bool _flushScheduled;
 
     public void Enqueue(
         SiloAddress peer,
-        DisseminationValue item,
-        IDisseminationTopic topic,
+        DisseminationBroadcastValue item,
+        IDisseminationNamespace disseminationNamespace,
         int maxBatchItems,
         int maxBatchBytes)
     {
         var now = timeProvider.GetUtcNow();
-        var key = new DigestKey(topic.Name, item.Digest.Key);
+        var key = new DigestKey(disseminationNamespace.Name, item.Value.Key);
         lock (_lock)
         {
-            if (!_pendingGossip.TryGetValue(peer, out var pending))
+            if (!_pendingBroadcast.TryGetValue(peer, out var pending))
             {
-                pending = new PendingGossipBatch(now + topic.Options.MaxCoalescingDelay);
-                _pendingGossip.Add(peer, pending);
+                pending = new PendingBroadcastBatch(now + disseminationNamespace.Options.MaxCoalescingDelay);
+                _pendingBroadcast.Add(peer, pending);
             }
             else if (pending.TryGetValue(key, out var existing)
-                && existing.Digest.Version >= item.Digest.Version)
+                && existing.Value.ToVersion >= item.Value.ToVersion)
             {
                 return;
             }
-            else if (now + topic.Options.MaxCoalescingDelay < pending.FlushAfter)
+            else if (now + disseminationNamespace.Options.MaxCoalescingDelay < pending.FlushAfter)
             {
-                pending.FlushAfter = now + topic.Options.MaxCoalescingDelay;
+                pending.FlushAfter = now + disseminationNamespace.Options.MaxCoalescingDelay;
             }
 
             pending.AddOrReplace(key, item);
             if (pending.Count >= maxBatchItems
                 || pending.ByteCount >= maxBatchBytes
-                || pending.GetTopicCount(topic.Name) >= topic.Options.MaxPendingItemCount)
+                || pending.GetNamespaceCount(disseminationNamespace.Name) >= disseminationNamespace.Options.MaxPendingItemCount)
             {
                 pending.FlushAfter = now;
             }
@@ -52,9 +52,9 @@ internal sealed class DisseminationGossipQueue(
         ScheduleFlush();
     }
 
-    public async Task FlushPendingGossip(CancellationToken cancellationToken)
+    public async Task FlushPendingBroadcast(CancellationToken cancellationToken)
     {
-        var batches = DrainPendingGossip(force: true);
+        var batches = DrainPendingBroadcast(force: true);
         CancelScheduledFlushDelay();
         await sendBatches(batches, cancellationToken);
     }
@@ -64,14 +64,14 @@ internal sealed class DisseminationGossipQueue(
         lock (_lock)
         {
             List<SiloAddress>? removedPeers = null;
-            foreach (var peer in _pendingGossip.Keys)
+            foreach (var peer in _pendingBroadcast.Keys)
             {
                 if (localSilo.Equals(peer))
                 {
                     continue;
                 }
 
-                if (!membershipSnapshot.ContainsParticipant(peer))
+                if (!membershipSnapshot.ContainsMember(peer))
                 {
                     (removedPeers ??= []).Add(peer);
                 }
@@ -81,11 +81,11 @@ internal sealed class DisseminationGossipQueue(
             {
                 foreach (var peer in removedPeers)
                 {
-                    _pendingGossip.Remove(peer);
+                    _pendingBroadcast.Remove(peer);
                 }
             }
 
-            if (_pendingGossip.Count == 0)
+            if (_pendingBroadcast.Count == 0)
             {
                 _nextFlushAt = null;
                 _flushWakeup?.Cancel();
@@ -98,12 +98,12 @@ internal sealed class DisseminationGossipQueue(
         var startFlushLoop = false;
         lock (_lock)
         {
-            if (_pendingGossip.Count == 0)
+            if (_pendingBroadcast.Count == 0)
             {
                 return;
             }
 
-            var next = GetNextPendingGossipFlushUnsafe();
+            var next = GetNextPendingBroadcastFlushUnsafe();
             if (!_flushScheduled)
             {
                 _flushScheduled = true;
@@ -147,7 +147,7 @@ internal sealed class DisseminationGossipQueue(
                     }
                 }
 
-                var batches = DrainPendingGossip(force: false);
+                var batches = DrainPendingBroadcast(force: false);
                 await sendBatches(batches, CancellationToken.None);
             }
         }
@@ -163,7 +163,7 @@ internal sealed class DisseminationGossipQueue(
                 _flushScheduled = false;
                 _nextFlushAt = null;
                 DisposeFlushWakeupUnsafe();
-                reschedule = _pendingGossip.Count > 0;
+                reschedule = _pendingBroadcast.Count > 0;
             }
 
             if (reschedule)
@@ -177,7 +177,7 @@ internal sealed class DisseminationGossipQueue(
     {
         lock (_lock)
         {
-            if (_pendingGossip.Count == 0)
+            if (_pendingBroadcast.Count == 0)
             {
                 _nextFlushAt = null;
                 DisposeFlushWakeupUnsafe();
@@ -186,7 +186,7 @@ internal sealed class DisseminationGossipQueue(
             }
 
             var now = timeProvider.GetUtcNow();
-            var next = GetNextPendingGossipFlushUnsafe();
+            var next = GetNextPendingBroadcastFlushUnsafe();
             _nextFlushAt = next;
             if (next <= now)
             {
@@ -210,17 +210,17 @@ internal sealed class DisseminationGossipQueue(
         }
     }
 
-    private DateTimeOffset GetNextPendingGossipFlushUnsafe() =>
-        _pendingGossip.Values.Min(static pending => pending.FlushAfter);
+    private DateTimeOffset GetNextPendingBroadcastFlushUnsafe() =>
+        _pendingBroadcast.Values.Min(static pending => pending.FlushAfter);
 
-    private List<Batch> DrainPendingGossip(bool force)
+    private List<Batch> DrainPendingBroadcast(bool force)
     {
         var now = timeProvider.GetUtcNow();
         var result = new List<Batch>();
         lock (_lock)
         {
             List<SiloAddress>? drainedPeers = null;
-            foreach (var (peer, pending) in _pendingGossip)
+            foreach (var (peer, pending) in _pendingBroadcast)
             {
                 if (!force && pending.FlushAfter > now)
                 {
@@ -228,14 +228,14 @@ internal sealed class DisseminationGossipQueue(
                 }
 
                 (drainedPeers ??= []).Add(peer);
-                result.Add(new Batch(peer, pending.ToImmutableValuesByTopic()));
+                result.Add(new Batch(peer, pending.ToImmutableValuesByNamespace()));
             }
 
             if (drainedPeers is not null)
             {
                 foreach (var peer in drainedPeers)
                 {
-                    _pendingGossip.Remove(peer);
+                    _pendingBroadcast.Remove(peer);
                 }
             }
         }
@@ -250,15 +250,15 @@ internal sealed class DisseminationGossipQueue(
         _flushWakeup = null;
     }
 
-    public readonly record struct Batch(SiloAddress Peer, ImmutableArray<PendingTopicValues> ValuesByTopic);
+    public readonly record struct Batch(SiloAddress Peer, ImmutableArray<PendingNamespaceValues> ValuesByNamespace);
 
-    public readonly record struct PendingTopicValues(string Topic, ImmutableArray<DisseminationValue> Values);
+    public readonly record struct PendingNamespaceValues(string Namespace, ImmutableArray<DisseminationBroadcastValue> Values);
 
-    private readonly record struct DigestKey(string Topic, string Key);
+    private readonly record struct DigestKey(string Namespace, string Key);
 
-    private sealed class PendingGossipBatch(DateTimeOffset flushAfter)
+    private sealed class PendingBroadcastBatch(DateTimeOffset flushAfter)
     {
-        private readonly Dictionary<string, Dictionary<string, DisseminationValue>> _valuesByTopic = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Dictionary<string, DisseminationBroadcastValue>> _valuesByNamespace = new(StringComparer.Ordinal);
 
         public DateTimeOffset FlushAfter { get; set; } = flushAfter;
 
@@ -266,46 +266,46 @@ internal sealed class DisseminationGossipQueue(
 
         public int ByteCount { get; private set; }
 
-        public int GetTopicCount(string topic) => _valuesByTopic.TryGetValue(topic, out var values) ? values.Count : 0;
+        public int GetNamespaceCount(string namespaceName) => _valuesByNamespace.TryGetValue(namespaceName, out var values) ? values.Count : 0;
 
-        public bool TryGetValue(DigestKey key, [NotNullWhen(true)] out DisseminationValue? value)
+        public bool TryGetValue(DigestKey key, [NotNullWhen(true)] out DisseminationBroadcastValue? value)
         {
-            if (_valuesByTopic.TryGetValue(key.Topic, out var topicValues))
+            if (_valuesByNamespace.TryGetValue(key.Namespace, out var namespaceValues))
             {
-                return topicValues.TryGetValue(key.Key, out value!);
+                return namespaceValues.TryGetValue(key.Key, out value!);
             }
 
             value = null;
             return false;
         }
 
-        public void AddOrReplace(DigestKey key, DisseminationValue value)
+        public void AddOrReplace(DigestKey key, DisseminationBroadcastValue value)
         {
-            if (!_valuesByTopic.TryGetValue(key.Topic, out var topicValues))
+            if (!_valuesByNamespace.TryGetValue(key.Namespace, out var namespaceValues))
             {
-                topicValues = new Dictionary<string, DisseminationValue>(StringComparer.Ordinal);
-                _valuesByTopic.Add(key.Topic, topicValues);
+                namespaceValues = new Dictionary<string, DisseminationBroadcastValue>(StringComparer.Ordinal);
+                _valuesByNamespace.Add(key.Namespace, namespaceValues);
             }
 
-            if (topicValues.TryGetValue(key.Key, out var previous))
+            if (namespaceValues.TryGetValue(key.Key, out var previous))
             {
-                ByteCount -= previous.Payload.Length;
+                ByteCount -= previous.Value.Payload.Length;
             }
             else
             {
                 Count++;
             }
 
-            topicValues[key.Key] = value;
-            ByteCount += value.Payload.Length;
+            namespaceValues[key.Key] = value;
+            ByteCount += value.Value.Payload.Length;
         }
 
-        public ImmutableArray<PendingTopicValues> ToImmutableValuesByTopic()
+        public ImmutableArray<PendingNamespaceValues> ToImmutableValuesByNamespace()
         {
-            var result = ImmutableArray.CreateBuilder<PendingTopicValues>(_valuesByTopic.Count);
-            foreach (var (topic, values) in _valuesByTopic)
+            var result = ImmutableArray.CreateBuilder<PendingNamespaceValues>(_valuesByNamespace.Count);
+            foreach (var (namespaceName, values) in _valuesByNamespace)
             {
-                result.Add(new PendingTopicValues(topic, [.. values.Values]));
+                result.Add(new PendingNamespaceValues(namespaceName, [.. values.Values]));
             }
 
             return result.ToImmutable();

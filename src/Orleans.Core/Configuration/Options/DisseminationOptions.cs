@@ -47,7 +47,7 @@ public sealed class DisseminationOverlayOptions
     /// Gets or sets the code-configured fanout selector.
     /// </summary>
     /// <remarks>
-    /// The argument is the current participant count for the selected dissemination topology.
+    /// The argument is the current member count for the selected dissemination topology.
     /// When this value is <see langword="null"/>, <see cref="TargetHopCount"/>, <see cref="MinFanOutFactor"/>,
     /// and <see cref="MaxFanOutFactor"/> are used to derive a fanout factor.
     /// </remarks>
@@ -80,40 +80,40 @@ public sealed class DisseminationOverlayOptions
 }
 
 /// <summary>
-/// Options for a dissemination topic.
+/// Options for a dissemination namespace.
 /// </summary>
-public sealed class DisseminationTopicOptions
+public sealed class DisseminationNamespaceOptions
 {
     /// <summary>
-    /// Gets or sets a value indicating whether this topic is enabled.
+    /// Gets or sets a value indicating whether this namespace is enabled.
     /// </summary>
     public bool Enabled { get; set; }
 
     /// <summary>
-    /// Gets or sets the maximum number of pending topic items.
+    /// Gets or sets the maximum number of pending namespace values.
     /// </summary>
     public int MaxPendingItemCount { get; set; } = 1024;
 
     /// <summary>
-    /// Gets or sets the maximum delay for topic coalescing.
+    /// Gets or sets the maximum delay for namespace coalescing.
     /// </summary>
     public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
-    /// Gets or sets how long a topic item remains useful.
+    /// Gets or sets how long a namespace value remains useful.
     /// </summary>
     public TimeSpan StaleItemTtl { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Gets or sets the expected cadence for updates in this topic.
+    /// Gets or sets the expected cadence for updates in this namespace.
     /// </summary>
     /// <remarks>
-    /// Anti-entropy requests omit digests for topic keys which have received an update within this interval.
+    /// Anti-entropy requests omit keys which have received a value within this interval.
     /// </remarks>
     public TimeSpan ExpectedUpdateCadence { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Gets or sets the maximum serialized payload size for this topic.
+    /// Gets or sets the maximum serialized payload size for this namespace.
     /// </summary>
     public int MaxPayloadBytes { get; set; } = 1024 * 1024;
 }

@@ -9,10 +9,10 @@ internal sealed class OrleansDisseminationTransport(
 {
     public SiloAddress LocalSilo => localSiloDetails.SiloAddress;
 
-    public Task SendGossip(SiloAddress peer, DisseminationGossipBatch batch, CancellationToken cancellationToken)
+    public Task SendBroadcast(SiloAddress peer, DisseminationBroadcastBatch batch, CancellationToken cancellationToken)
     {
         var target = grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, peer);
-        return target.PushGossip(batch, cancellationToken);
+        return target.PushBroadcast(batch, cancellationToken);
     }
 
     public async ValueTask<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(

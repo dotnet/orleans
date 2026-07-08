@@ -57,33 +57,33 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
     }
 }
 
-internal sealed class DisseminationTopicOptionsValidator
+internal sealed class DisseminationNamespaceOptionsValidator
 {
-    public static ValidateOptionsResult Validate(string owner, DisseminationTopicOptions options)
+    public static ValidateOptionsResult Validate(string owner, DisseminationNamespaceOptions options)
     {
         if (options.MaxPendingItemCount <= 0)
         {
-            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.MaxPendingItemCount)} must be greater than 0.");
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.MaxPendingItemCount)} must be greater than 0.");
         }
 
         if (options.MaxCoalescingDelay <= TimeSpan.Zero)
         {
-            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.MaxCoalescingDelay)} must be greater than 0.");
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.MaxCoalescingDelay)} must be greater than 0.");
         }
 
         if (options.StaleItemTtl <= options.MaxCoalescingDelay)
         {
-            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.StaleItemTtl)} must be greater than {nameof(DisseminationTopicOptions.MaxCoalescingDelay)}.");
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.StaleItemTtl)} must be greater than {nameof(DisseminationNamespaceOptions.MaxCoalescingDelay)}.");
         }
 
         if (options.ExpectedUpdateCadence <= TimeSpan.Zero)
         {
-            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.ExpectedUpdateCadence)} must be greater than 0.");
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.ExpectedUpdateCadence)} must be greater than 0.");
         }
 
         if (options.MaxPayloadBytes <= 0)
         {
-            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.MaxPayloadBytes)} must be greater than 0.");
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.MaxPayloadBytes)} must be greater than 0.");
         }
 
         return ValidateOptionsResult.Success;
@@ -93,11 +93,11 @@ internal sealed class DisseminationTopicOptionsValidator
 internal sealed class DeploymentLoadPublisherOptionsValidator : IValidateOptions<DeploymentLoadPublisherOptions>
 {
     public ValidateOptionsResult Validate(string? name, DeploymentLoadPublisherOptions options) =>
-        DisseminationTopicOptionsValidator.Validate(nameof(DeploymentLoadPublisherOptions.Dissemination), options.Dissemination);
+        DisseminationNamespaceOptionsValidator.Validate(nameof(DeploymentLoadPublisherOptions.Dissemination), options.Dissemination);
 }
 
 internal sealed class ClusterMembershipOptionsDisseminationValidator : IValidateOptions<ClusterMembershipOptions>
 {
     public ValidateOptionsResult Validate(string? name, ClusterMembershipOptions options) =>
-        DisseminationTopicOptionsValidator.Validate(nameof(ClusterMembershipOptions.Dissemination), options.Dissemination);
+        DisseminationNamespaceOptionsValidator.Validate(nameof(ClusterMembershipOptions.Dissemination), options.Dissemination);
 }

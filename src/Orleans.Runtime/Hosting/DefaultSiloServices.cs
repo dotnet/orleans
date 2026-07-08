@@ -172,8 +172,8 @@ namespace Orleans.Hosting
 
             services.AddSingleton<DeploymentLoadPublisher>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DeploymentLoadPublisher>();
-            services.AddSingleton<DeploymentLoadStatisticsDisseminationTopic>();
-            services.AddFromExisting<IDisseminationTopic, DeploymentLoadStatisticsDisseminationTopic>();
+            services.AddSingleton<DeploymentLoadStatisticsDisseminationNamespace>();
+            services.AddFromExisting<IDisseminationNamespace, DeploymentLoadStatisticsDisseminationNamespace>();
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
 
@@ -190,8 +190,8 @@ namespace Orleans.Hosting
             services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipSystemTarget>();
             services.AddSingleton<IMembershipGossiper, MembershipGossiper>();
-            services.AddSingleton<MembershipDisseminationTopic>();
-            services.AddFromExisting<IDisseminationTopic, MembershipDisseminationTopic>();
+            services.AddSingleton<MembershipDisseminationNamespace>();
+            services.AddFromExisting<IDisseminationNamespace, MembershipDisseminationNamespace>();
             services.AddSingleton<IRemoteSiloProber, RemoteSiloProber>();
             services.AddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();

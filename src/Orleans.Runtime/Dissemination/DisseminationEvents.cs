@@ -8,17 +8,18 @@ internal static class DisseminationEvents
     public const string ListenerName = "Microsoft.Orleans.Dissemination";
     public static readonly DiagnosticListener Listener = new(ListenerName);
 
-    public static void EmitValue(string topic, DisseminationTopicDigest digest, SiloAddress localSilo, SiloAddress? peer, DisseminationApplyResult result, int payloadBytes)
+    public static void EmitValue(string namespaceName, DisseminationValue value, SiloAddress localSilo, SiloAddress? peer, DisseminationApplyResult result, int payloadBytes)
     {
         if (Listener.IsEnabled("Dissemination.ValueApply"))
         {
             Listener.Write("Dissemination.ValueApply", new DisseminationValueEvent
             {
-                Topic = topic,
+                Namespace = namespaceName,
                 LocalSilo = localSilo,
                 Peer = peer,
-                Key = digest.Key,
-                Version = digest.Version,
+                Key = value.Key,
+                FromVersion = value.FromVersion,
+                ToVersion = value.ToVersion,
                 Result = result.ToString(),
                 PayloadBytes = payloadBytes,
                 Timestamp = DateTimeOffset.UtcNow,
@@ -26,16 +27,17 @@ internal static class DisseminationEvents
         }
     }
 
-    public static void EmitPayloadDrop(string topic, DisseminationTopicDigest digest, SiloAddress localSilo, string reason, int payloadBytes)
+    public static void EmitPayloadDrop(string namespaceName, DisseminationValue value, SiloAddress localSilo, string reason, int payloadBytes)
     {
         if (Listener.IsEnabled("Dissemination.PayloadDrop"))
         {
             Listener.Write("Dissemination.PayloadDrop", new DisseminationValueEvent
             {
-                Topic = topic,
+                Namespace = namespaceName,
                 LocalSilo = localSilo,
-                Key = digest.Key,
-                Version = digest.Version,
+                Key = value.Key,
+                FromVersion = value.FromVersion,
+                ToVersion = value.ToVersion,
                 Result = reason,
                 PayloadBytes = payloadBytes,
                 Timestamp = DateTimeOffset.UtcNow,
@@ -47,7 +49,7 @@ internal static class DisseminationEvents
 
 internal sealed class DisseminationValueEvent
 {
-    public string Topic { get; init; } = string.Empty;
+    public string Namespace { get; init; } = string.Empty;
 
     public required SiloAddress LocalSilo { get; init; }
 
@@ -55,7 +57,9 @@ internal sealed class DisseminationValueEvent
 
     public string Key { get; init; } = string.Empty;
 
-    public long Version { get; init; }
+    public long FromVersion { get; init; }
+
+    public long ToVersion { get; init; }
 
     public string Result { get; init; } = string.Empty;
 
