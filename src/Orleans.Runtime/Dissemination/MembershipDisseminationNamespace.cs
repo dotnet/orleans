@@ -17,8 +17,6 @@ internal sealed class MembershipDisseminationNamespace(
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.Membership;
 
-    public DisseminationGroup Group => DisseminationGroup.AllMembers;
-
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public DisseminationValue CreateValue(MembershipTableSnapshot snapshot)
@@ -31,14 +29,14 @@ internal sealed class MembershipDisseminationNamespace(
             serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }));
     }
 
-    public IReadOnlyDictionary<DisseminationKey, long> GetDigest()
+    public IEnumerable<DigestEntry> Digests
     {
-        var snapshot = membershipManager.CurrentSnapshot;
-        RememberSnapshot(snapshot);
-        return new Dictionary<DisseminationKey, long>
+        get
         {
-            [DisseminationKey.Default] = snapshot.Version.Value,
-        };
+            var snapshot = membershipManager.CurrentSnapshot;
+            RememberSnapshot(snapshot);
+            yield return new DigestEntry(DisseminationKey.Default, snapshot.Version.Value);
+        }
     }
 
     public long GetVersion(DisseminationKey key) =>

@@ -176,12 +176,12 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task PublishReturnsFalseWhenRootIsMissingFromGroup()
+    public async Task PublishReturnsFalseWhenRootIsMissingFromMembership()
     {
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
         var transport = new FakeTransport(local, peer);
-        transport.PeerStatuses[local] = SiloStatus.Joining;
+        transport.PeerStatuses[local] = SiloStatus.Dead;
         var ns = new FakeNamespace(local);
         var protocol = CreateProtocol(transport, ns);
         var item = ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1);
@@ -213,10 +213,7 @@ public class DisseminationProtocolTests
             return Task.CompletedTask;
         };
 
-        var ns = new FakeNamespace(local)
-        {
-            Group = DisseminationGroup.AllMembers,
-        };
+        var ns = new FakeNamespace(local);
         var protocol = CreateProtocol(transport, ns, options =>
         {
             options.FailureBackoff = TimeSpan.FromSeconds(5);
@@ -728,21 +725,18 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task AntiEntropySendsOneMergedDigestRequestPerPeer()
+    public async Task AntiEntropySendsOneDigestRequestPerPeer()
     {
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
         var transport = new FakeTransport(local, peer);
-        DisseminationKey activeKey = new("active");
-        DisseminationKey allKey = new("all");
-        var activeNamespace = new FakeNamespace(local, new DisseminationNamespace("active-namespace"));
-        activeNamespace.ExpectedKeys.Add(activeKey);
-        var allNamespace = new FakeNamespace(local, new DisseminationNamespace("all-namespace"))
-        {
-            Group = DisseminationGroup.AllMembers,
-        };
-        allNamespace.ExpectedKeys.Add(allKey);
-        var protocol = CreateProtocol(transport, new IDisseminationNamespace[] { activeNamespace, allNamespace }, options =>
+        DisseminationKey firstKey = new("first");
+        DisseminationKey secondKey = new("second");
+        var firstNamespace = new FakeNamespace(local, new DisseminationNamespace("first-namespace"));
+        firstNamespace.ExpectedKeys.Add(firstKey);
+        var secondNamespace = new FakeNamespace(local, new DisseminationNamespace("second-namespace"));
+        secondNamespace.ExpectedKeys.Add(secondKey);
+        var protocol = CreateProtocol(transport, new IDisseminationNamespace[] { firstNamespace, secondNamespace }, options =>
         {
             options.Overlay.AntiEntropyPeerCount = 1;
         });
@@ -751,14 +745,14 @@ public class DisseminationProtocolTests
 
         var request = Assert.Single(transport.AntiEntropyRequests).Request;
         Assert.Equal(
-            new[] { activeNamespace.Name, allNamespace.Name }.OrderBy(static name => name),
+            new[] { firstNamespace.Name, secondNamespace.Name }.OrderBy(static name => name),
             request.Digests.Keys.OrderBy(static name => name));
-        var activeDigest = Assert.Single(request.Digests[activeNamespace.Name]);
-        Assert.Equal(activeKey, activeDigest.Key);
-        Assert.Equal(0, activeDigest.Version);
-        var allDigest = Assert.Single(request.Digests[allNamespace.Name]);
-        Assert.Equal(allKey, allDigest.Key);
-        Assert.Equal(0, allDigest.Version);
+        var firstDigest = Assert.Single(request.Digests[firstNamespace.Name]);
+        Assert.Equal(firstKey, firstDigest.Key);
+        Assert.Equal(0, firstDigest.Version);
+        var secondDigest = Assert.Single(request.Digests[secondNamespace.Name]);
+        Assert.Equal(secondKey, secondDigest.Key);
+        Assert.Equal(0, secondDigest.Version);
     }
 
     [Fact]
@@ -916,13 +910,13 @@ public class DisseminationProtocolTests
         var serializer = serviceProvider.GetRequiredService<Serializer>();
         var sourceManager = new FakeMembershipManager(baseSnapshot);
         var sourceNamespace = CreateMembershipNamespace(sourceManager, serializer);
-        var peerDigest = Assert.Single(sourceNamespace.GetDigest());
+        var peerDigest = Assert.Single(sourceNamespace.Digests);
         sourceManager.CurrentSnapshot = updatedSnapshot;
-        var localDigest = Assert.Single(sourceNamespace.GetDigest());
+        var localDigest = Assert.Single(sourceNamespace.Digests);
 
-        Assert.True(sourceNamespace.TryCreateRepairValue(localDigest.Key, peerDigest.Value, out var value));
-        Assert.Equal(peerDigest.Value, value.FromVersion);
-        Assert.Equal(localDigest.Value, value.ToVersion);
+        Assert.True(sourceNamespace.TryCreateRepairValue(localDigest.Key, peerDigest.Version, out var value));
+        Assert.Equal(peerDigest.Version, value.FromVersion);
+        Assert.Equal(localDigest.Version, value.ToVersion);
         var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
         Assert.NotNull(update.Diff);
         Assert.Null(update.Snapshot);
@@ -1052,8 +1046,7 @@ public class DisseminationProtocolTests
 
         Assert.Same(first, second);
         Assert.Equal(new MembershipVersion(1), first.MembershipVersion);
-        Assert.Equal(new[] { local, peer }, first.AllMembers);
-        Assert.Equal(new[] { local }, first.ActiveMembers);
+        Assert.Equal(new[] { local, peer }, first.Members);
     }
 
     [Fact]
@@ -1079,7 +1072,7 @@ public class DisseminationProtocolTests
 
         Assert.NotSame(first, second);
         Assert.Equal(new MembershipVersion(2), second.MembershipVersion);
-        Assert.Equal(new[] { local, peer }, second.ActiveMembers);
+        Assert.Equal(new[] { local, peer }, second.Members);
     }
 
     [Fact]
@@ -1109,26 +1102,9 @@ public class DisseminationProtocolTests
             new MembershipVersion(1),
             local,
             [local, local],
-            [local],
             new DisseminationOverlayOptions()));
 
-        Assert.Equal("allMembers", exception.ParamName);
-    }
-
-    [Fact]
-    public void DisseminationMembershipSnapshotRejectsActiveMembersOutsideAllMembers()
-    {
-        var local = CreateSilo(11111);
-        var peer = CreateSilo(11112);
-
-        var exception = Assert.Throws<ArgumentException>(() => new DisseminationMembershipSnapshot(
-            new MembershipVersion(1),
-            local,
-            [local],
-            [local, peer],
-            new DisseminationOverlayOptions()));
-
-        Assert.Equal("activeMembers", exception.ParamName);
+        Assert.Equal("members", exception.ParamName);
     }
 
     [Fact]
@@ -1141,11 +1117,9 @@ public class DisseminationProtocolTests
             new MembershipVersion(1),
             root,
             [root, first, second],
-            [root, first, second],
             CreateOverlayOptions(fanout: 2));
 
-        var targets = snapshot.GetOriginatorTreeTargets(
-            DisseminationGroup.ActiveMembers);
+        var targets = snapshot.GetOriginatorTreeTargets();
 
         Assert.Equal(new[] { first, second }, targets);
     }
@@ -1161,11 +1135,9 @@ public class DisseminationProtocolTests
             new MembershipVersion(1),
             local,
             [local, root, sender, child],
-            [local, root, sender, child],
             CreateOverlayOptions(fanout: 2));
 
-        var targets = snapshot.GetForwardingTreeTargets(
-            DisseminationGroup.ActiveMembers);
+        var targets = snapshot.GetForwardingTreeTargets();
 
         Assert.Equal(new[] { sender, child }, targets);
     }
@@ -1179,15 +1151,13 @@ public class DisseminationProtocolTests
             new MembershipVersion(1),
             local,
             [peer],
-            [peer],
             CreateOverlayOptions(fanout: 1));
 
-        var targets = snapshot.GetOriginatorTreeTargets(
-            DisseminationGroup.ActiveMembers);
-        var antiEntropyPeers = snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, 1);
+        var targets = snapshot.GetOriginatorTreeTargets();
+        var antiEntropyPeers = snapshot.SelectAntiEntropyPeers(1);
 
-        Assert.False(snapshot.ContainsMember(local, DisseminationGroup.ActiveMembers));
-        Assert.Single(snapshot.ActiveMembers);
+        Assert.False(snapshot.ContainsMember(local));
+        Assert.Single(snapshot.Members);
         Assert.Empty(targets);
         Assert.Empty(antiEntropyPeers);
     }
@@ -1204,10 +1174,9 @@ public class DisseminationProtocolTests
             new MembershipVersion(1),
             local,
             [.. silos],
-            [.. silos],
             new DisseminationOverlayOptions());
 
-        var selectedPeers = snapshot.SelectAntiEntropyPeers(DisseminationGroup.ActiveMembers, peerCount);
+        var selectedPeers = snapshot.SelectAntiEntropyPeers(peerCount);
 
         Assert.Equal(silos.Length - 1, selectedPeers.Length);
         Assert.Equal(selectedPeers.Length, selectedPeers.Distinct().Count());
@@ -1520,8 +1489,6 @@ public class DisseminationProtocolTests
 
         public DisseminationNamespace Name => _name;
 
-        public DisseminationGroup Group { get; set; } = DisseminationGroup.ActiveMembers;
-
         public DisseminationNamespaceOptions Options { get; } = new() { Enabled = true };
 
         public DisseminationValue CreateValue(DisseminationKey key, long sequence, long fromVersion = 0) => new(
@@ -1539,15 +1506,23 @@ public class DisseminationProtocolTests
 
         public long GetVersion(DisseminationKey key) => _versions.TryGetValue(key, out var version) ? version : 0;
 
-        public IReadOnlyDictionary<DisseminationKey, long> GetDigest()
+        public IEnumerable<DigestEntry> Digests
         {
-            var digest = new Dictionary<DisseminationKey, long>(_versions);
-            foreach (var key in ExpectedKeys)
+            get
             {
-                digest.TryAdd(key, 0);
-            }
+                foreach (var (key, version) in _versions)
+                {
+                    yield return new DigestEntry(key, version);
+                }
 
-            return digest;
+                foreach (var key in ExpectedKeys)
+                {
+                    if (!_versions.ContainsKey(key))
+                    {
+                        yield return new DigestEntry(key, 0);
+                    }
+                }
+            }
         }
 
         public bool TryCreateRepairValue(
@@ -1722,13 +1697,13 @@ public class DisseminationProtocolTests
 
         public async Task<ModelRepairResponse> RepairPeer(long peerVersion)
         {
-            var localDigest = _topic.GetDigest().SingleOrDefault();
-            if (localDigest.Value == 0)
+            var localDigest = _topic.Digests.SingleOrDefault();
+            if (localDigest.Version == 0)
             {
                 return new ModelRepairResponse(false, 0);
             }
 
-            if (localDigest.Value <= peerVersion)
+            if (localDigest.Version <= peerVersion)
             {
                 return new ModelRepairResponse(false, 0);
             }

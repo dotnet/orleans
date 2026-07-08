@@ -7,61 +7,33 @@ namespace Orleans.Runtime.Dissemination;
 
 internal sealed class DisseminationMembershipSnapshot
 {
-    private readonly MemberSet _allMembers;
-    private readonly MemberSet _activeMembers;
+    private readonly MemberSet _members;
 
     public DisseminationMembershipSnapshot(
         MembershipVersion membershipVersion,
         SiloAddress localSilo,
-        ImmutableArray<SiloAddress> allMembers,
-        ImmutableArray<SiloAddress> activeMembers,
+        ImmutableArray<SiloAddress> members,
         DisseminationOverlayOptions overlayOptions)
     {
         MembershipVersion = membershipVersion;
-        AllMembers = allMembers.IsDefault ? [] : allMembers;
-        ActiveMembers = activeMembers.IsDefault ? [] : activeMembers;
-        _allMembers = new MemberSet(AllMembers, localSilo, overlayOptions, nameof(allMembers));
-        ValidateActiveMembers(ActiveMembers, _allMembers);
-        _activeMembers = new MemberSet(ActiveMembers, localSilo, overlayOptions, nameof(activeMembers));
+        Members = members.IsDefault ? [] : members;
+        _members = new MemberSet(Members, localSilo, overlayOptions, nameof(members));
     }
 
     public MembershipVersion MembershipVersion { get; }
 
-    public ImmutableArray<SiloAddress> AllMembers { get; }
+    public ImmutableArray<SiloAddress> Members { get; }
 
-    public ImmutableArray<SiloAddress> ActiveMembers { get; }
+    public bool ContainsMember(SiloAddress silo) => _members.Contains(silo);
 
-    public bool ContainsMember(SiloAddress silo, DisseminationGroup membershipScope = DisseminationGroup.AllMembers) =>
-        GetMemberSet(membershipScope).Contains(silo);
+    public ImmutableArray<SiloAddress> GetOriginatorTreeTargets() => _members.OriginatorTreeTargets;
 
-    public ImmutableArray<SiloAddress> GetOriginatorTreeTargets(
-        DisseminationGroup membershipScope) =>
-        GetMemberSet(membershipScope).OriginatorTreeTargets;
+    public ImmutableArray<SiloAddress> GetForwardingTreeTargets() => _members.ForwardingTreeTargets;
 
-    public ImmutableArray<SiloAddress> GetForwardingTreeTargets(
-        DisseminationGroup membershipScope) =>
-        GetMemberSet(membershipScope).ForwardingTreeTargets;
-
-    public ImmutableArray<SiloAddress> SelectAntiEntropyPeers(
-        DisseminationGroup membershipScope,
-        int peerCount)
+    public ImmutableArray<SiloAddress> SelectAntiEntropyPeers(int peerCount)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(peerCount);
-        return GetMemberSet(membershipScope).SelectRandomPeers(peerCount);
-    }
-
-    private MemberSet GetMemberSet(DisseminationGroup membershipScope) =>
-        membershipScope == DisseminationGroup.AllMembers ? _allMembers : _activeMembers;
-
-    private static void ValidateActiveMembers(ImmutableArray<SiloAddress> activeMembers, MemberSet allMembers)
-    {
-        foreach (var activeMember in activeMembers)
-        {
-            if (!allMembers.Contains(activeMember))
-            {
-                throw new ArgumentException("Active members must be present in all members.", nameof(activeMembers));
-            }
-        }
+        return _members.SelectRandomPeers(peerCount);
     }
 
     private sealed class MemberSet
