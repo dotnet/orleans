@@ -20,6 +20,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets dissemination options for deployment load statistics.
         /// </summary>
-        public DisseminationTopicOptions Dissemination { get; set; } = new() { ExpectedUpdateCadence = TimeSpan.FromSeconds(2) };
+        public DisseminationNamespaceOptions Dissemination { get; set; } = new() { ExpectedUpdateCadence = TimeSpan.FromSeconds(2) };
     }
 }

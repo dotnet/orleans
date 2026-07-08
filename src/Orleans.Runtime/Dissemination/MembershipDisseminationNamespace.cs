@@ -6,50 +6,53 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Dissemination;
 
-internal sealed class MembershipDisseminationTopic(
+internal sealed class MembershipDisseminationNamespace(
     IMembershipManager membershipManager,
     IOptionsMonitor<ClusterMembershipOptions> options,
-    Serializer serializer) : IDisseminationTopic
+    Serializer serializer) : IDisseminationNamespace
 {
     private const string MembershipKey = "cluster";
     private const int MaxSnapshotHistory = 32;
     private readonly object _historyLock = new();
     private readonly SortedDictionary<long, MembershipTableSnapshot> _snapshotHistory = new();
 
-    public string Name => DisseminationTopicNames.Membership;
+    public string Name => DisseminationNamespaceNames.Membership;
 
-    public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
+    public DisseminationGroup Group => DisseminationGroup.AllMembers;
 
-    public DisseminationTopicOptions Options => options.CurrentValue.Dissemination;
+    public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
-    public DisseminationTopicValue CreateValue(MembershipTableSnapshot snapshot)
+    public DisseminationValue CreateValue(MembershipTableSnapshot snapshot)
     {
         RememberSnapshot(snapshot);
-        return new DisseminationTopicValue(
-            new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
+        return new DisseminationValue(
+            MembershipKey,
+            fromVersion: 0,
+            toVersion: snapshot.Version.Value,
             serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }));
     }
 
-    public IReadOnlyList<DisseminationTopicDigest> GetDigests()
+    public IReadOnlyDictionary<string, long> GetDigest()
     {
         var snapshot = membershipManager.CurrentSnapshot;
         RememberSnapshot(snapshot);
-        return new[]
+        return new Dictionary<string, long>(StringComparer.Ordinal)
         {
-            new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
+            [MembershipKey] = snapshot.Version.Value,
         };
     }
 
-    public bool IsObsolete(DisseminationTopicDigest digest) =>
-        digest.Key != MembershipKey
-        || membershipManager.CurrentSnapshot.Version.Value > digest.Version;
+    public long GetVersion(string key) =>
+        string.Equals(key, MembershipKey, StringComparison.Ordinal)
+            ? membershipManager.CurrentSnapshot.Version.Value
+            : 0;
 
     public bool TryCreateRepairValue(
-        DisseminationTopicDigest localDigest,
-        DisseminationTopicDigest peerDigest,
-        out DisseminationTopicValue value)
+        string key,
+        long peerVersion,
+        out DisseminationValue value)
     {
-        if (localDigest.Key != MembershipKey || peerDigest.Key != MembershipKey)
+        if (!string.Equals(key, MembershipKey, StringComparison.Ordinal))
         {
             value = default;
             return false;
@@ -57,14 +60,13 @@ internal sealed class MembershipDisseminationTopic(
 
         var snapshot = membershipManager.CurrentSnapshot;
         RememberSnapshot(snapshot);
-        if (snapshot.Version.Value < localDigest.Version)
+        if (snapshot.Version.Value <= peerVersion)
         {
             value = default;
             return false;
         }
 
-        if (peerDigest.Version < snapshot.Version.Value
-            && TryCreateDiffValue(peerDigest.Version, snapshot, out value))
+        if (TryCreateDiffValue(peerVersion, snapshot, out value))
         {
             return true;
         }
@@ -74,10 +76,10 @@ internal sealed class MembershipDisseminationTopic(
     }
 
     public async ValueTask<DisseminationApplyResult> ApplyValueAsync(
-        DisseminationTopicValue value,
+        DisseminationValue value,
         CancellationToken cancellationToken)
     {
-        if (value.Digest.Key != MembershipKey)
+        if (!string.Equals(value.Key, MembershipKey, StringComparison.Ordinal))
         {
             return DisseminationApplyResult.Rejected;
         }
@@ -86,11 +88,18 @@ internal sealed class MembershipDisseminationTopic(
         if (update.Diff is { } diff)
         {
             return update.Snapshot is null
+                && value.FromVersion == diff.BaseVersion.Value
+                && value.ToVersion == diff.Version.Value
                 ? await ApplyDiff(diff, cancellationToken)
                 : DisseminationApplyResult.Rejected;
         }
 
         if (update.Snapshot is not { } snapshot)
+        {
+            return DisseminationApplyResult.Rejected;
+        }
+
+        if (value.FromVersion != 0 || value.ToVersion != snapshot.Version.Value)
         {
             return DisseminationApplyResult.Rejected;
         }
@@ -111,7 +120,7 @@ internal sealed class MembershipDisseminationTopic(
         return DisseminationApplyResult.Applied;
     }
 
-    private bool TryCreateDiffValue(long peerVersion, MembershipTableSnapshot snapshot, out DisseminationTopicValue value)
+    private bool TryCreateDiffValue(long peerVersion, MembershipTableSnapshot snapshot, out DisseminationValue value)
     {
         MembershipTableSnapshot? baseSnapshot;
         lock (_historyLock)
@@ -125,8 +134,10 @@ internal sealed class MembershipDisseminationTopic(
             return false;
         }
         var diff = CreateDiff(baseSnapshot, snapshot);
-        value = new DisseminationTopicValue(
-            new DisseminationTopicDigest(MembershipKey, snapshot.Version.Value),
+        value = new DisseminationValue(
+            MembershipKey,
+            fromVersion: peerVersion,
+            toVersion: snapshot.Version.Value,
             serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }));
         return true;
     }

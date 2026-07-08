@@ -37,45 +37,45 @@ internal sealed class DisseminationMembership(IMembershipManager membershipManag
     public Task RefreshMembership(CancellationToken cancellationToken) =>
         membershipManager.Refresh(targetVersion: null, cancellationToken);
 
-    public async ValueTask<DisseminationMembershipSnapshot?> GetSnapshotContainingParticipant(
-        DisseminationMembershipScope scope,
-        SiloAddress participant,
+    public async ValueTask<DisseminationMembershipSnapshot?> GetSnapshotContainingMember(
+        DisseminationGroup scope,
+        SiloAddress member,
         CancellationToken cancellationToken)
     {
         var snapshot = CurrentSnapshot;
-        if (snapshot.ContainsParticipant(participant, scope))
+        if (snapshot.ContainsMember(member, scope))
         {
             return snapshot;
         }
 
         await RefreshMembership(cancellationToken);
         snapshot = CurrentSnapshot;
-        return snapshot.ContainsParticipant(participant, scope) ? snapshot : null;
+        return snapshot.ContainsMember(member, scope) ? snapshot : null;
     }
 
     private static DisseminationMembershipSnapshot ComputeMembership(MembershipTableSnapshot snapshot)
     {
-        var participants = snapshot.Entries.Values
-            .Where(static entry => IsDisseminationParticipant(entry.Status))
+        var members = snapshot.Entries.Values
+            .Where(static entry => IsDisseminationMember(entry.Status))
             .OrderBy(static entry => GetStatusRank(entry.Status))
             .ThenBy(static entry => entry.StartTime)
             .ThenBy(static entry => entry.SiloAddress)
             .ToArray();
-        var allMembers = ImmutableArray.CreateBuilder<SiloAddress>(participants.Length);
+        var allMembers = ImmutableArray.CreateBuilder<SiloAddress>(members.Length);
         var activeMembers = ImmutableArray.CreateBuilder<SiloAddress>();
-        foreach (var participant in participants)
+        foreach (var member in members)
         {
-            allMembers.Add(participant.SiloAddress);
-            if (participant.Status == SiloStatus.Active)
+            allMembers.Add(member.SiloAddress);
+            if (member.Status == SiloStatus.Active)
             {
-                activeMembers.Add(participant.SiloAddress);
+                activeMembers.Add(member.SiloAddress);
             }
         }
 
         return new DisseminationMembershipSnapshot(snapshot.Version, allMembers.MoveToImmutable(), activeMembers.ToImmutable());
     }
 
-    private static bool IsDisseminationParticipant(SiloStatus status) =>
+    private static bool IsDisseminationMember(SiloStatus status) =>
         status is SiloStatus.Joining or SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
 
     private static int GetStatusRank(SiloStatus status) => status switch
