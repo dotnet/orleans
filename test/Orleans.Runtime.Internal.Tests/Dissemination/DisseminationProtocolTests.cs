@@ -40,7 +40,7 @@ public class DisseminationProtocolTests
             options.MaxConcurrentSends = 1;
             options.Overlay.FanOutFactor = static _ => 2;
         });
-        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var item = topic.CreateValue(FakeTopic.DefaultKey, sequence: 1);
 
         var result = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
@@ -63,7 +63,7 @@ public class DisseminationProtocolTests
             options.MaxConcurrentSends = 1;
             options.Overlay.FanOutFactor = static _ => 2;
         });
-        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var item = topic.CreateValue(FakeTopic.DefaultKey, sequence: 1);
 
         var result = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
@@ -122,7 +122,7 @@ public class DisseminationProtocolTests
             options.MaxConcurrentSends = maxConcurrentSends;
             options.Overlay.FanOutFactor = static _ => 10;
         });
-        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var item = topic.CreateValue(FakeTopic.DefaultKey, sequence: 1);
 
         Assert.True(await protocol.Publish(topic, item, CancellationToken.None));
         var flushTask = protocol.FlushPendingGossip(CancellationToken.None);
@@ -160,22 +160,19 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic);
         topic.SetValue("obsolete", version: 10);
 
-        var expired = new DisseminationValue
-        {
-            Digest = new DisseminationTopicDigest("expired", version: 1),
-            Root = local,
-            ExpiresAt = DateTimeOffset.UnixEpoch,
-            Payload = BitConverter.GetBytes(1L),
-        };
-        var obsolete = topic.CreateItem(local, "obsolete", sequence: 5);
+        topic.Options.MaxPayloadBytes = sizeof(long);
+        var oversized = new DisseminationTopicValue(
+            new DisseminationTopicDigest("oversized", version: 1),
+            new byte[sizeof(long) + 1]);
+        var obsolete = topic.CreateValue("obsolete", sequence: 5);
 
-        Assert.False(await protocol.Publish(topic, expired, CancellationToken.None));
+        Assert.False(await protocol.Publish(topic, oversized, CancellationToken.None));
         Assert.False(await protocol.Publish(topic, obsolete, CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
         Assert.Equal(
-            new[] { expired.Digest, obsolete.Digest },
+            new[] { oversized.Digest, obsolete.Digest },
             topic.FallbackDigests);
     }
 
@@ -188,7 +185,7 @@ public class DisseminationProtocolTests
         transport.PeerStatuses[local] = SiloStatus.Joining;
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic);
-        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var item = topic.CreateValue(FakeTopic.DefaultKey, sequence: 1);
 
         var result = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
@@ -226,7 +223,7 @@ public class DisseminationProtocolTests
             options.FailureBackoff = TimeSpan.FromSeconds(5);
             options.Overlay.FanOutFactor = static _ => 2;
         });
-        var value = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var value = topic.CreateValue(FakeTopic.DefaultKey, sequence: 1);
 
         var result = await protocol.Publish(topic, value, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
@@ -260,7 +257,7 @@ public class DisseminationProtocolTests
         {
             options.FailureBackoff = TimeSpan.FromSeconds(5);
         }, timeProvider);
-        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var item = topic.CreateValue(FakeTopic.DefaultKey, sequence: 1);
 
         var firstResult = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
@@ -302,15 +299,15 @@ public class DisseminationProtocolTests
             options.Overlay.FanOutFactor = static _ => 1;
         }, new TestTimeProvider());
 
-        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateValue("before-removal", sequence: 1), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
         Assert.Equal(1, sendCount);
 
         transport.Peers.Remove(peer);
-        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateValue("during-removal", sequence: 2), CancellationToken.None));
 
         transport.Peers.Add(peer);
-        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "after-return", sequence: 3), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateValue("after-return", sequence: 3), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Equal(2, sendCount);
@@ -327,10 +324,10 @@ public class DisseminationProtocolTests
         topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
         var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 1);
 
-        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "before-removal", sequence: 1), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateValue("before-removal", sequence: 1), CancellationToken.None));
 
         transport.Peers.Remove(peer);
-        Assert.True(await protocol.Publish(topic, topic.CreateItem(local, "during-removal", sequence: 2), CancellationToken.None));
+        Assert.True(await protocol.Publish(topic, topic.CreateValue("during-removal", sequence: 2), CancellationToken.None));
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Empty(transport.GossipBatches);
@@ -446,7 +443,7 @@ public class DisseminationProtocolTests
             options.MaxConcurrentSends = 1;
             options.Overlay.FanOutFactor = static _ => 2;
         });
-        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var item = topic.CreateValue(FakeTopic.DefaultKey, sequence: 1);
 
         var initialResult = await protocol.Publish(topic, item, CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
@@ -459,7 +456,7 @@ public class DisseminationProtocolTests
             if (!initialChildren.SequenceEqual(updatedChildren))
             {
                 transport.GossipBatches.Clear();
-                var updatedItem = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2);
+                var updatedItem = topic.CreateValue(FakeTopic.DefaultKey, sequence: 2);
 
                 var updatedResult = await protocol.Publish(topic, updatedItem, CancellationToken.None);
                 await protocol.FlushPendingGossip(CancellationToken.None);
@@ -483,8 +480,8 @@ public class DisseminationProtocolTests
         var topic = new FakeTopic(local);
         var protocol = CreateProtocol(transport, topic);
 
-        var first = await protocol.Publish(topic, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1), CancellationToken.None);
-        var second = await protocol.Publish(topic, topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 2), CancellationToken.None);
+        var first = await protocol.Publish(topic, topic.CreateValue(FakeTopic.DefaultKey, sequence: 1), CancellationToken.None);
+        var second = await protocol.Publish(topic, topic.CreateValue(FakeTopic.DefaultKey, sequence: 2), CancellationToken.None);
         await protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.True(first);
@@ -513,9 +510,9 @@ public class DisseminationProtocolTests
         topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
         var protocol = CreateProtocol(transport, topic, options => options.MaxBatchItems = 2);
 
-        var first = await protocol.Publish(topic, topic.CreateItem(local, "first", sequence: 1), CancellationToken.None);
+        var first = await protocol.Publish(topic, topic.CreateValue("first", sequence: 1), CancellationToken.None);
         await Task.Delay(TimeSpan.FromMilliseconds(50));
-        var second = await protocol.Publish(topic, topic.CreateItem(local, "second", sequence: 1), CancellationToken.None);
+        var second = await protocol.Publish(topic, topic.CreateValue("second", sequence: 1), CancellationToken.None);
 
         await sent.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(first);
@@ -816,7 +813,7 @@ public class DisseminationProtocolTests
         using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = serviceProvider.GetRequiredService<Serializer>();
         var sourceManager = new FakeMembershipManager(baseSnapshot);
-        var sourceTopic = CreateMembershipTopic(local, sourceManager, serializer);
+        var sourceTopic = CreateMembershipTopic(sourceManager, serializer);
         var peerDigest = Assert.Single(sourceTopic.GetDigests());
         sourceManager.CurrentSnapshot = updatedSnapshot;
         var localDigest = Assert.Single(sourceTopic.GetDigests());
@@ -826,13 +823,13 @@ public class DisseminationProtocolTests
             peerDigest,
             CancellationToken.None);
 
-        Assert.NotNull(value);
-        var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        var topicValue = Assert.NotNull(value);
+        var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(topicValue.Payload);
         Assert.NotNull(update.Diff);
         Assert.Null(update.Snapshot);
         var receiverManager = new FakeMembershipManager(baseSnapshot);
-        var receiverTopic = CreateMembershipTopic(peer, receiverManager, serializer);
-        var result = await receiverTopic.ApplyValue(value, CancellationToken.None);
+        var receiverTopic = CreateMembershipTopic(receiverManager, serializer);
+        var result = await receiverTopic.ApplyValue(CreateDisseminationValue(local, topicValue), CancellationToken.None);
 
         Assert.Equal(DisseminationApplyResult.Applied, result);
         Assert.Equal(updatedSnapshot.Version, receiverManager.CurrentSnapshot.Version);
@@ -1125,15 +1122,20 @@ public class DisseminationProtocolTests
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static MembershipDisseminationTopic CreateMembershipTopic(
-        SiloAddress local,
         FakeMembershipManager membershipManager,
         Serializer serializer) =>
         new(
             membershipManager,
             new TestOptionsMonitor<ClusterMembershipOptions>(new ClusterMembershipOptions()),
-            serializer,
-            TimeProvider.System,
-            new FakeLocalSiloDetails(local));
+            serializer);
+
+    private static DisseminationValue CreateDisseminationValue(SiloAddress root, DisseminationTopicValue value) => new()
+    {
+        Digest = value.Digest,
+        Root = root,
+        ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
+        Payload = value.Payload,
+    };
 
     private static MembershipTableSnapshot CreateMembershipSnapshot(long version, params MembershipEntry[] entries) =>
         new(new MembershipVersion(version), entries.ToImmutableDictionary(static entry => entry.SiloAddress));
@@ -1338,11 +1340,18 @@ public class DisseminationProtocolTests
     }
 #endif
 
-    private sealed class FakeTopic(SiloAddress localSilo, string name = FakeTopic.DefaultName) : IDisseminationTopic
+    private sealed class FakeTopic : IDisseminationTopic
     {
         public const string DefaultName = "fake-topic";
         public const string DefaultKey = "value";
         private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
+        private readonly string _name;
+
+        public FakeTopic(SiloAddress localSilo, string name = DefaultName)
+        {
+            _ = localSilo;
+            _name = name;
+        }
 
         public Dictionary<string, int> ApplyCounts { get; } = new(StringComparer.Ordinal);
 
@@ -1350,7 +1359,7 @@ public class DisseminationProtocolTests
 
         public List<DisseminationTopicDigest> FallbackDigests { get; } = new();
 
-        public string Name => name;
+        public string Name => _name;
 
         public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.ActiveMembers;
 
@@ -1358,13 +1367,12 @@ public class DisseminationProtocolTests
 
         public bool IsEnabled => true;
 
-        public DisseminationValue CreateItem(SiloAddress root, string key, long sequence) => new()
-        {
-            Digest = new DisseminationTopicDigest(key, sequence),
-            Root = root,
-            ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
-            Payload = BitConverter.GetBytes(sequence),
-        };
+        public DisseminationTopicValue CreateValue(string key, long sequence) => new(
+            new DisseminationTopicDigest(key, sequence),
+            BitConverter.GetBytes(sequence));
+
+        public DisseminationValue CreateItem(SiloAddress root, string key, long sequence) =>
+            CreateDisseminationValue(root, CreateValue(key, sequence));
 
         public void SetValue(string key, long version) => _versions[key] = version;
 
@@ -1393,17 +1401,17 @@ public class DisseminationProtocolTests
         public bool IsObsolete(DisseminationTopicDigest digest) =>
             _versions.TryGetValue(digest.Key, out var version) && version > digest.Version;
 
-        public ValueTask<DisseminationValue?> GetValue(
+        public ValueTask<DisseminationTopicValue?> GetValue(
             DisseminationTopicDigest digest,
             DisseminationTopicDigest? peerDigest,
             CancellationToken cancellationToken)
         {
             if (!_versions.TryGetValue(digest.Key, out var version) || version < digest.Version)
             {
-                return ValueTask.FromResult<DisseminationValue?>(null);
+                return ValueTask.FromResult<DisseminationTopicValue?>(null);
             }
 
-            return ValueTask.FromResult<DisseminationValue?>(CreateItem(localSilo, digest.Key, version));
+            return ValueTask.FromResult<DisseminationTopicValue?>(CreateValue(digest.Key, version));
         }
 
         public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
@@ -1565,7 +1573,7 @@ public class DisseminationProtocolTests
                 CancellationToken.None);
             return value is null
                 ? new ModelRepairResponse(false, 0)
-                : new ModelRepairResponse(true, value.Digest.Version);
+                : new ModelRepairResponse(true, value.Value.Digest.Version);
         }
 
         private static ModelApplyResult ToModelResult(DisseminationApplyResult result) => result switch
@@ -1650,18 +1658,7 @@ public class DisseminationProtocolTests
         }
     }
 
-    private sealed class FakeLocalSiloDetails(SiloAddress localSilo) : ILocalSiloDetails
-    {
-        public string Name => "local";
 
-        public string ClusterId => "test-cluster";
-
-        public string DnsHostName => "localhost";
-
-        public SiloAddress SiloAddress => localSilo;
-
-        public SiloAddress GatewayAddress => localSilo;
-    }
 
     private sealed class TestOptionsMonitor<T>(T currentValue) : IOptionsMonitor<T>
     {

@@ -22,7 +22,7 @@ internal interface IDisseminationTopic
 
     bool IsObsolete(DisseminationTopicDigest digest);
 
-    ValueTask<DisseminationValue?> GetValue(
+    ValueTask<DisseminationTopicValue?> GetValue(
         DisseminationTopicDigest digest,
         DisseminationTopicDigest? peerDigest,
         CancellationToken cancellationToken);
