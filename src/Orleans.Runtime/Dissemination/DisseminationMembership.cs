@@ -37,6 +37,22 @@ internal sealed class DisseminationMembership(IMembershipManager membershipManag
     public Task RefreshMembership(CancellationToken cancellationToken) =>
         membershipManager.Refresh(targetVersion: null, cancellationToken);
 
+    public async ValueTask<DisseminationMembershipSnapshot?> GetSnapshotContainingParticipant(
+        DisseminationMembershipScope scope,
+        SiloAddress participant,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = CurrentSnapshot;
+        if (snapshot.ContainsParticipant(scope, participant))
+        {
+            return snapshot;
+        }
+
+        await RefreshMembership(cancellationToken);
+        snapshot = CurrentSnapshot;
+        return snapshot.ContainsParticipant(scope, participant) ? snapshot : null;
+    }
+
     private static DisseminationMembershipSnapshot ComputeMembership(MembershipTableSnapshot snapshot)
     {
         var participants = snapshot.Entries.Values
