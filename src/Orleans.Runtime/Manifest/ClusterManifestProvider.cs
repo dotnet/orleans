@@ -273,7 +273,7 @@ namespace Orleans.Runtime.Metadata
                     break;
                 }
 
-                if (peer == _localSiloAddress)
+                if (peer.Equals(_localSiloAddress))
                 {
                     continue;
                 }
