@@ -13,8 +13,8 @@ using Orleans.Storage;
 using TestExtensions;
 using Xunit;
 
-namespace UnitTests.Storage
-{
+namespace UnitTests.Storage;
+
     [TestCategory("BVT"), TestCategory("Storage")]
     public class StateStorageBridgeConcurrencyTests
     {
@@ -60,6 +60,7 @@ namespace UnitTests.Storage
             Assert.Equal(1, storage.WriteCallCount);
             Assert.Equal(0, storage.ReadCallCount);
             Assert.Equal(0, storage.ClearCallCount);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -88,6 +89,7 @@ namespace UnitTests.Storage
             Assert.Equal(1, storage.ClearCallCount);
             Assert.Equal(0, storage.ReadCallCount);
             Assert.Equal(0, storage.WriteCallCount);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -113,6 +115,8 @@ namespace UnitTests.Storage
             });
 
             Assert.Equal(1, storage.WriteCallCount);
+            Assert.Single(storage.EtagSnapshot());
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -142,6 +146,11 @@ namespace UnitTests.Storage
                 secondWriteCompletion.SetResult();
                 await Task.WhenAll(firstWrite, secondWrite);
             });
+
+            var etags = storage.EtagSnapshot();
+            Assert.Equal(2, etags.Length);
+            Assert.NotEqual(etags[0], etags[1]);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -167,6 +176,7 @@ namespace UnitTests.Storage
 
             Assert.Equal(1, storage.WriteCallCount);
             Assert.Equal(0, storage.ReadCallCount);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -179,7 +189,12 @@ namespace UnitTests.Storage
             var readCompletion = CreateCompletionSource();
             var writeFailure = new InvalidOperationException("write failed");
             storage.WriteAsync = _ => writeCompletion.Task;
-            storage.ReadAsync = _ => readCompletion.Task;
+            storage.ReadAsync = async grainState =>
+            {
+                await readCompletion.Task;
+                grainState.ETag = "etag-read-after-failed-write";
+                grainState.RecordExists = true;
+            };
 
             await RunInGrainContextAsync(context, async () =>
             {
@@ -199,6 +214,8 @@ namespace UnitTests.Storage
 
             Assert.Equal(1, storage.WriteCallCount);
             Assert.Equal(1, storage.ReadCallCount);
+            Assert.Empty(storage.EtagSnapshot());
+            Assert.Equal("etag-read-after-failed-write", bridge.Etag);
         }
 
         [Fact]
@@ -211,7 +228,12 @@ namespace UnitTests.Storage
             var readCompletion = CreateCompletionSource();
             var secondWriteCompletion = CreateCompletionSource();
             storage.WriteAsync = _ => storage.WriteCallCount == 1 ? firstWriteCompletion.Task : secondWriteCompletion.Task;
-            storage.ReadAsync = _ => readCompletion.Task;
+            storage.ReadAsync = async grainState =>
+            {
+                await readCompletion.Task;
+                grainState.ETag = "etag-read-recovery";
+                grainState.RecordExists = true;
+            };
 
             await RunInGrainContextAsync(context, async () =>
             {
@@ -233,6 +255,11 @@ namespace UnitTests.Storage
                 await Task.WhenAll(read, secondWrite);
                 await Assert.ThrowsAsync<OrleansException>(() => firstWrite);
             });
+
+            var etag = Assert.Single(storage.EtagSnapshot());
+            Assert.StartsWith("etag-", etag);
+            Assert.NotEqual("etag-read-recovery", etag);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -257,6 +284,8 @@ namespace UnitTests.Storage
             });
 
             Assert.Equal(1, storage.ClearCallCount);
+            Assert.Single(storage.EtagSnapshot());
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -281,6 +310,8 @@ namespace UnitTests.Storage
             });
 
             Assert.Equal(1, storage.ClearCallCount);
+            Assert.Single(storage.EtagSnapshot());
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -311,6 +342,8 @@ namespace UnitTests.Storage
             });
 
             Assert.Equal(2, storage.ClearCallCount);
+            Assert.Single(storage.EtagSnapshot());
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -336,6 +369,7 @@ namespace UnitTests.Storage
 
             Assert.Equal(1, storage.ClearCallCount);
             Assert.Equal(0, storage.ReadCallCount);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -348,7 +382,12 @@ namespace UnitTests.Storage
             var readCompletion = CreateCompletionSource();
             var clearFailure = new InvalidOperationException("clear failed");
             storage.ClearAsync = _ => clearCompletion.Task;
-            storage.ReadAsync = _ => readCompletion.Task;
+            storage.ReadAsync = async grainState =>
+            {
+                await readCompletion.Task;
+                grainState.ETag = "etag-read-after-failed-clear";
+                grainState.RecordExists = true;
+            };
 
             await RunInGrainContextAsync(context, async () =>
             {
@@ -368,6 +407,8 @@ namespace UnitTests.Storage
 
             Assert.Equal(1, storage.ClearCallCount);
             Assert.Equal(1, storage.ReadCallCount);
+            Assert.Empty(storage.EtagSnapshot());
+            Assert.Equal("etag-read-after-failed-clear", bridge.Etag);
         }
 
         [Fact]
@@ -378,7 +419,12 @@ namespace UnitTests.Storage
             var bridge = CreateBridge(context, storage);
             var readCompletion = CreateCompletionSource();
             var writeCompletion = CreateCompletionSource();
-            storage.ReadAsync = _ => readCompletion.Task;
+            storage.ReadAsync = async grainState =>
+            {
+                await readCompletion.Task;
+                grainState.ETag = "etag-initial-read";
+                grainState.RecordExists = true;
+            };
             storage.WriteAsync = _ => writeCompletion.Task;
 
             await RunInGrainContextAsync(context, async () =>
@@ -397,6 +443,9 @@ namespace UnitTests.Storage
                 writeCompletion.SetResult();
                 await Task.WhenAll(readTask, writeTask);
             });
+
+            var writeEtag = AssertLatestEtag(bridge, storage);
+            Assert.NotEqual("etag-initial-read", writeEtag);
         }
 
         [Fact]
@@ -406,7 +455,12 @@ namespace UnitTests.Storage
             var storage = new ControllableGrainStorage();
             var bridge = CreateBridge(context, storage);
             var readCompletion = CreateCompletionSource();
-            storage.ReadAsync = _ => readCompletion.Task;
+            storage.ReadAsync = async grainState =>
+            {
+                await readCompletion.Task;
+                grainState.ETag = "etag-read";
+                grainState.RecordExists = true;
+            };
 
             await RunInGrainContextAsync(context, async () =>
             {
@@ -421,6 +475,7 @@ namespace UnitTests.Storage
             });
 
             Assert.Equal(1, storage.ReadCallCount);
+            Assert.Equal("etag-read", bridge.Etag);
         }
 
         [Fact]
@@ -448,6 +503,7 @@ namespace UnitTests.Storage
 
             Assert.Equal(1, storage.WriteCallCount);
             Assert.Equal(0, storage.ReadCallCount);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -484,6 +540,8 @@ namespace UnitTests.Storage
                 await writeFinished.Task;
                 await readTask;
             });
+
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -508,6 +566,7 @@ namespace UnitTests.Storage
             });
 
             Assert.Equal(1, storage.WriteCallCount);
+            AssertLatestEtag(bridge, storage);
         }
 
         [Fact]
@@ -532,10 +591,19 @@ namespace UnitTests.Storage
             });
 
             Assert.Equal(1, storage.WriteCallCount);
+            AssertLatestEtag(persistentState, storage);
         }
 
         private static StateStorageBridge<TestState> CreateBridge(TestGrainContext context, ControllableGrainStorage storage)
             => new("state", context, storage);
+
+        private static string AssertLatestEtag(IStorage storageAccessor, ControllableGrainStorage storage)
+        {
+            var etag = storage.LastEtag;
+            Assert.StartsWith("etag-", etag);
+            Assert.Equal(etag, storageAccessor.Etag);
+            return etag;
+        }
 
         private static TaskCompletionSource CreateCompletionSource()
             => new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -573,9 +641,11 @@ namespace UnitTests.Storage
         {
             private readonly object _gate = new();
             private readonly List<string> _operations = [];
+            private readonly List<string> _etags = [];
             private int _readCallCount;
             private int _writeCallCount;
             private int _clearCallCount;
+            private string _lastEtag;
 
             public Func<IGrainState<TestState>, Task> ReadAsync { get; set; } = _ => Task.CompletedTask;
 
@@ -616,7 +686,18 @@ namespace UnitTests.Storage
                 }
             }
 
-            public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+            public string LastEtag
+            {
+                get
+                {
+                    lock (_gate)
+                    {
+                        return _lastEtag;
+                    }
+                }
+            }
+
+            public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
             {
                 var testState = GetTestState(grainState);
 
@@ -626,10 +707,10 @@ namespace UnitTests.Storage
                     _operations.Add("read");
                 }
 
-                return ReadAsync(testState);
+                await ReadAsync(testState);
             }
 
-            public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+            public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
             {
                 var testState = GetTestState(grainState);
 
@@ -639,10 +720,11 @@ namespace UnitTests.Storage
                     _operations.Add($"write-{_writeCallCount}");
                 }
 
-                return WriteAsync(testState);
+                await WriteAsync(testState);
+                ResetEtag(testState, recordExists: true);
             }
 
-            public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+            public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
             {
                 var testState = GetTestState(grainState);
 
@@ -652,7 +734,8 @@ namespace UnitTests.Storage
                     _operations.Add($"clear-{_clearCallCount}");
                 }
 
-                return ClearAsync(testState);
+                await ClearAsync(testState);
+                ResetEtag(testState, recordExists: false);
             }
 
             public string[] Snapshot()
@@ -660,6 +743,27 @@ namespace UnitTests.Storage
                 lock (_gate)
                 {
                     return _operations.ToArray();
+                }
+            }
+
+            public string[] EtagSnapshot()
+            {
+                lock (_gate)
+                {
+                    return _etags.ToArray();
+                }
+            }
+
+            private void ResetEtag(IGrainState<TestState> grainState, bool recordExists)
+            {
+                var etag = $"etag-{Guid.NewGuid():N}";
+                grainState.ETag = etag;
+                grainState.RecordExists = recordExists;
+
+                lock (_gate)
+                {
+                    _lastEtag = etag;
+                    _etags.Add(etag);
                 }
             }
 
@@ -768,4 +872,3 @@ namespace UnitTests.Storage
             void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
     }
-}
