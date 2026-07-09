@@ -12,11 +12,6 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOptions.MaxConcurrentSends)} must be greater than 0.");
         }
 
-        if (options.FailureBackoff <= TimeSpan.Zero)
-        {
-            return ValidateOptionsResult.Fail($"{nameof(DisseminationOptions.FailureBackoff)} must be greater than 0.");
-        }
-
         if (options.MaxBatchBytes <= 0)
         {
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOptions.MaxBatchBytes)} must be greater than 0.");
