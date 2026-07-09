@@ -91,8 +91,6 @@ internal sealed class WakeTimer : IDisposable
     /// </remarks>
     public async ValueTask<bool> WaitAsync(CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         TaskCompletionSource<bool> waiter;
         lock (_lock)
         {
