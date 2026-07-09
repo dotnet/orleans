@@ -1,70 +1,105 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
 
 internal sealed class DisseminationBroadcastQueue(
     TimeProvider timeProvider,
-    Func<IReadOnlyList<DisseminationBroadcastQueue.Batch>, CancellationToken, Task> sendBatches,
+    SiloAddress localSilo,
+    IInternalGrainFactory grainFactory,
+    IOptionsMonitor<DisseminationOptions> options,
+    Action<SiloAddress, Exception> logSendFailed,
     Action<Exception> logFlushFailed)
 {
     private readonly object _lock = new();
-    private readonly Dictionary<SiloAddress, PendingBroadcastBatch> _pendingBroadcast = [];
-    private DateTimeOffset? _nextFlushAt;
-    private CancellationTokenSource? _flushWakeup;
-    private bool _flushScheduled;
+    private readonly Dictionary<SiloAddress, PeerQueuePump> _pendingBroadcast = [];
+    private readonly SemaphoreSlim _sendGate = new(Math.Max(1, options.CurrentValue.MaxConcurrentSends));
+    private bool _stopped;
 
     public void Enqueue(
         SiloAddress peer,
         DisseminationBroadcastValue item,
-        IDisseminationNamespace disseminationNamespace,
-        int maxBatchItems,
-        int maxBatchBytes)
+        IDisseminationNamespace disseminationNamespace)
     {
-        var now = timeProvider.GetUtcNow();
-        var key = new DigestKey(disseminationNamespace.Name, item.Value.Key);
         lock (_lock)
         {
+            ObjectDisposedException.ThrowIf(_stopped, this);
             if (!_pendingBroadcast.TryGetValue(peer, out var pending))
             {
-                pending = new PendingBroadcastBatch(now + disseminationNamespace.Options.MaxCoalescingDelay);
+                pending = new PeerQueuePump(
+                    peer,
+                    localSilo,
+                    grainFactory,
+                    timeProvider,
+                    options,
+                    _sendGate,
+                    logSendFailed,
+                    logFlushFailed);
                 _pendingBroadcast.Add(peer, pending);
             }
-            else if (pending.TryGetValue(key, out var existing)
-                && existing.Value.ToVersion >= item.Value.ToVersion)
-            {
-                return;
-            }
-            else if (now + disseminationNamespace.Options.MaxCoalescingDelay < pending.FlushAfter)
-            {
-                pending.FlushAfter = now + disseminationNamespace.Options.MaxCoalescingDelay;
-            }
 
-            pending.AddOrReplace(key, item);
-            if (pending.Count >= maxBatchItems
-                || pending.ByteCount >= maxBatchBytes
-                || pending.GetNamespaceCount(disseminationNamespace.Name) >= disseminationNamespace.Options.MaxPendingItemCount)
-            {
-                pending.FlushAfter = now;
-            }
+            pending.Enqueue(item, disseminationNamespace);
         }
-
-        ScheduleFlush();
     }
 
     public async Task FlushPendingBroadcast(CancellationToken cancellationToken)
     {
-        var batches = DrainPendingBroadcast(force: true);
-        CancelScheduledFlushDelay();
-        await sendBatches(batches, cancellationToken);
-    }
-
-    public void Prune(DisseminationMembershipSnapshot membershipSnapshot, SiloAddress localSilo)
-    {
+        List<PeerQueuePump> pending;
         lock (_lock)
         {
-            List<SiloAddress>? removedPeers = null;
-            foreach (var peer in _pendingBroadcast.Keys)
+            pending = [.. _pendingBroadcast.Values.OrderBy(static batch => batch.Peer)];
+        }
+
+        await Parallel.ForEachAsync(
+            pending,
+            new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = options.CurrentValue.MaxConcurrentSends,
+                TaskScheduler = TaskScheduler.Current
+            },
+            async (batch, operationCancellationToken) => await batch.FlushAsync(operationCancellationToken));
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        List<PeerQueuePump> pending;
+        lock (_lock)
+        {
+            if (_stopped)
+            {
+                return;
+            }
+
+            _stopped = true;
+            pending = [.. _pendingBroadcast.Values.OrderBy(static batch => batch.Peer)];
+            _pendingBroadcast.Clear();
+        }
+
+        await Parallel.ForEachAsync(
+            pending,
+            new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = options.CurrentValue.MaxConcurrentSends,
+                TaskScheduler = TaskScheduler.Current
+            },
+            async (batch, operationCancellationToken) => await batch.StopAsync(drain: true, operationCancellationToken));
+    }
+
+    public async Task Prune(
+        DisseminationMembershipSnapshot membershipSnapshot,
+        SiloAddress localSilo,
+        CancellationToken cancellationToken)
+    {
+        List<PeerQueuePump>? removedPeers = null;
+        lock (_lock)
+        {
+            foreach (var (peer, pending) in _pendingBroadcast)
             {
                 if (localSilo.Equals(peer))
                 {
@@ -73,202 +108,445 @@ internal sealed class DisseminationBroadcastQueue(
 
                 if (!membershipSnapshot.ContainsMember(peer))
                 {
-                    (removedPeers ??= []).Add(peer);
+                    (removedPeers ??= []).Add(pending);
                 }
             }
 
             if (removedPeers is not null)
             {
-                foreach (var peer in removedPeers)
+                foreach (var pending in removedPeers)
                 {
-                    _pendingBroadcast.Remove(peer);
+                    _pendingBroadcast.Remove(pending.Peer);
                 }
             }
+        }
 
-            if (_pendingBroadcast.Count == 0)
-            {
-                _nextFlushAt = null;
-                _flushWakeup?.Cancel();
-            }
+        if (removedPeers is null)
+        {
+            return;
+        }
+
+        foreach (var pending in removedPeers)
+        {
+            await pending.StopAsync(drain: false, cancellationToken);
         }
     }
 
-    private void ScheduleFlush()
+    private readonly record struct PendingNamespaceValues(DisseminationNamespace Namespace, ImmutableArray<DisseminationBroadcastValue> Values);
+
+    private readonly record struct DigestKey(DisseminationNamespace Namespace, DisseminationKey Key);
+
+    private sealed class PeerQueuePump(
+        SiloAddress peer,
+        SiloAddress localSilo,
+        IInternalGrainFactory grainFactory,
+        TimeProvider timeProvider,
+        IOptionsMonitor<DisseminationOptions> options,
+        SemaphoreSlim sendGate,
+        Action<SiloAddress, Exception> logSendFailed,
+        Action<Exception> logFlushFailed)
     {
-        var startFlushLoop = false;
-        lock (_lock)
-        {
-            if (_pendingBroadcast.Count == 0)
-            {
-                return;
-            }
+        private readonly object _lock = new();
+        private readonly SemaphoreSlim _flushLock = new(1, 1);
+        private readonly CancellationTokenSource _shutdownCts = new();
+        private readonly Dictionary<DisseminationNamespace, Dictionary<DisseminationKey, DisseminationBroadcastValue>> _valuesByNamespace = new();
+        private DateTimeOffset? _flushAfter;
+        private DateTimeOffset? _failureBackoffUntil;
+        private CancellationTokenSource? _flushWakeup;
+        private Task? _flushTask;
+        private IDisseminationSystemTarget? _target;
+        private bool _stopping;
 
-            var next = GetNextPendingBroadcastFlushUnsafe();
-            if (!_flushScheduled)
-            {
-                _flushScheduled = true;
-                _nextFlushAt = next;
-                startFlushLoop = true;
-            }
-            else if (_nextFlushAt is null || next < _nextFlushAt.Value)
-            {
-                _nextFlushAt = next;
-                _flushWakeup?.Cancel();
-            }
-        }
+        public SiloAddress Peer => peer;
 
-        if (startFlushLoop)
-        {
-            _ = Task.Run(RunScheduledFlush);
-        }
-    }
+        private int Count { get; set; }
 
-    private async Task RunScheduledFlush()
-    {
-        try
+        private int ByteCount { get; set; }
+
+        public void Enqueue(DisseminationBroadcastValue item, IDisseminationNamespace disseminationNamespace)
         {
-            while (true)
+            var now = timeProvider.GetUtcNow();
+            var key = new DigestKey(disseminationNamespace.Name, item.Value.Key);
+            lock (_lock)
             {
-                var delay = GetDelayUntilNextFlush(out var wakeupToken);
-                if (delay is null)
+                ObjectDisposedException.ThrowIf(_stopping, this);
+                if (TryGetValue(key, out var existing)
+                    && existing.Value.ToVersion >= item.Value.ToVersion)
                 {
                     return;
                 }
 
-                if (delay > TimeSpan.Zero)
+                var flushAfter = now + disseminationNamespace.Options.MaxCoalescingDelay;
+                if (_flushAfter is null || flushAfter < _flushAfter.Value)
                 {
-                    try
-                    {
-                        await Task.Delay(delay.Value, timeProvider, wakeupToken);
-                    }
-                    catch (OperationCanceledException) when (wakeupToken.IsCancellationRequested)
-                    {
-                        continue;
-                    }
+                    _flushAfter = flushAfter;
+                    WakeupUnsafe();
                 }
 
-                var batches = DrainPendingBroadcast(force: false);
-                await sendBatches(batches, CancellationToken.None);
+                AddOrReplace(key, item);
+                var currentOptions = options.CurrentValue;
+                if (Count >= currentOptions.MaxBatchItems
+                    || ByteCount >= currentOptions.MaxBatchBytes
+                    || GetNamespaceCount(disseminationNamespace.Name) >= disseminationNamespace.Options.MaxPendingItemCount)
+                {
+                    _flushAfter = now;
+                    WakeupUnsafe();
+                }
+
+                StartFlushLoopUnsafe();
             }
         }
-        catch (Exception exception)
+
+        public async ValueTask FlushAsync(CancellationToken cancellationToken)
         {
-            logFlushFailed(exception);
+            await _flushLock.WaitAsync(cancellationToken);
+            try
+            {
+                var values = DrainPendingBroadcast(force: true);
+                if (!values.IsDefaultOrEmpty)
+                {
+                    await SendValues(values, cancellationToken);
+                }
+            }
+            finally
+            {
+                _flushLock.Release();
+            }
+
+            Wakeup();
         }
-        finally
+
+        public async ValueTask StopAsync(bool drain, CancellationToken cancellationToken)
         {
-            bool reschedule;
             lock (_lock)
             {
-                _flushScheduled = false;
-                _nextFlushAt = null;
-                DisposeFlushWakeupUnsafe();
-                reschedule = _pendingBroadcast.Count > 0;
+                if (_stopping)
+                {
+                    return;
+                }
+
+                _stopping = true;
+                if (!drain)
+                {
+                    ClearPendingUnsafe();
+                }
+
+                _flushWakeup?.Cancel();
             }
 
-            if (reschedule)
+            if (drain)
             {
-                ScheduleFlush();
+                await FlushAsync(cancellationToken);
+            }
+            else
+            {
+                await _shutdownCts.CancelAsync();
+            }
+
+            if (_flushTask is { } flushTask)
+            {
+                try
+                {
+                    await flushTask.WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+                {
+                }
+            }
+
+            lock (_lock)
+            {
+                DisposeFlushWakeupUnsafe();
+            }
+
+            _flushLock.Dispose();
+            _shutdownCts.Dispose();
+        }
+
+        private async Task RunScheduledFlush()
+        {
+            try
+            {
+                var cancellationToken = _shutdownCts.Token;
+                while (true)
+                {
+                    var delay = GetDelayUntilNextFlush(out var wakeupToken);
+                    if (delay is null)
+                    {
+                        return;
+                    }
+
+                    if (delay > TimeSpan.Zero)
+                    {
+                        try
+                        {
+                            await Task.Delay(delay.Value, timeProvider, wakeupToken);
+                        }
+                        catch (OperationCanceledException) when (wakeupToken.IsCancellationRequested)
+                        {
+                            continue;
+                        }
+                    }
+
+                    await _flushLock.WaitAsync(cancellationToken);
+                    try
+                    {
+                        var values = DrainPendingBroadcast(force: false);
+                        if (!values.IsDefaultOrEmpty)
+                        {
+                            await SendValues(values, cancellationToken);
+                        }
+                    }
+                    finally
+                    {
+                        _flushLock.Release();
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                logFlushFailed(exception);
+            }
+            finally
+            {
+                var restart = false;
+                lock (_lock)
+                {
+                    _flushTask = null;
+                    DisposeFlushWakeupUnsafe();
+                    restart = !_stopping && Count > 0;
+                    if (restart)
+                    {
+                        StartFlushLoopUnsafe();
+                    }
+                }
             }
         }
-    }
 
-    private TimeSpan? GetDelayUntilNextFlush(out CancellationToken wakeupToken)
-    {
-        lock (_lock)
+        private TimeSpan? GetDelayUntilNextFlush(out CancellationToken wakeupToken)
         {
-            if (_pendingBroadcast.Count == 0)
+            lock (_lock)
             {
-                _nextFlushAt = null;
+                if (_stopping || Count == 0 || _flushAfter is null)
+                {
+                    DisposeFlushWakeupUnsafe();
+                    wakeupToken = CancellationToken.None;
+                    return null;
+                }
+
+                var now = timeProvider.GetUtcNow();
+                var next = _flushAfter.Value;
+                if (_failureBackoffUntil is { } backoffUntil)
+                {
+                    if (backoffUntil > now)
+                    {
+                        next = backoffUntil > next ? backoffUntil : next;
+                    }
+                    else
+                    {
+                        _failureBackoffUntil = null;
+                    }
+                }
+
+                if (next <= now)
+                {
+                    DisposeFlushWakeupUnsafe();
+                    wakeupToken = CancellationToken.None;
+                    return TimeSpan.Zero;
+                }
+
                 DisposeFlushWakeupUnsafe();
-                wakeupToken = CancellationToken.None;
-                return null;
+                _flushWakeup = new CancellationTokenSource();
+                wakeupToken = _flushWakeup.Token;
+                return next - now;
+            }
+        }
+
+        private async ValueTask<bool> SendValues(
+            ImmutableArray<PendingNamespaceValues> valuesByNamespace,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsPeerBackedOff())
+            {
+                return false;
             }
 
+            var currentBatch = new Dictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>.Builder>();
+            var itemCount = 0;
+            var byteCount = 0;
+            foreach (var group in valuesByNamespace)
+            {
+                foreach (var item in group.Values)
+                {
+                    var currentOptions = options.CurrentValue;
+                    if (itemCount > 0
+                        && (itemCount >= currentOptions.MaxBatchItems
+                            || byteCount + item.Value.Payload.Length > currentOptions.MaxBatchBytes))
+                    {
+                        if (!await SendBatch(currentBatch.ToFrozenDictionary(
+                            static pair => pair.Key,
+                            static pair => pair.Value.ToImmutable()), cancellationToken))
+                        {
+                            return false;
+                        }
+
+                        currentBatch.Clear();
+                        itemCount = 0;
+                        byteCount = 0;
+                    }
+
+                    ref var values = ref CollectionsMarshal.GetValueRefOrAddDefault(currentBatch, group.Namespace, out _);
+                    (values ??= ImmutableArray.CreateBuilder<DisseminationBroadcastValue>()).Add(item);
+                    itemCount++;
+                    byteCount += item.Value.Payload.Length;
+                }
+            }
+
+            if (itemCount > 0)
+            {
+                return await SendBatch(currentBatch.ToFrozenDictionary(
+                    static pair => pair.Key,
+                    static pair => pair.Value.ToImmutable()), cancellationToken);
+            }
+
+            return true;
+        }
+
+        private async ValueTask<bool> SendBatch(
+            FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsPeerBackedOff())
+            {
+                return false;
+            }
+
+            try
+            {
+                await sendGate.WaitAsync(cancellationToken);
+                try
+                {
+                    var batch = new DisseminationBroadcastBatch
+                    {
+                        Sender = localSilo,
+                        Values = valuesByNamespace,
+                    };
+
+                    await GetTarget().PushBroadcast(batch, cancellationToken);
+                    DisseminationInstruments.OnBroadcastSent(batch.Values, "tree");
+                }
+                finally
+                {
+                    sendGate.Release();
+                }
+
+                ClearBackoff();
+                return true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logSendFailed(peer, exception);
+                SetBackoff();
+                return false;
+            }
+        }
+
+        private IDisseminationSystemTarget GetTarget() =>
+            _target ??= grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, peer);
+
+        private bool IsPeerBackedOff()
+        {
             var now = timeProvider.GetUtcNow();
-            var next = GetNextPendingBroadcastFlushUnsafe();
-            _nextFlushAt = next;
-            if (next <= now)
+            lock (_lock)
             {
-                DisposeFlushWakeupUnsafe();
-                wakeupToken = CancellationToken.None;
-                return TimeSpan.Zero;
-            }
-
-            DisposeFlushWakeupUnsafe();
-            _flushWakeup = new CancellationTokenSource();
-            wakeupToken = _flushWakeup.Token;
-            return next - now;
-        }
-    }
-
-    private void CancelScheduledFlushDelay()
-    {
-        lock (_lock)
-        {
-            _flushWakeup?.Cancel();
-        }
-    }
-
-    private DateTimeOffset GetNextPendingBroadcastFlushUnsafe() =>
-        _pendingBroadcast.Values.Min(static pending => pending.FlushAfter);
-
-    private List<Batch> DrainPendingBroadcast(bool force)
-    {
-        var now = timeProvider.GetUtcNow();
-        var result = new List<Batch>();
-        lock (_lock)
-        {
-            List<SiloAddress>? drainedPeers = null;
-            foreach (var (peer, pending) in _pendingBroadcast)
-            {
-                if (!force && pending.FlushAfter > now)
+                if (_failureBackoffUntil is not { } until)
                 {
-                    continue;
+                    return false;
                 }
 
-                (drainedPeers ??= []).Add(peer);
-                result.Add(new Batch(peer, pending.ToImmutableValuesByNamespace()));
-            }
-
-            if (drainedPeers is not null)
-            {
-                foreach (var peer in drainedPeers)
+                if (until > now)
                 {
-                    _pendingBroadcast.Remove(peer);
+                    return true;
                 }
+
+                _failureBackoffUntil = null;
+                return false;
             }
         }
 
-        result.Sort(static (left, right) => left.Peer.CompareTo(right.Peer));
-        return result;
-    }
+        private void SetBackoff()
+        {
+            lock (_lock)
+            {
+                _failureBackoffUntil = timeProvider.GetUtcNow() + options.CurrentValue.FailureBackoff;
+                WakeupUnsafe();
+            }
+        }
 
-    private void DisposeFlushWakeupUnsafe()
-    {
-        _flushWakeup?.Dispose();
-        _flushWakeup = null;
-    }
+        private void ClearBackoff()
+        {
+            lock (_lock)
+            {
+                _failureBackoffUntil = null;
+            }
+        }
 
-    public readonly record struct Batch(SiloAddress Peer, ImmutableArray<PendingNamespaceValues> ValuesByNamespace);
+        private void StartFlushLoopUnsafe()
+        {
+            if (_stopping)
+            {
+                return;
+            }
 
-    public readonly record struct PendingNamespaceValues(DisseminationNamespace Namespace, ImmutableArray<DisseminationBroadcastValue> Values);
+            if (_flushTask is not { IsCompleted: false })
+            {
+                _flushTask = Task.Run(RunScheduledFlush);
+            }
+        }
 
-    private readonly record struct DigestKey(DisseminationNamespace Namespace, DisseminationKey Key);
+        private void Wakeup()
+        {
+            lock (_lock)
+            {
+                WakeupUnsafe();
+            }
+        }
 
-    private sealed class PendingBroadcastBatch(DateTimeOffset flushAfter)
-    {
-        private readonly Dictionary<DisseminationNamespace, Dictionary<DisseminationKey, DisseminationBroadcastValue>> _valuesByNamespace = new();
+        private void WakeupUnsafe() => _flushWakeup?.Cancel();
 
-        public DateTimeOffset FlushAfter { get; set; } = flushAfter;
+        private ImmutableArray<PendingNamespaceValues> DrainPendingBroadcast(bool force)
+        {
+            var now = timeProvider.GetUtcNow();
+            lock (_lock)
+            {
+                if (Count == 0 || _flushAfter is null || !force && _flushAfter > now)
+                {
+                    return [];
+                }
 
-        public int Count { get; private set; }
+                var result = ToImmutableValuesByNamespace();
+                ClearPendingUnsafe();
+                return result;
+            }
+        }
 
-        public int ByteCount { get; private set; }
+        private int GetNamespaceCount(DisseminationNamespace namespaceName) =>
+            _valuesByNamespace.TryGetValue(namespaceName, out var values) ? values.Count : 0;
 
-        public int GetNamespaceCount(DisseminationNamespace namespaceName) => _valuesByNamespace.TryGetValue(namespaceName, out var values) ? values.Count : 0;
-
-        public bool TryGetValue(DigestKey key, [NotNullWhen(true)] out DisseminationBroadcastValue? value)
+        private bool TryGetValue(DigestKey key, [NotNullWhen(true)] out DisseminationBroadcastValue? value)
         {
             if (_valuesByNamespace.TryGetValue(key.Namespace, out var namespaceValues))
             {
@@ -279,7 +557,7 @@ internal sealed class DisseminationBroadcastQueue(
             return false;
         }
 
-        public void AddOrReplace(DigestKey key, DisseminationBroadcastValue value)
+        private void AddOrReplace(DigestKey key, DisseminationBroadcastValue value)
         {
             if (!_valuesByNamespace.TryGetValue(key.Namespace, out var namespaceValues))
             {
@@ -300,7 +578,7 @@ internal sealed class DisseminationBroadcastQueue(
             ByteCount += value.Value.Payload.Length;
         }
 
-        public ImmutableArray<PendingNamespaceValues> ToImmutableValuesByNamespace()
+        private ImmutableArray<PendingNamespaceValues> ToImmutableValuesByNamespace()
         {
             var result = ImmutableArray.CreateBuilder<PendingNamespaceValues>(_valuesByNamespace.Count);
             foreach (var (namespaceName, values) in _valuesByNamespace)
@@ -309,6 +587,20 @@ internal sealed class DisseminationBroadcastQueue(
             }
 
             return result.ToImmutable();
+        }
+
+        private void ClearPendingUnsafe()
+        {
+            _valuesByNamespace.Clear();
+            _flushAfter = null;
+            Count = 0;
+            ByteCount = 0;
+        }
+
+        private void DisposeFlushWakeupUnsafe()
+        {
+            _flushWakeup?.Dispose();
+            _flushWakeup = null;
         }
     }
 }
