@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
@@ -23,7 +24,9 @@ namespace Orleans.Core
         private readonly IGrainContext _grainContext;
         private readonly StorageInstruments _storageInstruments;
         private readonly StateStorageBridgeShared<TState> _shared;
+        private readonly object _storageOperationLock = new();
         private GrainState<TState>? _grainState;
+        private QueuedStorageOperation? _storageOperationTail;
 
         /// <inheritdoc/>
         public TState State
@@ -78,7 +81,199 @@ namespace Orleans.Core
         }
 
         /// <inheritdoc />
-        public async Task ReadStateAsync()
+        public Task ReadStateAsync() => ReadStateInternalAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task WriteStateAsync() => WriteStateInternalAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task ClearStateAsync() => ClearStateInternalAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        Task IStorage.ReadStateAsync(CancellationToken cancellationToken) => ReadStateInternalAsync(cancellationToken);
+
+        /// <inheritdoc />
+        Task IStorage.WriteStateAsync(CancellationToken cancellationToken) => WriteStateInternalAsync(cancellationToken);
+
+        /// <inheritdoc />
+        Task IStorage.ClearStateAsync(CancellationToken cancellationToken) => ClearStateInternalAsync(cancellationToken);
+
+        private Task ReadStateInternalAsync(CancellationToken cancellationToken)
+        {
+            QueuedStorageOperation operation;
+
+            lock (_storageOperationLock)
+            {
+                var predecessor = _storageOperationTail;
+                operation = new QueuedStorageOperation(StorageOperationKind.Read);
+                operation.SetCompletion(RunReadStorageOperationAsync(operation, predecessor));
+                _storageOperationTail = operation;
+            }
+
+            return WaitForStorageOperationAsync(operation.Completion, cancellationToken);
+        }
+
+        private Task WriteStateInternalAsync(CancellationToken cancellationToken)
+        {
+            QueuedStorageOperation operation;
+
+            lock (_storageOperationLock)
+            {
+                if (_storageOperationTail is { Kind: StorageOperationKind.Write, Started: false } tail)
+                {
+                    operation = tail;
+                }
+                else
+                {
+                    var predecessor = _storageOperationTail;
+                    operation = new QueuedStorageOperation(StorageOperationKind.Write);
+                    operation.SetCompletion(RunRequiredStorageOperationAsync(operation, predecessor, WriteStateCoreAsync));
+                    _storageOperationTail = operation;
+                }
+            }
+
+            return WaitForStorageOperationAsync(operation.Completion, cancellationToken);
+        }
+
+        private Task ClearStateInternalAsync(CancellationToken cancellationToken)
+        {
+            QueuedStorageOperation operation;
+
+            lock (_storageOperationLock)
+            {
+                if (_storageOperationTail is { Kind: StorageOperationKind.Clear, Started: false } tail)
+                {
+                    operation = tail;
+                }
+                else
+                {
+                    var predecessor = _storageOperationTail;
+                    operation = new QueuedStorageOperation(StorageOperationKind.Clear);
+                    operation.SetCompletion(RunClearStorageOperationAsync(operation, predecessor));
+                    _storageOperationTail = operation;
+                }
+            }
+
+            return WaitForStorageOperationAsync(operation.Completion, cancellationToken);
+        }
+
+        private static Task WaitForStorageOperationAsync(Task operation, CancellationToken cancellationToken)
+            => cancellationToken.CanBeCanceled ? operation.WaitAsync(cancellationToken) : operation;
+
+        private async Task RunRequiredStorageOperationAsync(
+            QueuedStorageOperation operation,
+            QueuedStorageOperation? predecessor,
+            Func<Task> performOperation)
+        {
+            await Task.CompletedTask.ConfigureAwait(
+                ConfigureAwaitOptions.ForceYielding |
+                ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            try
+            {
+                if (predecessor is not null)
+                {
+                    await predecessor.Completion.ConfigureAwait(
+                        ConfigureAwaitOptions.SuppressThrowing |
+                        ConfigureAwaitOptions.ContinueOnCapturedContext);
+                }
+
+                MarkStorageOperationStarted(operation);
+
+                await performOperation();
+            }
+            finally
+            {
+                ClearStorageOperationTail(operation);
+            }
+        }
+
+        private async Task RunReadStorageOperationAsync(QueuedStorageOperation operation, QueuedStorageOperation? predecessor)
+        {
+            await Task.CompletedTask.ConfigureAwait(
+                ConfigureAwaitOptions.ForceYielding |
+                ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            try
+            {
+                var readSatisfiedByPredecessor = false;
+
+                if (predecessor is not null)
+                {
+                    await predecessor.Completion.ConfigureAwait(
+                        ConfigureAwaitOptions.SuppressThrowing |
+                        ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+                    readSatisfiedByPredecessor = predecessor.Completion.IsCompletedSuccessfully;
+                }
+
+                MarkStorageOperationStarted(operation);
+
+                if (!readSatisfiedByPredecessor)
+                {
+                    await ReadStateCoreAsync();
+                }
+            }
+            finally
+            {
+                ClearStorageOperationTail(operation);
+            }
+        }
+
+        private async Task RunClearStorageOperationAsync(QueuedStorageOperation operation, QueuedStorageOperation? predecessor)
+        {
+            await Task.CompletedTask.ConfigureAwait(
+                ConfigureAwaitOptions.ForceYielding |
+                ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            try
+            {
+                var clearSatisfiedByPredecessor = false;
+
+                if (predecessor is not null)
+                {
+                    await predecessor.Completion.ConfigureAwait(
+                        ConfigureAwaitOptions.SuppressThrowing |
+                        ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+                    clearSatisfiedByPredecessor =
+                        predecessor.Kind is StorageOperationKind.Clear &&
+                        predecessor.Completion.IsCompletedSuccessfully;
+                }
+
+                MarkStorageOperationStarted(operation);
+
+                if (!clearSatisfiedByPredecessor)
+                {
+                    await ClearStateCoreAsync();
+                }
+            }
+            finally
+            {
+                ClearStorageOperationTail(operation);
+            }
+        }
+
+        private void MarkStorageOperationStarted(QueuedStorageOperation operation)
+        {
+            lock (_storageOperationLock)
+            {
+                operation.Started = true;
+            }
+        }
+
+        private void ClearStorageOperationTail(QueuedStorageOperation operation)
+        {
+            lock (_storageOperationLock)
+            {
+                if (ReferenceEquals(_storageOperationTail, operation))
+                {
+                    _storageOperationTail = null;
+                }
+            }
+        }
+
+        private async Task ReadStateCoreAsync()
         {
             try
             {
@@ -112,8 +307,7 @@ namespace Orleans.Core
             }
         }
 
-        /// <inheritdoc />
-        public async Task WriteStateAsync()
+        private async Task WriteStateCoreAsync()
         {
             try
             {
@@ -145,8 +339,7 @@ namespace Orleans.Core
             }
         }
 
-        /// <inheritdoc />
-        public async Task ClearStateAsync()
+        private async Task ClearStateCoreAsync()
         {
             try
             {
@@ -281,6 +474,35 @@ namespace Orleans.Core
             Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
         )]
         private static partial void LogErrorStorageDeleteFailed(ILogger logger, Exception exception, string providerName, string stateName, string operation, GrainId grainId, string? errorCode);
+
+        private enum StorageOperationKind
+        {
+            Read,
+            Write,
+            Clear
+        }
+
+        private sealed class QueuedStorageOperation(StorageOperationKind kind)
+        {
+            private Task? _completion;
+
+            public StorageOperationKind Kind { get; } = kind;
+
+            public bool Started { get; set; }
+
+            public Task Completion =>
+                _completion ?? throw new InvalidOperationException("The storage operation has not been scheduled.");
+
+            public void SetCompletion(Task completion)
+            {
+                if (_completion is not null)
+                {
+                    throw new InvalidOperationException("The storage operation has already been scheduled.");
+                }
+
+                _completion = completion;
+            }
+        }
     }
 
     internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)
