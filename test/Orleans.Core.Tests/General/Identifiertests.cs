@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -341,6 +342,33 @@ namespace UnitTests.General
 
             Assert.Equal(addressStr2, addressStr2Out); // SiloAddress equal after From-To-ParsableString
         }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddress_ParseInterfaces()
+        {
+            const string addressString = "127.0.0.1:11111@144611139";
+            var expected = SiloAddress.FromParsableString(addressString);
+
+            Assert.Same(expected, SiloAddress.Parse(addressString));
+            Assert.Same(expected, SiloAddress.Parse(addressString, null));
+            Assert.True(SiloAddress.TryParse(addressString, out var parsedWithoutProvider));
+            Assert.Same(expected, parsedWithoutProvider);
+            Assert.True(SiloAddress.TryParse(addressString, null, out var parsed));
+            Assert.Same(expected, parsed);
+
+            var utf8 = Encoding.UTF8.GetBytes(addressString);
+            Assert.Same(expected, SiloAddress.Parse(utf8));
+            Assert.Same(expected, SiloAddress.Parse(utf8, null));
+            Assert.Same(expected, SiloAddress.FromUtf8String(utf8));
+            Assert.True(SiloAddress.TryParse(utf8, out var utf8ParsedWithoutProvider));
+            Assert.Same(expected, utf8ParsedWithoutProvider);
+            Assert.True(SiloAddress.TryParse(utf8, null, out var utf8Parsed));
+            Assert.Same(expected, utf8Parsed);
+
+            Assert.False(SiloAddress.TryParse("not-a-silo", out _));
+            Assert.False(SiloAddress.TryParse(Encoding.UTF8.GetBytes("not-a-silo"), null, out _));
+        }
+
         /// <summary>
         /// Tests GrainReference creation, serialization, and round-trip operations.
         /// </summary>

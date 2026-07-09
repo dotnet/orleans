@@ -21,7 +21,12 @@ namespace Orleans.Runtime
     [JsonConverter(typeof(SiloAddressConverter))]
     [DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
-    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, ISpanFormattable
+    public sealed class SiloAddress :
+        IEquatable<SiloAddress>,
+        IComparable<SiloAddress>,
+        ISpanFormattable,
+        IParsable<SiloAddress>,
+        IUtf8SpanParsable<SiloAddress>
     {
         [NonSerialized]
         private int hashCode;
@@ -171,20 +176,88 @@ namespace Orleans.Runtime
         /// <param name="addr">String containing the SiloAddress info to be parsed.</param>
         /// <returns>New SiloAddress object created from the input data.</returns>
         public static SiloAddress FromParsableString(string addr)
+            => Parse(addr, null);
+
+        /// <summary>
+        /// Parses a <see cref="SiloAddress"/> from a string in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="value">String containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <returns>A <see cref="SiloAddress"/> parsed from the input data.</returns>
+        public static SiloAddress Parse(string value)
+            => Parse(value, null);
+
+        /// <summary>
+        /// Parses a <see cref="SiloAddress"/> from a string in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="value">String containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <param name="provider">An object that provides culture-specific formatting information. This parameter is ignored.</param>
+        /// <returns>A <see cref="SiloAddress"/> parsed from the input data.</returns>
+        public static SiloAddress Parse(string value, IFormatProvider? provider = null)
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (!TryParse(value, provider, out var result))
+            {
+                throw new FormatException("Invalid string SiloAddress: " + value);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Tries to parse a <see cref="SiloAddress"/> from a string in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="value">String containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <param name="result">The parsed <see cref="SiloAddress"/>, or <see langword="null"/> if parsing failed.</param>
+        /// <returns><see langword="true"/> if parsing succeeded; otherwise, <see langword="false"/>.</returns>
+        public static bool TryParse([NotNullWhen(true)] string? value, [NotNullWhen(true)] out SiloAddress? result)
+            => TryParse(value, null, out result);
+
+        /// <summary>
+        /// Tries to parse a <see cref="SiloAddress"/> from a string in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="value">String containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <param name="provider">An object that provides culture-specific formatting information. This parameter is ignored.</param>
+        /// <param name="result">The parsed <see cref="SiloAddress"/>, or <see langword="null"/> if parsing failed.</param>
+        /// <returns><see langword="true"/> if parsing succeeded; otherwise, <see langword="false"/>.</returns>
+        public static bool TryParse([NotNullWhen(true)] string? value, IFormatProvider? provider, [NotNullWhen(true)] out SiloAddress? result)
+        {
+            if (value is null)
+            {
+                result = null;
+                return false;
+            }
+
+            return TryParse(value.AsSpan(), out result);
+        }
+
+        private static bool TryParse(ReadOnlySpan<char> addr, [NotNullWhen(true)] out SiloAddress? result)
         {
             // This must be the "inverse" of ToParsableString, and must be the same across all silos in a deployment.
             // Basically, this should never change unless the data content of SiloAddress changes
 
             // First is the IPEndpoint; then '@'; then the generation
-            int atSign = addr.LastIndexOf(SEPARATOR);
-            // IPEndpoint is the host, then ':', then the port
-            int lastColon = addr.LastIndexOf(':', atSign - 1);
-            if (atSign < 0 || lastColon < 0) throw new FormatException("Invalid string SiloAddress: " + addr);
+            var atSign = addr.LastIndexOf(SEPARATOR);
+            if (atSign < 0)
+            {
+                result = null;
+                return false;
+            }
 
-            var host = IPAddress.Parse(addr.AsSpan(0, lastColon));
-            int port = int.Parse(addr.AsSpan(lastColon + 1, atSign - lastColon - 1), NumberStyles.None);
-            var gen = int.Parse(addr.AsSpan(atSign + 1), NumberStyles.None);
-            return New(host, port, gen);
+            // IPEndpoint is the host, then ':', then the port
+            var endpoint = addr[..atSign];
+            var lastColon = endpoint.LastIndexOf(':');
+            if (lastColon < 0
+                || !IPAddress.TryParse(endpoint[..lastColon], out var host)
+                || !int.TryParse(endpoint[(lastColon + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out var port)
+                || port is < IPEndPoint.MinPort or > IPEndPoint.MaxPort
+                || !int.TryParse(addr[(atSign + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out var gen))
+            {
+                result = null;
+                return false;
+            }
+
+            result = New(host, port, gen);
+            return true;
         }
 
         /// <summary>
@@ -193,18 +266,69 @@ namespace Orleans.Runtime
         /// <param name="addr">String containing the SiloAddress info to be parsed.</param>
         /// <returns>New SiloAddress object created from the input data.</returns>
         public static SiloAddress FromUtf8String(ReadOnlySpan<byte> addr)
+            => Parse(addr, null);
+
+        /// <summary>
+        /// Parses a <see cref="SiloAddress"/> from UTF-8 text in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="utf8Text">UTF-8 text containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <returns>A <see cref="SiloAddress"/> parsed from the input data.</returns>
+        public static SiloAddress Parse(ReadOnlySpan<byte> utf8Text)
+            => Parse(utf8Text, null);
+
+        /// <summary>
+        /// Parses a <see cref="SiloAddress"/> from UTF-8 text in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="utf8Text">UTF-8 text containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <param name="provider">An object that provides culture-specific formatting information. This parameter is ignored.</param>
+        /// <returns>A <see cref="SiloAddress"/> parsed from the input data.</returns>
+        public static SiloAddress Parse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider = null)
+        {
+            if (!TryParse(utf8Text, provider, out var result))
+            {
+                ThrowInvalidUtf8SiloAddress(utf8Text);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Tries to parse a <see cref="SiloAddress"/> from UTF-8 text in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="utf8Text">UTF-8 text containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <param name="result">The parsed <see cref="SiloAddress"/>, or <see langword="null"/> if parsing failed.</param>
+        /// <returns><see langword="true"/> if parsing succeeded; otherwise, <see langword="false"/>.</returns>
+        public static bool TryParse(ReadOnlySpan<byte> utf8Text, [NotNullWhen(true)] out SiloAddress? result)
+            => TryParse(utf8Text, null, out result);
+
+        /// <summary>
+        /// Tries to parse a <see cref="SiloAddress"/> from UTF-8 text in the standard form returned from <see cref="ToParsableString"/>.
+        /// </summary>
+        /// <param name="utf8Text">UTF-8 text containing the <see cref="SiloAddress"/> info to be parsed.</param>
+        /// <param name="provider">An object that provides culture-specific formatting information. This parameter is ignored.</param>
+        /// <param name="result">The parsed <see cref="SiloAddress"/>, or <see langword="null"/> if parsing failed.</param>
+        /// <returns><see langword="true"/> if parsing succeeded; otherwise, <see langword="false"/>.</returns>
+        public static bool TryParse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider, [NotNullWhen(true)] out SiloAddress? result)
         {
             // This must be the "inverse" of ToParsableString, and must be the same across all silos in a deployment.
             // Basically, this should never change unless the data content of SiloAddress changes
 
             // First is the IPEndpoint; then '@'; then the generation
-            var atSign = addr.LastIndexOf((byte)SEPARATOR);
-            if (atSign < 0) ThrowInvalidUtf8SiloAddress(addr);
+            var atSign = utf8Text.LastIndexOf((byte)SEPARATOR);
+            if (atSign < 0)
+            {
+                result = null;
+                return false;
+            }
 
             // IPEndpoint is the host, then ':', then the port
-            var endpointSlice = addr[..atSign];
+            var endpointSlice = utf8Text[..atSign];
             int lastColon = endpointSlice.LastIndexOf((byte)':');
-            if (lastColon < 0) ThrowInvalidUtf8SiloAddress(addr);
+            if (lastColon < 0)
+            {
+                result = null;
+                return false;
+            }
 
             var ipSlice = endpointSlice[..lastColon];
             Span<char> buf = stackalloc char[45];
@@ -212,17 +336,29 @@ namespace Orleans.Runtime
                 ? buf[..Encoding.UTF8.GetChars(ipSlice, buf)]
                 : Encoding.UTF8.GetString(ipSlice).AsSpan();
             if (!IPAddress.TryParse(hostString, out var host))
-                ThrowInvalidUtf8SiloAddress(addr);
+            {
+                result = null;
+                return false;
+            }
 
             var portSlice = endpointSlice[(lastColon + 1)..];
-            if (!Utf8Parser.TryParse(portSlice, out int port, out len) || len < portSlice.Length)
-                ThrowInvalidUtf8SiloAddress(addr);
+            if (!Utf8Parser.TryParse(portSlice, out int port, out len)
+                || len != portSlice.Length
+                || port is < IPEndPoint.MinPort or > IPEndPoint.MaxPort)
+            {
+                result = null;
+                return false;
+            }
 
-            var genSlice = addr[(atSign + 1)..];
-            if (!Utf8Parser.TryParse(genSlice, out int generation, out len) || len < genSlice.Length)
-                ThrowInvalidUtf8SiloAddress(addr);
+            var genSlice = utf8Text[(atSign + 1)..];
+            if (!Utf8Parser.TryParse(genSlice, out int generation, out len) || len != genSlice.Length)
+            {
+                result = null;
+                return false;
+            }
 
-            return New(host, port, generation);
+            result = New(host, port, generation);
+            return true;
         }
 
         [DoesNotReturn]
