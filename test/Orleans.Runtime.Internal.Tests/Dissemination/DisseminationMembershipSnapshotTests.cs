@@ -45,8 +45,8 @@ public class DisseminationMembershipSnapshotTests
             var outsideMember = CreateSilo(25000 + testCase.LocalSeed);
             Assert.False(snapshot.ContainsMember(outsideMember));
 
-            var originatorTargets = snapshot.GetOriginatorTreeTargets();
-            var forwardingTargets = snapshot.GetForwardingTreeTargets();
+            var originatorTargets = snapshot.OriginatorTreeTargets;
+            var forwardingTargets = snapshot.ForwardingTreeTargets;
 
             AssertNoDuplicates(nameof(originatorTargets), originatorTargets);
             AssertNoDuplicates(nameof(forwardingTargets), forwardingTargets);
@@ -54,8 +54,8 @@ public class DisseminationMembershipSnapshotTests
             AssertSubset(nameof(forwardingTargets), forwardingTargets, members);
             Assert.DoesNotContain(local, originatorTargets);
             Assert.DoesNotContain(local, forwardingTargets);
-            Assert.Equal(originatorTargets, snapshot.GetOriginatorTreeTargets());
-            Assert.Equal(forwardingTargets, snapshot.GetForwardingTreeTargets());
+            Assert.Equal(originatorTargets, snapshot.OriginatorTreeTargets);
+            Assert.Equal(forwardingTargets, snapshot.ForwardingTreeTargets);
 
             if (!members.Contains(local))
             {
