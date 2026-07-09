@@ -13,7 +13,7 @@ public sealed class DisseminationOptions
     public bool Enabled { get; set; }
 
     /// <summary>
-    /// Gets or sets the maximum number of concurrent dissemination sends.
+    /// Gets or sets the maximum number of concurrent dissemination broadcast sends.
     /// </summary>
     public int MaxConcurrentSends { get; set; } = 32;
 

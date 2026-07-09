@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,8 +15,6 @@ internal sealed partial class DisseminationProtocol
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger;
     private readonly DisseminationBroadcastQueue _broadcastQueue;
-    private readonly Dictionary<SiloAddress, DateTimeOffset> _antiEntropyFailureBackoffUntil = [];
-    private readonly object _failureLock = new();
     private readonly object _seenValueLock = new();
     private readonly Dictionary<DigestKey, DateTimeOffset> _lastValueSeenAt = [];
     private readonly FrozenDictionary<DisseminationNamespace, IDisseminationNamespace> _namespaces;
@@ -163,13 +160,17 @@ internal sealed partial class DisseminationProtocol
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         // Exchange digests with selected peers and apply any repair values they return.
         var request = new DisseminationAntiEntropyRequest { Digests = requestDigests };
-        var responses = await ExchangeAntiEntropyRequests(
-            peers,
-            request,
-            GetDigestCount(requestDigests),
-            cancellationToken);
+        var tasks = new Task<DisseminationAntiEntropyResponse?>[peers.Length];
+        for (var i = 0; i < peers.Length; i++)
+        {
+            tasks[i] = ExchangeAntiEntropyRequest(peers[i], request, cancellationToken);
+        }
+
+        var responses = await Task.WhenAll(tasks);
         await ApplyAntiEntropyResponses(responses, cancellationToken);
     }
 
@@ -243,48 +244,29 @@ internal sealed partial class DisseminationProtocol
         return digestsByNamespace ?? [];
     }
 
-    private async Task<DisseminationAntiEntropyResponse?[]> ExchangeAntiEntropyRequests(
-        ImmutableArray<SiloAddress> peers,
+    private async Task<DisseminationAntiEntropyResponse?> ExchangeAntiEntropyRequest(
+        SiloAddress peer,
         DisseminationAntiEntropyRequest request,
-        int requestDigestCount,
         CancellationToken cancellationToken)
     {
-        // Reserve a response slot per peer so successful exchanges preserve their peer index.
-        var responses = new DisseminationAntiEntropyResponse?[peers.Length];
-        await Parallel.ForAsync(
-            0,
-            peers.Length,
-            new ParallelOptions
-            {
-                CancellationToken = cancellationToken,
-                MaxDegreeOfParallelism = _options.CurrentValue.MaxConcurrentSends,
-                TaskScheduler = TaskScheduler.Current
-            },
-            async (index, operationCancellationToken) =>
-            {
-                // Treat a failed or backed-off peer as a missing response and keep the rest of the round moving.
-                var peer = peers[index];
-                var response = await ExecutePeerOperation(
-                    peer,
-                    async target =>
-                        await _grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, target)
-                            .ExchangeAntiEntropy(request, operationCancellationToken),
-                    failureResult: null, cancellationToken: operationCancellationToken);
-                if (response is null)
-                {
-                    return;
-                }
-
-                // Record exchange metrics after the peer returns so truncation and repair counts reflect the response.
-                DisseminationInstruments.OnAntiEntropyExchange(
-                    "out",
-                    requestDigestCount,
-                    GetValueCount(response.Values),
-                    response.Truncated);
-                responses[index] = response;
-            });
-
-        return responses;
+        try
+        {
+            var response = await _grainFactory.GetSystemTarget<IDisseminationSystemTarget>(Constants.DisseminationSystemTargetType, peer)
+                .ExchangeAntiEntropy(request, cancellationToken);
+            // Record exchange metrics after the peer returns so truncation and repair counts reflect the response.
+            DisseminationInstruments.OnAntiEntropyExchange(
+                "out",
+                GetDigestCount(request.Digests),
+                GetValueCount(response.Values),
+                response.Truncated);
+            return response;
+        }
+        catch (Exception exception)
+        {
+            // Anti-entropy transport failures are isolated to the peer; random peer selection naturally spreads retries.
+            LogDebugDisseminationSendFailed(_logger, exception, peer);
+            return null;
+        }
     }
 
     private async Task ApplyAntiEntropyResponses(
@@ -349,7 +331,6 @@ internal sealed partial class DisseminationProtocol
         }
 
         // Track request and response sizes so the reply respects configured batch limits and emits useful metrics.
-        var requestDigestCount = GetDigestCount(request.Digests);
         var valueCount = 0;
         var byteCount = 0;
         var truncated = false;
@@ -419,7 +400,7 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        DisseminationInstruments.OnAntiEntropyExchange("in", requestDigestCount, valueCount, truncated);
+        DisseminationInstruments.OnAntiEntropyExchange("in", GetDigestCount(request.Digests), valueCount, truncated);
         return new DisseminationAntiEntropyResponse
         {
             Sender = _localSilo,
@@ -486,46 +467,6 @@ internal sealed partial class DisseminationProtocol
         _broadcastQueue.Enqueue(peer, item, disseminationNamespace);
     }
 
-    private async ValueTask<T> ExecutePeerOperation<T>(SiloAddress peer,
-        Func<SiloAddress, ValueTask<T>> operation,
-        T failureResult,
-        CancellationToken cancellationToken)
-    {
-        // Respect cancellation and anti-entropy peer backoff before invoking the peer operation.
-        cancellationToken.ThrowIfCancellationRequested();
-        if (IsPeerBackedOff(peer))
-        {
-            return failureResult;
-        }
-
-        try
-        {
-            // A successful operation clears any previous anti-entropy backoff for the peer.
-            var result = await operation(peer);
-            lock (_failureLock)
-            {
-                _antiEntropyFailureBackoffUntil.Remove(peer);
-            }
-
-            return result;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            // Anti-entropy transport failures are isolated to the peer and suppress future attempts until the backoff expires.
-            LogDebugDisseminationSendFailed(_logger, exception, peer);
-            lock (_failureLock)
-            {
-                _antiEntropyFailureBackoffUntil[peer] = _timeProvider.GetUtcNow() + _options.CurrentValue.FailureBackoff;
-            }
-
-            return failureResult;
-        }
-    }
-
     private void RecordSeenValue(DisseminationNamespace namespaceName, DisseminationKey key)
     {
         // Store the last local observation time for this stream so anti-entropy can suppress fresh digest requests.
@@ -538,35 +479,6 @@ internal sealed partial class DisseminationProtocol
 
     private async Task PrunePeerState(DisseminationMembershipSnapshot membershipSnapshot, CancellationToken cancellationToken)
     {
-        // Compare anti-entropy backoff entries against current time and membership to find peers which can be forgotten.
-        var now = _timeProvider.GetUtcNow();
-
-        lock (_failureLock)
-        {
-            List<SiloAddress>? removedPeers = null;
-            foreach (var (peer, until) in _antiEntropyFailureBackoffUntil)
-            {
-                if (_localSilo.Equals(peer))
-                {
-                    continue;
-                }
-
-                if (until <= now || !membershipSnapshot.ContainsMember(peer))
-                {
-                    (removedPeers ??= []).Add(peer);
-                }
-            }
-
-            if (removedPeers is not null)
-            {
-                // Remove after enumeration so the dictionary is not mutated while it is being walked.
-                foreach (var peer in removedPeers)
-                {
-                    _antiEntropyFailureBackoffUntil.Remove(peer);
-                }
-            }
-        }
-
         // Let the broadcast queue discard work for peers which are no longer valid routing targets.
         await _broadcastQueue.Prune(membershipSnapshot, cancellationToken);
     }
@@ -710,28 +622,6 @@ internal sealed partial class DisseminationProtocol
             Originator = _localSilo,
             ExpiresAt = _timeProvider.GetUtcNow() + disseminationNamespace.Options.StaleItemTtl,
         };
-    }
-
-    private bool IsPeerBackedOff(SiloAddress peer)
-    {
-        // Check the peer's anti-entropy backoff deadline under lock because failures update the same map concurrently.
-        var now = _timeProvider.GetUtcNow();
-        lock (_failureLock)
-        {
-            if (!_antiEntropyFailureBackoffUntil.TryGetValue(peer, out var until))
-            {
-                return false;
-            }
-
-            if (until > now)
-            {
-                return true;
-            }
-
-            // Expired backoff entries are cleared lazily when the peer is next considered.
-            _antiEntropyFailureBackoffUntil.Remove(peer);
-            return false;
-        }
     }
 
     private void EmitApplyResult(DisseminationNamespace namespaceName, DisseminationBroadcastValue item, SiloAddress sender, DisseminationApplyResult result)

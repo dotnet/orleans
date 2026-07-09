@@ -882,6 +882,103 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task AntiEntropyExchangeFailureDoesNotBackOffPeer()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.ExpectedKeys.Add(FakeNamespace.DefaultKey);
+        var exchangeCount = 0;
+        transport.ExchangeAntiEntropyHandler = (target, request) =>
+        {
+            if (Interlocked.Increment(ref exchangeCount) == 1)
+            {
+                throw new InvalidOperationException("transient anti-entropy failure");
+            }
+
+            return ValueTask.FromResult(new DisseminationAntiEntropyResponse { Sender = target });
+        };
+
+        var protocol = CreateProtocol(transport, ns, options =>
+        {
+            options.Overlay.AntiEntropyPeerCount = 1;
+        });
+
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+
+        Assert.Equal(2, Volatile.Read(ref exchangeCount));
+        Assert.Equal(2, transport.AntiEntropyRequests.Count);
+    }
+
+    [Fact]
+    public async Task AntiEntropyExchangesAreNotLimitedByMaxConcurrentSends()
+    {
+        var local = CreateSilo(11111);
+        var peers = Enumerable.Range(11112, 3).Select(CreateSilo).ToArray();
+        var transport = new FakeTransport(local, peers);
+        var ns = new FakeNamespace(local);
+        ns.ExpectedKeys.Add(FakeNamespace.DefaultKey);
+        var gate = new object();
+        var allStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseExchanges = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var inFlight = 0;
+        var started = 0;
+        var observedMax = 0;
+        transport.ExchangeAntiEntropyHandler = async (target, request) =>
+        {
+            lock (gate)
+            {
+                inFlight++;
+                started++;
+                observedMax = Math.Max(observedMax, inFlight);
+                if (started == peers.Length)
+                {
+                    allStarted.TrySetResult(true);
+                }
+            }
+
+            try
+            {
+                await releaseExchanges.Task;
+                return new DisseminationAntiEntropyResponse { Sender = target };
+            }
+            finally
+            {
+                lock (gate)
+                {
+                    inFlight--;
+                }
+            }
+        };
+
+        var protocol = CreateProtocol(transport, ns, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.AntiEntropyPeerCount = peers.Length;
+        });
+
+        var exchangeTask = protocol.RunAntiEntropyRound(CancellationToken.None);
+        try
+        {
+            await allStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            lock (gate)
+            {
+                Assert.Equal(peers.Length, observedMax);
+            }
+        }
+        finally
+        {
+            releaseExchanges.TrySetResult(true);
+        }
+
+        await exchangeTask;
+
+        Assert.Equal(peers.Length, transport.AntiEntropyRequests.Count);
+    }
+
+    [Fact]
     public async Task AntiEntropyAppliesReturnedRepairItemsWithoutForwarding()
     {
         var local = CreateSilo(11111);
