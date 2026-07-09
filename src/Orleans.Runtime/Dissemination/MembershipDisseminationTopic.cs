@@ -246,7 +246,7 @@ internal sealed class MembershipDisseminationTopic(
     };
 
     private static bool MembershipEntriesEqual(MembershipEntry left, MembershipEntry right) =>
-        left.SiloAddress == right.SiloAddress
+        left.SiloAddress.Equals(right.SiloAddress)
         && left.Status == right.Status
         && EqualSuspectTimes(left.SuspectTimes, right.SuspectTimes)
         && left.ProxyPort == right.ProxyPort
