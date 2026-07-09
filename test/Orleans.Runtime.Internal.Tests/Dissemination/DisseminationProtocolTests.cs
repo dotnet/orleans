@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -965,7 +964,7 @@ public class DisseminationProtocolTests
                 {
                     1 => CreateValueGroups(badRepairItem),
                     2 => CreateValueGroups(goodRepairItem),
-                    _ => FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>.Empty,
+                    _ => [],
                 },
             });
         };
@@ -1350,15 +1349,15 @@ public class DisseminationProtocolTests
     private static SiloAddress[] CreateSilos(int count) =>
         Enumerable.Range(11111, count).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
 
-    private static FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> CreateAntiEntropyRequestDigest(
+    private static Dictionary<DisseminationNamespace, List<DigestEntry>> CreateAntiEntropyRequestDigest(
         DisseminationNamespace namespaceName,
         params (DisseminationKey Key, long Version)[] versions) =>
-        new Dictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>
+        new()
         {
             [namespaceName] = versions
                 .Select(static entry => new DigestEntry(entry.Key, entry.Version))
-                .ToImmutableArray(),
-        }.ToFrozenDictionary();
+                .ToList(),
+        };
 
     private static DisseminationBroadcastBatch CreateBroadcastBatch(SiloAddress sender, params DisseminationBroadcastValue[] values) => new()
     {
@@ -1394,14 +1393,14 @@ public class DisseminationProtocolTests
             [FakeNamespace.DefaultName] = [.. values],
         };
 
-    private static FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> CreateValueGroups(params DisseminationBroadcastValue[] values) =>
+    private static Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> CreateValueGroups(params DisseminationBroadcastValue[] values) =>
         CreateValueGroups(FakeNamespace.DefaultName, values);
 
-    private static FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> CreateValueGroups(DisseminationNamespace namespaceName, params DisseminationBroadcastValue[] values) =>
-        new Dictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>
+    private static Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> CreateValueGroups(DisseminationNamespace namespaceName, params DisseminationBroadcastValue[] values) =>
+        new()
         {
             [namespaceName] = [.. values],
-        }.ToFrozenDictionary();
+        };
 
     private static MembershipDisseminationNamespace CreateMembershipNamespace(
         FakeMembershipManager membershipManager,
