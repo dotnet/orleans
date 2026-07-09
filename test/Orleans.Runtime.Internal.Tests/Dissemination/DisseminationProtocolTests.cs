@@ -1363,7 +1363,7 @@ public class DisseminationProtocolTests
     private static DisseminationBroadcastBatch CreateBroadcastBatch(SiloAddress sender, params DisseminationBroadcastValue[] values) => new()
     {
         Sender = sender,
-        Values = CreateValueGroups(values),
+        Values = CreateBroadcastValueGroups(values),
     };
 
     private static IEnumerable<DisseminationBroadcastValue> GetBroadcastValues(DisseminationBroadcastBatch batch) =>
@@ -1387,6 +1387,12 @@ public class DisseminationProtocolTests
 
     private static IEnumerable<DisseminationBroadcastValue> GetAntiEntropyResponseValues(DisseminationAntiEntropyResponse response) =>
         response.Values.Values.SelectMany(static values => values);
+
+    private static Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> CreateBroadcastValueGroups(params DisseminationBroadcastValue[] values) =>
+        new()
+        {
+            [FakeNamespace.DefaultName] = [.. values],
+        };
 
     private static FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> CreateValueGroups(params DisseminationBroadcastValue[] values) =>
         CreateValueGroups(FakeNamespace.DefaultName, values);

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Threading;
@@ -225,15 +226,14 @@ internal sealed class DisseminationBroadcastValue
     public DateTimeOffset ExpiresAt { get; init; }
 }
 
-[GenerateSerializer, Immutable]
+[GenerateSerializer]
 internal sealed class DisseminationBroadcastBatch
 {
     [Id(0)]
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> Values { get; init; } =
-        FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>.Empty;
+    public Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> Values { get; init; } = [];
 }
 
 [GenerateSerializer, Immutable]
