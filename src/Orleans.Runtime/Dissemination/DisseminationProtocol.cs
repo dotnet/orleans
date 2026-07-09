@@ -26,7 +26,8 @@ internal sealed partial class DisseminationProtocol
         IOptionsMonitor<DisseminationOptions> options,
         IEnumerable<IDisseminationNamespace> disseminationNamespaces,
         TimeProvider timeProvider,
-        ILogger<DisseminationProtocol> logger)
+        ILogger<DisseminationProtocol> logger,
+        ILogger<DisseminationBroadcastQueue> broadcastQueueLogger)
     {
         // Capture the runtime collaborators and index namespaces once so receive-side lookups stay cheap.
         _localSilo = localSiloDetails.SiloAddress;
@@ -39,12 +40,12 @@ internal sealed partial class DisseminationProtocol
 
         // Let the queue own batching and direct peer delivery.
         _broadcastQueue = new DisseminationBroadcastQueue(
-            timeProvider,
+            _timeProvider,
             _localSilo,
-            grainFactory,
+            _grainFactory,
             _options,
-            (peer, exception) => LogDebugDisseminationSendFailed(_logger, exception, peer),
-            exception => LogDebugBroadcastFlushFailed(_logger, exception));
+            _namespaces.Values,
+            broadcastQueueLogger);
     }
 
     public async ValueTask<bool> Publish(
@@ -164,10 +165,11 @@ internal sealed partial class DisseminationProtocol
 
         // Exchange digests with selected peers and apply any repair values they return.
         var request = new DisseminationAntiEntropyRequest { Digests = requestDigests };
+        var requestDigestCount = GetDigestCount(requestDigests);
         var tasks = new Task<DisseminationAntiEntropyResponse?>[peers.Length];
         for (var i = 0; i < peers.Length; i++)
         {
-            tasks[i] = ExchangeAntiEntropyRequest(peers[i], request, cancellationToken);
+            tasks[i] = ExchangeAntiEntropyRequest(peers[i], request, requestDigestCount, cancellationToken);
         }
 
         var responses = await Task.WhenAll(tasks);
@@ -247,6 +249,7 @@ internal sealed partial class DisseminationProtocol
     private async Task<DisseminationAntiEntropyResponse?> ExchangeAntiEntropyRequest(
         SiloAddress peer,
         DisseminationAntiEntropyRequest request,
+        int requestDigestCount,
         CancellationToken cancellationToken)
     {
         try
@@ -256,10 +259,14 @@ internal sealed partial class DisseminationProtocol
             // Record exchange metrics after the peer returns so truncation and repair counts reflect the response.
             DisseminationInstruments.OnAntiEntropyExchange(
                 "out",
-                GetDigestCount(request.Digests),
+                requestDigestCount,
                 GetValueCount(response.Values),
                 response.Truncated);
             return response;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -463,7 +470,7 @@ internal sealed partial class DisseminationProtocol
 
     private void EnqueueBroadcast(SiloAddress peer, DisseminationBroadcastValue item, IDisseminationNamespace disseminationNamespace)
     {
-        // Hand the item to the peer pump so it owns coalescing, scheduling, and send backoff.
+        // Hand the item to the peer pump so it owns coalescing, scheduling, and sending.
         _broadcastQueue.Enqueue(peer, item, disseminationNamespace);
     }
 
@@ -669,7 +676,7 @@ internal sealed partial class DisseminationProtocol
 
     private readonly record struct DigestKey(DisseminationNamespace Namespace, DisseminationKey Key);
 
-    // Generate the send-failure log method used by anti-entropy and broadcast peer pumps.
+    // Generate the send-failure log method used by anti-entropy exchanges.
     [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Dissemination send to {Peer} failed.")]
@@ -680,12 +687,6 @@ internal sealed partial class DisseminationProtocol
         Level = LogLevel.Debug,
         Message = "Failed to apply anti-entropy repair value from {Sender} for namespace {Namespace}, key {Key}, version {Version}.")]
     private static partial void LogDebugAntiEntropyRepairValueFailed(ILogger logger, Exception exception, SiloAddress sender, DisseminationNamespace @namespace, DisseminationKey key, long version);
-
-    // Generate the queue-flush log method used when a broadcast batch cannot be sent.
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Dissemination broadcast batch flush failed.")]
-    private static partial void LogDebugBroadcastFlushFailed(ILogger logger, Exception exception);
 
     // Generate the originator-missing log method used before refreshing membership for routing.
     [LoggerMessage(
