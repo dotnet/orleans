@@ -507,6 +507,58 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task ReceiveBroadcastContinuesAfterFailedValue()
+    {
+        var root = CreateSilo(11111);
+        var local = CreateSilo(11112);
+        var child = CreateSilo(11113);
+        var transport = new FakeTransport(local, root, child);
+        var ns = new FakeNamespace(local);
+        var protocol = CreateProtocol(transport, ns, options => options.Overlay.FanOutFactor = static _ => 1);
+        DisseminationKey firstKey = new("first");
+        DisseminationKey failedKey = new("failed");
+        DisseminationKey secondKey = new("second");
+        var first = ns.CreateItem(root, firstKey, sequence: 1);
+        var failed = CreateDisseminationValue(
+            root,
+            new DisseminationValue(failedKey, fromVersion: 0, toVersion: 1, Array.Empty<byte>()));
+        var second = ns.CreateItem(root, secondKey, sequence: 1);
+
+        await protocol.ReceiveBroadcast(CreateBroadcastBatch(root, first, failed, second), CancellationToken.None);
+        await protocol.FlushPendingBroadcast(CancellationToken.None);
+
+        Assert.Equal(1, ns.GetVersion(firstKey));
+        Assert.Equal(0, ns.GetVersion(failedKey));
+        Assert.Equal(1, ns.GetVersion(secondKey));
+        var forwarded = Assert.Single(transport.BroadcastBatches);
+        Assert.Equal(child, forwarded.Peer);
+        Assert.Equal(
+            new[] { firstKey, secondKey }.OrderBy(static key => key),
+            GetBroadcastValues(forwarded.Batch).Select(static item => item.Value.Key).OrderBy(static key => key));
+    }
+
+    [Fact]
+    public async Task ReceiveBroadcastRefreshesMembershipOnceForMissingOriginators()
+    {
+        var local = CreateSilo(11111);
+        var sender = CreateSilo(11112);
+        var firstOriginator = CreateSilo(11120);
+        var secondOriginator = CreateSilo(11121);
+        var transport = new FakeTransport(local, sender);
+        var ns = new FakeNamespace(local);
+        var protocol = CreateProtocol(transport, ns);
+        var first = ns.CreateItem(firstOriginator, "first", sequence: 1);
+        var second = ns.CreateItem(secondOriginator, "second", sequence: 1);
+
+        await protocol.ReceiveBroadcast(CreateBroadcastBatch(sender, first, second), CancellationToken.None);
+
+        Assert.Equal(1, transport.RefreshMembershipCallCount);
+        Assert.Equal(1, ns.GetVersion("first"));
+        Assert.Equal(1, ns.GetVersion("second"));
+        Assert.Empty(transport.BroadcastBatches);
+    }
+
+    [Fact]
     public async Task DuplicateBroadcastDoesNotForwardAgain()
     {
         var silos = Enumerable.Range(11111, 8).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
@@ -903,6 +955,29 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task DuplicateBroadcastDoesNotPostponeAntiEntropyProbe()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        var timeProvider = new TestTimeProvider();
+        ns.Options.ExpectedUpdateCadence = TimeSpan.FromSeconds(2);
+        var protocol = CreateProtocol(transport, ns, timeProvider: timeProvider);
+        var batch = CreateBroadcastBatch(peer, ns.CreateItem(peer, FakeNamespace.DefaultKey, sequence: 1));
+
+        await protocol.ReceiveBroadcast(batch, CancellationToken.None);
+        timeProvider.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromMilliseconds(1));
+        await protocol.ReceiveBroadcast(batch, CancellationToken.None);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+
+        var request = Assert.Single(transport.AntiEntropyRequests).Request;
+        Assert.Single(request.Digests[ns.Name]);
+    }
+
+    [Fact]
     public async Task AntiEntropySendsOneDigestRequestPerPeer()
     {
         var local = CreateSilo(11111);
@@ -988,6 +1063,21 @@ public class DisseminationProtocolTests
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => exchangeTask);
+    }
+
+    [Fact]
+    public async Task AntiEntropyResponseHonorsCancellation()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        var protocol = CreateProtocol(transport, ns);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest(), cancellation.Token));
     }
 
     [Fact]
@@ -1085,6 +1175,62 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task AntiEntropyAppliesNewestRepairFirstForEachStream()
+    {
+        var local = CreateSilo(11111);
+        var peers = new[] { CreateSilo(11112), CreateSilo(11113) };
+        var transport = new FakeTransport(local, peers);
+        var ns = new FakeNamespace(local);
+        ns.SetValue(FakeNamespace.DefaultKey, version: 1);
+        var exchangeCount = 0;
+        transport.ExchangeAntiEntropyHandler = (target, request) =>
+        {
+            var requestedVersion = Assert.Single(request.Digests[ns.Name]).Version;
+            var responseVersion = Interlocked.Increment(ref exchangeCount) == 1 ? 2 : 3;
+            var repair = ns.CreateItem(
+                target,
+                FakeNamespace.DefaultKey,
+                sequence: responseVersion,
+                fromVersion: requestedVersion);
+            return ValueTask.FromResult(new DisseminationAntiEntropyResponse
+            {
+                Sender = target,
+                Values = CreateValueGroups(repair),
+            });
+        };
+
+        var protocol = CreateProtocol(
+            transport,
+            ns,
+            options => options.Overlay.AntiEntropyPeerCount = peers.Length);
+
+        await protocol.RunAntiEntropyRound(CancellationToken.None);
+
+        Assert.Equal(3, ns.GetVersion(FakeNamespace.DefaultKey));
+        Assert.Equal(peers.Length, exchangeCount);
+    }
+
+    [Fact]
+    public async Task AntiEntropyResponseOmitsNamespacesWithoutRepairs()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        ns.SetValue(FakeNamespace.DefaultKey, version: 5);
+        var protocol = CreateProtocol(transport, ns);
+
+        var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Digests = CreateAntiEntropyRequestDigest(
+                ns.Name,
+                (FakeNamespace.DefaultKey, 5)),
+        }, CancellationToken.None);
+
+        Assert.Empty(response.Values);
+    }
+
+    [Fact]
     public async Task AntiEntropyAppliesValidItemsAfterFailedRepairItem()
     {
         var local = CreateSilo(11111);
@@ -1095,7 +1241,7 @@ public class DisseminationProtocolTests
         ns.SetValue(FakeNamespace.DefaultKey, version: 1);
         var badRepairItem = new DisseminationBroadcastValue
         {
-            Value = new DisseminationValue(FakeNamespace.DefaultKey, fromVersion: 1, toVersion: 2, Array.Empty<byte>()),
+            Value = new DisseminationValue("bad", fromVersion: 0, toVersion: 1, Array.Empty<byte>()),
             Originator = peer,
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
         };
@@ -2181,10 +2327,19 @@ public class DisseminationProtocolTests
     private sealed class TestTimeProvider : TimeProvider
     {
         private DateTimeOffset _utcNow = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        private long _timestamp;
 
         public override DateTimeOffset GetUtcNow() => _utcNow;
 
-        public void Advance(TimeSpan value) => _utcNow += value;
+        public override long GetTimestamp() => _timestamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public void Advance(TimeSpan value)
+        {
+            _utcNow += value;
+            _timestamp += value.Ticks;
+        }
     }
 
     private sealed class AutoAdvancingTimeProvider(TimeSpan step) : TimeProvider
