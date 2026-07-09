@@ -514,8 +514,6 @@ namespace Orleans.Configuration
     {
         public bool Enabled { get { throw null; } set { } }
 
-        public System.TimeSpan FailureBackoff { get { throw null; } set { } }
-
         public int MaxBatchBytes { get { throw null; } set { } }
 
         public int MaxBatchItems { get { throw null; } set { } }

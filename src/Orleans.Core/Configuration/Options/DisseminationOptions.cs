@@ -18,11 +18,6 @@ public sealed class DisseminationOptions
     public int MaxConcurrentSends { get; set; } = 32;
 
     /// <summary>
-    /// Gets or sets how long failed peers are backed off before retrying.
-    /// </summary>
-    public TimeSpan FailureBackoff { get; set; } = TimeSpan.FromSeconds(5);
-
-    /// <summary>
     /// Gets or sets the maximum total payload bytes in one dissemination batch.
     /// </summary>
     public int MaxBatchBytes { get; set; } = 1024 * 1024;
@@ -120,6 +115,10 @@ public sealed class DisseminationNamespaceOptions
     /// <summary>
     /// Gets or sets the maximum delay for namespace coalescing.
     /// </summary>
+    /// <remarks>
+    /// Per-peer batches can contain values from multiple namespaces and use the shortest configured delay among
+    /// enabled namespaces.
+    /// </remarks>
     public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>

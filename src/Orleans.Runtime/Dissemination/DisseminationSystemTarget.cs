@@ -22,12 +22,13 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         IEnumerable<IDisseminationNamespace> disseminationNamespaces,
         TimeProvider timeProvider,
         ILogger<DisseminationProtocol> logger,
+        ILogger<DisseminationBroadcastQueue> broadcastQueueLogger,
         SystemTargetShared shared)
         : base(Constants.DisseminationSystemTargetType, shared)
     {
         _options = options;
         _logger = logger;
-        _protocol = new DisseminationProtocol(localSiloDetails, grainFactory, membership, options, disseminationNamespaces, timeProvider, logger);
+        _protocol = new DisseminationProtocol(localSiloDetails, grainFactory, membership, options, disseminationNamespaces, timeProvider, logger, broadcastQueueLogger);
         _timer = new PeriodicTimer(_options.CurrentValue.Overlay.AntiEntropyInterval, timeProvider);
         shared.ActivationDirectory.RecordNewTarget(this);
     }
