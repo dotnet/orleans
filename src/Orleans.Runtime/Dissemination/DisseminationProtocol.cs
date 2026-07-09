@@ -173,10 +173,10 @@ internal sealed partial class DisseminationProtocol
         await ApplyAntiEntropyResponses(responses, cancellationToken);
     }
 
-    private FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> CreateAntiEntropyRequestDigests(DateTimeOffset now)
+    private Dictionary<DisseminationNamespace, List<DigestEntry>> CreateAntiEntropyRequestDigests(DateTimeOffset now)
     {
         // Build the anti-entropy request payload by grouping requested digests under their namespace.
-        Dictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>? digestsByNamespace = null;
+        Dictionary<DisseminationNamespace, List<DigestEntry>>? digestsByNamespace = null;
 
         // Track every value stream which still exists locally so obsolete seen-value entries can be pruned later.
         var currentValueStreams = new HashSet<DigestKey>();
@@ -189,7 +189,7 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
-            ImmutableArray<DigestEntry>.Builder? digestEntries = null;
+            List<DigestEntry>? digestEntries = null;
             foreach (var digest in disseminationNamespace.Digests)
             {
                 // Record the stream before applying cadence suppression so pruning only removes streams which disappeared.
@@ -206,7 +206,7 @@ internal sealed partial class DisseminationProtocol
 
                 if (shouldRequestDigest)
                 {
-                    (digestEntries ??= ImmutableArray.CreateBuilder<DigestEntry>()).Add(digest);
+                    (digestEntries ??= []).Add(digest);
                 }
             }
 
@@ -216,7 +216,7 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
-            (digestsByNamespace ??= [])[disseminationNamespace.Name] = digestEntries.ToImmutable();
+            (digestsByNamespace ??= [])[disseminationNamespace.Name] = digestEntries;
         }
 
         // Remove seen-value timestamps for streams which are no longer reported by their namespace.
@@ -240,10 +240,7 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        // Freeze the completed request payload, or return a shared empty dictionary when there is nothing to request.
-        return digestsByNamespace is null
-            ? FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>.Empty
-            : digestsByNamespace.ToFrozenDictionary();
+        return digestsByNamespace ?? [];
     }
 
     private async Task<DisseminationAntiEntropyResponse?[]> ExchangeAntiEntropyRequests(
@@ -346,7 +343,7 @@ internal sealed partial class DisseminationProtocol
             return new DisseminationAntiEntropyResponse
             {
                 Sender = _localSilo,
-                Values = FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>.Empty,
+                Values = [],
                 Truncated = false,
             };
         }
@@ -359,7 +356,7 @@ internal sealed partial class DisseminationProtocol
         var options = _options.CurrentValue;
 
         // Walk requested namespaces and compare the peer's versions with the local digest.
-        var valuesByNamespace = new Dictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>();
+        var valuesByNamespace = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
         foreach (var (namespaceName, remoteDigest) in request.Digests)
         {
             if (!TryGetEnabledNamespace(namespaceName, out var requestedNamespace))
@@ -367,12 +364,12 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
-            if (remoteDigest.Length == 0)
+            if (remoteDigest.Count == 0)
             {
                 continue;
             }
 
-            var namespaceValues = ImmutableArray.CreateBuilder<DisseminationBroadcastValue>();
+            var namespaceValues = new List<DisseminationBroadcastValue>();
             var remoteVersions = CreateDigestLookup(remoteDigest);
             foreach (var localDigest in requestedNamespace.Digests)
             {
@@ -415,7 +412,7 @@ internal sealed partial class DisseminationProtocol
             }
 
             // Include the namespace result even when no repair values were produced, mirroring the request shape.
-            valuesByNamespace[requestedNamespace.Name] = namespaceValues.ToImmutable();
+            valuesByNamespace[requestedNamespace.Name] = namespaceValues;
             if (truncated)
             {
                 break;
@@ -426,7 +423,7 @@ internal sealed partial class DisseminationProtocol
         return new DisseminationAntiEntropyResponse
         {
             Sender = _localSilo,
-            Values = valuesByNamespace.ToFrozenDictionary(),
+            Values = valuesByNamespace,
             Truncated = truncated,
         };
     }
@@ -744,22 +741,22 @@ internal sealed partial class DisseminationProtocol
         DisseminationInstruments.OnValueApplied(namespaceName, result);
     }
 
-    private static int GetDigestCount(FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> digest)
+    private static int GetDigestCount(Dictionary<DisseminationNamespace, List<DigestEntry>> digest)
     {
-        // Sum per-namespace digest arrays into the exchange-level count used by metrics.
+        // Sum per-namespace digest lists into the exchange-level count used by metrics.
         var result = 0;
         foreach (var entries in digest.Values)
         {
-            result += entries.Length;
+            result += entries.Count;
         }
 
         return result;
     }
 
-    private static Dictionary<DisseminationKey, long> CreateDigestLookup(ImmutableArray<DigestEntry> digest)
+    private static Dictionary<DisseminationKey, long> CreateDigestLookup(List<DigestEntry> digest)
     {
-        // Convert the peer digest array into a version lookup keyed by value stream.
-        var result = new Dictionary<DisseminationKey, long>(digest.Length);
+        // Convert the peer digest list into a version lookup keyed by value stream.
+        var result = new Dictionary<DisseminationKey, long>(digest.Count);
         foreach (var entry in digest)
         {
             result[entry.Key] = entry.Version;
@@ -768,13 +765,13 @@ internal sealed partial class DisseminationProtocol
         return result;
     }
 
-    private static int GetValueCount(FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace)
+    private static int GetValueCount(Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace)
     {
-        // Sum per-namespace repair arrays into the exchange-level count used by metrics.
+        // Sum per-namespace repair lists into the exchange-level count used by metrics.
         var result = 0;
         foreach (var values in valuesByNamespace.Values)
         {
-            result += values.Length;
+            result += values.Count;
         }
 
         return result;
