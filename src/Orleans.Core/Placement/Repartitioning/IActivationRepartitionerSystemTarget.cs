@@ -97,7 +97,7 @@ public readonly struct EdgeVertex(
     public static bool operator !=(EdgeVertex left, EdgeVertex right) => !left.Equals(right);
 
     public override bool Equals([NotNullWhen(true)] object obj) => obj is EdgeVertex other && Equals(other);
-    public bool Equals(EdgeVertex other) => Id == other.Id && Silo == other.Silo && IsMigratable == other.IsMigratable;
+    public bool Equals(EdgeVertex other) => Id == other.Id && Silo.Equals(other.Silo) && IsMigratable == other.IsMigratable;
 
     public override int GetHashCode() => HashCode.Combine(Id, Silo, IsMigratable);
 

@@ -74,7 +74,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             _monitorTimer = RegisterGrainTimer(async ct =>
             {
                 var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
-                var shouldFetchReport = _latestReport.Host == SiloAddress.Zero ||
+                var shouldFetchReport = SiloAddress.Zero.Equals(_latestReport.Host) ||
                     elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
 
                 if (shouldFetchReport)

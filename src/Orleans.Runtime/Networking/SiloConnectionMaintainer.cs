@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Messaging
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (status == SiloStatus.Dead && updatedSilo != siloStatusOracle.SiloAddress)
+            if (status == SiloStatus.Dead && !updatedSilo.Equals(siloStatusOracle.SiloAddress))
             {
                 this.runtimeClient.BreakOutstandingMessagesToSilo(updatedSilo);
                 _ = Task.Run(() => this.CloseConnectionAsync(updatedSilo));

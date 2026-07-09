@@ -158,7 +158,7 @@ public static class DeploymentLoadPublisherEvents
 
     internal static void EmitReceived(SiloAddress sourceSiloAddress, SiloAddress observerSiloAddress, SiloRuntimeStatistics statistics)
     {
-        if (sourceSiloAddress == observerSiloAddress
+        if (sourceSiloAddress.Equals(observerSiloAddress)
             || !Listener.IsEnabled(nameof(Received)))
         {
             return;

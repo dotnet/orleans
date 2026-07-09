@@ -76,7 +76,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        var existingMatch = _publishedEvents.FirstOrDefault(e => e.SiloAddress == siloAddress);
+        var existingMatch = _publishedEvents.FirstOrDefault(e => e.SiloAddress.Equals(siloAddress));
         if (existingMatch is not null)
         {
             return existingMatch;
@@ -93,7 +93,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
                 break;
             }
 
-            var match = _publishedEvents.FirstOrDefault(e => e.SiloAddress == siloAddress);
+            var match = _publishedEvents.FirstOrDefault(e => e.SiloAddress.Equals(siloAddress));
             if (match is not null)
             {
                 return match;
@@ -114,7 +114,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        var existingMatch = _clusterRefreshedEvents.FirstOrDefault(e => e.SiloAddress == siloAddress);
+        var existingMatch = _clusterRefreshedEvents.FirstOrDefault(e => e.SiloAddress.Equals(siloAddress));
         if (existingMatch is not null)
         {
             return existingMatch;
@@ -131,7 +131,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
                 break;
             }
 
-            var match = _clusterRefreshedEvents.FirstOrDefault(e => e.SiloAddress == siloAddress);
+            var match = _clusterRefreshedEvents.FirstOrDefault(e => e.SiloAddress.Equals(siloAddress));
             if (match is not null)
             {
                 return match;
@@ -189,7 +189,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        var existingMatch = _receivedEvents.FirstOrDefault(e => e.FromSilo == fromSilo && e.ReceiverSilo == receiverSilo);
+        var existingMatch = _receivedEvents.FirstOrDefault(e => e.FromSilo.Equals(fromSilo) && e.ReceiverSilo.Equals(receiverSilo));
         if (existingMatch is not null)
         {
             return existingMatch;
@@ -206,7 +206,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
                 break;
             }
 
-            var match = _receivedEvents.FirstOrDefault(e => e.FromSilo == fromSilo && e.ReceiverSilo == receiverSilo);
+            var match = _receivedEvents.FirstOrDefault(e => e.FromSilo.Equals(fromSilo) && e.ReceiverSilo.Equals(receiverSilo));
             if (match is not null)
             {
                 return match;
@@ -295,7 +295,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
     /// <returns>The count of refresh events.</returns>
     public int GetClusterRefreshCount(SiloAddress siloAddress)
     {
-        return _clusterRefreshedEvents.Count(e => e.SiloAddress == siloAddress);
+        return _clusterRefreshedEvents.Count(e => e.SiloAddress.Equals(siloAddress));
     }
 
     /// <summary>

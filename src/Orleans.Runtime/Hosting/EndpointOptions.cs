@@ -28,10 +28,10 @@ namespace Orleans.Configuration
                         + $"to configure endpoints and ensure that {nameof(AdvertisedIPAddress)} is set.");
                 }
 
-                if (value == IPAddress.Any
-                    || value == IPAddress.IPv6Any
-                    || value == IPAddress.None
-                    || value == IPAddress.IPv6None)
+                if (Equals(value, IPAddress.Any)
+                    || Equals(value, IPAddress.IPv6Any)
+                    || Equals(value, IPAddress.None)
+                    || Equals(value, IPAddress.IPv6None))
                 {
                     throw new OrleansConfigurationException(
                         $"Invalid value specified for {nameof(AdvertisedIPAddress)}. The value was {value}");
@@ -76,13 +76,13 @@ namespace Orleans.Configuration
         public const int DEFAULT_GATEWAY_PORT = 30000;
 
         /// <summary>
-        /// Gets or sets the endpoint used to listen for silo to silo communication. 
+        /// Gets or sets the endpoint used to listen for silo to silo communication.
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="SiloPort"/>
         /// </summary>
         public IPEndPoint SiloListeningEndpoint { get; set; }
 
         /// <summary>
-        /// Gets or sets the endpoint used to listen for client to silo communication. 
+        /// Gets or sets the endpoint used to listen for client to silo communication.
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="GatewayPort"/>
         /// </summary>
         public IPEndPoint GatewayListeningEndpoint { get; set; }
