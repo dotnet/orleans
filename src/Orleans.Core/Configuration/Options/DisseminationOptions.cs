@@ -130,7 +130,8 @@ public sealed class DisseminationNamespaceOptions
     /// Gets or sets the expected cadence for updates in this namespace.
     /// </summary>
     /// <remarks>
-    /// Anti-entropy requests omit keys which have received a value within this interval.
+    /// Anti-entropy requests omit keys whose version advanced within this interval. Duplicate values do not
+    /// postpone repair probes.
     /// </remarks>
     public TimeSpan ExpectedUpdateCadence { get; set; } = TimeSpan.FromSeconds(10);
 
