@@ -94,7 +94,7 @@ public class WakeTimerTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWait);
         var nextWait = timer.WaitAsync();
         Assert.True(nextWait.IsCompletedSuccessfully);
-        Assert.True(nextWait.Result);
+        Assert.True(await nextWait);
     }
 
     [Fact]
