@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.Frozen;
-using System.Collections.Immutable;
 using System.Threading;
 using Orleans.Concurrency;
 
@@ -226,7 +224,7 @@ internal sealed class DisseminationBroadcastValue
     public DateTimeOffset ExpiresAt { get; init; }
 }
 
-[GenerateSerializer]
+[GenerateSerializer, Immutable]
 internal sealed class DisseminationBroadcastBatch
 {
     [Id(0)]
@@ -240,8 +238,7 @@ internal sealed class DisseminationBroadcastBatch
 internal sealed class DisseminationAntiEntropyRequest
 {
     [Id(0)]
-    public FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>> Digests { get; init; } =
-        FrozenDictionary<DisseminationNamespace, ImmutableArray<DigestEntry>>.Empty;
+    public Dictionary<DisseminationNamespace, List<DigestEntry>> Digests { get; init; } = [];
 }
 
 [GenerateSerializer, Immutable]
@@ -251,8 +248,7 @@ internal sealed class DisseminationAntiEntropyResponse
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> Values { get; init; } =
-        FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>>.Empty;
+    public Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> Values { get; init; } = [];
 
     [Id(2)]
     public bool Truncated { get; init; }
