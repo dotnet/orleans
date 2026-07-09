@@ -15,7 +15,8 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
     private Task? _antiEntropyTask;
 
     public DisseminationSystemTarget(
-        IDisseminationTransport transport,
+        ILocalSiloDetails localSiloDetails,
+        IInternalGrainFactory grainFactory,
         DisseminationMembership membership,
         IOptionsMonitor<DisseminationOptions> options,
         IEnumerable<IDisseminationNamespace> disseminationNamespaces,
@@ -26,7 +27,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
     {
         _options = options;
         _logger = logger;
-        _protocol = new DisseminationProtocol(transport, membership, options, disseminationNamespaces, timeProvider, logger);
+        _protocol = new DisseminationProtocol(localSiloDetails, grainFactory, membership, options, disseminationNamespaces, timeProvider, logger);
         _timer = new PeriodicTimer(_options.CurrentValue.Overlay.AntiEntropyInterval, timeProvider);
         shared.ActivationDirectory.RecordNewTarget(this);
     }
@@ -68,7 +69,7 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
     private async Task StopAsync(CancellationToken cancellationToken)
     {
         _timer.Dispose();
-        await this.RunOrQueueTask(() => _protocol.FlushPendingBroadcast(cancellationToken));
+        await this.RunOrQueueTask(() => _protocol.StopAsync(cancellationToken));
         await _shutdownCts.CancelAsync();
         if (_antiEntropyTask is not null)
         {
