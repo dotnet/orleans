@@ -239,6 +239,40 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_AllowsConstructedGenericTypes_WhenTypeFilterAllowsThem()
+        {
+            var type = typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<UriBuilder>);
+            var converter = CreateConverter(
+                typeFilters:
+                [
+                    new DelegateTypeFilter(candidate => candidate == type ? true : null)
+                ]);
+
+            AssertRoundTrips(converter, type);
+        }
+
+        [Fact]
+        public void TypeConverter_RejectsConstructedGenericTypes_WhenTypeFilterDeniesGenericArguments()
+        {
+            var type = typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<UriBuilder>);
+            var converter = CreateConverter(
+                typeFilters:
+                [
+                    new DelegateTypeFilter(candidate =>
+                    {
+                        if (candidate == type)
+                        {
+                            return true;
+                        }
+
+                        return candidate == typeof(UriBuilder) ? false : null;
+                    })
+                ]);
+
+            AssertTypeNotAllowed(converter, type);
+        }
+
+        [Fact]
         public void TypeConverter_UsesTypeFiltersForArrayElementTypes_WhenNameFiltersHaveNoOpinion()
         {
             var converter = CreateConverter(
@@ -408,6 +442,10 @@ namespace Orleans.Serialization.UnitTests
     }
 
     internal sealed class TypeConverterTestsGenericArgumentAllowedByTypeFilter
+    {
+    }
+
+    internal sealed class TypeConverterTestsGenericTypeAllowedByTypeFilter<T>
     {
     }
 

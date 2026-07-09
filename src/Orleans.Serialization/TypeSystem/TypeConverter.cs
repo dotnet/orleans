@@ -556,10 +556,17 @@ public class TypeConverter
         }
 
         result = Combine(result, IsTypeAllowedByConfiguration(type));
+        var isAllowedByTypeFilter = false;
 
         foreach (var filter in _typeFilters)
         {
-            result = Combine(result, filter.IsTypeAllowed(type));
+            var filterResult = filter.IsTypeAllowed(type);
+            if (filterResult == true)
+            {
+                isAllowedByTypeFilter = true;
+            }
+
+            result = Combine(result, filterResult);
             if (result == false)
             {
                 return false;
@@ -575,6 +582,16 @@ public class TypeConverter
         if (type.IsConstructedGenericType)
         {
             var genericArgumentsResult = InspectGenericArguments(type);
+            if (genericArgumentsResult == false)
+            {
+                return false;
+            }
+
+            if (isAllowedByTypeFilter)
+            {
+                return true;
+            }
+
             if (genericArgumentsResult != true)
             {
                 return genericArgumentsResult;
