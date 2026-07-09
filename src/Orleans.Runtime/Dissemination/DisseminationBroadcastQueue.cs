@@ -1,5 +1,3 @@
-using System.Collections.Frozen;
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Options;
@@ -76,7 +74,7 @@ internal sealed class DisseminationBroadcastQueue(
             }
 
             _stopped = true;
-            pending = [.. _pendingBroadcast.Values.OrderBy(static batch => batch.Peer)];
+            pending = [.. _pendingBroadcast.Values];
             _pendingBroadcast.Clear();
         }
 
@@ -93,7 +91,6 @@ internal sealed class DisseminationBroadcastQueue(
 
     public async Task Prune(
         DisseminationMembershipSnapshot membershipSnapshot,
-        SiloAddress localSilo,
         CancellationToken cancellationToken)
     {
         List<PeerQueuePump>? removedPeers = null;
@@ -132,7 +129,7 @@ internal sealed class DisseminationBroadcastQueue(
         }
     }
 
-    private readonly record struct PendingNamespaceValues(DisseminationNamespace Namespace, ImmutableArray<DisseminationBroadcastValue> Values);
+    private readonly record struct PendingNamespaceValues(DisseminationNamespace Namespace, List<DisseminationBroadcastValue> Values);
 
     private readonly record struct DigestKey(DisseminationNamespace Namespace, DisseminationKey Key);
 
@@ -203,7 +200,7 @@ internal sealed class DisseminationBroadcastQueue(
             try
             {
                 var values = DrainPendingBroadcast(force: true);
-                if (!values.IsDefaultOrEmpty)
+                if (values.Count > 0)
                 {
                     await SendValues(values, cancellationToken);
                 }
@@ -296,7 +293,7 @@ internal sealed class DisseminationBroadcastQueue(
                     try
                     {
                         var values = DrainPendingBroadcast(force: false);
-                        if (!values.IsDefaultOrEmpty)
+                        if (values.Count > 0)
                         {
                             await SendValues(values, cancellationToken);
                         }
@@ -316,13 +313,11 @@ internal sealed class DisseminationBroadcastQueue(
             }
             finally
             {
-                var restart = false;
                 lock (_lock)
                 {
                     _flushTask = null;
                     DisposeFlushWakeupUnsafe();
-                    restart = !_stopping && Count > 0;
-                    if (restart)
+                    if (!_stopping && Count > 0)
                     {
                         StartFlushLoopUnsafe();
                     }
@@ -369,9 +364,7 @@ internal sealed class DisseminationBroadcastQueue(
             }
         }
 
-        private async ValueTask<bool> SendValues(
-            ImmutableArray<PendingNamespaceValues> valuesByNamespace,
-            CancellationToken cancellationToken)
+        private async ValueTask<bool> SendValues(List<PendingNamespaceValues> valuesByNamespace, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (IsPeerBackedOff())
@@ -379,7 +372,7 @@ internal sealed class DisseminationBroadcastQueue(
                 return false;
             }
 
-            var currentBatch = new Dictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>.Builder>();
+            var currentBatch = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
             var itemCount = 0;
             var byteCount = 0;
             foreach (var group in valuesByNamespace)
@@ -391,20 +384,18 @@ internal sealed class DisseminationBroadcastQueue(
                         && (itemCount >= currentOptions.MaxBatchItems
                             || byteCount + item.Value.Payload.Length > currentOptions.MaxBatchBytes))
                     {
-                        if (!await SendBatch(currentBatch.ToFrozenDictionary(
-                            static pair => pair.Key,
-                            static pair => pair.Value.ToImmutable()), cancellationToken))
+                        if (!await SendBatch(currentBatch, cancellationToken))
                         {
                             return false;
                         }
 
-                        currentBatch.Clear();
+                        currentBatch = new();
                         itemCount = 0;
                         byteCount = 0;
                     }
 
                     ref var values = ref CollectionsMarshal.GetValueRefOrAddDefault(currentBatch, group.Namespace, out _);
-                    (values ??= ImmutableArray.CreateBuilder<DisseminationBroadcastValue>()).Add(item);
+                    (values ??= []).Add(item);
                     itemCount++;
                     byteCount += item.Value.Payload.Length;
                 }
@@ -412,16 +403,14 @@ internal sealed class DisseminationBroadcastQueue(
 
             if (itemCount > 0)
             {
-                return await SendBatch(currentBatch.ToFrozenDictionary(
-                    static pair => pair.Key,
-                    static pair => pair.Value.ToImmutable()), cancellationToken);
+                return await SendBatch(currentBatch, cancellationToken);
             }
 
             return true;
         }
 
         private async ValueTask<bool> SendBatch(
-            FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace,
+            Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -527,7 +516,7 @@ internal sealed class DisseminationBroadcastQueue(
 
         private void WakeupUnsafe() => _flushWakeup?.Cancel();
 
-        private ImmutableArray<PendingNamespaceValues> DrainPendingBroadcast(bool force)
+        private List<PendingNamespaceValues> DrainPendingBroadcast(bool force)
         {
             var now = timeProvider.GetUtcNow();
             lock (_lock)
@@ -537,7 +526,7 @@ internal sealed class DisseminationBroadcastQueue(
                     return [];
                 }
 
-                var result = ToImmutableValuesByNamespace();
+                var result = ToValuesByNamespace();
                 ClearPendingUnsafe();
                 return result;
             }
@@ -578,15 +567,15 @@ internal sealed class DisseminationBroadcastQueue(
             ByteCount += value.Value.Payload.Length;
         }
 
-        private ImmutableArray<PendingNamespaceValues> ToImmutableValuesByNamespace()
+        private List<PendingNamespaceValues> ToValuesByNamespace()
         {
-            var result = ImmutableArray.CreateBuilder<PendingNamespaceValues>(_valuesByNamespace.Count);
+            var result = new List<PendingNamespaceValues>(_valuesByNamespace.Count);
             foreach (var (namespaceName, values) in _valuesByNamespace)
             {
                 result.Add(new PendingNamespaceValues(namespaceName, [.. values.Values]));
             }
 
-            return result.ToImmutable();
+            return result;
         }
 
         private void ClearPendingUnsafe()

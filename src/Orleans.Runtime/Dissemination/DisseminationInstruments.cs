@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.Frozen;
-using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime.Dissemination;
@@ -47,7 +45,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnBroadcastSent(FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
+    public static void OnBroadcastSent(Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace, string kind)
     {
         if (!BroadcastSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
         {
@@ -56,7 +54,7 @@ internal static class DisseminationInstruments
 
         foreach (var (namespaceName, values) in valuesByNamespace)
         {
-            OnBroadcastSent(namespaceName, kind, values.Length, values.Sum(static item => item.Value.Payload.Length));
+            OnBroadcastSent(namespaceName, kind, values.Count, values.Sum(static item => item.Value.Payload.Length));
         }
     }
 
@@ -81,7 +79,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnBroadcastReceived(FrozenDictionary<DisseminationNamespace, ImmutableArray<DisseminationBroadcastValue>> valuesByNamespace, string kind)
+    public static void OnBroadcastReceived(Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace, string kind)
     {
         if (!BroadcastReceived.Enabled && !ValuesApplied.Enabled)
         {
@@ -90,7 +88,7 @@ internal static class DisseminationInstruments
 
         foreach (var (namespaceName, values) in valuesByNamespace)
         {
-            OnBroadcastReceived(namespaceName, kind, values.Length);
+            OnBroadcastReceived(namespaceName, kind, values.Count);
         }
     }
 

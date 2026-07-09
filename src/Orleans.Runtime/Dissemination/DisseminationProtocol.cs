@@ -571,7 +571,7 @@ internal sealed partial class DisseminationProtocol
         }
 
         // Let the broadcast queue discard work for peers which are no longer valid routing targets.
-        await _broadcastQueue.Prune(membershipSnapshot, _localSilo, cancellationToken);
+        await _broadcastQueue.Prune(membershipSnapshot, cancellationToken);
     }
 
     private async ValueTask<DisseminationMembershipSnapshot?> GetMembershipSnapshotForRouting(
