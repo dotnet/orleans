@@ -1246,7 +1246,7 @@ public class DisseminationProtocolTests
             [root, first, second],
             CreateOverlayOptions(fanout: 2));
 
-        var targets = snapshot.GetOriginatorTreeTargets();
+        var targets = snapshot.OriginatorTreeTargets;
 
         Assert.Equal(new[] { first, second }, targets);
     }
@@ -1264,7 +1264,7 @@ public class DisseminationProtocolTests
             [local, root, sender, child],
             CreateOverlayOptions(fanout: 2));
 
-        var targets = snapshot.GetForwardingTreeTargets();
+        var targets = snapshot.ForwardingTreeTargets;
 
         Assert.Equal(new[] { sender, child }, targets);
     }
@@ -1280,7 +1280,7 @@ public class DisseminationProtocolTests
             [peer],
             CreateOverlayOptions(fanout: 1));
 
-        var targets = snapshot.GetOriginatorTreeTargets();
+        var targets = snapshot.OriginatorTreeTargets;
         var antiEntropyPeers = snapshot.SelectAntiEntropyPeers(1);
 
         Assert.False(snapshot.ContainsMember(local));

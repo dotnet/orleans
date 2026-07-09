@@ -76,7 +76,7 @@ internal sealed partial class DisseminationProtocol
         }
 
         // Remember the local publication and enqueue it for each direct tree target.
-        var treeTargets = membership.GetOriginatorTreeTargets();
+        var treeTargets = membership.OriginatorTreeTargets;
         RecordSeenValue(disseminationNamespace.Name, value.Key);
         foreach (var peer in treeTargets)
         {
@@ -126,7 +126,7 @@ internal sealed partial class DisseminationProtocol
                     continue;
                 }
 
-                foreach (var peer in membership.GetForwardingTreeTargets())
+                foreach (var peer in membership.ForwardingTreeTargets)
                 {
                     if (Equals(peer, originator) || Equals(peer, batch.Sender))
                     {
