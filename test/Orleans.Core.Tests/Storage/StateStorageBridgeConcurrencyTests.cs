@@ -507,20 +507,18 @@ namespace UnitTests.Storage;
         }
 
         [Fact]
-        public async Task InterfaceCancellation_CancelsWaiterButDoesNotCancelQueuedOperationAsync()
+        public async Task InterfaceCancellation_ReliesOnStorageProviderAsync()
         {
             using var context = TestGrainContext.Create();
             var storage = new ControllableGrainStorage();
             IStorage bridge = CreateBridge(context, storage);
             var readCompletion = CreateCompletionSource();
-            var writeCompletion = CreateCompletionSource();
-            var writeFinished = CreateCompletionSource();
             using var cancellationTokenSource = new CancellationTokenSource();
             storage.ReadAsync = _ => readCompletion.Task;
-            storage.WriteAsync = async _ =>
+            storage.WriteWithCancellationAsync = (_, cancellationToken) =>
             {
-                await writeCompletion.Task;
-                writeFinished.SetResult();
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
             };
 
             await RunInGrainContextAsync(context, async () =>
@@ -530,18 +528,64 @@ namespace UnitTests.Storage;
                 var canceledWriteWaiter = bridge.WriteStateAsync(cancellationTokenSource.Token);
                 await cancellationTokenSource.CancelAsync();
 
-                await Assert.ThrowsAsync<TaskCanceledException>(() => canceledWriteWaiter);
+                Assert.False(canceledWriteWaiter.IsCompleted);
                 Assert.Equal(0, storage.WriteCallCount);
 
                 readCompletion.SetResult();
-                await WaitUntilAsync(() => storage.WriteCallCount == 1);
-
-                writeCompletion.SetResult();
-                await writeFinished.Task;
+                await Assert.ThrowsAsync<OperationCanceledException>(() => canceledWriteWaiter);
+                Assert.Equal(cancellationTokenSource.Token, storage.LastWriteCancellationToken);
                 await readTask;
             });
 
+            Assert.Equal(1, storage.WriteCallCount);
+        }
+
+        [Fact]
+        public async Task CancelableWrite_DoesNotCoalesceWithUncancelableWriteAsync()
+        {
+            using var context = TestGrainContext.Create();
+            var storage = new ControllableGrainStorage();
+            IStorage bridge = CreateBridge(context, storage);
+            var readCompletion = CreateCompletionSource();
+            using var cancellationTokenSource = new CancellationTokenSource();
+            storage.ReadAsync = _ => readCompletion.Task;
+
+            await RunInGrainContextAsync(context, async () =>
+            {
+                var readTask = bridge.ReadStateAsync();
+                await WaitUntilAsync(() => storage.ReadCallCount == 1);
+                var canceledWriteWaiter = bridge.WriteStateAsync(cancellationTokenSource.Token);
+                var uncancelableWrite = bridge.WriteStateAsync();
+
+                await cancellationTokenSource.CancelAsync();
+
+                readCompletion.SetResult();
+                await Task.WhenAll(readTask, canceledWriteWaiter, uncancelableWrite);
+            });
+
+            Assert.Equal(2, storage.WriteCallCount);
             AssertLatestEtag(bridge, storage);
+        }
+
+        [Fact]
+        public async Task InterfaceMethods_FlowCancellationTokenToStorageProviderAsync()
+        {
+            using var context = TestGrainContext.Create();
+            var storage = new ControllableGrainStorage();
+            IStorage bridge = CreateBridge(context, storage);
+            using var cancellationTokenSource = new CancellationTokenSource();
+            var cancellationToken = cancellationTokenSource.Token;
+
+            await RunInGrainContextAsync(context, async () =>
+            {
+                await bridge.ReadStateAsync(cancellationToken);
+                await bridge.WriteStateAsync(cancellationToken);
+                await bridge.ClearStateAsync(cancellationToken);
+            });
+
+            Assert.Equal(cancellationToken, storage.LastReadCancellationToken);
+            Assert.Equal(cancellationToken, storage.LastWriteCancellationToken);
+            Assert.Equal(cancellationToken, storage.LastClearCancellationToken);
         }
 
         [Fact]
@@ -646,10 +690,15 @@ namespace UnitTests.Storage;
             private int _writeCallCount;
             private int _clearCallCount;
             private string _lastEtag;
+            private CancellationToken _lastReadCancellationToken;
+            private CancellationToken _lastWriteCancellationToken;
+            private CancellationToken _lastClearCancellationToken;
 
             public Func<IGrainState<TestState>, Task> ReadAsync { get; set; } = _ => Task.CompletedTask;
 
             public Func<IGrainState<TestState>, Task> WriteAsync { get; set; } = _ => Task.CompletedTask;
+
+            public Func<IGrainState<TestState>, CancellationToken, Task> WriteWithCancellationAsync { get; set; }
 
             public Func<IGrainState<TestState>, Task> ClearAsync { get; set; } = _ => Task.CompletedTask;
 
@@ -686,6 +735,39 @@ namespace UnitTests.Storage;
                 }
             }
 
+            public CancellationToken LastReadCancellationToken
+            {
+                get
+                {
+                    lock (_gate)
+                    {
+                        return _lastReadCancellationToken;
+                    }
+                }
+            }
+
+            public CancellationToken LastWriteCancellationToken
+            {
+                get
+                {
+                    lock (_gate)
+                    {
+                        return _lastWriteCancellationToken;
+                    }
+                }
+            }
+
+            public CancellationToken LastClearCancellationToken
+            {
+                get
+                {
+                    lock (_gate)
+                    {
+                        return _lastClearCancellationToken;
+                    }
+                }
+            }
+
             public string LastEtag
             {
                 get
@@ -697,40 +779,66 @@ namespace UnitTests.Storage;
                 }
             }
 
-            public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+            public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+                => ReadStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+            public async Task ReadStateAsync<T>(
+                string stateName,
+                GrainId grainId,
+                IGrainState<T> grainState,
+                CancellationToken cancellationToken)
             {
                 var testState = GetTestState(grainState);
 
                 lock (_gate)
                 {
                     _readCallCount++;
+                    _lastReadCancellationToken = cancellationToken;
                     _operations.Add("read");
                 }
 
                 await ReadAsync(testState);
             }
 
-            public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+            public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+                => WriteStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+            public async Task WriteStateAsync<T>(
+                string stateName,
+                GrainId grainId,
+                IGrainState<T> grainState,
+                CancellationToken cancellationToken)
             {
                 var testState = GetTestState(grainState);
 
                 lock (_gate)
                 {
                     _writeCallCount++;
+                    _lastWriteCancellationToken = cancellationToken;
                     _operations.Add($"write-{_writeCallCount}");
                 }
 
-                await WriteAsync(testState);
+                await (WriteWithCancellationAsync is { } write
+                    ? write(testState, cancellationToken)
+                    : WriteAsync(testState));
                 ResetEtag(testState, recordExists: true);
             }
 
-            public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+            public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+                => ClearStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+            public async Task ClearStateAsync<T>(
+                string stateName,
+                GrainId grainId,
+                IGrainState<T> grainState,
+                CancellationToken cancellationToken)
             {
                 var testState = GetTestState(grainState);
 
                 lock (_gate)
                 {
                     _clearCallCount++;
+                    _lastClearCancellationToken = cancellationToken;
                     _operations.Add($"clear-{_clearCallCount}");
                 }
 

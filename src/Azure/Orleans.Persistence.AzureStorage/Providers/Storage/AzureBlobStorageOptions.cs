@@ -54,7 +54,7 @@ namespace Orleans.Configuration
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether to delete the state when <see cref="IGrainStorage.ClearStateAsync"/> is called.  Defaults to true.
+        /// Gets or sets a value indicating whether to delete the state when <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/> is called.  Defaults to true.
         /// </summary>
         public bool DeleteStateOnClear { get; set; } = true;
 

@@ -105,12 +105,12 @@ namespace Orleans.Core
             lock (_storageOperationLock)
             {
                 var predecessor = _storageOperationTail;
-                operation = new QueuedStorageOperation(StorageOperationKind.Read);
+                operation = new QueuedStorageOperation(StorageOperationKind.Read, cancellationToken);
                 operation.SetCompletion(RunReadStorageOperationAsync(operation, predecessor));
                 _storageOperationTail = operation;
             }
 
-            return WaitForStorageOperationAsync(operation.Completion, cancellationToken);
+            return operation.Completion;
         }
 
         private Task WriteStateInternalAsync(CancellationToken cancellationToken)
@@ -119,20 +119,21 @@ namespace Orleans.Core
 
             lock (_storageOperationLock)
             {
-                if (_storageOperationTail is { Kind: StorageOperationKind.Write, Started: false } tail)
+                if (!cancellationToken.CanBeCanceled
+                    && _storageOperationTail is { Kind: StorageOperationKind.Write, Started: false, CanBeCanceled: false } tail)
                 {
                     operation = tail;
                 }
                 else
                 {
                     var predecessor = _storageOperationTail;
-                    operation = new QueuedStorageOperation(StorageOperationKind.Write);
+                    operation = new QueuedStorageOperation(StorageOperationKind.Write, cancellationToken);
                     operation.SetCompletion(RunRequiredStorageOperationAsync(operation, predecessor, WriteStateCoreAsync));
                     _storageOperationTail = operation;
                 }
             }
 
-            return WaitForStorageOperationAsync(operation.Completion, cancellationToken);
+            return operation.Completion;
         }
 
         private Task ClearStateInternalAsync(CancellationToken cancellationToken)
@@ -141,29 +142,27 @@ namespace Orleans.Core
 
             lock (_storageOperationLock)
             {
-                if (_storageOperationTail is { Kind: StorageOperationKind.Clear, Started: false } tail)
+                if (!cancellationToken.CanBeCanceled
+                    && _storageOperationTail is { Kind: StorageOperationKind.Clear, Started: false, CanBeCanceled: false } tail)
                 {
                     operation = tail;
                 }
                 else
                 {
                     var predecessor = _storageOperationTail;
-                    operation = new QueuedStorageOperation(StorageOperationKind.Clear);
+                    operation = new QueuedStorageOperation(StorageOperationKind.Clear, cancellationToken);
                     operation.SetCompletion(RunClearStorageOperationAsync(operation, predecessor));
                     _storageOperationTail = operation;
                 }
             }
 
-            return WaitForStorageOperationAsync(operation.Completion, cancellationToken);
+            return operation.Completion;
         }
-
-        private static Task WaitForStorageOperationAsync(Task operation, CancellationToken cancellationToken)
-            => cancellationToken.CanBeCanceled ? operation.WaitAsync(cancellationToken) : operation;
 
         private async Task RunRequiredStorageOperationAsync(
             QueuedStorageOperation operation,
             QueuedStorageOperation? predecessor,
-            Func<Task> performOperation)
+            Func<CancellationToken, Task> performOperation)
         {
             await Task.CompletedTask.ConfigureAwait(
                 ConfigureAwaitOptions.ForceYielding |
@@ -180,7 +179,7 @@ namespace Orleans.Core
 
                 MarkStorageOperationStarted(operation);
 
-                await performOperation();
+                await performOperation(operation.CancellationToken);
             }
             finally
             {
@@ -211,7 +210,7 @@ namespace Orleans.Core
 
                 if (!readSatisfiedByPredecessor)
                 {
-                    await ReadStateCoreAsync();
+                    await ReadStateCoreAsync(operation.CancellationToken);
                 }
             }
             finally
@@ -245,7 +244,7 @@ namespace Orleans.Core
 
                 if (!clearSatisfiedByPredecessor)
                 {
-                    await ClearStateCoreAsync();
+                    await ClearStateCoreAsync(operation.CancellationToken);
                 }
             }
             finally
@@ -273,7 +272,7 @@ namespace Orleans.Core
             }
         }
 
-        private async Task ReadStateCoreAsync()
+        private async Task ReadStateCoreAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -296,9 +295,13 @@ namespace Orleans.Core
                 activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
-                await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
+                await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState, cancellationToken);
                 IsStateInitialized = true;
                 _storageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -307,7 +310,7 @@ namespace Orleans.Core
             }
         }
 
-        private async Task WriteStateCoreAsync()
+        private async Task WriteStateCoreAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -329,8 +332,12 @@ namespace Orleans.Core
                 activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
-                await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
+                await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState, cancellationToken);
                 _storageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -339,7 +346,7 @@ namespace Orleans.Core
             }
         }
 
-        private async Task ClearStateCoreAsync()
+        private async Task ClearStateCoreAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -363,11 +370,15 @@ namespace Orleans.Core
                 var sw = ValueStopwatch.StartNew();
 
                 // Clear state in external storage
-                await _shared.Store.ClearStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
+                await _shared.Store.ClearStateAsync(_shared.Name, _grainContext.GrainId, GrainState, cancellationToken);
                 sw.Stop();
 
                 // Update counters
                 _storageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -482,11 +493,15 @@ namespace Orleans.Core
             Clear
         }
 
-        private sealed class QueuedStorageOperation(StorageOperationKind kind)
+        private sealed class QueuedStorageOperation(StorageOperationKind kind, CancellationToken cancellationToken)
         {
             private Task? _completion;
 
             public StorageOperationKind Kind { get; } = kind;
+
+            public CancellationToken CancellationToken { get; } = cancellationToken;
+
+            public bool CanBeCanceled => CancellationToken.CanBeCanceled;
 
             public bool Started { get; set; }
 
