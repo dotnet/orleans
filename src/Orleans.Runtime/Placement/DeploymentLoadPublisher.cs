@@ -160,8 +160,11 @@ namespace Orleans.Runtime
                     return false;
                 }
 
-                var item = disseminationNamespace.CreateValue(_siloDetails.SiloAddress, myStats);
-                return await dissemination.Publish(disseminationNamespace, item, CancellationToken.None);
+                return await dissemination.Publish(
+                    disseminationNamespace,
+                    _siloDetails.SiloAddress,
+                    myStats.DateTime.Ticks,
+                    CancellationToken.None);
             }
             catch (Exception exception)
             {

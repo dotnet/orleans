@@ -9,25 +9,40 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
     IOptionsMonitor<DeploymentLoadPublisherOptions> options,
     Serializer serializer) : IDisseminationNamespace
 {
+    private readonly object _cacheLock = new();
+    private readonly Dictionary<SiloAddress, DisseminationValue> _cachedValues = [];
+
     public DisseminationNamespace Name => DisseminationNamespaceNames.DeploymentLoad;
 
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public DisseminationValue CreateValue(SiloAddress origin, SiloRuntimeStatistics statistics)
     {
-        var payload = serializer.SerializeToArray(statistics);
-        return new DisseminationValue(
-            origin,
-            fromVersion: 0,
-            toVersion: statistics.DateTime.Ticks,
-            payload);
+        lock (_cacheLock)
+        {
+            if (_cachedValues.TryGetValue(origin, out var cached)
+                && cached.ToVersion == statistics.DateTime.Ticks)
+            {
+                return cached;
+            }
+
+            var result = new DisseminationValue(
+                origin,
+                fromVersion: 0,
+                toVersion: statistics.DateTime.Ticks,
+                serializer.SerializeToArray(statistics));
+            _cachedValues[origin] = result;
+            return result;
+        }
     }
 
     public IEnumerable<DigestEntry> Digests
     {
         get
         {
-            foreach (var siloAddress in deploymentLoadPublisher.GetActiveSilosForStatisticsDigest())
+            var activeSilos = deploymentLoadPublisher.GetActiveSilosForStatisticsDigest();
+            PruneCache(activeSilos);
+            foreach (var siloAddress in activeSilos)
             {
                 yield return new DigestEntry(siloAddress, GetVersion(siloAddress));
             }
@@ -41,21 +56,36 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
                 ? statistics.DateTime.Ticks
                 : 0;
 
-    public bool TryCreateRepairValue(
-        DisseminationKey key,
-        long peerVersion,
-        out DisseminationValue value)
+    public DisseminationRepairResult CreateRepair(in DisseminationRepairRequest request)
     {
-        if (key.Value is not SiloAddress siloAddress
+        if (request.Key.Value is not SiloAddress siloAddress
             || !deploymentLoadPublisher.PeriodicStatistics.TryGetValue(siloAddress, out var statistics)
-            || statistics.DateTime.Ticks <= peerVersion)
+            || deploymentLoadPublisher.IsRuntimeStatisticsObsolete(siloAddress, statistics.DateTime.Ticks))
         {
-            value = default;
-            return false;
+            return DisseminationRepairResult.Unavailable(version: 0);
         }
 
-        value = CreateValue(siloAddress, statistics);
-        return true;
+        var version = statistics.DateTime.Ticks;
+        if (request.ToVersion is { } targetVersion && targetVersion != version)
+        {
+            return DisseminationRepairResult.Unavailable(version);
+        }
+
+        if (request.FromVersion is { } peerVersion && peerVersion >= version)
+        {
+            return DisseminationRepairResult.Current(version);
+        }
+
+        if (request.MaxItemCount <= 0)
+        {
+            return DisseminationRepairResult.InsufficientCapacity(version);
+        }
+
+        var value = CreateValue(siloAddress, statistics);
+        return value.Payload.Length <= request.MaxPayloadBytes
+            && value.Payload.Length <= request.MaxBatchBytes
+                ? DisseminationRepairResult.Produced(version, [value])
+                : DisseminationRepairResult.InsufficientCapacity(version);
     }
 
     public ValueTask<DisseminationApplyResult> ApplyValueAsync(
@@ -77,4 +107,14 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
             deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }
 
+    private void PruneCache(IReadOnlyCollection<SiloAddress> activeSilos)
+    {
+        lock (_cacheLock)
+        {
+            foreach (var key in _cachedValues.Keys.Where(key => !activeSilos.Contains(key)).ToArray())
+            {
+                _cachedValues.Remove(key);
+            }
+        }
+    }
 }
