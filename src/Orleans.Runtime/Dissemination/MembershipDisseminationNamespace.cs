@@ -14,19 +14,24 @@ internal sealed class MembershipDisseminationNamespace(
     private const int MaxSnapshotHistory = 32;
     private readonly object _historyLock = new();
     private readonly SortedDictionary<long, MembershipTableSnapshot> _snapshotHistory = new();
+    private readonly Dictionary<long, ReadOnlyMemory<byte>> _snapshotPayloads = [];
+    private readonly Dictionary<(long FromVersion, long ToVersion), ReadOnlyMemory<byte>> _diffPayloads = [];
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.Membership;
 
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
-    public DisseminationValue CreateValue(MembershipTableSnapshot snapshot)
+    public async ValueTask<bool> PublishAsync(
+        IDisseminationService disseminationService,
+        MembershipTableSnapshot snapshot,
+        CancellationToken cancellationToken)
     {
         RememberSnapshot(snapshot);
-        return new DisseminationValue(
+        return await disseminationService.Publish(
+            this,
             DisseminationKey.Default,
-            fromVersion: 0,
-            toVersion: snapshot.Version.Value,
-            serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }));
+            snapshot.Version.Value,
+            cancellationToken);
     }
 
     public IEnumerable<DigestEntry> Digests
@@ -35,7 +40,10 @@ internal sealed class MembershipDisseminationNamespace(
         {
             var snapshot = membershipManager.CurrentSnapshot;
             RememberSnapshot(snapshot);
-            yield return new DigestEntry(DisseminationKey.Default, snapshot.Version.Value);
+            yield return new DigestEntry(
+                DisseminationKey.Default,
+                snapshot.Version.Value,
+                GetFingerprint(snapshot));
         }
     }
 
@@ -44,32 +52,71 @@ internal sealed class MembershipDisseminationNamespace(
             ? membershipManager.CurrentSnapshot.Version.Value
             : 0;
 
-    public bool TryCreateRepairValue(
-        DisseminationKey key,
-        long peerVersion,
-        out DisseminationValue value)
+    public DisseminationRepairResult CreateRepair(in DisseminationRepairRequest request)
     {
-        if (key != DisseminationKey.Default)
+        if (request.Key != DisseminationKey.Default)
         {
-            value = default;
-            return false;
+            return DisseminationRepairResult.Unavailable(version: 0);
         }
 
-        var snapshot = membershipManager.CurrentSnapshot;
-        RememberSnapshot(snapshot);
-        if (snapshot.Version.Value <= peerVersion)
+        lock (_historyLock)
         {
-            value = default;
-            return false;
-        }
+            var currentSnapshot = membershipManager.CurrentSnapshot;
+            RememberSnapshotUnsafe(currentSnapshot);
+            var targetVersion = request.ToVersion ?? currentSnapshot.Version.Value;
+            if (targetVersion > currentSnapshot.Version.Value
+                || !_snapshotHistory.TryGetValue(targetVersion, out var targetSnapshot))
+            {
+                return DisseminationRepairResult.Unavailable(currentSnapshot.Version.Value);
+            }
 
-        if (TryCreateDiffValue(peerVersion, snapshot, out value))
-        {
-            return true;
-        }
+            MembershipTableSnapshot? baseSnapshot = null;
+            if (request.FromVersion is { } fromVersion
+                && fromVersion > 0
+                && fromVersion < targetVersion)
+            {
+                _snapshotHistory.TryGetValue(fromVersion, out baseSnapshot);
+            }
 
-        value = CreateValue(snapshot);
-        return true;
+            var resolvedVersion = targetSnapshot.Version.Value;
+            if (request.FromVersion is { } peerVersion && peerVersion > resolvedVersion)
+            {
+                return DisseminationRepairResult.Current(resolvedVersion);
+            }
+
+            if (request.MaxItemCount <= 0)
+            {
+                return DisseminationRepairResult.InsufficientCapacity(resolvedVersion);
+            }
+
+            var snapshotValue = CreateSnapshotValue(targetSnapshot);
+            var selectedValue = snapshotValue;
+            if (baseSnapshot is not null)
+            {
+                var diffValue = CreateDiffValue(baseSnapshot, targetSnapshot);
+                if (diffValue.Payload.Length < snapshotValue.Payload.Length)
+                {
+                    selectedValue = diffValue;
+                }
+            }
+
+            if (selectedValue.Payload.Length > request.MaxPayloadBytes
+                || selectedValue.Payload.Length > request.MaxBatchBytes)
+            {
+                if (selectedValue.FromVersion != 0
+                    && snapshotValue.Payload.Length <= request.MaxPayloadBytes
+                    && snapshotValue.Payload.Length <= request.MaxBatchBytes)
+                {
+                    selectedValue = snapshotValue;
+                }
+                else
+                {
+                    return DisseminationRepairResult.InsufficientCapacity(resolvedVersion);
+                }
+            }
+
+            return DisseminationRepairResult.Produced(resolvedVersion, [selectedValue]);
+        }
     }
 
     public async ValueTask<DisseminationApplyResult> ApplyValueAsync(
@@ -101,15 +148,22 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Rejected;
         }
 
-        var currentVersion = membershipManager.CurrentSnapshot.Version;
-        if (snapshot.Version < currentVersion)
+        var currentSnapshot = membershipManager.CurrentSnapshot;
+        if (snapshot.Version < currentSnapshot.Version)
         {
             return DisseminationApplyResult.Obsolete;
         }
 
-        if (snapshot.Version == currentVersion)
+        if (snapshot.Version == currentSnapshot.Version)
         {
-            return DisseminationApplyResult.Duplicate;
+            if (!snapshot.IsSuccessorTo(currentSnapshot))
+            {
+                return DisseminationApplyResult.Duplicate;
+            }
+
+            await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
+            RememberSnapshot(membershipManager.CurrentSnapshot);
+            return DisseminationApplyResult.Applied;
         }
 
         await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
@@ -117,27 +171,19 @@ internal sealed class MembershipDisseminationNamespace(
         return DisseminationApplyResult.Applied;
     }
 
-    private bool TryCreateDiffValue(long peerVersion, MembershipTableSnapshot snapshot, out DisseminationValue value)
-    {
-        MembershipTableSnapshot? baseSnapshot;
-        lock (_historyLock)
-        {
-            _snapshotHistory.TryGetValue(peerVersion, out baseSnapshot);
-        }
+    private DisseminationValue CreateSnapshotValue(MembershipTableSnapshot snapshot) => new(
+        DisseminationKey.Default,
+        fromVersion: 0,
+        toVersion: snapshot.Version.Value,
+        GetSnapshotPayload(snapshot));
 
-        if (baseSnapshot is null)
-        {
-            value = default!;
-            return false;
-        }
-        var diff = CreateDiff(baseSnapshot, snapshot);
-        value = new DisseminationValue(
-            DisseminationKey.Default,
-            fromVersion: peerVersion,
-            toVersion: snapshot.Version.Value,
-            serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }));
-        return true;
-    }
+    private DisseminationValue CreateDiffValue(
+        MembershipTableSnapshot baseSnapshot,
+        MembershipTableSnapshot snapshot) => new(
+        DisseminationKey.Default,
+        fromVersion: baseSnapshot.Version.Value,
+        toVersion: snapshot.Version.Value,
+        GetDiffPayload(baseSnapshot, snapshot));
 
     private async ValueTask<DisseminationApplyResult> ApplyDiff(MembershipTableSnapshotDiff diff, CancellationToken cancellationToken)
     {
@@ -178,15 +224,73 @@ internal sealed class MembershipDisseminationNamespace(
     {
         lock (_historyLock)
         {
-            _snapshotHistory[snapshot.Version.Value] = snapshot;
-            while (_snapshotHistory.Count > MaxSnapshotHistory)
+            RememberSnapshotUnsafe(snapshot);
+        }
+    }
+
+    private void RememberSnapshotUnsafe(MembershipTableSnapshot snapshot)
+    {
+        if (_snapshotHistory.TryGetValue(snapshot.Version.Value, out var previous)
+            && !MembershipSnapshotsEqual(previous, snapshot))
+        {
+            InvalidatePayloads(snapshot.Version.Value);
+        }
+
+        _snapshotHistory[snapshot.Version.Value] = snapshot;
+        while (_snapshotHistory.Count > MaxSnapshotHistory)
+        {
+            using var enumerator = _snapshotHistory.Keys.GetEnumerator();
+            if (enumerator.MoveNext())
             {
-                using var enumerator = _snapshotHistory.Keys.GetEnumerator();
-                if (enumerator.MoveNext())
-                {
-                    _snapshotHistory.Remove(enumerator.Current);
-                }
+                var removedVersion = enumerator.Current;
+                _snapshotHistory.Remove(removedVersion);
+                InvalidatePayloads(removedVersion);
             }
+        }
+    }
+
+    private void InvalidatePayloads(long version)
+    {
+        _snapshotPayloads.Remove(version);
+        foreach (var key in _diffPayloads.Keys
+            .Where(key => key.FromVersion == version || key.ToVersion == version)
+            .ToArray())
+        {
+            _diffPayloads.Remove(key);
+        }
+    }
+
+    private ReadOnlyMemory<byte> GetSnapshotPayload(MembershipTableSnapshot snapshot)
+    {
+        lock (_historyLock)
+        {
+            if (!_snapshotPayloads.TryGetValue(snapshot.Version.Value, out var payload))
+            {
+                payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot });
+                _snapshotPayloads.Add(snapshot.Version.Value, payload);
+            }
+
+            return payload;
+        }
+    }
+
+    private ReadOnlyMemory<byte> GetDiffPayload(
+        MembershipTableSnapshot baseSnapshot,
+        MembershipTableSnapshot snapshot)
+    {
+        var key = (baseSnapshot.Version.Value, snapshot.Version.Value);
+        lock (_historyLock)
+        {
+            if (!_diffPayloads.TryGetValue(key, out var payload))
+            {
+                payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate
+                {
+                    Diff = CreateDiff(baseSnapshot, snapshot),
+                });
+                _diffPayloads.Add(key, payload);
+            }
+
+            return payload;
         }
     }
 
@@ -195,10 +299,7 @@ internal sealed class MembershipDisseminationNamespace(
         var updated = ImmutableArray.CreateBuilder<MembershipEntry>();
         foreach (var entry in snapshot.Entries)
         {
-            if (!baseSnapshot.Entries.TryGetValue(entry.Key, out var previous) || !MembershipEntriesEqual(previous, entry.Value))
-            {
-                updated.Add(entry.Value);
-            }
+            updated.Add(entry.Value);
         }
 
         var removed = ImmutableArray.CreateBuilder<SiloAddress>();
@@ -215,6 +316,20 @@ internal sealed class MembershipDisseminationNamespace(
             snapshot.Version,
             updated.ToImmutable(),
             removed.ToImmutable());
+    }
+
+    private static long GetFingerprint(MembershipTableSnapshot snapshot)
+    {
+        const ulong offset = 14695981039346656037;
+        const ulong prime = 1099511628211;
+        var hash = offset;
+        foreach (var entry in snapshot.Entries.OrderBy(static entry => entry.Key))
+        {
+            hash = unchecked((hash ^ (uint)entry.Key.GetConsistentHashCode()) * prime);
+            hash = unchecked((hash ^ (ulong)entry.Value.EffectiveIAmAliveTime.Ticks) * prime);
+        }
+
+        return unchecked((long)hash);
     }
 
     private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
@@ -255,6 +370,32 @@ internal sealed class MembershipDisseminationNamespace(
         && left.FaultZone == right.FaultZone
         && left.StartTime == right.StartTime
         && left.IAmAliveTime == right.IAmAliveTime;
+
+    private static bool MembershipSnapshotsEqual(
+        MembershipTableSnapshot left,
+        MembershipTableSnapshot right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return true;
+        }
+
+        if (left.Version != right.Version || left.Entries.Count != right.Entries.Count)
+        {
+            return false;
+        }
+
+        foreach (var (siloAddress, entry) in left.Entries)
+        {
+            if (!right.Entries.TryGetValue(siloAddress, out var other)
+                || !MembershipEntriesEqual(entry, other))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static bool EqualSuspectTimes(List<Tuple<SiloAddress, DateTime>>? left, List<Tuple<SiloAddress, DateTime>>? right)
     {

@@ -4,6 +4,7 @@ internal interface IDisseminationService
 {
     ValueTask<bool> Publish(
         IDisseminationNamespace disseminationNamespace,
-        DisseminationValue value,
+        DisseminationKey key,
+        long version,
         CancellationToken cancellationToken);
 }
