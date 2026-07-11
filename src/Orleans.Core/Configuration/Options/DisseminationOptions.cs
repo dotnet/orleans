@@ -108,7 +108,7 @@ public sealed class DisseminationNamespaceOptions
     public bool Enabled { get; set; }
 
     /// <summary>
-    /// Gets or sets the maximum number of pending namespace values.
+    /// Gets or sets the maximum number of pending namespace keys per peer.
     /// </summary>
     public int MaxPendingItemCount { get; set; } = 1024;
 

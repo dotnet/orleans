@@ -35,11 +35,18 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
     async ValueTask<bool> IDisseminationService.Publish(
         IDisseminationNamespace disseminationNamespace,
-        DisseminationValue value,
+        DisseminationKey key,
+        long version,
         CancellationToken cancellationToken) =>
-        await this.RunOrQueueTask(async () => await _protocol.Publish(disseminationNamespace, value, cancellationToken));
+        await this.RunOrQueueTask(async () => await _protocol.Publish(
+            disseminationNamespace,
+            key,
+            version,
+            cancellationToken));
 
-    Task IDisseminationSystemTarget.PushBroadcast(DisseminationBroadcastBatch batch, CancellationToken cancellationToken) =>
+    Task<DisseminationBroadcastResponse> IDisseminationSystemTarget.PushBroadcast(
+        DisseminationBroadcastBatch batch,
+        CancellationToken cancellationToken) =>
         _protocol.ReceiveBroadcast(batch, cancellationToken);
 
     async Task<DisseminationAntiEntropyResponse> IDisseminationSystemTarget.ExchangeAntiEntropy(

@@ -42,8 +42,7 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
                 return false;
             }
 
-            var item = disseminationNamespace.CreateValue(snapshot);
-            return await dissemination.Publish(disseminationNamespace, item, CancellationToken.None);
+            return await disseminationNamespace.PublishAsync(dissemination, snapshot, CancellationToken.None);
         }
         catch (Exception exception)
         {
