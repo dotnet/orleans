@@ -128,7 +128,7 @@ namespace Orleans.Core
                 {
                     var predecessor = _storageOperationTail;
                     operation = new QueuedStorageOperation(StorageOperationKind.Write, cancellationToken);
-                    operation.SetCompletion(RunRequiredStorageOperationAsync(operation, predecessor, WriteStateCoreAsync));
+                    operation.SetCompletion(RunWriteStorageOperationAsync(operation, predecessor));
                     _storageOperationTail = operation;
                 }
             }
@@ -159,10 +159,9 @@ namespace Orleans.Core
             return operation.Completion;
         }
 
-        private async Task RunRequiredStorageOperationAsync(
+        private async Task RunWriteStorageOperationAsync(
             QueuedStorageOperation operation,
-            QueuedStorageOperation? predecessor,
-            Func<CancellationToken, Task> performOperation)
+            QueuedStorageOperation? predecessor)
         {
             await Task.CompletedTask.ConfigureAwait(
                 ConfigureAwaitOptions.ForceYielding |
@@ -179,7 +178,7 @@ namespace Orleans.Core
 
                 MarkStorageOperationStarted(operation);
 
-                await performOperation(operation.CancellationToken);
+                await WriteStateCoreAsync(operation.CancellationToken);
             }
             finally
             {
