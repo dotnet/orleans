@@ -380,7 +380,7 @@ namespace Orleans.Internal
             {
                 currMax = maxDelay;
             }
-            currMax = currMax.Min(maxDelay);
+            currMax = StandardExtensions.Min(currMax, maxDelay);
 
             if (minDelay >= currMax) throw new ArgumentOutOfRangeException($"minDelay {minDelay}, currMax = {currMax}");
             return RandomTimeSpan.Next(minDelay, currMax);

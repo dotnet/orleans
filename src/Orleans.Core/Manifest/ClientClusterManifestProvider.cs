@@ -116,7 +116,7 @@ namespace Orleans.Runtime
                         gateway = _gatewayManager.GetLiveGateway();
                         if (gateway is null)
                         {
-                            await Task.Delay(_typeManagementOptions.TypeMapRefreshInterval.Min(TimeSpan.FromMilliseconds(500)), _shutdownCts.Token);
+                            await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)), _shutdownCts.Token);
                             continue;
                         }
 
@@ -167,7 +167,7 @@ namespace Orleans.Runtime
                         var updatedManifest = new ClusterManifest(new MajorMinorVersion(gatewayVersion.Major, ++minorVersion), siloManifests);
                         if (!_updates.TryPublish(updatedManifest))
                         {
-                            await Task.Delay(_typeManagementOptions.TypeMapRefreshInterval.Min(TimeSpan.FromMilliseconds(500)), _shutdownCts.Token);
+                            await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)), _shutdownCts.Token);
                             continue;
                         }
 
@@ -185,7 +185,7 @@ namespace Orleans.Runtime
                     catch (Exception exception)
                     {
                         LogErrorTryingToGetClusterManifest(_logger, exception, gateway);
-                        await Task.Delay(_typeManagementOptions.TypeMapRefreshInterval.Min(TimeSpan.FromSeconds(5)), _shutdownCts.Token).SuppressThrowing();
+                        await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromSeconds(5)), _shutdownCts.Token).SuppressThrowing();
 
                         // Reset the gateway so that another will be selected on the next iteration.
                         gateway = null;

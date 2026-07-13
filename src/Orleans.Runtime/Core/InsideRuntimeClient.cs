@@ -12,13 +12,13 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Diagnostics;
 using Orleans.GrainReferences;
-using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Storage;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans.Runtime
 {
@@ -83,7 +83,7 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
-            var period = this.messagingOptions.ResponseTimeout.Min(TimeSpan.FromSeconds(1)).Max(TimeSpan.FromMilliseconds(1));
+            var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
             var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();

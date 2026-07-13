@@ -10,11 +10,11 @@ using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
@@ -86,9 +86,11 @@ namespace Orleans
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
-            var period = this.clientMessagingOptions.ResponseTimeout
-                .Min(TimeSpan.FromSeconds(1))
-                .Max(TimeSpan.FromMilliseconds(1));
+            var period = Max(
+                TimeSpan.FromMilliseconds(1),
+                Min(
+                    this.clientMessagingOptions.ResponseTimeout,
+                    TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
