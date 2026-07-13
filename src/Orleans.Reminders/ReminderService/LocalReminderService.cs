@@ -1008,7 +1008,9 @@ namespace Orleans.Runtime.ReminderService
                     {
                         if (initialDueTime is { } delay)
                         {
-                            var delayTask = Task.Delay(delay, _shared._timeProvider, waitCancellation.Token);
+                            var delayTask = _shared._timeProvider.DelayUntilAsync(
+                                _shared._timeProvider.GetUtcNow() + delay,
+                                waitCancellation.Token);
                             if (!scheduleChangedToken.IsCancellationRequested && !_stopCancellation.IsCancellationRequested)
                             {
                                 ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);

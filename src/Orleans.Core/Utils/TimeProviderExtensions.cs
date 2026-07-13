@@ -1,0 +1,30 @@
+namespace Orleans.Internal;
+
+internal static class TimeProviderExtensions
+{
+    private static readonly TimeSpan MaximumTimerDelay = TimeSpan.FromMilliseconds(0xfffffffe);
+
+    public static async Task DelayUntilAsync(
+        this TimeProvider timeProvider,
+        DateTimeOffset dueTime,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var remaining = dueTime - timeProvider.GetUtcNow();
+            if (remaining <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            // Task.Delay cannot represent delays beyond approximately 49.7 days. Waiting in bounded
+            // chunks preserves the absolute deadline without imposing that limit on callers.
+            await Task.Delay(
+                remaining > MaximumTimerDelay ? MaximumTimerDelay : remaining,
+                timeProvider,
+                cancellationToken);
+        }
+    }
+}
