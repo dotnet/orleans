@@ -62,7 +62,7 @@ namespace Orleans.Runtime.ReminderService
             this.asyncTimerFactory = asyncTimerFactory;
             _timeProvider = timeProvider;
             _reminderInstruments = reminderInstruments;
-            _reminderInstruments.RegisterActiveRemindersObserve();
+            _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher", _timeProvider);
@@ -180,11 +180,6 @@ namespace Orleans.Runtime.ReminderService
             var tasks = new List<Task>(localReminders.Count);
             foreach (var reminderData in localReminders.Values)
             {
-                if (!reminderData.IsPendingRemoval)
-                {
-                    _reminderInstruments.OnLocalReminderUnloaded();
-                }
-
                 tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
             }
 
@@ -375,11 +370,6 @@ namespace Orleans.Runtime.ReminderService
                 LogTraceRemovingReminder(r.Value);
 
                 // remove locally
-                if (!r.Value.IsPendingRemoval)
-                {
-                    _reminderInstruments.OnLocalReminderUnloaded();
-                }
-
                 removedReminderTasks.Add(r.Value.StopAsync(ReminderEvents.LocalReminderStopReason.RemovedFromRange));
                 localReminders.Remove(r.Key);
             }
@@ -668,7 +658,6 @@ namespace Orleans.Runtime.ReminderService
                         LocalSequenceNumber = sequence,
                     };
                     localReminders[key] = reminderData;
-                    _reminderInstruments.OnLocalReminderLoaded();
                     LogDebugStartedReminder(entry);
                 }
                 else
@@ -686,7 +675,6 @@ namespace Orleans.Runtime.ReminderService
                     LocalSequenceNumber = sequence,
                 };
                 localReminders.Add(key, reminderData);
-                _reminderInstruments.OnLocalReminderLoaded();
 
                 LogDebugStartedReminder(entry);
             }
@@ -752,13 +740,7 @@ namespace Orleans.Runtime.ReminderService
                 return;
             }
 
-            var wasLoaded = !reminder.IsPendingRemoval;
             var stopTask = reminder.StopAsync(reason, sequence);
-            if (wasLoaded)
-            {
-                _reminderInstruments.OnLocalReminderUnloaded();
-            }
-
             if (!retainTombstone)
             {
                 localReminders.Remove(key);
@@ -937,7 +919,6 @@ namespace Orleans.Runtime.ReminderService
                 return false;
             }
 
-            _reminderInstruments.OnLocalReminderUnloaded();
             // Keep the stopped object as a tombstone until a newer table read observes this scheduling decision.
             return true;
         }

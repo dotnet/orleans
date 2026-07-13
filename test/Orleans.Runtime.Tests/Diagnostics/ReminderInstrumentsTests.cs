@@ -21,12 +21,7 @@ public class ReminderInstrumentsTests
         using var tardinessCollector = new MetricCollector<double>(meterFactory, "Microsoft.Orleans", InstrumentNames.REMINDERS_TARDINESS);
         using var ticksDeliveredCollector = new MetricCollector<int>(meterFactory, "Microsoft.Orleans", InstrumentNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
 
-        instruments.RegisterActiveRemindersObserve();
-        instruments.OnLocalReminderLoaded();
-        instruments.OnLocalReminderLoaded();
-        instruments.OnLocalReminderLoaded();
-        instruments.OnLocalReminderLoaded();
-        instruments.OnLocalReminderUnloaded();
+        instruments.RegisterActiveRemindersObserve(() => 3);
         instruments.OnTardiness(TimeSpan.FromSeconds(4));
         instruments.OnTickDelivered();
 
