@@ -653,10 +653,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (existing.State is LocalReminderState.Tombstone)
                 {
-                    reminderData = new LocalReminderData(entry, this)
-                    {
-                        LocalSequenceNumber = sequence,
-                    };
+                    reminderData = LocalReminderData.CreateRunnable(entry, this, sequence);
                     localReminders[key] = reminderData;
                     LogDebugStartedReminder(entry);
                 }
@@ -670,10 +667,7 @@ namespace Orleans.Runtime.ReminderService
             }
             else
             {
-                reminderData = new LocalReminderData(entry, this)
-                {
-                    LocalSequenceNumber = sequence,
-                };
+                reminderData = LocalReminderData.CreateRunnable(entry, this, sequence);
                 localReminders.Add(key, reminderData);
 
                 LogDebugStartedReminder(entry);
@@ -700,14 +694,14 @@ namespace Orleans.Runtime.ReminderService
                 return;
             }
 
-            localReminders[key] = new LocalReminderData(entry, this, reason, GetLocalMutationSequence());
+            localReminders[key] = LocalReminderData.CreateTombstone(entry, this, reason, GetLocalMutationSequence());
             LogDebugStoppingReminder(entry, reason);
         }
 
         private void AddLocalReminderTombstone(ReminderIdentity key, ReminderEvents.LocalReminderStopReason reason)
         {
             var sequence = GetLocalMutationSequence();
-            localReminders[key] = new LocalReminderData(key, this, reason, sequence);
+            localReminders[key] = LocalReminderData.CreateTombstone(key, this, reason, sequence);
         }
 
         private void RequestLocalReminderRemoval(
@@ -934,36 +928,49 @@ namespace Orleans.Runtime.ReminderService
             private long _localSequenceNumber;
             private Task? _runTask;
 
-            internal LocalReminderData(ReminderEntry entry, LocalReminderService reminderService)
+            private LocalReminderData(
+                ReminderIdentity identity,
+                ReminderEntry? entry,
+                LocalReminderService reminderService,
+                ReminderEvents.LocalReminderStopReason reason,
+                long localSequenceNumber)
             {
                 _shared = reminderService;
                 _entry = entry;
-                _identity = new(entry.GrainId, entry.ReminderName);
-                _localSequenceNumber = -1;
-            }
-
-            internal LocalReminderData(
-                ReminderEntry entry,
-                LocalReminderService reminderService,
-                ReminderEvents.LocalReminderStopReason reason,
-                long localSequenceNumber)
-                : this(entry, reminderService)
-            {
-                _localSequenceNumber = localSequenceNumber;
-                _stopReason = (int)reason;
-            }
-
-            internal LocalReminderData(
-                ReminderIdentity identity,
-                LocalReminderService reminderService,
-                ReminderEvents.LocalReminderStopReason reason,
-                long localSequenceNumber)
-            {
-                _shared = reminderService;
                 _identity = identity;
                 _localSequenceNumber = localSequenceNumber;
                 _stopReason = (int)reason;
             }
+
+            public static LocalReminderData CreateRunnable(
+                ReminderEntry entry,
+                LocalReminderService reminderService,
+                long localSequenceNumber)
+                => new(
+                    new ReminderIdentity(entry.GrainId, entry.ReminderName),
+                    entry,
+                    reminderService,
+                    ReminderEvents.LocalReminderStopReason.Unknown,
+                    localSequenceNumber);
+
+            public static LocalReminderData CreateTombstone(
+                ReminderEntry entry,
+                LocalReminderService reminderService,
+                ReminderEvents.LocalReminderStopReason reason,
+                long localSequenceNumber)
+                => new(
+                    new ReminderIdentity(entry.GrainId, entry.ReminderName),
+                    entry,
+                    reminderService,
+                    reason,
+                    localSequenceNumber);
+
+            public static LocalReminderData CreateTombstone(
+                ReminderIdentity identity,
+                LocalReminderService reminderService,
+                ReminderEvents.LocalReminderStopReason reason,
+                long localSequenceNumber)
+                => new(identity, entry: null, reminderService, reason, localSequenceNumber);
 
             public ReminderEntry Entry
             {
