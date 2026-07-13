@@ -94,6 +94,28 @@ namespace UnitTests.TimerTests
             await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
         }
 
+        [Fact]
+        public async Task Rem_Grain_LongPeriod()
+        {
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            const string reminderName = "LONG_PERIOD";
+            var period = TimeSpan.FromDays(60);
+            var grainId = grain.GetGrainId();
+
+            await grain.StartReminder(reminderName, period);
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var firstTick = observer.WaitForTickCountAsync(grainId, 1, cts.Token, reminderName);
+            await AdvanceReminderTimeAsync(period, cts.Token);
+            await firstTick;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var secondTick = observer.WaitForTickCountAsync(grainId, 2, cts.Token, reminderName);
+            await AdvanceReminderTimeAsync(period, cts.Token);
+            await secondTick;
+        }
+
         // Single join tests ... multi grain, multi reminders
 
         /// <summary>

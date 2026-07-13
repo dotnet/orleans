@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 #nullable disable
 namespace Orleans.Runtime
@@ -53,22 +54,11 @@ namespace Orleans.Runtime
             this.expected = dueTime;
             if (delay > TimeSpan.Zero)
             {
-                // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
-                var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
-                while (delay > maxDelay)
+                try
                 {
-                    delay -= maxDelay;
-                    var task2 = await Task.WhenAny(Task.Delay(maxDelay, _timeProvider, cancellation.Token)).ConfigureAwait(false);
-                    if (task2.IsCanceled)
-                    {
-                        await Task.Yield();
-                        expected = default;
-                        return false;
-                    }
+                    await _timeProvider.DelayUntilAsync(new DateTimeOffset(dueTime), cancellation.Token).ConfigureAwait(false);
                 }
-
-                var task = await Task.WhenAny(Task.Delay(delay, _timeProvider, cancellation.Token)).ConfigureAwait(false);
-                if (task.IsCanceled)
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
                 {
                     await Task.Yield();
                     expected = default;
