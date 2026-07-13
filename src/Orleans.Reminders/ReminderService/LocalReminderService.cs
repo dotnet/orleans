@@ -538,13 +538,13 @@ namespace Orleans.Runtime.ReminderService
                     else
                     {
                         LogTraceNotInTableInLocalOld(reminder);
-                        RemoveLocalReminder(
-                            kv.Key,
-                            reminder,
-                            ReminderEvents.LocalReminderStopReason.RemovedFromTable,
-                            cachedSequence,
-                            retainTombstone: false,
-                            stopTasks: tasks);
+                        tasks.Add(
+                            RemoveLocalReminder(
+                                kv.Key,
+                                reminder,
+                                ReminderEvents.LocalReminderStopReason.RemovedFromTable,
+                                cachedSequence,
+                                retainTombstone: false));
                     }
                 }
 
@@ -594,13 +594,13 @@ namespace Orleans.Runtime.ReminderService
             if (!shouldLoad)
             {
                 LogTraceRemovingReminder(localReminder);
-                RemoveLocalReminder(
-                    key,
-                    localReminder,
-                    ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow,
-                    tableSequence,
-                    retainTombstone: false,
-                    stopTasks: stopTasks);
+                stopTasks.Add(
+                    RemoveLocalReminder(
+                        key,
+                        localReminder,
+                        ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow,
+                        tableSequence,
+                        retainTombstone: false));
                 return;
             }
 
@@ -697,7 +697,7 @@ namespace Orleans.Runtime.ReminderService
             if (localReminders.TryGetValue(key, out var existing) && !existing.IsPendingRemoval)
             {
                 existing.Update(entry);
-                RemoveLocalReminder(key, existing, reason, sequence, retainTombstone: true);
+                RequestLocalReminderRemoval(key, existing, reason);
                 return;
             }
 
@@ -715,29 +715,29 @@ namespace Orleans.Runtime.ReminderService
         private void RequestLocalReminderRemoval(
             ReminderIdentity key,
             LocalReminderData reminder,
-            ReminderEvents.LocalReminderStopReason reason,
-            List<Task>? stopTasks = null)
-            => RemoveLocalReminder(
+            ReminderEvents.LocalReminderStopReason reason)
+        {
+            var stopTask = RemoveLocalReminder(
                 key,
                 reminder,
                 reason,
                 GetLocalMutationSequence(),
-                retainTombstone: true,
-                stopTasks: stopTasks);
+                retainTombstone: true);
+            ObserveLocalReminderStop(stopTask, key.GrainId, key.ReminderName);
+        }
 
         private long GetLocalMutationSequence() => localTableSequence + 1;
 
-        private void RemoveLocalReminder(
+        private Task RemoveLocalReminder(
             ReminderIdentity key,
             LocalReminderData reminder,
             ReminderEvents.LocalReminderStopReason reason,
             long sequence,
-            bool retainTombstone,
-            List<Task>? stopTasks = null)
+            bool retainTombstone)
         {
             if (!localReminders.TryGetValue(key, out var current) || !ReferenceEquals(current, reminder))
             {
-                return;
+                return Task.CompletedTask;
             }
 
             var stopTask = reminder.StopAsync(reason, sequence);
@@ -746,14 +746,7 @@ namespace Orleans.Runtime.ReminderService
                 localReminders.Remove(key);
             }
 
-            if (stopTasks is not null)
-            {
-                stopTasks.Add(stopTask);
-            }
-            else
-            {
-                ObserveLocalReminderStop(stopTask, key.GrainId, key.ReminderName);
-            }
+            return stopTask;
         }
 
         private bool TryBeginSingleReminderDelivery()
