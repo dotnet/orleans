@@ -9,9 +9,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans.Messaging
 {
@@ -56,7 +56,7 @@ namespace Orleans.Messaging
             this.connectionManager = connectionManager;
             this.gatewayListProvider = gatewayListProvider;
 
-            var refreshPeriod = Max(this.gatewayOptions.GatewayListRefreshPeriod, TimeSpan.FromMilliseconds(1));
+            var refreshPeriod = this.gatewayOptions.GatewayListRefreshPeriod.Max(TimeSpan.FromMilliseconds(1));
             this.gatewayRefreshTimer = new PeriodicTimer(this.gatewayOptions.GatewayListRefreshPeriod, timeProvider);
         }
 

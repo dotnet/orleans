@@ -392,7 +392,7 @@ namespace Orleans.Runtime.ReminderService
         private async Task RunAsync()
         {
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-            var initialRefreshStagger = StandardExtensions.Min(reminderOptions.RefreshReminderListPeriod, InitialReadRetryPeriod);
+            var initialRefreshStagger = reminderOptions.RefreshReminderListPeriod.Min(InitialReadRetryPeriod);
             TimeSpan? overrideDelay = RandomTimeSpan.Next(initialRefreshStagger);
             int consecutiveFailures = 0;
             while (await listRefreshTimer.NextTick(overrideDelay))

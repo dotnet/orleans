@@ -77,7 +77,7 @@ namespace Orleans.Runtime
             initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
-                initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), clusterMembershipOptions.Value.MaxJoinAttemptTime);
+                initTimeout = TimeSpan.FromMinutes(10).Max(clusterMembershipOptions.Value.MaxJoinAttemptTime);
             }
 
             var localEndpoint = this.siloDetails.SiloAddress.Endpoint;
