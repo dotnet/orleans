@@ -116,6 +116,7 @@ public static class ReminderEvents
         RemovedFromRange = 3,
         RemovedFromTable = 4,
         ServiceStopped = 5,
+        OutsideLoadingWindow = 6,
     }
 
     /// <summary>

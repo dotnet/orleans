@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
@@ -12,55 +14,87 @@ namespace UnitTests.TimerTests;
 public class LocalReminderServiceTests
 {
     [Fact, TestCategory("BVT")]
-    public void CalculateInitialDueTime_ReturnsMinimumDueTime_WhenNextTickIsDueNow()
+    public void CalculateFollowingTickTime_ReturnsNextScheduledOccurrence()
     {
-        var period = TimeSpan.FromSeconds(12);
+        var period = TimeSpan.FromDays(60);
         var startAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var entry = CreateReminderEntry(startAt, period);
-        var now = startAt + period;
 
-        var dueTime = LocalReminderService.CalculateInitialDueTime(entry, now);
+        var nextTick = LocalReminderService.CalculateFollowingTickTime(entry, startAt, startAt);
 
-        Assert.Equal(TimeSpan.FromMilliseconds(1), dueTime);
+        Assert.Equal(startAt + period, nextTick);
     }
 
     [Fact, TestCategory("BVT")]
-    public void CalculateInitialDueTime_ReturnsMinimumDueTime_WhenNextTickIsWithinMinimumDueTime()
+    public void CalculateFollowingTickTime_SkipsMissedOccurrencesWithoutDrifting()
     {
-        var period = TimeSpan.FromSeconds(12);
+        var period = TimeSpan.FromMinutes(10);
         var startAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var entry = CreateReminderEntry(startAt, period);
-        var now = startAt + period - TimeSpan.FromTicks(1);
 
-        var dueTime = LocalReminderService.CalculateInitialDueTime(entry, now);
+        var nextTick = LocalReminderService.CalculateFollowingTickTime(
+            entry,
+            startAt,
+            startAt + TimeSpan.FromMinutes(25));
 
-        Assert.Equal(TimeSpan.FromMilliseconds(1), dueTime);
+        Assert.Equal(startAt + TimeSpan.FromMinutes(30), nextTick);
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData(-1, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    public void IsReminderWithinLoadingWindow_UsesInclusiveBoundary(int millisecondsInsideWindow, bool expected)
+    {
+        var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var loadingWindow = TimeSpan.FromMinutes(10);
+        var entry = CreateReminderEntry(now + loadingWindow + TimeSpan.FromMilliseconds(-millisecondsInsideWindow), TimeSpan.FromHours(1));
+
+        var result = LocalReminderService.IsReminderWithinLoadingWindow(entry, now, loadingWindow);
+
+        Assert.Equal(expected, result);
     }
 
     [Fact, TestCategory("BVT")]
-    public void CalculateInitialDueTime_ReturnsRemainingDueTime_WhenNextTickIsAtLeastMinimumDueTime()
+    public void ReminderOptions_DefaultLoadingWindowIsTwiceDefaultRefreshPeriod()
     {
-        var period = TimeSpan.FromSeconds(12);
-        var startAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var entry = CreateReminderEntry(startAt, period);
-        var now = startAt + period - TimeSpan.FromMilliseconds(10);
+        var options = new ReminderOptions();
 
-        var dueTime = LocalReminderService.CalculateInitialDueTime(entry, now);
-
-        Assert.Equal(TimeSpan.FromMilliseconds(10), dueTime);
+        Assert.Equal(2 * options.RefreshReminderListPeriod, options.ReminderLoadingWindow);
     }
 
     [Fact, TestCategory("BVT")]
-    public void CalculateInitialDueTime_ReturnsRemainingPeriod_WhenNextTickIsInFuture()
+    public void ReminderOptionsValidator_RejectsNonPositiveLoadingWindow()
     {
-        var period = TimeSpan.FromSeconds(12);
-        var startAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var entry = CreateReminderEntry(startAt, period);
-        var now = startAt + TimeSpan.FromSeconds(3);
+        var options = new ReminderOptions { ReminderLoadingWindow = TimeSpan.Zero };
 
-        var dueTime = LocalReminderService.CalculateInitialDueTime(entry, now);
+        Assert.Throws<OrleansConfigurationException>(() => Validate(options));
+    }
 
-        Assert.Equal(TimeSpan.FromSeconds(9), dueTime);
+    [Theory, TestCategory("BVT")]
+    [InlineData(-1, true)]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    public void ReminderOptionsValidator_RejectsLoadingWindowShorterThanRefreshPeriod(int differenceInSeconds, bool throws)
+    {
+        var refreshPeriod = TimeSpan.FromMinutes(5);
+        var options = new ReminderOptions
+        {
+            RefreshReminderListPeriod = refreshPeriod,
+            ReminderLoadingWindow = refreshPeriod + TimeSpan.FromSeconds(differenceInSeconds),
+        };
+
+        var exception = Record.Exception(() => Validate(options));
+
+        Assert.Equal(throws, exception is OrleansConfigurationException);
+    }
+
+    private static void Validate(ReminderOptions options)
+    {
+        var validator = new ReminderOptionsValidator(
+            NullLogger<ReminderOptionsValidator>.Instance,
+            Options.Create(options));
+        validator.ValidateConfiguration();
     }
 
     [Fact, TestCategory("BVT")]

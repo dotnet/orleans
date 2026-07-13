@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,7 +24,6 @@ namespace Orleans.Runtime.ReminderService
         private readonly ILogger logger;
         private readonly ReminderOptions reminderOptions;
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
-        private readonly Dictionary<ReminderIdentity, long> localReminderTombstones = new();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly IAsyncTimerFactory asyncTimerFactory;
@@ -34,6 +33,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
+        private readonly SortedDictionary<long, HashSet<ReminderIdentity>> _inFlightTableReads = [];
         private uint initialReadCallCount = 0;
         private Task? runTask;
         private readonly object _deliveryLock = new();
@@ -220,9 +220,9 @@ namespace Orleans.Runtime.ReminderService
 
             if (newEtag != null)
             {
-                LogDebugRegisterReminder(entry, localTableSequence);
                 entry.ETag = newEtag;
-                AddOrUpdateLocalReminder(entry);
+                ReconcileLocalReminder(entry, _timeProvider.GetUtcNow().UtcDateTime);
+                LogDebugRegisterReminder(entry, localTableSequence);
 
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
                 var reminder = new ReminderData(grainId, reminderName, newEtag);
@@ -268,16 +268,13 @@ namespace Orleans.Runtime.ReminderService
                 var key = new ReminderIdentity(grainId, reminderName);
                 if (localReminders.TryGetValue(key, out var localRem))
                 {
-                    // Retain the stopped entry until a newer table refresh confirms the deletion.
-                    localRem.LocalSequenceNumber = ++localTableSequence;
-                    ObserveLocalReminderStop(localRem.StopAsync(ReminderEvents.LocalReminderStopReason.Unregistered), grainId, reminderName);
+                    RequestLocalReminderRemoval(key, localRem, ReminderEvents.LocalReminderStopReason.Unregistered);
                     LogStoppedReminder(reminder);
                     if (logger.IsEnabled(LogLevel.Trace)) PrintReminders($"After removing {reminder}.");
                 }
                 else
                 {
-                    // Preserve the deletion against table reads which started before the row was removed.
-                    localReminderTombstones[key] = ++localTableSequence;
+                    RecordLocalReminderMutation(key);
                     LogRemovedReminderFromTable(reminder);
                 }
                 ReminderEvents.EmitUnregistered(grainId, reminderName, Silo);
@@ -375,14 +372,6 @@ namespace Orleans.Runtime.ReminderService
                 localReminders.Remove(r.Key);
             }
 
-            foreach (var key in localReminderTombstones.Keys.ToArray())
-            {
-                if (!RingRange.InRange(key.GrainId))
-                {
-                    localReminderTombstones.Remove(key);
-                }
-            }
-
             if (remindersOutOfRange > 0)
             {
                 LogInfoRemovedLocalReminders(remindersOutOfRange);
@@ -403,7 +392,10 @@ namespace Orleans.Runtime.ReminderService
         private async Task RunAsync()
         {
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-            TimeSpan? overrideDelay = RandomTimeSpan.Next(InitialReadRetryPeriod);
+            var initialRefreshStagger = reminderOptions.RefreshReminderListPeriod < InitialReadRetryPeriod
+                ? reminderOptions.RefreshReminderListPeriod
+                : InitialReadRetryPeriod;
+            TimeSpan? overrideDelay = RandomTimeSpan.Next(initialRefreshStagger);
             int consecutiveFailures = 0;
             while (await listRefreshTimer.NextTick(overrideDelay))
             {
@@ -484,11 +476,13 @@ namespace Orleans.Runtime.ReminderService
             CheckRuntimeContext();
 
             LogDebugReadingRows(range);
-            localTableSequence++;
-            long cachedSequence = localTableSequence;
+            var cachedSequence = ++localTableSequence;
+            _inFlightTableReads.Add(cachedSequence, []);
 
             try
             {
+                // Capture and register the read sequence before yielding. Local mutations which run while storage
+                // is reading will receive a later sequence and therefore win when this snapshot returns.
                 ReminderTableData? table = await reminderTable.ReadRows(range.Begin, range.End); // get all reminders, even the ones we already have
 
                 if (rangeSerialNumberCopy < RangeSerialNumber)
@@ -502,95 +496,48 @@ namespace Orleans.Runtime.ReminderService
                 // Providers built against older Orleans versions can still return null.
                 if (table is null) return;
 
-                var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>(); // shallow copy
+                // Begin with every loaded reminder in this range, then remove identities as storage returns them.
+                // Anything left afterward has been deleted from storage and must also be removed locally.
+                var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>();
                 foreach (var r in localReminders)
+                {
                     if (range.InRange(r.Key.GrainId))
+                    {
                         remindersNotInTable.Add(r.Key, r.Value);
+                    }
+                }
 
                 LogDebugReadRemindersFromTable(range, table.Reminders.Count, localTableSequence, cachedSequence);
                 var tasks = new List<Task>();
+                // Use one timestamp for the entire snapshot so every row is evaluated against the same loading window.
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
                 foreach (var entry in table.Reminders)
                 {
                     var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
-                    if (localReminders.TryGetValue(key, out var localRem))
-                    {
-                        if (cachedSequence > localRem.LocalSequenceNumber) // info read from table is same or newer than local info
-                        {
-                            if (localRem.IsRunning) // if ticking
-                            {
-                                LogTraceInTableInLocalOldTicking(localRem);
-                                // it might happen that our local reminder is different than the one in the table, i.e., eTag is different
-                                // if so, update the local timer in place with the new info
-                                if (!StringComparer.Ordinal.Equals(localRem.Entry.ETag, entry.ETag))
-                                {
-                                    LogTraceLocalReminderNeedsUpdate(localRem);
-                                    AddOrUpdateLocalReminder(entry);
-                                }
-                            }
-                            else // if not ticking
-                            {
-                                // no-op
-                                LogTraceInTableInLocalOldNotTicking(localRem);
-                            }
-                        }
-                        else // cachedSequence < localRem.LocalSequenceNumber ... // info read from table is older than local info
-                        {
-                            if (localRem.IsRunning) // if ticking
-                            {
-                                // no-op
-                                LogTraceInTableInLocalNewerTicking(localRem);
-                            }
-                            else // if not ticking
-                            {
-                                // no-op
-                                LogTraceInTableInLocalNewerNotTicking(localRem);
-                            }
-                        }
-                    }
-                    else // exists in table, but not locally
-                    {
-                        if (localReminderTombstones.TryGetValue(key, out var tombstoneSequence)
-                            && cachedSequence < tombstoneSequence)
-                        {
-                            continue;
-                        }
-
-                        LogTraceInTableNotInLocal(entry);
-                        // create and start the reminder
-                        AddOrUpdateLocalReminder(entry);
-                    }
-
-                    // keep a track of extra reminders ... this 'reminder' is useful, so remove it from extra list
                     remindersNotInTable.Remove(key);
-                } // foreach reminder read from table
+                    ReconcileTableEntry(entry, cachedSequence, now, tasks);
+                }
 
                 int remindersCountBeforeRemove = localReminders.Count;
 
-                // foreach reminder that is not in global table, but exists locally
+                // A newer local update wins over this snapshot. Otherwise, reminders which storage did not
+                // return are no longer ours to schedule.
                 foreach (var kv in remindersNotInTable)
                 {
                     var reminder = kv.Value;
                     if (cachedSequence < reminder.LocalSequenceNumber)
                     {
-                        // no-op
                         LogTraceNotInTableInLocalNewer(reminder);
                     }
-                    else // cachedSequence > reminder.LocalSequenceNumber
+                    else
                     {
                         LogTraceNotInTableInLocalOld(reminder);
-
-                        // remove locally
                         var reminderEntry = reminder.Entry;
-                        tasks.Add(reminder.StopAsync(ReminderEvents.LocalReminderStopReason.RemovedFromTable));
-                        localReminders.Remove(new(reminderEntry.GrainId, reminderEntry.ReminderName));
-                    }
-                }
-
-                foreach (var key in localReminderTombstones.Keys.ToArray())
-                {
-                    if (range.InRange(key.GrainId) && cachedSequence >= localReminderTombstones[key])
-                    {
-                        localReminderTombstones.Remove(key);
+                        RequestLocalReminderRemoval(
+                            new(reminderEntry.GrainId, reminderEntry.ReminderName),
+                            reminder,
+                            ReminderEvents.LocalReminderStopReason.RemovedFromTable,
+                            tasks);
                     }
                 }
 
@@ -602,28 +549,139 @@ namespace Orleans.Runtime.ReminderService
                 LogErrorFailedToReadTableAndStartTimer(exc);
                 throw;
             }
+            finally
+            {
+                _inFlightTableReads.Remove(cachedSequence);
+                RemoveUnprotectedLocalReminders();
+            }
+        }
+
+        private void ReconcileTableEntry(ReminderEntry entry, long tableSequence, DateTime now, List<Task> stopTasks)
+        {
+            var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
+            if (_inFlightTableReads[tableSequence].Contains(key))
+            {
+                // The snapshot predates a local mutation for this identity. This check also protects storage-only
+                // reminders, which have no LocalReminderData whose sequence could reject the stale row.
+                return;
+            }
+
+            var shouldLoad = IsReminderWithinLoadingWindow(entry, now, reminderOptions.ReminderLoadingWindow);
+            if (!localReminders.TryGetValue(key, out var localReminder))
+            {
+                // Distant reminders remain exclusively in storage until a later refresh brings their next tick
+                // into the loading window.
+                if (shouldLoad)
+                {
+                    LogTraceInTableNotInLocal(entry);
+                    AddOrUpdateLocalReminder(entry);
+                }
+                else
+                {
+                    SupersedeOlderTableReads(key, tableSequence);
+                }
+
+                return;
+            }
+
+            // A direct registration or update which completed after this read began is newer than the table
+            // snapshot, so leave its local schedule unchanged.
+            if (tableSequence <= localReminder.LocalSequenceNumber)
+            {
+                if (localReminder.IsRunning)
+                {
+                    LogTraceInTableInLocalNewerTicking(localReminder);
+                }
+                else
+                {
+                    LogTraceInTableInLocalNewerNotTicking(localReminder);
+                }
+
+                return;
+            }
+
+            if (!shouldLoad)
+            {
+                LogTraceRemovingReminder(localReminder);
+                RequestLocalReminderRemoval(key, localReminder, ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow, stopTasks);
+                return;
+            }
+
+            if (localReminder.IsPendingRemoval)
+            {
+                LogTraceInTableInLocalOldNotTicking(localReminder);
+                AddOrUpdateLocalReminder(entry);
+                return;
+            }
+
+            if (!localReminder.IsRunning)
+            {
+                LogTraceInTableInLocalOldNotTicking(localReminder);
+                return;
+            }
+
+            LogTraceInTableInLocalOldTicking(localReminder);
+            if (!StringComparer.Ordinal.Equals(localReminder.Entry.ETag, entry.ETag))
+            {
+                LogTraceLocalReminderNeedsUpdate(localReminder);
+                AddOrUpdateLocalReminder(entry);
+            }
+        }
+
+        private void ReconcileLocalReminder(ReminderEntry entry, DateTime now)
+        {
+            var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
+            if (IsReminderWithinLoadingWindow(entry, now, reminderOptions.ReminderLoadingWindow))
+            {
+                AddOrUpdateLocalReminder(entry);
+            }
+            else if (localReminders.TryGetValue(key, out var localReminder))
+            {
+                // The updated schedule is durable, but its next tick is too distant to justify retaining a
+                // local task. A refresh will load it again when it approaches the window.
+                LogTraceRemovingReminder(localReminder);
+                localReminder.Update(entry);
+                RequestLocalReminderRemoval(key, localReminder, ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow);
+            }
+            else
+            {
+                RecordLocalReminderMutation(key);
+            }
         }
 
         private void AddOrUpdateLocalReminder(ReminderEntry entry)
         {
             CheckRuntimeContext();
 
-            localTableSequence++;
             var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
-            localReminderTombstones.Remove(key);
-            ref var reminderData = ref CollectionsMarshal.GetValueRefOrAddDefault(localReminders, key, out var exists);
-            if (exists && reminderData is { IsStopped: false })
+            var sequence = RecordLocalReminderMutation(key);
+            LocalReminderData reminderData;
+            if (localReminders.TryGetValue(key, out var existing))
             {
-                reminderData.LocalSequenceNumber = localTableSequence;
-                reminderData.Update(entry);
-                LogDebugUpdatedReminder(entry);
+                if (existing.IsPendingRemoval)
+                {
+                    reminderData = new LocalReminderData(entry, this)
+                    {
+                        LocalSequenceNumber = sequence,
+                    };
+                    localReminders[key] = reminderData;
+                    LogDebugStartedReminder(entry);
+                }
+                else
+                {
+                    reminderData = existing;
+                    reminderData.LocalSequenceNumber = sequence;
+                    reminderData.Update(entry);
+                    LogDebugUpdatedReminder(entry);
+                }
             }
             else
             {
                 reminderData = new LocalReminderData(entry, this)
                 {
-                    LocalSequenceNumber = localTableSequence,
+                    LocalSequenceNumber = sequence,
                 };
+                localReminders.Add(key, reminderData);
 
                 LogDebugStartedReminder(entry);
             }
@@ -637,6 +695,75 @@ namespace Orleans.Runtime.ReminderService
             }
 
             reminderData.TryStart();
+        }
+
+        private void RequestLocalReminderRemoval(
+            ReminderIdentity key,
+            LocalReminderData reminder,
+            ReminderEvents.LocalReminderStopReason reason,
+            List<Task>? stopTasks = null)
+        {
+            if (!localReminders.TryGetValue(key, out var current) || !ReferenceEquals(current, reminder))
+            {
+                return;
+            }
+
+            var sequence = RecordLocalReminderMutation(key);
+            var stopTask = reminder.StopAsync(reason, sequence);
+            if (!HasOlderInFlightTableRead(sequence))
+            {
+                localReminders.Remove(key);
+            }
+
+            if (stopTasks is not null)
+            {
+                stopTasks.Add(stopTask);
+            }
+            else
+            {
+                ObserveLocalReminderStop(stopTask, key.GrainId, key.ReminderName);
+            }
+        }
+
+        private bool HasOlderInFlightTableRead(long sequence)
+            => _inFlightTableReads.Count > 0 && _inFlightTableReads.First().Key < sequence;
+
+        private long RecordLocalReminderMutation(ReminderIdentity key)
+        {
+            var sequence = ++localTableSequence;
+            SupersedeOlderTableReads(key, sequence);
+            return sequence;
+        }
+
+        private void SupersedeOlderTableReads(ReminderIdentity key, long sequence)
+        {
+            foreach (var (readSequence, supersededIdentities) in _inFlightTableReads)
+            {
+                if (readSequence >= sequence)
+                {
+                    break;
+                }
+
+                supersededIdentities.Add(key);
+            }
+        }
+
+        private void RemoveUnprotectedLocalReminders()
+        {
+            foreach (var (key, reminder) in localReminders)
+            {
+                if (!reminder.IsPendingRemoval || HasOlderInFlightTableRead(reminder.LocalSequenceNumber))
+                {
+                    continue;
+                }
+
+                if (localReminders.TryGetValue(key, out var current) && ReferenceEquals(current, reminder))
+                {
+                    // The stopped object only remained in the table so that older snapshots could observe its
+                    // sequence. Once those reads complete, storage is the sole owner of distant reminders.
+                    localReminders.Remove(key);
+                }
+            }
         }
 
         private bool TryBeginSingleReminderDelivery()
@@ -739,60 +866,90 @@ namespace Orleans.Runtime.ReminderService
 
         private IRemindable GetGrain(GrainId grainId) => (IRemindable)_referenceActivator.CreateReference(grainId, _grainInterfaceType);
 
-        internal static TimeSpan CalculateInitialDueTime(ReminderEntry entry, DateTime now)
+        internal static DateTime CalculateNextTickTime(ReminderEntry entry, DateTime now)
         {
             ArgumentNullException.ThrowIfNull(entry);
+            Debug.Assert(entry.StartAt.Kind == DateTimeKind.Utc);
+            Debug.Assert(now.Kind == DateTimeKind.Utc);
             if (entry.Period <= TimeSpan.Zero)
             {
                 throw new ArgumentOutOfRangeException(nameof(entry), entry.Period, "Reminder period must be greater than zero.");
             }
 
-            TimeSpan dueTimeSpan;
-            if (now < entry.StartAt) // if the time for first tick hasn't passed yet
+            if (now <= entry.StartAt)
             {
-                dueTimeSpan = entry.StartAt.Subtract(now); // then duetime is duration between now and the first tick time
-            }
-            else // the first tick happened in the past ... compute duetime based on the first tick time, and period
-            {
-                // formula used:
-                // due = period - 'time passed since last tick (==sinceLast)'
-                // due = period - ((Now - FirstTickTime) % period)
-                // explanation of formula:
-                // (Now - FirstTickTime) => gives amount of time since first tick happened
-                // (Now - FirstTickTime) % period => gives amount of time passed since the last tick should have triggered
-                var sinceFirstTick = now.Subtract(entry.StartAt);
-                var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % entry.Period.Ticks);
-                dueTimeSpan = entry.Period.Subtract(sinceLastTick);
-
-                // in corner cases, dueTime can be equal to period ... so, take another mod
-                dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % entry.Period.Ticks);
+                return entry.StartAt;
             }
 
-            // AsyncTimer requires a positive delay, so clamp immediate ticks to a small positive delay.
-            if (dueTimeSpan < MinimumReminderDueTime)
+            var sinceFirstTick = now.Ticks - entry.StartAt.Ticks;
+            var sinceLastTick = sinceFirstTick % entry.Period.Ticks;
+            if (sinceLastTick == 0)
             {
-                dueTimeSpan = MinimumReminderDueTime;
+                return now;
             }
 
-            return dueTimeSpan;
+            return now.AddClamped(TimeSpan.FromTicks(entry.Period.Ticks - sinceLastTick));
         }
 
-        internal static DateTime CalculateNextDueTime(DateTime now, TimeSpan period)
+        internal static bool IsReminderWithinLoadingWindow(ReminderEntry entry, DateTime now, TimeSpan loadingWindow)
         {
-            return period <= DateTime.MaxValue - now ? now.Add(period) : DateTime.MaxValue;
+            Debug.Assert(now.Kind == DateTimeKind.Utc);
+            if (loadingWindow <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(loadingWindow), loadingWindow, "The reminder loading window must be greater than zero.");
+            }
+
+            return CalculateNextTickTime(entry, now) <= now.AddClamped(loadingWindow);
+        }
+
+        internal static DateTime CalculateFollowingTickTime(ReminderEntry entry, DateTime previousTickTime, DateTime now)
+        {
+            Debug.Assert(previousTickTime.Kind == DateTimeKind.Utc);
+            Debug.Assert(now.Kind == DateTimeKind.Utc);
+            var nextTick = CalculateNextTickTime(entry, now);
+            return nextTick > previousTickTime ? nextTick : previousTickTime.AddClamped(entry.Period);
+        }
+
+        private bool TryEvictLocalReminder(LocalReminderData reminder, long scheduleVersion)
+        {
+            CheckRuntimeContext();
+
+            var entry = reminder.Entry;
+            var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
+            // Only the local instance and schedule version which made the eviction decision may remove itself.
+            // A concurrent update leaves the reminder in place so its run loop can observe the new schedule.
+            if (!localReminders.TryGetValue(key, out var current) || !ReferenceEquals(current, reminder))
+            {
+                return true;
+            }
+
+            var sequence = RecordLocalReminderMutation(key);
+            if (!reminder.TryStopOutsideLoadingWindow(scheduleVersion, sequence))
+            {
+                return false;
+            }
+
+            if (!HasOlderInFlightTableRead(sequence))
+            {
+                localReminders.Remove(key);
+            }
+
+            // The timer loop is stopped even when the object must remain briefly so that an older snapshot can
+            // observe its sequence and leave the newer schedule decision intact.
+            return true;
         }
 
         private sealed class LocalReminderData
         {
             private readonly LocalReminderService _shared;
-            private IAsyncTimer _timer;
+            private readonly CancellationTokenSource _stopCancellation = new();
 #if NET10_0_OR_GREATER
             private readonly System.Threading.Lock _lock = new();
 #else
             private readonly object _lock = new();
 #endif
             private ReminderEntry _entry;
-            private bool _isFirstTickPending;
+            private CancellationTokenSource _scheduleChangedCancellation = new();
             private long _scheduleVersion;
 
             private int _stopReason;
@@ -804,8 +961,6 @@ namespace Orleans.Runtime.ReminderService
                 _shared = reminderService;
                 _entry = entry;
                 _localSequenceNumber = -1;
-                _isFirstTickPending = true;
-                _timer = CreateTimer(entry);
             }
 
             public ReminderEntry Entry
@@ -854,7 +1009,7 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            public bool IsStopped
+            public bool IsPendingRemoval
             {
                 get
                 {
@@ -891,7 +1046,7 @@ namespace Orleans.Runtime.ReminderService
                 ArgumentNullException.ThrowIfNull(entry);
 
                 long scheduleVersion;
-                IAsyncTimer timerToDispose;
+                CancellationTokenSource scheduleChangedCancellation;
                 lock (_lock)
                 {
                     if (_entry.GrainId != entry.GrainId || !StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName))
@@ -900,47 +1055,83 @@ namespace Orleans.Runtime.ReminderService
                     }
 
                     _entry = entry;
-                    _isFirstTickPending = true;
-                    timerToDispose = _timer;
-                    _timer = CreateTimer(entry);
                     scheduleVersion = ++_scheduleVersion;
+                    scheduleChangedCancellation = _scheduleChangedCancellation;
+                    _scheduleChangedCancellation = new();
                 }
 
                 ReminderEvents.EmitLocalReminderScheduleChanged(entry.GrainId, entry.ReminderName, this, scheduleVersion, _shared.Silo);
-                timerToDispose.Dispose();
+                scheduleChangedCancellation.Cancel();
             }
 
             public Task StopAsync(ReminderEvents.LocalReminderStopReason reason)
+                => StopAsync(reason, localSequenceNumber: null);
+
+            public Task StopAsync(ReminderEvents.LocalReminderStopReason reason, long localSequenceNumber)
+                => StopAsync(reason, (long?)localSequenceNumber);
+
+            private Task StopAsync(ReminderEvents.LocalReminderStopReason reason, long? localSequenceNumber)
             {
                 ReminderEntry entry;
-                IAsyncTimer timerToDispose;
+                CancellationTokenSource scheduleChangedCancellation;
                 Task? runTask;
                 lock (_lock)
                 {
                     entry = _entry;
+                    if (localSequenceNumber is { } sequence)
+                    {
+                        _localSequenceNumber = sequence;
+                    }
+
                     if (_stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown)
                     {
                         _stopReason = (int)reason;
                     }
 
-                    timerToDispose = _timer;
+                    scheduleChangedCancellation = _scheduleChangedCancellation;
                     runTask = _runTask;
                 }
 
                 _shared.LogDebugStoppingReminder(entry, reason);
-                timerToDispose.Dispose();
+                _stopCancellation.Cancel();
+                scheduleChangedCancellation.Cancel();
                 return runTask ?? Task.CompletedTask;
+            }
+
+            public bool TryStopOutsideLoadingWindow(long scheduleVersion, long localSequenceNumber)
+            {
+                ReminderEntry entry;
+                CancellationTokenSource scheduleChangedCancellation;
+                lock (_lock)
+                {
+                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown || _scheduleVersion != scheduleVersion)
+                    {
+                        return false;
+                    }
+
+                    _localSequenceNumber = localSequenceNumber;
+                    _stopReason = (int)ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow;
+                    entry = _entry;
+                    scheduleChangedCancellation = _scheduleChangedCancellation;
+                }
+
+                _shared.LogDebugStoppingReminder(entry, ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow);
+                _stopCancellation.Cancel();
+                scheduleChangedCancellation.Cancel();
+                return true;
             }
 
             private async Task RunAsync(GrainId grainId, string reminderName)
             {
                 await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
+                DateTime? previousTickTime = null;
+                long previousScheduleVersion = -1;
                 try
                 {
-                    while (await WaitForNextTick())
+                    while (await WaitForNextTick(previousTickTime, previousScheduleVersion) is { } scheduledTick)
                     {
-                        var entry = PrepareTick();
+                        var entry = PrepareTick(scheduledTick.ScheduleVersion);
                         if (entry is null || !_shared.TryBeginSingleReminderDelivery())
                         {
                             continue;
@@ -968,7 +1159,8 @@ namespace Orleans.Runtime.ReminderService
                                 {
                                     var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
                                     var elapsed = after - before;
-                                    LogTraceTickTriggered(_shared.logger, this, elapsed.TotalSeconds, CalculateNextDueTime(after, entry.Period));
+                                    var nextTick = CalculateFollowingTickTime(entry, scheduledTick.TickTime, after);
+                                    LogTraceTickTriggered(_shared.logger, this, elapsed.TotalSeconds, nextTick);
                                 }
 
                                 ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
@@ -977,7 +1169,8 @@ namespace Orleans.Runtime.ReminderService
                             catch (Exception exc)
                             {
                                 var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                                LogErrorDeliveringReminderTick(_shared.logger, this, CalculateNextDueTime(after, entry.Period), exc);
+                                var nextTick = CalculateFollowingTickTime(entry, scheduledTick.TickTime, after);
+                                LogErrorDeliveringReminderTick(_shared.logger, this, nextTick, exc);
                                 ReminderEvents.EmitTickFailed(entry.GrainId, entry.ReminderName, status, exc, _shared.Silo);
 
                                 // What to do with repeated failures to deliver a reminder's ticks?
@@ -991,6 +1184,9 @@ namespace Orleans.Runtime.ReminderService
                         {
                             _shared.CompleteSingleReminderDelivery();
                         }
+
+                        previousTickTime = scheduledTick.TickTime;
+                        previousScheduleVersion = scheduledTick.ScheduleVersion;
                     }
                 }
                 finally
@@ -1004,12 +1200,12 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            private async Task<bool> WaitForNextTick()
+            private async Task<ScheduledTick?> WaitForNextTick(DateTime? previousTickTime, long previousScheduleVersion)
             {
                 while (true)
                 {
-                    TimeSpan overrideDelay;
-                    IAsyncTimer timer;
+                    ReminderEntry entry;
+                    CancellationToken scheduleChangedToken;
                     GrainId grainId;
                     string reminderName;
                     long scheduleVersion;
@@ -1017,42 +1213,77 @@ namespace Orleans.Runtime.ReminderService
                     {
                         if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
                         {
-                            return false;
+                            return null;
                         }
 
-                        _isFirstTickPending = false;
-                        overrideDelay = GetInitialDueTime(_entry);
-                        timer = _timer;
-                        grainId = _entry.GrainId;
-                        reminderName = _entry.ReminderName;
+                        entry = _entry;
+                        scheduleChangedToken = _scheduleChangedCancellation.Token;
+                        grainId = entry.GrainId;
+                        reminderName = entry.ReminderName;
                         scheduleVersion = _scheduleVersion;
                     }
 
-                    var nextTick = timer.NextTick(overrideDelay);
-                    if (IsCurrentSchedule(timer))
-                    {
-                        ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);
-                    }
+                    var now = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                    // Anchor every tick to the persisted StartAt + N * Period cadence. If delivery ran long,
+                    // skip missed occurrences instead of drifting the schedule from delivery completion.
+                    var tickTime = previousTickTime is { } previous && previousScheduleVersion == scheduleVersion
+                        ? CalculateFollowingTickTime(entry, previous, now)
+                        : CalculateNextTickTime(entry, now);
 
-                    var result = await nextTick;
-                    if (!result && !IsCurrentSchedule(timer))
+                    // Once the next tick is distant, discard the local task. The reminder remains durable and
+                    // a future table refresh will load it again as it approaches the window.
+                    if (tickTime > now.AddClamped(_shared.reminderOptions.ReminderLoadingWindow))
                     {
+                        if (_shared.TryEvictLocalReminder(this, scheduleVersion))
+                        {
+                            return null;
+                        }
+
                         continue;
                     }
 
-                    return result;
+                    using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopCancellation.Token, scheduleChangedToken);
+                    try
+                    {
+                        // A tick due at or before now gets a minimal asynchronous delay to avoid a tight loop.
+                        var waitUntil = tickTime <= now ? now.AddClamped(MinimumReminderDueTime) : tickTime;
+                        // Reminder timestamps represent UTC even if a storage provider loses DateTimeKind.
+                        var delayTask = _shared._timeProvider.DelayUntilAsync(
+                            new DateTimeOffset(waitUntil.Ticks, TimeSpan.Zero),
+                            waitCancellation.Token);
+                        if (!scheduleChangedToken.IsCancellationRequested && !_stopCancellation.IsCancellationRequested)
+                        {
+                            ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);
+                        }
+
+                        await delayTask;
+                        lock (_lock)
+                        {
+                            if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
+                            {
+                                return null;
+                            }
+
+                            if (_scheduleVersion != scheduleVersion)
+                            {
+                                continue;
+                            }
+
+                            return new ScheduledTick(scheduleVersion, tickTime);
+                        }
+                    }
+                    catch (OperationCanceledException) when (_stopCancellation.IsCancellationRequested)
+                    {
+                        return null;
+                    }
+                    catch (OperationCanceledException) when (scheduleChangedToken.IsCancellationRequested)
+                    {
+                        continue;
+                    }
                 }
             }
 
-            private bool IsCurrentSchedule(IAsyncTimer timer)
-            {
-                lock (_lock)
-                {
-                    return _stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown && ReferenceEquals(timer, _timer);
-                }
-            }
-
-            private ReminderEntry? PrepareTick()
+            private ReminderEntry? PrepareTick(long scheduleVersion)
             {
                 lock (_lock)
                 {
@@ -1061,23 +1292,13 @@ namespace Orleans.Runtime.ReminderService
                         return null;
                     }
 
-                    if (_isFirstTickPending)
+                    if (_scheduleVersion != scheduleVersion)
                     {
                         return null;
                     }
 
                     return _entry;
                 }
-            }
-
-            private IAsyncTimer CreateTimer(ReminderEntry entry)
-            {
-                return _shared.asyncTimerFactory.Create(entry.Period, "ReminderService.LocalReminder", _shared._timeProvider);
-            }
-
-            private TimeSpan GetInitialDueTime(ReminderEntry entry)
-            {
-                return CalculateInitialDueTime(entry, _shared._timeProvider.GetUtcNow().UtcDateTime);
             }
 
             private static TimeSpan CalculateTardiness(TickStatus status)
@@ -1099,6 +1320,8 @@ namespace Orleans.Runtime.ReminderService
                     return $"[{_entry.ReminderName}, {_entry.GrainId}, {_entry.Period}, {LogFormatter.PrintDate(_entry.StartAt)}, {_entry.ETag}, {_localSequenceNumber}, {(isRunning ? "Ticking" : "Stopped")}]";
                 }
             }
+
+            private readonly record struct ScheduledTick(long ScheduleVersion, DateTime TickTime);
         }
 
         private readonly struct ReminderIdentity(GrainId grainId, string reminderName) : IEquatable<ReminderIdentity>

@@ -16,6 +16,8 @@ namespace UnitTests.GrainInterfaces
         Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? period = null, bool validate = false);
         Task<IGrainReminder> StartReminder(string reminderName, TimeSpan dueTime, TimeSpan period);
 
+        Task<IGrainReminder> StartReminder(string reminderName, TimeSpan dueTime, TimeSpan period);
+
         Task StopReminder(string reminderName);
         Task StopReminder(IGrainReminder reminder);
 
