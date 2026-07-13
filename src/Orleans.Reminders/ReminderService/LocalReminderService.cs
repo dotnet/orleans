@@ -33,7 +33,6 @@ namespace Orleans.Runtime.ReminderService
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
-        private readonly SortedDictionary<long, HashSet<ReminderIdentity>> _inFlightTableReads = [];
         private uint initialReadCallCount = 0;
         private Task? runTask;
         private readonly object _deliveryLock = new();
@@ -63,7 +62,7 @@ namespace Orleans.Runtime.ReminderService
             this.asyncTimerFactory = asyncTimerFactory;
             _timeProvider = timeProvider;
             _reminderInstruments = reminderInstruments;
-            _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
+            _reminderInstruments.RegisterActiveRemindersObserve();
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher", _timeProvider);
@@ -181,6 +180,11 @@ namespace Orleans.Runtime.ReminderService
             var tasks = new List<Task>(localReminders.Count);
             foreach (var reminderData in localReminders.Values)
             {
+                if (!reminderData.IsPendingRemoval)
+                {
+                    _reminderInstruments.OnLocalReminderUnloaded();
+                }
+
                 tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
             }
 
@@ -274,7 +278,7 @@ namespace Orleans.Runtime.ReminderService
                 }
                 else
                 {
-                    RecordLocalReminderMutation(key);
+                    AddLocalReminderTombstone(key, ReminderEvents.LocalReminderStopReason.Unregistered);
                     LogRemovedReminderFromTable(reminder);
                 }
                 ReminderEvents.EmitUnregistered(grainId, reminderName, Silo);
@@ -342,12 +346,15 @@ namespace Orleans.Runtime.ReminderService
             var tasks = new List<Task>();
             RemoveOutOfRangeReminders(tasks);
 
-            // try to retrieve reminders from all my subranges
+            // Refreshes use even sequence values. Local writes use the following odd value, so they can supersede
+            // this snapshot without advancing the refresh generation. A newer refresh advances by two and causes
+            // all older refresh results to be discarded.
+            var cachedSequence = localTableSequence += 2;
             var rangeSerialNumberCopy = RangeSerialNumber;
             LogTraceRingRange(RingRange, RangeSerialNumber, localReminders.Count);
             foreach (var range in RangeFactory.GetSubRanges(RingRange))
             {
-                tasks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
+                tasks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy, cachedSequence));
             }
             var task = Task.WhenAll(tasks);
             if (logger.IsEnabled(LogLevel.Trace)) task.ContinueWith(_ => PrintReminders(), TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
@@ -368,6 +375,11 @@ namespace Orleans.Runtime.ReminderService
                 LogTraceRemovingReminder(r.Value);
 
                 // remove locally
+                if (!r.Value.IsPendingRemoval)
+                {
+                    _reminderInstruments.OnLocalReminderUnloaded();
+                }
+
                 removedReminderTasks.Add(r.Value.StopAsync(ReminderEvents.LocalReminderStopReason.RemovedFromRange));
                 localReminders.Remove(r.Key);
             }
@@ -471,19 +483,23 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        private async Task ReadTableAndStartTimers(ISingleRange range, int rangeSerialNumberCopy)
+        private async Task ReadTableAndStartTimers(ISingleRange range, int rangeSerialNumberCopy, long cachedSequence)
         {
             CheckRuntimeContext();
 
             LogDebugReadingRows(range);
-            var cachedSequence = ++localTableSequence;
-            _inFlightTableReads.Add(cachedSequence, []);
 
             try
             {
-                // Capture and register the read sequence before yielding. Local mutations which run while storage
-                // is reading will receive a later sequence and therefore win when this snapshot returns.
+                // The read sequence was captured before any range read yielded. Local mutations which run while
+                // storage is reading receive a later sequence and therefore win when this snapshot returns.
                 ReminderTableData? table = await reminderTable.ReadRows(range.Begin, range.End); // get all reminders, even the ones we already have
+
+                if (cachedSequence < localTableSequence)
+                {
+                    // A newer refresh has started, so this result can no longer retire tombstones or change schedules.
+                    return;
+                }
 
                 if (rangeSerialNumberCopy < RangeSerialNumber)
                 {
@@ -525,19 +541,20 @@ namespace Orleans.Runtime.ReminderService
                 foreach (var kv in remindersNotInTable)
                 {
                     var reminder = kv.Value;
-                    if (cachedSequence < reminder.LocalSequenceNumber)
+                    if (cachedSequence <= reminder.LocalSequenceNumber)
                     {
                         LogTraceNotInTableInLocalNewer(reminder);
                     }
                     else
                     {
                         LogTraceNotInTableInLocalOld(reminder);
-                        var reminderEntry = reminder.Entry;
-                        RequestLocalReminderRemoval(
-                            new(reminderEntry.GrainId, reminderEntry.ReminderName),
+                        RemoveLocalReminder(
+                            kv.Key,
                             reminder,
                             ReminderEvents.LocalReminderStopReason.RemovedFromTable,
-                            tasks);
+                            cachedSequence,
+                            retainTombstone: false,
+                            stopTasks: tasks);
                     }
                 }
 
@@ -549,23 +566,11 @@ namespace Orleans.Runtime.ReminderService
                 LogErrorFailedToReadTableAndStartTimer(exc);
                 throw;
             }
-            finally
-            {
-                _inFlightTableReads.Remove(cachedSequence);
-                RemoveUnprotectedLocalReminders();
-            }
         }
 
         private void ReconcileTableEntry(ReminderEntry entry, long tableSequence, DateTime now, List<Task> stopTasks)
         {
             var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
-            if (_inFlightTableReads[tableSequence].Contains(key))
-            {
-                // The snapshot predates a local mutation for this identity. This check also protects storage-only
-                // reminders, which have no LocalReminderData whose sequence could reject the stale row.
-                return;
-            }
-
             var shouldLoad = IsReminderWithinLoadingWindow(entry, now, reminderOptions.ReminderLoadingWindow);
             if (!localReminders.TryGetValue(key, out var localReminder))
             {
@@ -574,11 +579,7 @@ namespace Orleans.Runtime.ReminderService
                 if (shouldLoad)
                 {
                     LogTraceInTableNotInLocal(entry);
-                    AddOrUpdateLocalReminder(entry);
-                }
-                else
-                {
-                    SupersedeOlderTableReads(key, tableSequence);
+                    AddOrUpdateLocalReminder(entry, tableSequence);
                 }
 
                 return;
@@ -603,14 +604,20 @@ namespace Orleans.Runtime.ReminderService
             if (!shouldLoad)
             {
                 LogTraceRemovingReminder(localReminder);
-                RequestLocalReminderRemoval(key, localReminder, ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow, stopTasks);
+                RemoveLocalReminder(
+                    key,
+                    localReminder,
+                    ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow,
+                    tableSequence,
+                    retainTombstone: false,
+                    stopTasks: stopTasks);
                 return;
             }
 
             if (localReminder.IsPendingRemoval)
             {
                 LogTraceInTableInLocalOldNotTicking(localReminder);
-                AddOrUpdateLocalReminder(entry);
+                AddOrUpdateLocalReminder(entry, tableSequence);
                 return;
             }
 
@@ -624,7 +631,7 @@ namespace Orleans.Runtime.ReminderService
             if (!StringComparer.Ordinal.Equals(localReminder.Entry.ETag, entry.ETag))
             {
                 LogTraceLocalReminderNeedsUpdate(localReminder);
-                AddOrUpdateLocalReminder(entry);
+                AddOrUpdateLocalReminder(entry, tableSequence);
             }
         }
 
@@ -635,26 +642,22 @@ namespace Orleans.Runtime.ReminderService
             {
                 AddOrUpdateLocalReminder(entry);
             }
-            else if (localReminders.TryGetValue(key, out var localReminder))
-            {
-                // The updated schedule is durable, but its next tick is too distant to justify retaining a
-                // local task. A refresh will load it again when it approaches the window.
-                LogTraceRemovingReminder(localReminder);
-                localReminder.Update(entry);
-                RequestLocalReminderRemoval(key, localReminder, ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow);
-            }
             else
             {
-                RecordLocalReminderMutation(key);
+                // The updated schedule is durable, but its next tick is too distant to justify retaining a
+                // local task. Keep a stopped sequence-bearing entry until a newer refresh observes this write.
+                AddLocalReminderTombstone(entry, ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow);
             }
         }
 
         private void AddOrUpdateLocalReminder(ReminderEntry entry)
+            => AddOrUpdateLocalReminder(entry, GetLocalMutationSequence());
+
+        private void AddOrUpdateLocalReminder(ReminderEntry entry, long sequence)
         {
             CheckRuntimeContext();
 
             var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
-            var sequence = RecordLocalReminderMutation(key);
             LocalReminderData reminderData;
             if (localReminders.TryGetValue(key, out var existing))
             {
@@ -665,6 +668,7 @@ namespace Orleans.Runtime.ReminderService
                         LocalSequenceNumber = sequence,
                     };
                     localReminders[key] = reminderData;
+                    _reminderInstruments.OnLocalReminderLoaded();
                     LogDebugStartedReminder(entry);
                 }
                 else
@@ -682,6 +686,7 @@ namespace Orleans.Runtime.ReminderService
                     LocalSequenceNumber = sequence,
                 };
                 localReminders.Add(key, reminderData);
+                _reminderInstruments.OnLocalReminderLoaded();
 
                 LogDebugStartedReminder(entry);
             }
@@ -697,10 +702,49 @@ namespace Orleans.Runtime.ReminderService
             reminderData.TryStart();
         }
 
+        private void AddLocalReminderTombstone(ReminderEntry entry, ReminderEvents.LocalReminderStopReason reason)
+        {
+            var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
+            var sequence = GetLocalMutationSequence();
+            if (localReminders.TryGetValue(key, out var existing) && !existing.IsPendingRemoval)
+            {
+                existing.Update(entry);
+                RemoveLocalReminder(key, existing, reason, sequence, retainTombstone: true);
+                return;
+            }
+
+            var tombstone = new LocalReminderData(entry, this);
+            _ = tombstone.StopAsync(reason, sequence);
+            localReminders[key] = tombstone;
+        }
+
+        private void AddLocalReminderTombstone(ReminderIdentity key, ReminderEvents.LocalReminderStopReason reason)
+        {
+            var sequence = GetLocalMutationSequence();
+            localReminders[key] = new LocalReminderData(key, this, reason, sequence);
+        }
+
         private void RequestLocalReminderRemoval(
             ReminderIdentity key,
             LocalReminderData reminder,
             ReminderEvents.LocalReminderStopReason reason,
+            List<Task>? stopTasks = null)
+            => RemoveLocalReminder(
+                key,
+                reminder,
+                reason,
+                GetLocalMutationSequence(),
+                retainTombstone: true,
+                stopTasks: stopTasks);
+
+        private long GetLocalMutationSequence() => localTableSequence + 1;
+
+        private void RemoveLocalReminder(
+            ReminderIdentity key,
+            LocalReminderData reminder,
+            ReminderEvents.LocalReminderStopReason reason,
+            long sequence,
+            bool retainTombstone,
             List<Task>? stopTasks = null)
         {
             if (!localReminders.TryGetValue(key, out var current) || !ReferenceEquals(current, reminder))
@@ -708,9 +752,14 @@ namespace Orleans.Runtime.ReminderService
                 return;
             }
 
-            var sequence = RecordLocalReminderMutation(key);
+            var wasLoaded = !reminder.IsPendingRemoval;
             var stopTask = reminder.StopAsync(reason, sequence);
-            if (!HasOlderInFlightTableRead(sequence))
+            if (wasLoaded)
+            {
+                _reminderInstruments.OnLocalReminderUnloaded();
+            }
+
+            if (!retainTombstone)
             {
                 localReminders.Remove(key);
             }
@@ -722,47 +771,6 @@ namespace Orleans.Runtime.ReminderService
             else
             {
                 ObserveLocalReminderStop(stopTask, key.GrainId, key.ReminderName);
-            }
-        }
-
-        private bool HasOlderInFlightTableRead(long sequence)
-            => _inFlightTableReads.Count > 0 && _inFlightTableReads.First().Key < sequence;
-
-        private long RecordLocalReminderMutation(ReminderIdentity key)
-        {
-            var sequence = ++localTableSequence;
-            SupersedeOlderTableReads(key, sequence);
-            return sequence;
-        }
-
-        private void SupersedeOlderTableReads(ReminderIdentity key, long sequence)
-        {
-            foreach (var (readSequence, supersededIdentities) in _inFlightTableReads)
-            {
-                if (readSequence >= sequence)
-                {
-                    break;
-                }
-
-                supersededIdentities.Add(key);
-            }
-        }
-
-        private void RemoveUnprotectedLocalReminders()
-        {
-            foreach (var (key, reminder) in localReminders)
-            {
-                if (!reminder.IsPendingRemoval || HasOlderInFlightTableRead(reminder.LocalSequenceNumber))
-                {
-                    continue;
-                }
-
-                if (localReminders.TryGetValue(key, out var current) && ReferenceEquals(current, reminder))
-                {
-                    // The stopped object only remained in the table so that older snapshots could observe its
-                    // sequence. Once those reads complete, storage is the sole owner of distant reminders.
-                    localReminders.Remove(key);
-                }
             }
         }
 
@@ -923,19 +931,14 @@ namespace Orleans.Runtime.ReminderService
                 return true;
             }
 
-            var sequence = RecordLocalReminderMutation(key);
+            var sequence = GetLocalMutationSequence();
             if (!reminder.TryStopOutsideLoadingWindow(scheduleVersion, sequence))
             {
                 return false;
             }
 
-            if (!HasOlderInFlightTableRead(sequence))
-            {
-                localReminders.Remove(key);
-            }
-
-            // The timer loop is stopped even when the object must remain briefly so that an older snapshot can
-            // observe its sequence and leave the newer schedule decision intact.
+            _reminderInstruments.OnLocalReminderUnloaded();
+            // Keep the stopped object as a tombstone until a newer table read observes this scheduling decision.
             return true;
         }
 
@@ -948,7 +951,8 @@ namespace Orleans.Runtime.ReminderService
 #else
             private readonly object _lock = new();
 #endif
-            private ReminderEntry _entry;
+            private readonly ReminderIdentity _identity;
+            private ReminderEntry? _entry;
             private CancellationTokenSource _scheduleChangedCancellation = new();
             private long _scheduleVersion;
 
@@ -960,7 +964,20 @@ namespace Orleans.Runtime.ReminderService
             {
                 _shared = reminderService;
                 _entry = entry;
+                _identity = new(entry.GrainId, entry.ReminderName);
                 _localSequenceNumber = -1;
+            }
+
+            internal LocalReminderData(
+                ReminderIdentity identity,
+                LocalReminderService reminderService,
+                ReminderEvents.LocalReminderStopReason reason,
+                long localSequenceNumber)
+            {
+                _shared = reminderService;
+                _identity = identity;
+                _localSequenceNumber = localSequenceNumber;
+                _stopReason = (int)reason;
             }
 
             public ReminderEntry Entry
@@ -969,7 +986,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     lock (_lock)
                     {
-                        return _entry;
+                        return _entry ?? throw new InvalidOperationException($"Reminder {_identity} is a tombstone.");
                     }
                 }
             }
@@ -1031,8 +1048,9 @@ namespace Orleans.Runtime.ReminderService
                         return false;
                     }
 
-                    grainId = _entry.GrainId;
-                    reminderName = _entry.ReminderName;
+                    var entry = _entry ?? throw new InvalidOperationException($"Reminder {_identity} is a tombstone.");
+                    grainId = entry.GrainId;
+                    reminderName = entry.ReminderName;
                     using var suppressExecutionContext = new ExecutionContextSuppressor();
                     _runTask = RunAsync(grainId, reminderName);
                 }
@@ -1049,9 +1067,9 @@ namespace Orleans.Runtime.ReminderService
                 CancellationTokenSource scheduleChangedCancellation;
                 lock (_lock)
                 {
-                    if (_entry.GrainId != entry.GrainId || !StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName))
+                    if (_identity.GrainId != entry.GrainId || !StringComparer.Ordinal.Equals(_identity.ReminderName, entry.ReminderName))
                     {
-                        throw new InvalidOperationException($"Cannot update reminder {new ReminderIdentity(_entry.GrainId, _entry.ReminderName)} with {entry} because the reminder identity changed.");
+                        throw new InvalidOperationException($"Cannot update reminder {_identity} with {entry} because the reminder identity changed.");
                     }
 
                     _entry = entry;
@@ -1072,7 +1090,7 @@ namespace Orleans.Runtime.ReminderService
 
             private Task StopAsync(ReminderEvents.LocalReminderStopReason reason, long? localSequenceNumber)
             {
-                ReminderEntry entry;
+                ReminderEntry? entry;
                 CancellationTokenSource scheduleChangedCancellation;
                 Task? runTask;
                 lock (_lock)
@@ -1092,7 +1110,10 @@ namespace Orleans.Runtime.ReminderService
                     runTask = _runTask;
                 }
 
-                _shared.LogDebugStoppingReminder(entry, reason);
+                if (entry is not null)
+                {
+                    _shared.LogDebugStoppingReminder(entry, reason);
+                }
                 _stopCancellation.Cancel();
                 scheduleChangedCancellation.Cancel();
                 return runTask ?? Task.CompletedTask;
@@ -1111,7 +1132,7 @@ namespace Orleans.Runtime.ReminderService
 
                     _localSequenceNumber = localSequenceNumber;
                     _stopReason = (int)ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow;
-                    entry = _entry;
+                    entry = _entry ?? throw new InvalidOperationException($"Reminder {_identity} is a tombstone.");
                     scheduleChangedCancellation = _scheduleChangedCancellation;
                 }
 
@@ -1216,7 +1237,7 @@ namespace Orleans.Runtime.ReminderService
                             return null;
                         }
 
-                        entry = _entry;
+                        entry = _entry ?? throw new InvalidOperationException($"Reminder {_identity} is a tombstone.");
                         scheduleChangedToken = _scheduleChangedCancellation.Token;
                         grainId = entry.GrainId;
                         reminderName = entry.ReminderName;
@@ -1317,7 +1338,9 @@ namespace Orleans.Runtime.ReminderService
                 lock (_lock)
                 {
                     var isRunning = _runTask is Task task && !task.IsCompleted;
-                    return $"[{_entry.ReminderName}, {_entry.GrainId}, {_entry.Period}, {LogFormatter.PrintDate(_entry.StartAt)}, {_entry.ETag}, {_localSequenceNumber}, {(isRunning ? "Ticking" : "Stopped")}]";
+                    return _entry is { } entry
+                        ? $"[{entry.ReminderName}, {entry.GrainId}, {entry.Period}, {LogFormatter.PrintDate(entry.StartAt)}, {entry.ETag}, {_localSequenceNumber}, {(isRunning ? "Ticking" : "Stopped")}]"
+                        : $"[{_identity.ReminderName}, {_identity.GrainId}, tombstone, {_localSequenceNumber}]";
                 }
             }
 
