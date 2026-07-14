@@ -108,7 +108,6 @@ public static class ReminderEvents
     {
         Unknown = 0,
         Unregistered = 1,
-        Replaced = 2,
         RemovedFromRange = 3,
         RemovedFromTable = 4,
         ServiceStopped = 5,
