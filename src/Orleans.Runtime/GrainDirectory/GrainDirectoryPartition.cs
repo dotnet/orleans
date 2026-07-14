@@ -778,7 +778,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                     LogErrorErrorInvokingOperation(_logger, ex, operationName, siloAddress);
                 }
 
-                await _owner.RefreshViewAsync(default, CancellationToken.None);
+                await _owner.RefreshViewAsync(default, ShutdownToken);
                 if (!DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
                 {
                     break;
