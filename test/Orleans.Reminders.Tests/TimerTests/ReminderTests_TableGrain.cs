@@ -107,13 +107,22 @@ namespace UnitTests.TimerTests
             await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
 
             var firstTick = observer.WaitForTickCountAsync(grainId, 1, cts.Token, reminderName);
-            await AdvanceReminderTimeAsync(period, cts.Token);
+            await AdvanceReminderTimeAsync(TimeSpan.FromDays(50), cts.Token);
+            Assert.Equal(0, observer.GetTickCount(grainId, reminderName));
+            await AdvanceReminderTimeAsync(TimeSpan.FromDays(10), cts.Token);
             await firstTick;
             await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
 
             var secondTick = observer.WaitForTickCountAsync(grainId, 2, cts.Token, reminderName);
-            await AdvanceReminderTimeAsync(period, cts.Token);
+            await AdvanceReminderTimeAsync(TimeSpan.FromDays(90), cts.Token);
             await secondTick;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var thirdTick = observer.WaitForTickCountAsync(grainId, 3, cts.Token, reminderName);
+            await AdvanceReminderTimeAsync(TimeSpan.FromDays(29), cts.Token);
+            Assert.Equal(2, observer.GetTickCount(grainId, reminderName));
+            await AdvanceReminderTimeAsync(TimeSpan.FromDays(1), cts.Token);
+            await thirdTick;
         }
 
         // Single join tests ... multi grain, multi reminders

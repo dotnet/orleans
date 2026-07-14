@@ -7,15 +7,31 @@ namespace NonSilo.Tests.Utils;
 public class TimeProviderExtensionsTests
 {
     [Fact, TestCategory("BVT")]
-    public async Task DelayUntilAsync_SupportsDelaysBeyondMaximumTimerDelay()
+    public async Task DelayAsync_SupportsDelaysBeyondMaximumTimerDelay()
     {
         var timeProvider = new FakeTimeProvider();
         var delay = TimeSpan.FromDays(60);
 
+        var task = timeProvider.DelayAsync(delay);
+
+        Assert.False(task.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromDays(50));
+        Assert.False(task.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromDays(10));
+        await task;
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task DelayUntilAsync_SupportsDelaysBeyondMaximumTimerDelay()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var delay = TimeSpan.FromDays(60);
         var task = timeProvider.DelayUntilAsync(timeProvider.GetUtcNow() + delay);
 
         Assert.False(task.IsCompleted);
-        timeProvider.Advance(delay);
+        timeProvider.Advance(TimeSpan.FromDays(50));
+        Assert.False(task.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromDays(10));
         await task;
     }
 }

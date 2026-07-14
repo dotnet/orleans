@@ -748,6 +748,11 @@ namespace Orleans.Runtime.ReminderService
             return dueTimeSpan;
         }
 
+        internal static DateTime CalculateNextDueTime(DateTime now, TimeSpan period)
+        {
+            return period <= DateTime.MaxValue - now ? now.Add(period) : DateTime.MaxValue;
+        }
+
         private sealed class LocalReminderData
         {
             private readonly LocalReminderService _shared;
@@ -931,7 +936,7 @@ namespace Orleans.Runtime.ReminderService
                                 {
                                     var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
                                     var elapsed = after - before;
-                                    LogTraceTickTriggered(_shared.logger, this, elapsed.TotalSeconds, after + entry.Period);
+                                    LogTraceTickTriggered(_shared.logger, this, elapsed.TotalSeconds, CalculateNextDueTime(after, entry.Period));
                                 }
 
                                 ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
@@ -940,7 +945,7 @@ namespace Orleans.Runtime.ReminderService
                             catch (Exception exc)
                             {
                                 var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                                LogErrorDeliveringReminderTick(_shared.logger, this, after + entry.Period, exc);
+                                LogErrorDeliveringReminderTick(_shared.logger, this, CalculateNextDueTime(after, entry.Period), exc);
                                 ReminderEvents.EmitTickFailed(entry.GrainId, entry.ReminderName, status, exc, _shared.Silo);
 
                                 // What to do with repeated failures to deliver a reminder's ticks?
@@ -984,15 +989,8 @@ namespace Orleans.Runtime.ReminderService
                             return false;
                         }
 
-                        if (_isFirstTickPending)
-                        {
-                            _isFirstTickPending = false;
-                            overrideDelay = GetInitialDueTime(_entry);
-                        }
-                        else
-                        {
-                            overrideDelay = null;
-                        }
+                        _isFirstTickPending = false;
+                        overrideDelay = GetInitialDueTime(_entry);
 
                         timer = _timer;
                         scheduleChangedToken = _scheduleChangedCancellation.Token;

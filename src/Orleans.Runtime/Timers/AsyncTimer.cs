@@ -45,18 +45,27 @@ namespace Orleans.Runtime
             {
                 { } value => value,
                 _ when lastFired == DateTime.MinValue => period,
-                _ => lastFired.Add(period).Subtract(start)
+                _ when start - lastFired < period => period - (start - lastFired),
+                _ => TimeSpan.Zero,
             };
 
             if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
 
-            var dueTime = start.Add(delay);
+            var hasAbsoluteDueTime = delay <= DateTime.MaxValue - start;
+            var dueTime = hasAbsoluteDueTime ? start.Add(delay) : DateTime.MaxValue;
             this.expected = dueTime;
             if (delay > TimeSpan.Zero)
             {
                 try
                 {
-                    await _timeProvider.DelayUntilAsync(new DateTimeOffset(dueTime), cancellation.Token).ConfigureAwait(false);
+                    if (hasAbsoluteDueTime)
+                    {
+                        await _timeProvider.DelayUntilAsync(new DateTimeOffset(dueTime), cancellation.Token).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await _timeProvider.DelayAsync(delay, cancellation.Token).ConfigureAwait(false);
+                    }
                 }
                 catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
                 {
