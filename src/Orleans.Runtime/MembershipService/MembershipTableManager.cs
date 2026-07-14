@@ -516,6 +516,9 @@ namespace Orleans.Runtime.MembershipService
                     updated.Entries.SetItem(this.myAddress, localSiloEntry.WithStatus(SiloStatus.Dead)));
             }
 
+            // The local silo was present in the previous view but is missing now. Preserve its entry so
+            // that non-newer views cannot erase it; a newer view means that it is dead, so publish an
+            // artificial Dead entry for downstream observers before self-terminating.
             return new MembershipTableSnapshot(
                 updated.Version,
                 updated.Entries.SetItem(
