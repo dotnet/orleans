@@ -45,16 +45,18 @@ namespace Orleans.Runtime
             {
                 { } value => value,
                 _ when lastFired == DateTime.MinValue => period,
+                _ when period == Timeout.InfiniteTimeSpan => period,
                 _ when start - lastFired < period => period - (start - lastFired),
                 _ => TimeSpan.Zero,
             };
 
-            if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
+            var isInfinite = delay == Timeout.InfiniteTimeSpan;
+            if (delay < TimeSpan.Zero && !isInfinite) delay = TimeSpan.Zero;
 
-            var hasAbsoluteDueTime = delay <= DateTime.MaxValue - start;
+            var hasAbsoluteDueTime = !isInfinite && delay <= DateTime.MaxValue - start;
             var dueTime = hasAbsoluteDueTime ? start.Add(delay) : DateTime.MaxValue;
             this.expected = dueTime;
-            if (delay > TimeSpan.Zero)
+            if (delay > TimeSpan.Zero || isInfinite)
             {
                 try
                 {

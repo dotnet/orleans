@@ -125,6 +125,24 @@ namespace UnitTests.TimerTests
             await thirdTick;
         }
 
+        [Fact]
+        public async Task Rem_Grain_LongDueTime()
+        {
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            const string reminderName = "LONG_DUE_TIME";
+            var grainId = grain.GetGrainId();
+
+            await grain.StartReminder(reminderName, TimeSpan.FromDays(60), TimeSpan.FromDays(1));
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var firstTick = observer.WaitForTickCountAsync(grainId, 1, cts.Token, reminderName);
+            await AdvanceReminderTimeAsync(TimeSpan.FromDays(50), cts.Token);
+            Assert.Equal(0, observer.GetTickCount(grainId, reminderName));
+            await AdvanceReminderTimeAsync(TimeSpan.FromDays(10), cts.Token);
+            await firstTick;
+        }
+
         // Single join tests ... multi grain, multi reminders
 
         /// <summary>

@@ -10,6 +10,12 @@ internal static class TimeProviderExtensions
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(timeProvider);
+        if (delay == Timeout.InfiniteTimeSpan)
+        {
+            await Task.Delay(delay, timeProvider, cancellationToken);
+            return;
+        }
+
         ArgumentOutOfRangeException.ThrowIfLessThan(delay, TimeSpan.Zero);
         var startTimestamp = timeProvider.GetTimestamp();
         while (true)
