@@ -441,7 +441,11 @@ namespace NonSilo.Tests.Membership
             await manager.RefreshFromSnapshot(Snapshot(
                 new MembershipVersion(version.Value - 1),
                 Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)));
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
+            await manager.RefreshFromSnapshot(Snapshot(
+                new MembershipVersion(version.Value + 1),
+                Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)));
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
             await this.lifecycle.OnStop();
         }

@@ -139,9 +139,7 @@ namespace Orleans.Runtime.MembershipService
 
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
-            this.updates.TryPublish(
-                (previous, update) => this.ProcessMembershipUpdate(previous, MembershipTableSnapshot.Update(previous, update.Snapshot), update.Caller),
-                (Snapshot: snapshot, Caller: nameof(RefreshFromSnapshot)));
+            this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup)
@@ -469,9 +467,7 @@ namespace Orleans.Runtime.MembershipService
             if (table is null) throw new ArgumentNullException(nameof(table));
             LogDebugProcessTableUpdate(this.log, caller, table);
 
-            if (this.updates.TryPublish(
-                (previous, update) => this.ProcessMembershipUpdate(previous, MembershipTableSnapshot.Update(previous, update.Table), update.Caller),
-                (Table: table, Caller: caller)))
+            if (this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, table, caller))
             {
                 this.LogMissedIAmAlives(table);
 
@@ -480,14 +476,29 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private MembershipTableSnapshot ProcessMembershipUpdate(
+        private bool TryProcessMembershipUpdate<TState>(
+            Func<MembershipTableSnapshot, TState, MembershipTableSnapshot> updateFunc,
+            TState state,
+            string caller)
+        {
+            var update = new MembershipUpdate<TState>(updateFunc, state);
+            if (!this.updates.TryPublish(static (previous, update) => update.Apply(previous), update))
+            {
+                return false;
+            }
+
+            this.ProcessMembershipUpdate(update.Previous, update.Published, caller);
+            return true;
+        }
+
+        private void ProcessMembershipUpdate(
             MembershipTableSnapshot previous,
             MembershipTableSnapshot updated,
             string caller)
         {
             if (this.CurrentStatus == SiloStatus.Dead)
             {
-                return updated;
+                return;
             }
 
             if (updated.Entries.TryGetValue(this.myAddress, out var localSiloEntry))
@@ -506,8 +517,21 @@ namespace Orleans.Runtime.MembershipService
                 this.KillMyselfLocally(
                     $"My entry is missing from a newer membership table view (in {caller}). Previous version: {previous.Version}, updated version: {updated.Version}.");
             }
+        }
 
-            return updated;
+        private sealed class MembershipUpdate<TState>(
+            Func<MembershipTableSnapshot, TState, MembershipTableSnapshot> updateFunc,
+            TState state)
+        {
+            public MembershipTableSnapshot Previous { get; private set; } = default!;
+
+            public MembershipTableSnapshot Published { get; private set; } = default!;
+
+            public MembershipTableSnapshot Apply(MembershipTableSnapshot previous)
+            {
+                this.Previous = previous;
+                return this.Published = updateFunc(previous, state);
+            }
         }
 
         private void LogMissedIAmAlives(MembershipTableData table)
