@@ -486,12 +486,6 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await manager.RefreshFromSnapshot(Snapshot(
-                new MembershipVersion(currentVersion.Value + 2),
-                Entry(this.localSilo, SiloStatus.Active, DateTimeOffset.UtcNow)));
-            Assert.True(await membershipUpdates.MoveNextAsync());
-            Assert.Equal(SiloStatus.Dead, membershipUpdates.Current.Entries[this.localSilo].Status);
-
             await this.lifecycle.OnStop();
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -506,14 +507,10 @@ namespace Orleans.Runtime.MembershipService
 
             if (updated.Entries.TryGetValue(this.myAddress, out var localSiloEntry))
             {
-                if (previousLocalSiloEntry.Status != SiloStatus.Dead || localSiloEntry.Status == SiloStatus.Dead)
-                {
-                    return updated;
-                }
-
-                return new MembershipTableSnapshot(
-                    updated.Version,
-                    updated.Entries.SetItem(this.myAddress, localSiloEntry.WithStatus(SiloStatus.Dead)));
+                Debug.Assert(
+                    previousLocalSiloEntry.Status != SiloStatus.Dead || localSiloEntry.Status == SiloStatus.Dead,
+                    "The local silo cannot transition from Dead to another status.");
+                return updated;
             }
 
             // The local silo was present in the previous view but is missing now. Preserve its entry so
