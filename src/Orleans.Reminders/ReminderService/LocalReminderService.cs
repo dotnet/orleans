@@ -763,7 +763,6 @@ namespace Orleans.Runtime.ReminderService
             private readonly object _lock = new();
 #endif
             private ReminderEntry _entry;
-            private CancellationTokenSource _scheduleChangedCancellation = new();
             private bool _isFirstTickPending;
             private long _scheduleVersion;
 
@@ -852,7 +851,6 @@ namespace Orleans.Runtime.ReminderService
                 ArgumentNullException.ThrowIfNull(entry);
 
                 long scheduleVersion;
-                CancellationTokenSource scheduleChangedCancellation;
                 IAsyncTimer timerToDispose;
                 lock (_lock)
                 {
@@ -866,12 +864,9 @@ namespace Orleans.Runtime.ReminderService
                     timerToDispose = _timer;
                     _timer = CreateTimer(entry);
                     scheduleVersion = ++_scheduleVersion;
-                    scheduleChangedCancellation = _scheduleChangedCancellation;
-                    _scheduleChangedCancellation = new();
                 }
 
                 ReminderEvents.EmitLocalReminderScheduleChanged(entry.GrainId, entry.ReminderName, this, scheduleVersion, _shared.Silo);
-                scheduleChangedCancellation.Cancel();
                 timerToDispose.Dispose();
             }
 
@@ -879,7 +874,6 @@ namespace Orleans.Runtime.ReminderService
             {
                 ReminderEntry entry;
                 IAsyncTimer timerToDispose;
-                CancellationTokenSource scheduleChangedCancellation;
                 Task? runTask;
                 lock (_lock)
                 {
@@ -890,12 +884,10 @@ namespace Orleans.Runtime.ReminderService
                     }
 
                     timerToDispose = _timer;
-                    scheduleChangedCancellation = _scheduleChangedCancellation;
                     runTask = _runTask;
                 }
 
                 _shared.LogDebugStoppingReminder(entry, reason);
-                scheduleChangedCancellation.Cancel();
                 timerToDispose.Dispose();
                 return runTask ?? Task.CompletedTask;
             }
@@ -976,9 +968,8 @@ namespace Orleans.Runtime.ReminderService
             {
                 while (true)
                 {
-                    TimeSpan? overrideDelay;
+                    TimeSpan overrideDelay;
                     IAsyncTimer timer;
-                    CancellationToken scheduleChangedToken;
                     GrainId grainId;
                     string reminderName;
                     long scheduleVersion;
@@ -991,27 +982,33 @@ namespace Orleans.Runtime.ReminderService
 
                         _isFirstTickPending = false;
                         overrideDelay = GetInitialDueTime(_entry);
-
                         timer = _timer;
-                        scheduleChangedToken = _scheduleChangedCancellation.Token;
                         grainId = _entry.GrainId;
                         reminderName = _entry.ReminderName;
                         scheduleVersion = _scheduleVersion;
                     }
 
                     var nextTick = timer.NextTick(overrideDelay);
-                    if (!scheduleChangedToken.IsCancellationRequested)
+                    if (IsCurrentSchedule(timer))
                     {
                         ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, this, scheduleVersion, _shared.Silo);
                     }
 
                     var result = await nextTick;
-                    if (!result && scheduleChangedToken.IsCancellationRequested)
+                    if (!result && !IsCurrentSchedule(timer))
                     {
                         continue;
                     }
 
                     return result;
+                }
+            }
+
+            private bool IsCurrentSchedule(IAsyncTimer timer)
+            {
+                lock (_lock)
+                {
+                    return _stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown && ReferenceEquals(timer, _timer);
                 }
             }
 
