@@ -139,16 +139,9 @@ namespace Orleans.Runtime.MembershipService
 
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
-            if (snapshot.Entries.TryGetValue(this.myAddress, out var localSiloEntry))
-            {
-                if (localSiloEntry.Status == SiloStatus.Dead && this.CurrentStatus != SiloStatus.Dead)
-                {
-                    LogWarningFoundMyselfDeadInRefreshFromSnapshot(this.log, localSiloEntry.ToFullString());
-                    this.KillMyselfLocally($"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString())}.");
-                }
-            }
-
-            this.updates.TryPublish(MembershipTableSnapshot.Update, snapshot);
+            this.updates.TryPublish(
+                (previous, update) => this.ProcessMembershipUpdate(previous, MembershipTableSnapshot.Update(previous, update.Snapshot), update.Caller),
+                (Snapshot: snapshot, Caller: nameof(RefreshFromSnapshot)));
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup)
@@ -476,13 +469,45 @@ namespace Orleans.Runtime.MembershipService
             if (table is null) throw new ArgumentNullException(nameof(table));
             LogDebugProcessTableUpdate(this.log, caller, table);
 
-            if (this.updates.TryPublish(MembershipTableSnapshot.Update, table))
+            if (this.updates.TryPublish(
+                (previous, update) => this.ProcessMembershipUpdate(previous, MembershipTableSnapshot.Update(previous, update.Table), update.Caller),
+                (Table: table, Caller: caller)))
             {
                 this.LogMissedIAmAlives(table);
 
                 LogDebugProcessTableUpdateWithTable(this.log, caller, new(table));
                 MembershipEvents.EmitViewChanged(this.snapshot, this.myAddress);
             }
+        }
+
+        private MembershipTableSnapshot ProcessMembershipUpdate(
+            MembershipTableSnapshot previous,
+            MembershipTableSnapshot updated,
+            string caller)
+        {
+            if (this.CurrentStatus == SiloStatus.Dead)
+            {
+                return updated;
+            }
+
+            if (updated.Entries.TryGetValue(this.myAddress, out var localSiloEntry))
+            {
+                if (localSiloEntry.Status == SiloStatus.Dead)
+                {
+                    LogWarningFoundMyselfDeadInMembershipUpdate(this.log, caller, localSiloEntry.ToFullString());
+                    this.KillMyselfLocally($"I should be Dead according to the membership table (in {caller}). Local entry: {localSiloEntry.ToFullString()}.");
+                }
+            }
+            else if (previous.Entries.TryGetValue(this.myAddress, out var previousLocalSiloEntry)
+                && previousLocalSiloEntry.Status != SiloStatus.Created
+                && updated.Version > previous.Version)
+            {
+                LogWarningLocalSiloMissingFromMembershipUpdate(this.log, caller, previous.Version, updated.Version);
+                this.KillMyselfLocally(
+                    $"My entry is missing from a newer membership table view (in {caller}). Previous version: {previous.Version}, updated version: {updated.Version}.");
+            }
+
+            return updated;
         }
 
         private void LogMissedIAmAlives(MembershipTableData table)
@@ -951,9 +976,19 @@ namespace Orleans.Runtime.MembershipService
         [LoggerMessage(
             EventId = (int)ErrorCode.MembershipFoundMyselfDead1,
             Level = LogLevel.Warning,
-            Message = "I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {Entry}."
+            Message = "I should be Dead according to the membership table (in {Caller}). Local entry: {Entry}."
         )]
-        private static partial void LogWarningFoundMyselfDeadInRefreshFromSnapshot(ILogger logger, string entry);
+        private static partial void LogWarningFoundMyselfDeadInMembershipUpdate(ILogger logger, string caller, string entry);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "The local silo entry is missing from a newer membership table view (in {Caller}). Previous version: {PreviousVersion}, updated version: {UpdatedVersion}."
+        )]
+        private static partial void LogWarningLocalSiloMissingFromMembershipUpdate(
+            ILogger logger,
+            string caller,
+            MembershipVersion previousVersion,
+            MembershipVersion updatedVersion);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

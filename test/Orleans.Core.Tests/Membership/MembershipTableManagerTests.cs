@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
@@ -427,6 +428,96 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStop();
         }
 
+        [Fact]
+        public async Task MembershipTableManager_ExplicitDeadSnapshot_Terminates()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Joining);
+
+            var version = manager.MembershipTableSnapshot.Version;
+            await manager.RefreshFromSnapshot(Snapshot(
+                new MembershipVersion(version.Value - 1),
+                Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)));
+
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_MissingLocalEntry_OnlyNewerSnapshotAfterJoiningTerminates()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(1)));
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Joining);
+            var currentVersion = manager.MembershipTableSnapshot.Version;
+
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(currentVersion.Value - 1)));
+            await manager.RefreshFromSnapshot(Snapshot(currentVersion));
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(currentVersion.Value + 1)));
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_MissingLocalEntry_WhenJoinSnapshotWasNotPublished_DoesNotTerminate()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)));
+            await manager.UpdateStatus(SiloStatus.Joining);
+            Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
+            Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
+
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)));
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_DeclaredDeadThenPrunedBeforeRefresh_Terminates()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Joining);
+
+            while (true)
+            {
+                var table = await membershipTable.ReadAll();
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(this.localSilo));
+                if (await membershipTable.UpdateRow(row.Item1.WithStatus(SiloStatus.Dead), row.Item2, table.Version.Next()))
+                {
+                    break;
+                }
+            }
+
+            await membershipTable.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow.AddMinutes(1));
+            var prunedTable = await membershipTable.ReadAll();
+            Assert.DoesNotContain(prunedTable.Members, row => row.Item1.SiloAddress.Equals(this.localSilo));
+
+            await manager.Refresh();
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+
+            await this.lifecycle.OnStop();
+        }
+
         /// <summary>
         /// Try to suspect another silo of failing but discover that this silo has failed.
         /// </summary>
@@ -767,6 +858,24 @@ namespace NonSilo.Tests.Membership
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
+
+        private MembershipTableManager CreateMembershipTableManager(IMembershipTable membershipTable)
+        {
+            return new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
+                siloLifecycle: this.lifecycle);
+        }
+
+        private static MembershipTableSnapshot Snapshot(MembershipVersion version, params MembershipEntry[] entries)
+        {
+            return new MembershipTableSnapshot(version, entries.ToImmutableDictionary(entry => entry.SiloAddress));
+        }
 
         private static async Task<MembershipEvents.SuspectOrKillRequestCompleted> WaitForSuspectOrKillCompletion(DiagnosticEventCollector membershipEvents, SiloAddress silo)
         {
