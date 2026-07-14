@@ -453,7 +453,11 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_MissingLocalEntry_OnlyNewerSnapshotAfterJoiningTerminates()
         {
-            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var now = DateTimeOffset.UtcNow;
+            var otherSilo = Silo("127.0.0.1:200@100");
+            var membershipTable = new InMemoryMembershipTable(
+                new TableVersion(123, "123"),
+                Entry(otherSilo, SiloStatus.Active, now));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
@@ -465,11 +469,28 @@ namespace NonSilo.Tests.Membership
             var currentVersion = manager.MembershipTableSnapshot.Version;
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(currentVersion.Value - 1)));
-            await manager.RefreshFromSnapshot(Snapshot(currentVersion));
+            await manager.RefreshFromSnapshot(Snapshot(
+                currentVersion,
+                Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))));
+            Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
-            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(currentVersion.Value + 1)));
+            await using var membershipUpdates = manager.MembershipTableUpdates.GetAsyncEnumerator();
+            Assert.True(await membershipUpdates.MoveNextAsync());
+
+            await manager.RefreshFromSnapshot(Snapshot(
+                new MembershipVersion(currentVersion.Value + 1),
+                Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))));
+            Assert.True(await membershipUpdates.MoveNextAsync());
+            Assert.Equal(SiloStatus.Dead, membershipUpdates.Current.Entries[this.localSilo].Status);
+            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+
+            await manager.RefreshFromSnapshot(Snapshot(
+                new MembershipVersion(currentVersion.Value + 2),
+                Entry(this.localSilo, SiloStatus.Active, DateTimeOffset.UtcNow)));
+            Assert.True(await membershipUpdates.MoveNextAsync());
+            Assert.Equal(SiloStatus.Dead, membershipUpdates.Current.Entries[this.localSilo].Status);
 
             await this.lifecycle.OnStop();
         }
@@ -517,6 +538,7 @@ namespace NonSilo.Tests.Membership
             Assert.DoesNotContain(prunedTable.Members, row => row.Item1.SiloAddress.Equals(this.localSilo));
 
             await manager.Refresh();
+            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop();
