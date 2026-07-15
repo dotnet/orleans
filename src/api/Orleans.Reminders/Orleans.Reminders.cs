@@ -192,7 +192,6 @@ namespace Orleans.Reminders.Diagnostics
         {
             Unknown = 0,
             Unregistered = 1,
-            [System.Obsolete("Unused, will be removed in a future version.")]
             Replaced = 2,
             RemovedFromRange = 3,
             RemovedFromTable = 4,
