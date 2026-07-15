@@ -186,12 +186,15 @@ internal sealed partial class DisseminationBroadcastQueue
 
     private TimeSpan GetCoalescingDelay(TimeSpan namespaceDelay)
     {
-        // A peer pump can mix namespaces, so its next wake honors the most urgent enabled namespace.
+        // A peer pump can mix namespaces, so its next wake honors the most urgent coalescing namespace.
+        // High-priority namespaces never coalesce, so they do not lower other namespaces' windows.
         var result = namespaceDelay;
         foreach (var disseminationNamespace in _disseminationNamespaces)
         {
             var namespaceOptions = disseminationNamespace.Options;
-            if (namespaceOptions.Enabled && namespaceOptions.MaxCoalescingDelay < result)
+            if (namespaceOptions.Enabled
+                && namespaceOptions.Priority != DisseminationPriority.High
+                && namespaceOptions.MaxCoalescingDelay < result)
             {
                 result = namespaceOptions.MaxCoalescingDelay;
             }
@@ -203,11 +206,14 @@ internal sealed partial class DisseminationBroadcastQueue
     private TimeSpan GetRetryDelay(int attempt)
     {
         // Retries begin at the normal coalescing cadence and back off no further than anti-entropy.
+        // High-priority namespaces do not coalesce, so they do not define the retry floor.
         var floor = TimeSpan.MaxValue;
         foreach (var disseminationNamespace in _disseminationNamespaces)
         {
             var namespaceOptions = disseminationNamespace.Options;
-            if (namespaceOptions.Enabled && namespaceOptions.MaxCoalescingDelay < floor)
+            if (namespaceOptions.Enabled
+                && namespaceOptions.Priority != DisseminationPriority.High
+                && namespaceOptions.MaxCoalescingDelay < floor)
             {
                 floor = namespaceOptions.MaxCoalescingDelay;
             }
@@ -276,7 +282,14 @@ internal sealed partial class DisseminationBroadcastQueue
 
                 // Filled queues flush immediately; otherwise one timer coalesces all pending namespaces.
                 var currentOptions = _owner._options.CurrentValue;
-                if (DirtyCount >= currentOptions.MaxBatchItems
+                if (disseminationNamespace.Options.Priority == DisseminationPriority.High)
+                {
+                    // High-priority updates skip the coalescing window and pull any pending flush forward.
+                    _flushTimer.Change(TimeSpan.Zero);
+                    _wakeScheduled = true;
+                    scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                }
+                else if (DirtyCount >= currentOptions.MaxBatchItems
                     || namespaceState.DirtyCount >= disseminationNamespace.Options.MaxPendingItemCount)
                 {
                     _flushTimer.Change(TimeSpan.Zero);
@@ -536,6 +549,12 @@ internal sealed partial class DisseminationBroadcastQueue
                                         _flushTimer.Change(delay);
                                         scheduled = new(DisseminationBroadcastScheduleReason.Retry, delay, _retryAttempt, _notificationEpoch);
                                     }
+                                    else if (HasHighPriorityDirtyUnsafe())
+                                    {
+                                        // Leftover high-priority work must not wait for another coalescing window.
+                                        _flushTimer.Change(TimeSpan.Zero);
+                                        scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                                    }
                                     else
                                     {
                                         var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
@@ -547,9 +566,18 @@ internal sealed partial class DisseminationBroadcastQueue
                                 }
                                 else if (!_wakeScheduled)
                                 {
-                                    var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
-                                    _flushTimer.Change(delay);
-                                    scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
+                                    if (HasHighPriorityDirtyUnsafe())
+                                    {
+                                        _flushTimer.Change(TimeSpan.Zero);
+                                        scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                                    }
+                                    else
+                                    {
+                                        var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
+                                        _flushTimer.Change(delay);
+                                        scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
+                                    }
+
                                     _wakeScheduled = true;
                                 }
                             }
@@ -1027,6 +1055,20 @@ internal sealed partial class DisseminationBroadcastQueue
             keyState.Dirty = true;
             namespaceState.DirtyCount++;
             DirtyCount++;
+        }
+
+        private bool HasHighPriorityDirtyUnsafe()
+        {
+            foreach (var namespaceState in _statesByNamespace.Values)
+            {
+                if (namespaceState.DirtyCount > 0
+                    && namespaceState.Namespace.Options.Priority == DisseminationPriority.High)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static Dictionary<DigestKey, long> CreateAcknowledgmentLookup(
