@@ -3,6 +3,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
 
+// A namespace owns current state plus any history and caching needed to repair a peer from an acknowledged version.
 internal interface IDisseminationNamespace
 {
     DisseminationNamespace Name { get; }
@@ -20,6 +21,7 @@ internal interface IDisseminationNamespace
         CancellationToken cancellationToken);
 }
 
+// A null FromVersion means no known peer baseline; a null ToVersion asks for the highest repairable version.
 internal readonly struct DisseminationRepairRequest(
     DisseminationKey key,
     long? fromVersion,
@@ -41,6 +43,8 @@ internal readonly struct DisseminationRepairRequest(
     public int MaxPayloadBytes { get; } = maxPayloadBytes;
 }
 
+// Version reports the namespace's resolved or current version.
+// For Produced results, IsComplete says whether Values reaches that version or only forms a prefix.
 internal readonly struct DisseminationRepairResult(
     DisseminationRepairStatus status,
     long version,
@@ -73,8 +77,12 @@ internal readonly struct DisseminationRepairResult(
 
 internal enum DisseminationRepairStatus
 {
+    // The peer is already at or beyond the resolved version.
     Current,
+    // Values contains a valid repair, possibly a prefix when IsComplete is false.
     Produced,
+    // The key or requested target cannot currently be reconstructed.
     Unavailable,
+    // No valid repair fits within the supplied item or byte budget.
     InsufficientCapacity,
 }

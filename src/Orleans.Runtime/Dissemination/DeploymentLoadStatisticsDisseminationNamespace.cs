@@ -4,6 +4,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Dissemination;
 
+// A newer load sample supersedes every older sample, so this namespace never needs a version chain.
 internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
     DeploymentLoadPublisher deploymentLoadPublisher,
     IOptionsMonitor<DeploymentLoadPublisherOptions> options,
@@ -20,6 +21,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
     {
         lock (_cacheLock)
         {
+            // Reuse serialization until this silo publishes a new timestamp.
             if (_cachedValues.TryGetValue(origin, out var cached)
                 && cached.ToVersion == statistics.DateTime.Ticks)
             {
@@ -81,6 +83,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
             return DisseminationRepairResult.InsufficientCapacity(version);
         }
 
+        // Every repair is a full value from zero, making the peer's exact baseline irrelevant.
         var value = CreateValue(siloAddress, statistics);
         return value.Payload.Length <= request.MaxPayloadBytes
             && value.Payload.Length <= request.MaxBatchBytes
