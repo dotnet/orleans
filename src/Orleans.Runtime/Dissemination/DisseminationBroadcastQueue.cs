@@ -7,6 +7,8 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Dissemination;
 
+// The queue remembers what each peer has acknowledged.
+// Payloads are materialized from namespace state only when a peer is ready to send.
 internal sealed partial class DisseminationBroadcastQueue
 {
     private readonly TimeProvider _timeProvider;
@@ -64,6 +66,7 @@ internal sealed partial class DisseminationBroadcastQueue
             return;
         }
 
+        // Passive evidence only sharpens an existing ledger; it must not allocate a timer for a peer with no outbound work.
         lock (_lock)
         {
             if (_stopped || !_peers.TryGetValue(peer, out var pending))
@@ -108,6 +111,7 @@ internal sealed partial class DisseminationBroadcastQueue
         DisseminationMembershipSnapshot membershipSnapshot,
         CancellationToken cancellationToken)
     {
+        // Namespace digests are the authoritative inventory, so clean ledger entries can disappear with their keys.
         var activeKeys = new Dictionary<DisseminationNamespace, HashSet<DisseminationKey>>();
         foreach (var disseminationNamespace in _disseminationNamespaces)
         {
@@ -169,6 +173,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
     private TimeSpan GetCoalescingDelay(TimeSpan namespaceDelay)
     {
+        // A peer pump can mix namespaces, so its next wake honors the most urgent enabled namespace.
         var result = namespaceDelay;
         foreach (var disseminationNamespace in _disseminationNamespaces)
         {
@@ -184,6 +189,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
     private TimeSpan GetRetryDelay(int attempt)
     {
+        // Retries begin at the normal coalescing cadence and back off no further than anti-entropy.
         var floor = TimeSpan.MaxValue;
         foreach (var disseminationNamespace in _disseminationNamespaces)
         {
@@ -220,6 +226,7 @@ internal sealed partial class DisseminationBroadcastQueue
         private TaskCompletionSource _nextFlushCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task? _activeFlushCompletion;
         private IDisseminationSystemTarget? _target;
+        // Notifications arriving during a send advance the epoch and remain dirty for the next pass.
         private long _notificationEpoch;
         private int _retryAttempt;
         private bool _wakeScheduled;
@@ -245,6 +252,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 ObjectDisposedException.ThrowIf(_stopping, this);
                 var namespaceState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace);
                 var keyState = namespaceState.GetOrCreateKey(key);
+                // A notification is only a wake-up. The namespace will choose the latest repair when this key is drained.
                 keyState.NotificationGeneration++;
                 _notificationEpoch++;
                 var wasRetrying = _retryAttempt > 0;
@@ -252,6 +260,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 var wasEmpty = DirtyCount == 0;
                 MarkDirtyUnsafe(namespaceState, keyState);
 
+                // Filled queues flush immediately; otherwise one timer coalesces all pending namespaces.
                 var currentOptions = _owner._options.CurrentValue;
                 if (DirtyCount >= currentOptions.MaxBatchItems
                     || namespaceState.DirtyCount >= disseminationNamespace.Options.MaxPendingItemCount)
@@ -279,6 +288,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     return;
                 }
 
+                // Peer knowledge is evidence-driven and monotonic across acknowledgments, pushes, and anti-entropy.
                 var keyState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace).GetOrCreateKey(key);
                 if (keyState.KnownVersion is not { } knownVersion || version > knownVersion)
                 {
@@ -432,6 +442,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     TaskCompletionSource flushCompletion;
                     List<PendingKeyWork> work;
                     long notificationEpoch;
+                    // Move one dirty generation to in-flight atomically; a concurrent notification can mark it dirty again.
                     lock (_lock)
                     {
                         _wakeScheduled = false;
@@ -464,6 +475,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     }
                     finally
                     {
+                        // Complete callers waiting on this generation before scheduling unresolved or newly arrived work.
                         flushCompletion.TrySetResult();
                         lock (_lock)
                         {
@@ -479,6 +491,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
                             if (DirtyCount > 0 && !_stopping)
                             {
+                                // Do not overwrite a timer which a newer notification already chose.
                                 if (notificationEpoch == _notificationEpoch)
                                 {
                                     if (result.RequiresBackoff)
@@ -516,12 +529,14 @@ internal sealed partial class DisseminationBroadcastQueue
             List<PendingKeyWork> initialWork,
             CancellationToken cancellationToken)
         {
+            // Every pass re-materializes repairs from the latest acknowledged version instead of retaining serialized messages.
             var pending = new Queue<PendingKeyWork>(initialWork);
             var requiresBackoff = false;
             var madeProgress = false;
             while (pending.Count > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                // Fill one bounded batch while preserving the order of each namespace-produced repair chain.
                 var currentOptions = _owner._options.CurrentValue;
                 var batch = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
                 var sentKeys = new List<SentKey>();
@@ -555,6 +570,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     var repair = work.Namespace.CreateRepair(request);
                     if (repair.Status is DisseminationRepairStatus.Current)
                     {
+                        // The namespace confirms that the peer is already current, so no RPC is needed.
                         pending.Dequeue();
                         CompleteCurrent(work, repair.Version);
                         continue;
@@ -562,11 +578,13 @@ internal sealed partial class DisseminationBroadcastQueue
 
                     if (repair.Status is DisseminationRepairStatus.InsufficientCapacity && itemCount > 0)
                     {
+                        // Give this key a fresh budget in the next batch.
                         break;
                     }
 
                     if (repair.Status is DisseminationRepairStatus.InsufficientCapacity)
                     {
+                        // A value which cannot fit in an empty batch waits for a future publication to change it.
                         pending.Dequeue();
                         CompleteUnsendable(work);
                         continue;
@@ -575,6 +593,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     if (repair.Status is DisseminationRepairStatus.Unavailable
                         && !IsActiveKey(work.Namespace, work.Key))
                     {
+                        // A key absent from current digests was removed, not transiently unavailable.
                         pending.Dequeue();
                         CompleteRemoved(work);
                         continue;
@@ -583,6 +602,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     if (repair.Status is not DisseminationRepairStatus.Produced
                         || !ValidateRepair(request, repair))
                     {
+                        // Invalid or temporarily unavailable repairs retain the dirty key and enter backoff.
                         pending.Dequeue();
                         Requeue([work]);
                         requiresBackoff = true;
@@ -618,6 +638,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     continue;
                 }
 
+                // RPC completion is not application evidence; only the returned receiver versions advance the ledger.
                 var response = await SendBatch(batch, cancellationToken);
                 if (response is null)
                 {
@@ -654,6 +675,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     requiresBackoff |= completion.RequiresBackoff;
                     if (completion.ImmediateRetry is { } retry)
                     {
+                        // An acknowledged prefix continues immediately from the receiver's new version.
                         pending.Enqueue(retry);
                     }
                 }
@@ -706,6 +728,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private List<PendingKeyWork> DrainDirtyUnsafe()
         {
+            // Snapshot dirty work into an in-flight generation; any later notification will set Dirty again.
             var result = new List<PendingKeyWork>(DirtyCount);
             foreach (var namespaceState in _statesByNamespace.Values)
             {
@@ -785,6 +808,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 var madeProgress = sent.FromVersion is null
                     ? acknowledgedVersion >= 0
                     : acknowledgedVersion > sent.FromVersion;
+                // Retire only the generation we sent; a newer notification remains queued even if this repair reached its target.
                 if (keyState.NotificationGeneration != sent.Work.NotificationGeneration
                     || keyState.Dirty
                     || keyState.KnownVersion >= sent.ResolvedVersion)
@@ -795,6 +819,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
                 if (madeProgress)
                 {
+                    // Partial repairs stay in flight and are re-materialized immediately from the acknowledged prefix.
                     return new(
                         sent.Work with { NotificationGeneration = keyState.NotificationGeneration, KnownVersion = keyState.KnownVersion },
                         RequiresBackoff: false,
@@ -809,6 +834,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private bool CompleteFromExistingEvidence(SentKey sent)
         {
+            // A concurrent digest observation can satisfy a response which omitted this key's acknowledgment.
             lock (_lock)
             {
                 if (!TryGetKeyStateUnsafe(sent.Work, out var namespaceState, out var keyState))
@@ -830,6 +856,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private void CompleteUnsupported(PendingKeyWork work)
         {
+            // Treat this as peer capability evidence and forget the namespace until a new publication recreates it.
             lock (_lock)
             {
                 if (!_statesByNamespace.TryGetValue(work.Namespace.Name, out var namespaceState))
@@ -850,6 +877,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private void CompleteRemoved(PendingKeyWork work)
         {
+            // Removed keys leave no retry state behind unless a newer notification raced with the repair.
             lock (_lock)
             {
                 if (!TryGetKeyStateUnsafe(work, out var namespaceState, out var keyState))
@@ -873,6 +901,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private void CompleteUnsendable(PendingKeyWork work)
         {
+            // Keep peer knowledge, but stop retrying until a later publication wakes the key.
             lock (_lock)
             {
                 if (TryGetKeyStateUnsafe(work, out _, out var keyState))
@@ -985,6 +1014,7 @@ internal sealed partial class DisseminationBroadcastQueue
             in DisseminationRepairRequest request,
             in DisseminationRepairResult repair)
         {
+            // Defensively enforce a bounded, contiguous chain toward the namespace's resolved target.
             if (repair.Status is not DisseminationRepairStatus.Produced
                 || repair.Values.IsDefaultOrEmpty
                 || repair.Version <= 0
@@ -1057,6 +1087,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private sealed class PeerKeyState
         {
+            // A null version means no known baseline. Dirty can coexist with InFlight when a newer notification arrives mid-send.
             public long? KnownVersion { get; set; }
 
             public long NotificationGeneration { get; set; }
