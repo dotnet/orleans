@@ -83,6 +83,9 @@ internal enum DisseminationBroadcastScheduleReason
 
     // A prior send failed and the pump re-armed after backoff.
     Retry,
+
+    // A high-priority namespace bypasses the coalescing window and flushes immediately.
+    Priority,
 }
 
 internal sealed class DisseminationBroadcastScheduledEvent
