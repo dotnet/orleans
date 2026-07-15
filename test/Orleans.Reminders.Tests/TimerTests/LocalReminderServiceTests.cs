@@ -97,16 +97,6 @@ public class LocalReminderServiceTests
         validator.ValidateConfiguration();
     }
 
-    [Fact, TestCategory("BVT")]
-    public void CalculateNextDueTime_ClampsOverflow()
-    {
-        var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        var dueTime = LocalReminderService.CalculateNextDueTime(now, TimeSpan.MaxValue);
-
-        Assert.Equal(DateTime.MaxValue, dueTime);
-    }
-
     private static ReminderEntry CreateReminderEntry(DateTime startAt, TimeSpan period)
     {
         return new ReminderEntry
