@@ -260,6 +260,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         public void Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key)
         {
+            ScheduledFlush? scheduled = null;
             lock (_lock)
             {
                 ObjectDisposedException.ThrowIf(_stopping, this);
@@ -280,14 +281,34 @@ internal sealed partial class DisseminationBroadcastQueue
                 {
                     _flushTimer.Change(TimeSpan.Zero);
                     _wakeScheduled = true;
+                    scheduled = new(DisseminationBroadcastScheduleReason.Immediate, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
                 }
                 else if (wasEmpty || wasRetrying || !_wakeScheduled)
                 {
-                    _flushTimer.Change(_owner.GetCoalescingDelay(disseminationNamespace.Options.MaxCoalescingDelay));
+                    var delay = _owner.GetCoalescingDelay(disseminationNamespace.Options.MaxCoalescingDelay);
+                    _flushTimer.Change(delay);
                     _wakeScheduled = true;
+                    scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
                 }
             }
+
+            EmitScheduled(scheduled);
         }
+
+        private void EmitScheduled(ScheduledFlush? scheduled)
+        {
+            if (scheduled is { } info)
+            {
+                DisseminationEvents.EmitBroadcastScheduled(_owner._localSilo, Peer, info.Reason, info.DueTime, info.Attempt, info.Epoch);
+            }
+        }
+
+        // Captures a scheduling decision made under the lock so the diagnostic can be emitted after the lock is released.
+        private readonly record struct ScheduledFlush(
+            DisseminationBroadcastScheduleReason Reason,
+            TimeSpan DueTime,
+            int Attempt,
+            long Epoch);
 
         public void ObservePeerVersion(
             IDisseminationNamespace disseminationNamespace,
@@ -490,6 +511,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     {
                         // Complete callers waiting on this generation before scheduling unresolved or newly arrived work.
                         flushCompletion.TrySetResult();
+                        ScheduledFlush? scheduled = null;
                         lock (_lock)
                         {
                             if (ReferenceEquals(_activeFlushCompletion, flushCompletion.Task))
@@ -510,22 +532,30 @@ internal sealed partial class DisseminationBroadcastQueue
                                     if (result.RequiresBackoff)
                                     {
                                         _retryAttempt++;
-                                        _flushTimer.Change(_owner.GetRetryDelay(_retryAttempt));
+                                        var delay = _owner.GetRetryDelay(_retryAttempt);
+                                        _flushTimer.Change(delay);
+                                        scheduled = new(DisseminationBroadcastScheduleReason.Retry, delay, _retryAttempt, _notificationEpoch);
                                     }
                                     else
                                     {
-                                        _flushTimer.Change(_owner.GetCoalescingDelay(TimeSpan.MaxValue));
+                                        var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
+                                        _flushTimer.Change(delay);
+                                        scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
                                     }
 
                                     _wakeScheduled = true;
                                 }
                                 else if (!_wakeScheduled)
                                 {
-                                    _flushTimer.Change(_owner.GetCoalescingDelay(TimeSpan.MaxValue));
+                                    var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
+                                    _flushTimer.Change(delay);
+                                    scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
                                     _wakeScheduled = true;
                                 }
                             }
                         }
+
+                        EmitScheduled(scheduled);
                     }
                 }
             }
