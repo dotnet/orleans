@@ -88,7 +88,7 @@ namespace Orleans.Providers.Streams.Generator
                 if (!newBuffer.TryGetSegment(size, out segment))
                 {
                     newBuffer.Dispose();
-                    string errmsg = $"Message size is to big. MessageSize: {size}";
+                    string errmsg = $"Message size is too big. MessageSize: {size}";
                     throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                 }
                 currentBuffer = newBuffer;

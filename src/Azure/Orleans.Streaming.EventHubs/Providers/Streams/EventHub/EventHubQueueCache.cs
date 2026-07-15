@@ -217,7 +217,7 @@ namespace Orleans.Streaming.EventHubs
                 if (!newBuffer.TryGetSegment(size, out segment))
                 {
                     newBuffer.Dispose();
-                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is to big. MessageSize: {size}");
+                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
                 }
                 currentBuffer = newBuffer;
                 //call EvictionStrategy's OnBlockAllocated method

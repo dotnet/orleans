@@ -20,7 +20,7 @@ namespace UnitTests.OrleansRuntime.Streams
             private static readonly byte[] FixedMessage = new byte[MessageSize];
             public StreamId StreamId;
             public long SequenceNumber;
-            public byte[] Data = FixedMessage;
+            public byte[] Data { get; init; } = FixedMessage;
             public DateTime EnqueueTimeUtc = DateTime.UtcNow;
         }
 
