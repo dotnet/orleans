@@ -2696,20 +2696,6 @@ public class DisseminationProtocolTests
         IAmAliveTime = iAmAliveTime ?? startTime,
     };
 
-    private static async Task WaitUntil(Func<bool> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!condition())
-        {
-            if (DateTime.UtcNow >= deadline)
-            {
-                Assert.True(condition(), "Condition was not satisfied within the timeout.");
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(10));
-        }
-    }
-
     private static IReadOnlyList<SiloAddress> GetOriginatorTreeTargets(
         SiloAddress root,
         IEnumerable<SiloAddress> peers,
@@ -2974,14 +2960,16 @@ public class DisseminationProtocolTests
                     versions = [.. _versions];
                 }
 
+                var present = new HashSet<DisseminationKey>(versions.Length);
                 foreach (var (key, version) in versions)
                 {
+                    present.Add(key);
                     yield return new DigestEntry(key, version);
                 }
 
                 foreach (var key in ExpectedKeys)
                 {
-                    if (!_versions.ContainsKey(key))
+                    if (!present.Contains(key))
                     {
                         yield return new DigestEntry(key, 0);
                     }
@@ -3487,19 +3475,35 @@ public class DisseminationProtocolTests
 
     private sealed class TestTimeProvider : TimeProvider
     {
+        private readonly object _lock = new();
         private DateTimeOffset _utcNow = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         private long _timestamp;
 
-        public override DateTimeOffset GetUtcNow() => _utcNow;
+        public override DateTimeOffset GetUtcNow()
+        {
+            lock (_lock)
+            {
+                return _utcNow;
+            }
+        }
 
-        public override long GetTimestamp() => _timestamp;
+        public override long GetTimestamp()
+        {
+            lock (_lock)
+            {
+                return _timestamp;
+            }
+        }
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
         public void Advance(TimeSpan value)
         {
-            _utcNow += value;
-            _timestamp += value.Ticks;
+            lock (_lock)
+            {
+                _utcNow += value;
+                _timestamp += value.Ticks;
+            }
         }
     }
 
