@@ -528,6 +528,62 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task HighPriorityNamespaceValuesAreSentAheadOfNormalPriority()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
+        transport.SendBroadcastResponseHandler = (target, batch, cancellationToken) =>
+        {
+            transport.BroadcastBatches.Add((target, batch));
+            var acknowledgments = new Dictionary<DisseminationNamespace, List<DigestEntry>>();
+            foreach (var (namespaceName, values) in batch.Values)
+            {
+                acknowledgments[namespaceName] =
+                    [.. values.Select(static value => new DigestEntry(value.Value.Key, value.Value.ToVersion))];
+            }
+
+            return Task.FromResult(new DisseminationBroadcastResponse { Acknowledgments = acknowledgments });
+        };
+
+        var normalNamespace = new FakeNamespace(local, new DisseminationNamespace("normal"));
+        normalNamespace.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        var highNamespace = new FakeNamespace(local, new DisseminationNamespace("high"));
+        highNamespace.Options.Priority = DisseminationPriority.High;
+        DisseminationOptions? optionsRef = null;
+        var protocol = CreateProtocol(
+            transport,
+            new IDisseminationNamespace[] { normalNamespace, highNamespace },
+            options =>
+            {
+                optionsRef = options;
+                options.MaxBatchItems = 10;
+            },
+            timeProvider);
+
+        Assert.True(await PublishValue(
+            protocol,
+            normalNamespace,
+            normalNamespace.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
+            CancellationToken.None));
+        Assert.True(await PublishValue(
+            protocol,
+            highNamespace,
+            highNamespace.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
+            CancellationToken.None));
+
+        // One value per batch, so the recorded send sequence reflects the drain order.
+        optionsRef!.MaxBatchItems = 1;
+        await protocol.FlushPendingBroadcast(CancellationToken.None);
+
+        Assert.Equal(
+            new[] { highNamespace.Name, normalNamespace.Name },
+            transport.BroadcastBatches.Select(batch => Assert.Single(batch.Batch.Values.Keys)));
+        await protocol.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task PeerVersionAdvancesOnlyFromExplicitAcknowledgment()
     {
         var local = CreateSilo(11111);
