@@ -800,8 +800,10 @@ internal sealed partial class DisseminationBroadcastQueue
         private List<PendingKeyWork> DrainDirtyUnsafe()
         {
             // Snapshot dirty work into an in-flight generation; any later notification will set Dirty again.
+            // Drain higher-priority namespaces first so their values fill the earliest batches.
             var result = new List<PendingKeyWork>(DirtyCount);
-            foreach (var namespaceState in _statesByNamespace.Values)
+            foreach (var namespaceState in _statesByNamespace.Values
+                .OrderByDescending(static state => (int)state.Namespace.Options.Priority))
             {
                 foreach (var (key, keyState) in namespaceState.Keys)
                 {
