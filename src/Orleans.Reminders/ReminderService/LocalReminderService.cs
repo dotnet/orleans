@@ -6,6 +6,7 @@ using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Internal;
 using Orleans.Metadata;
+using Orleans.Reminders.Concurrency;
 using Orleans.Reminders.Diagnostics;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
@@ -30,6 +31,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly GrainInterfaceType _grainInterfaceType;
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
+        private readonly IReminderDeliveryThrottle _deliveryThrottle;
+        private readonly ReminderThrottleInstruments _throttleInstruments;
         private long localTableSequence;
         private uint initialReadCallCount = 0;
         private Task? runTask;
@@ -47,6 +50,8 @@ namespace Orleans.Runtime.ReminderService
             IConsistentRingProvider ringProvider,
             TimeProvider timeProvider,
             ReminderInstruments reminderInstruments,
+            IReminderDeliveryThrottle deliveryThrottle,
+            ReminderThrottleInstruments throttleInstruments,
             SystemTargetShared shared)
             : base(
                   SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null!, shared.SiloAddress),
@@ -61,6 +66,8 @@ namespace Orleans.Runtime.ReminderService
             _timeProvider = timeProvider;
             _reminderInstruments = reminderInstruments;
             _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
+            _deliveryThrottle = deliveryThrottle ?? NoOpReminderDeliveryThrottle.Instance;
+            _throttleInstruments = throttleInstruments;
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
@@ -169,16 +176,22 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            if (deliveryQuiescedTask is not null)
-            {
-                await deliveryQuiescedTask;
-            }
-
-            // Stop all reminders.
+            // Stop all reminders FIRST so any throttle/timer waits that observe _stopCancellation
+            // unblock promptly. In-flight grain calls do not observe _stopCancellation, so they
+            // continue to drain naturally and the quiescence wait below correctly bounds shutdown
+            // on dispatches that have already entered the grain-call phase. The previous ordering
+            // (quiescence wait first, StopAsync second) deadlocked when a configured throttle was
+            // waiting on _stopCancellation.Token: the wait was counted as an active delivery, but
+            // the token would only be cancelled after the wait completed.
             var tasks = new List<Task>(localReminders.Count);
             foreach (var reminderData in localReminders.Values)
             {
                 tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
+            }
+
+            if (deliveryQuiescedTask is not null)
+            {
+                await deliveryQuiescedTask;
             }
 
             await Task.WhenAll(tasks);
@@ -460,7 +473,7 @@ namespace Orleans.Runtime.ReminderService
                 else
                 {
                     LogErrorInitialLoadFailed(ex, initialReadCallCount);
-                    startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.", ex));
+                    startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo. Please check the logs for details."));
                 }
             }
         }
@@ -881,6 +894,7 @@ namespace Orleans.Runtime.ReminderService
                     if (_stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown)
                     {
                         _stopReason = (int)reason;
+                        _scheduleVersion++;
                     }
 
                     timerToDispose = _timer;
@@ -900,14 +914,49 @@ namespace Orleans.Runtime.ReminderService
                 {
                     while (await WaitForNextTick())
                     {
-                        var entry = PrepareTick();
-                        if (entry is null || !_shared.TryBeginSingleReminderDelivery())
+                        if (!TryPrepareTick(out var entry, out var preparedScheduleVersion) || !_shared.TryBeginSingleReminderDelivery())
                         {
                             continue;
                         }
 
                         try
                         {
+                            // Acquire a throttle lease first so that the user-visible TickStatus
+                            // (and the TickFiring event + tardiness sample) reflect the actual
+                            // dispatch time, not a pre-wait timestamp. The throttle context carries
+                            // a provisional status with the pre-wait timestamp so the throttle has
+                            // accurate scheduling info; the grain-facing status is rebuilt after
+                            // admission. Skipped ticks emit TickSkipped (no TickFiring, no
+                            // tardiness sample) since the grain never observes them.
+                            var preThrottleNow = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                            var provisionalStatus = new TickStatus(entry.StartAt, entry.Period, preThrottleNow);
+                            var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus);
+                            ReminderDeliveryLease lease;
+                            try
+                            {
+                                lease = await _shared._deliveryThrottle.AcquireAsync(context, _stopCancellation.Token).ConfigureAwait(true);
+                            }
+                            catch (OperationCanceledException) when (_stopCancellation.IsCancellationRequested)
+                            {
+                                continue;
+                            }
+
+                            _shared._throttleInstruments.RecordAcquireDuration(lease.TierName, lease.Outcome, lease.WaitedFor);
+
+                            if (lease.Outcome == ReminderAdmissionOutcome.Skipped)
+                            {
+                                _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
+                                ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, provisionalStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
+                                lease.Dispose();
+                                continue;
+                            }
+
+                            if (!IsTickStillValid(preparedScheduleVersion, entry))
+                            {
+                                lease.Dispose();
+                                continue;
+                            }
+
                             var before = _shared._timeProvider.GetUtcNow().UtcDateTime;
                             var status = new TickStatus(entry.StartAt, entry.Period, before);
 
@@ -917,6 +966,23 @@ namespace Orleans.Runtime.ReminderService
                             {
                                 var tardiness = CalculateTardiness(status);
                                 _shared._reminderInstruments.OnTardiness(tardiness);
+                            }
+
+                            _shared._throttleInstruments.OnLeaseAcquired(lease.TierName);
+                            using var activity = RemindersActivitySource.Source.HasListeners()
+                                ? RemindersActivitySource.Source.StartActivity("Reminder.Dispatch", System.Diagnostics.ActivityKind.Internal)
+                                : null;
+                            if (activity is { IsAllDataRequested: true })
+                            {
+                                activity.SetTag(ReminderActivityAttributes.ReminderName, entry.ReminderName);
+                                activity.SetTag(ReminderActivityAttributes.GrainId, entry.GrainId.ToString());
+                                activity.SetTag(ReminderActivityAttributes.GrainType, entry.GrainId.Type.ToString());
+                                activity.SetTag(ReminderActivityAttributes.Tardiness, CalculateTardiness(status).TotalSeconds);
+                                if (lease.TierName is not null)
+                                {
+                                    activity.SetTag(ReminderActivityAttributes.ThrottleTier, lease.TierName);
+                                    activity.SetTag(ReminderActivityAttributes.ThrottleOutcome, "admitted");
+                                }
                             }
 
                             try
@@ -933,14 +999,21 @@ namespace Orleans.Runtime.ReminderService
 
                                 ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
                                 _shared._reminderInstruments.OnTickDelivered();
+                                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
                             }
                             catch (Exception exc)
                             {
                                 var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
                                 LogErrorDeliveringReminderTick(_shared.logger, this, CalculateNextDueTime(after, entry.Period), exc);
                                 ReminderEvents.EmitTickFailed(entry.GrainId, entry.ReminderName, status, exc, _shared.Silo);
+                                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error);
 
                                 // What to do with repeated failures to deliver a reminder's ticks?
+                            }
+                            finally
+                            {
+                                _shared._throttleInstruments.OnLeaseReleased(lease.TierName);
+                                lease.Dispose();
                             }
                         }
                         catch (Exception exception)
@@ -1012,21 +1085,53 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            private ReminderEntry? PrepareTick()
+            private bool TryPrepareTick(out ReminderEntry entry, out long scheduleVersion)
+            {
+                lock (_lock)
+                {
+                    scheduleVersion = _scheduleVersion;
+
+                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
+                    {
+                        entry = default!;
+                        return false;
+                    }
+
+                    if (_isFirstTickPending)
+                    {
+                        entry = default!;
+                        return false;
+                    }
+
+                    entry = _entry;
+                    return true;
+                }
+            }
+
+            private bool IsTickStillValid(long scheduleVersion, ReminderEntry entry)
             {
                 lock (_lock)
                 {
                     if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
                     {
-                        return null;
+                        return false;
                     }
 
                     if (_isFirstTickPending)
                     {
-                        return null;
+                        return false;
                     }
 
-                    return _entry;
+                    if (_scheduleVersion != scheduleVersion)
+                    {
+                        return false;
+                    }
+
+                    return _entry.GrainId == entry.GrainId
+                        && StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName)
+                        && _entry.StartAt == entry.StartAt
+                        && _entry.Period == entry.Period
+                        && StringComparer.Ordinal.Equals(_entry.ETag, entry.ETag);
                 }
             }
 
@@ -1217,7 +1322,7 @@ namespace Orleans.Runtime.ReminderService
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {RangeSerialNumberCopy}."
+            Message = "My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {RangeSerialNumber}, RangeSerialNumberCopy {RangeSerialNumberCopy}"
         )]
         private partial void LogDebugRangeChangedWhileFromTable(int rangeSerialNumber, int rangeSerialNumberCopy);
 
