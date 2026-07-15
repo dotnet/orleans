@@ -76,27 +76,36 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
     private async Task StopAsync(CancellationToken cancellationToken)
     {
-        _timer.Dispose();
-        await this.RunOrQueueTask(() => _protocol.StopAsync(cancellationToken));
+        // Cancel the anti-entropy loop before disposing its timer so a pending wakeup cannot race timer disposal.
         await _shutdownCts.CancelAsync();
-        if (_antiEntropyTask is not null)
+        _timer.Dispose();
+        try
         {
-            try
-            {
-                await _antiEntropyTask.WaitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected during silo shutdown.
-            }
-            catch (Exception exception)
-            {
-                LogDebugAntiEntropyLoopFailed(_logger, exception);
-            }
+            await this.RunOrQueueTask(() => _protocol.StopAsync(cancellationToken));
         }
+        finally
+        {
+            // Always observe the loop and release the cancellation source, even if draining the protocol threw.
+            if (_antiEntropyTask is not null)
+            {
+                try
+                {
+                    await _antiEntropyTask.WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected during silo shutdown.
+                }
+                catch (Exception exception)
+                {
+                    LogDebugAntiEntropyLoopFailed(_logger, exception);
+                }
 
-        _antiEntropyTask = null;
-        _shutdownCts.Dispose();
+                _antiEntropyTask = null;
+            }
+
+            _shutdownCts.Dispose();
+        }
     }
 
     private async Task RunAntiEntropyLoop()
@@ -120,6 +129,10 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Expected during silo shutdown.
+        }
+        catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The anti-entropy timer was disposed during shutdown after cancellation was requested.
         }
     }
 
