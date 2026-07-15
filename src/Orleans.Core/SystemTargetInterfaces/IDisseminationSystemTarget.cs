@@ -2,6 +2,7 @@ namespace Orleans.Runtime;
 
 internal interface IDisseminationSystemTarget : ISystemTarget
 {
+    // The response carries receiver versions, which are the evidence used to sequence later repairs.
     Task<DisseminationBroadcastResponse> PushBroadcast(DisseminationBroadcastBatch batch, CancellationToken cancellationToken);
 
     Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request, CancellationToken cancellationToken);
@@ -182,10 +183,12 @@ internal readonly struct DigestEntry
     [Id(1)]
     public long Version { get; }
 
+    // Fingerprints distinguish meaningful same-version state, such as membership liveness.
     [Id(2)]
     public long Fingerprint { get; }
 }
 
+// FromVersion zero denotes a full value which can replace any baseline; nonzero ranges must form a chain.
 [GenerateSerializer, Immutable]
 internal readonly struct DisseminationValue
 {
@@ -210,6 +213,7 @@ internal readonly struct DisseminationValue
     public ReadOnlyMemory<byte> Payload { get; }
 }
 
+// Expiry is hop-local so forwarding re-materializes both the payload and its delivery window.
 [GenerateSerializer, Immutable]
 internal sealed class DisseminationBroadcastValue
 {
@@ -220,6 +224,7 @@ internal sealed class DisseminationBroadcastValue
     public DateTimeOffset ExpiresAt { get; init; }
 }
 
+// Sender is the immediate hop, not the original publisher.
 [GenerateSerializer, Immutable]
 internal sealed class DisseminationBroadcastBatch
 {
@@ -230,6 +235,7 @@ internal sealed class DisseminationBroadcastBatch
     public Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> Values { get; init; } = [];
 }
 
+// Acknowledgments report the versions the receiver actually holds after processing the batch.
 [GenerateSerializer, Immutable]
 internal sealed class DisseminationBroadcastResponse
 {
@@ -259,6 +265,7 @@ internal sealed class DisseminationAntiEntropyResponse
     [Id(1)]
     public Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> Values { get; init; } = [];
 
+    // Truncation means at least one valid repair remains for a later round.
     [Id(2)]
     public bool Truncated { get; init; }
 }

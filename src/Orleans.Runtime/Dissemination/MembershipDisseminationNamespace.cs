@@ -6,6 +6,8 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Dissemination;
 
+// Membership retains a bounded snapshot history so each peer can receive either a compact diff
+// or a universal full snapshot.
 internal sealed class MembershipDisseminationNamespace(
     IMembershipManager membershipManager,
     IOptionsMonitor<ClusterMembershipOptions> options,
@@ -26,6 +28,7 @@ internal sealed class MembershipDisseminationNamespace(
         MembershipTableSnapshot snapshot,
         CancellationToken cancellationToken)
     {
+        // Remember the exact snapshot before waking peer pumps so it is immediately repairable.
         RememberSnapshot(snapshot);
         return await disseminationService.Publish(
             this,
@@ -40,6 +43,7 @@ internal sealed class MembershipDisseminationNamespace(
         {
             var snapshot = membershipManager.CurrentSnapshot;
             RememberSnapshot(snapshot);
+            // Version alone misses same-version liveness advances, so the digest fingerprints heartbeat state too.
             yield return new DigestEntry(
                 DisseminationKey.Default,
                 snapshot.Version.Value,
@@ -59,6 +63,7 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationRepairResult.Unavailable(version: 0);
         }
 
+        // Select history and cached bytes atomically because membership can change without advancing its version.
         lock (_historyLock)
         {
             var currentSnapshot = membershipManager.CurrentSnapshot;
@@ -70,6 +75,7 @@ internal sealed class MembershipDisseminationNamespace(
                 return DisseminationRepairResult.Unavailable(currentSnapshot.Version.Value);
             }
 
+            // Prefer a retained peer baseline when available; otherwise the full snapshot remains the fallback.
             MembershipTableSnapshot? baseSnapshot = null;
             if (request.FromVersion is { } fromVersion
                 && fromVersion > 0
@@ -93,6 +99,7 @@ internal sealed class MembershipDisseminationNamespace(
             var selectedValue = snapshotValue;
             if (baseSnapshot is not null)
             {
+                // Use the smaller representation, retaining the full snapshot as the capacity fallback.
                 var diffValue = CreateDiffValue(baseSnapshot, targetSnapshot);
                 if (diffValue.Payload.Length < snapshotValue.Payload.Length)
                 {
@@ -156,6 +163,7 @@ internal sealed class MembershipDisseminationNamespace(
 
         if (snapshot.Version == currentSnapshot.Version)
         {
+            // Same-version snapshots can still advance IAmAlive state.
             if (!snapshot.IsSuccessorTo(currentSnapshot))
             {
                 return DisseminationApplyResult.Duplicate;
@@ -233,6 +241,7 @@ internal sealed class MembershipDisseminationNamespace(
         if (_snapshotHistory.TryGetValue(snapshot.Version.Value, out var previous)
             && !MembershipSnapshotsEqual(previous, snapshot))
         {
+            // Replacing a same-version snapshot invalidates bytes derived from the older liveness state.
             InvalidatePayloads(snapshot.Version.Value);
         }
 
@@ -296,6 +305,7 @@ internal sealed class MembershipDisseminationNamespace(
 
     private static MembershipTableSnapshotDiff CreateDiff(MembershipTableSnapshot baseSnapshot, MembershipTableSnapshot snapshot)
     {
+        // Include every current entry: peers at the same table version can still have different liveness baselines.
         var updated = ImmutableArray.CreateBuilder<MembershipEntry>();
         foreach (var entry in snapshot.Entries)
         {
@@ -320,6 +330,7 @@ internal sealed class MembershipDisseminationNamespace(
 
     private static long GetFingerprint(MembershipTableSnapshot snapshot)
     {
+        // Keep the hash deterministic across hosts and focused on state which can change without a version bump.
         const ulong offset = 14695981039346656037;
         const ulong prime = 1099511628211;
         var hash = offset;
@@ -334,6 +345,7 @@ internal sealed class MembershipDisseminationNamespace(
 
     private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
     {
+        // A repair must not move locally observed liveness backward.
         if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
             && previousEntry.IAmAliveTime > entry.IAmAliveTime)
         {

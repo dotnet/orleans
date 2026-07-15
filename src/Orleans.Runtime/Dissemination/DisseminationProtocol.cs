@@ -6,6 +6,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
 
+// The protocol coordinates routing and application while namespaces remain authoritative for values and repair history.
 internal sealed partial class DisseminationProtocol
 {
     private readonly SiloAddress _localSilo;
@@ -58,6 +59,7 @@ internal sealed partial class DisseminationProtocol
             return false;
         }
 
+        // Before replacing the legacy fallback, prove that an unknown peer can receive a complete, bounded repair.
         if (!TryValidatePublish(
             disseminationNamespace,
             key,
@@ -76,6 +78,7 @@ internal sealed partial class DisseminationProtocol
             return false;
         }
 
+        // Notifications carry identity only; each peer pump asks the namespace for the latest repair at send time.
         RecordValueUpdate(disseminationNamespace.Name, key, publishedVersion);
         foreach (var peer in membership.OriginatorTreeTargets)
         {
@@ -115,6 +118,7 @@ internal sealed partial class DisseminationProtocol
             foreach (var item in values)
             {
                 namespaceKeys.Add(item.Value.Key);
+                // The sender necessarily owns this version; use that fact only if an outbound ledger already exists.
                 _broadcastQueue.ObservePeerVersion(
                     batch.Sender,
                     namespaceName,
@@ -129,9 +133,11 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        // Apply every value before choosing a routing snapshot because membership can be disseminated in the batch.
+        // Membership may be part of this batch, so apply everything before deriving the forwarding tree.
         var membership = _membership.CurrentSnapshot;
         await _broadcastQueue.Prune(membership, cancellationToken);
+        // Re-materialize downstream repairs from local state. Duplicate deliveries still wake children,
+        // while their peer ledgers suppress redundant sends.
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
             foreach (var key in keys)
@@ -151,6 +157,7 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
+        // Once downstream work is queued, report the versions this receiver actually holds.
         var acknowledgments = new Dictionary<DisseminationNamespace, List<DigestEntry>>();
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
@@ -186,6 +193,7 @@ internal sealed partial class DisseminationProtocol
             return;
         }
 
+        // Push traffic suppresses redundant checks; quiet streams are offered to a few random peers.
         var requestDigests = CreateAntiEntropyRequestDigests(_timeProvider.GetTimestamp());
         if (requestDigests.Count == 0)
         {
@@ -207,6 +215,7 @@ internal sealed partial class DisseminationProtocol
 
     private Dictionary<DisseminationNamespace, List<DigestEntry>> CreateAntiEntropyRequestDigests(long now)
     {
+        // New or quiet streams need periodic repair; this pass also forgets streams which disappeared.
         Dictionary<DigestKey, ValueUpdate> lastValueUpdates;
         lock (_valueUpdateLock)
         {
@@ -302,6 +311,7 @@ internal sealed partial class DisseminationProtocol
         DisseminationOptions options,
         CancellationToken cancellationToken)
     {
+        // Keep each sender's chain intact; competing repairs are ranked only after all responses are collected.
         Dictionary<DigestKey, List<AntiEntropyRepair>>? repairs = null;
         foreach (var response in responses)
         {
@@ -346,6 +356,7 @@ internal sealed partial class DisseminationProtocol
 
         foreach (var candidates in repairs.Values)
         {
+            // Try the furthest-reaching repair first, preferring a full value when candidates tie.
             candidates.Sort(CompareAntiEntropyRepairs);
 
             foreach (var candidate in candidates)
@@ -368,6 +379,7 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        // Incoming digests are passive evidence for existing peer pumps, not a reason to create new ones.
         foreach (var (namespaceName, entries) in request.Digests)
         {
             foreach (var entry in entries)
@@ -403,6 +415,7 @@ internal sealed partial class DisseminationProtocol
         var byteCount = 0;
         var truncated = false;
         var valuesByNamespace = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
+        // Walk the caller's digest order and spend one shared response budget across namespaces.
         foreach (var (namespaceName, remoteDigest) in request.Digests)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -433,6 +446,7 @@ internal sealed partial class DisseminationProtocol
                     continue;
                 }
 
+                // Ask the namespace to reconstruct a repair from the caller's version to its latest state.
                 var repairRequest = new DisseminationRepairRequest(
                     localDigest.Key,
                     peerDigest.Version,
@@ -445,6 +459,7 @@ internal sealed partial class DisseminationProtocol
                 {
                     if (valueCount > 0)
                     {
+                        // Probe with a fresh batch budget to distinguish truncation from a permanently oversized key.
                         var emptyBatchRequest = new DisseminationRepairRequest(
                             localDigest.Key,
                             peerDigest.Version,
@@ -483,6 +498,7 @@ internal sealed partial class DisseminationProtocol
 
                 if (!repair.IsComplete)
                 {
+                    // A valid prefix consumes this response; the caller can continue in its next round.
                     truncated = true;
                     break;
                 }
@@ -561,6 +577,7 @@ internal sealed partial class DisseminationProtocol
             return DisseminationApplyResult.Obsolete;
         }
 
+        // Reject gaps before deserializing; full values from version zero can replace any baseline.
         if (TryGetTerminalApplyResult(disseminationNamespace, item.Value, out var terminalResult))
         {
             EmitApplyResult(namespaceName, item, sender, terminalResult);
@@ -585,6 +602,7 @@ internal sealed partial class DisseminationProtocol
 
     private void RecordValueUpdate(DisseminationNamespace namespaceName, DisseminationKey key, long version)
     {
+        // Recent successful updates suppress anti-entropy until the namespace's expected cadence elapses.
         var digestKey = new DigestKey(namespaceName, key);
         var update = new ValueUpdate(version, _timeProvider.GetTimestamp());
         lock (_valueUpdateLock)
@@ -600,6 +618,7 @@ internal sealed partial class DisseminationProtocol
         SiloAddress member,
         CancellationToken cancellationToken)
     {
+        // Prune peer ledgers against the same membership view used to choose tree targets.
         var membership = await _membership.GetSnapshotContainingMember(member, cancellationToken);
         await _broadcastQueue.Prune(membership ?? _membership.CurrentSnapshot, cancellationToken);
         return membership;
@@ -656,6 +675,7 @@ internal sealed partial class DisseminationProtocol
             return false;
         }
 
+        // Publishing is safe only if the namespace can materialize a complete repair for an unknown peer.
         var request = new DisseminationRepairRequest(
             key,
             fromVersion: null,
@@ -692,6 +712,7 @@ internal sealed partial class DisseminationProtocol
         in DisseminationRepairResult repair,
         DisseminationOptions options)
     {
+        // Keep namespace-specific serialization behind one common range and budget contract.
         if (repair.Status is not DisseminationRepairStatus.Produced
             || repair.Values.IsDefaultOrEmpty
             || repair.Version <= 0
@@ -797,6 +818,7 @@ internal sealed partial class DisseminationProtocol
 
     private static int GetValueCount(Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace) => valuesByNamespace.Values.Sum(values => values.Count);
 
+    // Prefer the highest terminal version, then a universal full value, then stable peer order.
     private static int CompareAntiEntropyRepairs(AntiEntropyRepair left, AntiEntropyRepair right)
     {
         var result = right.Items[^1].Value.ToVersion.CompareTo(left.Items[^1].Value.ToVersion);
