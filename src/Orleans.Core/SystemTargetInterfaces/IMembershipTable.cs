@@ -317,6 +317,35 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Gets the most recent time at which this entry is known to have been updated. This is the later of
+        /// <see cref="EffectiveIAmAliveTime"/> and the most recent time at which a silo voted to suspect this
+        /// silo (see <see cref="SuspectTimes"/>). Declaring a silo dead records a suspect vote, so this value
+        /// reflects a recent death declaration even when the silo last reported itself alive long ago. It is
+        /// used to retain the most-recently-updated defunct entries when cleaning up the membership table, so
+        /// that recently-declared-dead silos remain visible in membership snapshots.
+        /// </summary>
+        internal DateTime EffectiveUpdateTime
+        {
+            get
+            {
+                var result = EffectiveIAmAliveTime;
+                if (SuspectTimes is { } suspectTimes)
+                {
+                    foreach (var vote in suspectTimes)
+                    {
+                        var voteTimeUtc = DateTime.SpecifyKind(vote.Item2, DateTimeKind.Utc);
+                        if (voteTimeUtc > result)
+                        {
+                            result = voteTimeUtc;
+                        }
+                    }
+                }
+
+                return result;
+            }
+        }
+
         public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
         {
             var allVotes = SuspectTimes ??= new List<Tuple<SiloAddress, DateTime>>();

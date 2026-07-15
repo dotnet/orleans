@@ -112,6 +112,46 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipTableCleanupAgent_ThresholdCleanup_RetainsRecentlySuspectedEntries()
+        {
+            var now = this.timeProvider.GetUtcNow();
+            var recentlySuspectedSilo = Silo("127.0.0.1:700@100");
+            var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = null, MaxDefunctSiloEntries = 1 };
+            var membershipManager = new TestMembershipManager();
+
+            // This entry reported itself alive most recently, but was not suspected recently.
+            var newerAliveEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddMinutes(-2));
+
+            // This entry last reported itself alive long ago, but was declared dead (suspected) very recently.
+            // It is therefore the most-recently-updated defunct entry and should be retained even though its
+            // IAmAliveTime is the oldest.
+            var recentlySuspectedEntry = Entry(recentlySuspectedSilo, SiloStatus.Dead, now.AddMinutes(-10));
+            recentlySuspectedEntry.AddSuspector(this.localSilo, now.AddMinutes(-1).UtcDateTime);
+
+            var table = new InMemoryMembershipTable(
+                new TableVersion(123, "123"),
+                newerAliveEntry,
+                recentlySuspectedEntry);
+            var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
+
+            await lifecycle.OnStart();
+            membershipManager.Publish(Snapshot(
+                Entry(this.localSilo, SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:200@200"), SiloStatus.Active, now),
+                newerAliveEntry,
+                recentlySuspectedEntry));
+            await Until(() => table.Calls.Any(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntries)));
+
+            var updatedTable = await table.ReadAll();
+            Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
+            Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(recentlySuspectedSilo));
+
+            await lifecycle.OnStop();
+        }
+
+        [Fact]
         public async Task MembershipTableCleanupAgent_ExpirationCleanup_SkipsUntilExpiredNonActiveEntryOrCleanupPeriodElapsed()
         {
             var options = new ClusterMembershipOptions
