@@ -48,7 +48,12 @@ internal sealed partial class DisseminationBroadcastQueue
     {
         lock (_lock)
         {
-            ObjectDisposedException.ThrowIf(_stopped, this);
+            // A late notification during shutdown is a no-op; the peer pumps are already draining or gone.
+            if (_stopped)
+            {
+                return;
+            }
+
             GetOrCreatePeerUnsafe(peer).Notify(disseminationNamespace, key);
         }
     }
