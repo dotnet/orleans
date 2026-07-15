@@ -394,6 +394,140 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task HighPriorityNamespaceFlushesWithoutWaitingForCoalescingWindow()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
+        var sent = new TaskCompletionSource<DisseminationBroadcastBatch>(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
+        {
+            transport.BroadcastBatches.Add((target, batch));
+            sent.TrySetResult(batch);
+            return Task.CompletedTask;
+        };
+
+        var ns = new FakeNamespace(local);
+        ns.Options.Priority = DisseminationPriority.High;
+        // A long window would delay a normal namespace; a high-priority namespace must ignore it.
+        ns.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        var protocol = CreateProtocol(transport, ns, timeProvider: timeProvider);
+        using var schedule = new BroadcastScheduleObserver();
+
+        Assert.True(await PublishValue(
+            protocol,
+            ns,
+            ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
+            CancellationToken.None));
+
+        var scheduled = await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Priority,
+            TimeSpan.FromSeconds(5));
+        Assert.Equal(TimeSpan.Zero, scheduled.DueTime);
+
+        // Advancing far less than the coalescing window still delivers the update immediately.
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        var batch = await sent.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, Assert.Single(GetBroadcastValues(batch)).Value.ToVersion);
+        await protocol.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task HighPriorityNotificationPullsPendingCoalescedFlushForward()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
+        {
+            transport.BroadcastBatches.Add((target, batch));
+            sent.TrySetResult();
+            return Task.CompletedTask;
+        };
+
+        var normalNamespace = new FakeNamespace(local, new DisseminationNamespace("normal"));
+        normalNamespace.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        var highNamespace = new FakeNamespace(local, new DisseminationNamespace("high"));
+        highNamespace.Options.Priority = DisseminationPriority.High;
+        var protocol = CreateProtocol(
+            transport,
+            new IDisseminationNamespace[] { normalNamespace, highNamespace },
+            timeProvider: timeProvider);
+        using var schedule = new BroadcastScheduleObserver();
+
+        // A normal update on the peer pump arms a distant coalescing timer.
+        Assert.True(await PublishValue(
+            protocol,
+            normalNamespace,
+            normalNamespace.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
+            CancellationToken.None));
+        var coalesced = await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Coalesce,
+            TimeSpan.FromSeconds(5));
+        Assert.Equal(TimeSpan.FromMinutes(1), coalesced.DueTime);
+        Assert.False(sent.Task.IsCompleted);
+
+        // A high-priority update on the same pump must pull that flush forward to now.
+        Assert.True(await PublishValue(
+            protocol,
+            highNamespace,
+            highNamespace.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
+            CancellationToken.None));
+        var pulled = await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Priority,
+            TimeSpan.FromSeconds(5));
+        Assert.Equal(TimeSpan.Zero, pulled.DueTime);
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        await sent.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await protocol.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task NormalPriorityNamespaceStillWaitsForCoalescingWindow()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
+        {
+            transport.BroadcastBatches.Add((target, batch));
+            sent.TrySetResult();
+            return Task.CompletedTask;
+        };
+
+        var ns = new FakeNamespace(local);
+        ns.Options.MaxCoalescingDelay = TimeSpan.FromSeconds(1);
+        Assert.Equal(DisseminationPriority.Normal, ns.Options.Priority);
+        var protocol = CreateProtocol(transport, ns, timeProvider: timeProvider);
+        using var schedule = new BroadcastScheduleObserver();
+
+        Assert.True(await PublishValue(
+            protocol,
+            ns,
+            ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
+            CancellationToken.None));
+        var scheduled = await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Coalesce,
+            TimeSpan.FromSeconds(5));
+        Assert.Equal(TimeSpan.FromSeconds(1), scheduled.DueTime);
+
+        // A sub-window advance must not release the coalesced batch.
+        timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        Assert.False(sent.Task.IsCompleted);
+
+        // Crossing the window flushes it.
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        await sent.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await protocol.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task PeerVersionAdvancesOnlyFromExplicitAcknowledgment()
     {
         var local = CreateSilo(11111);
