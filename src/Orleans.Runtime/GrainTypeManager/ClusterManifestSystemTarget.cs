@@ -16,6 +16,8 @@ namespace Orleans.Runtime
         private readonly ClusterManifestUpdate? _noUpdate = default;
         private MembershipVersion _cachedMembershipVersion;
         private ClusterManifestUpdate? _cachedUpdate;
+        private MajorMinorVersion _cachedHashSummaryVersion;
+        private ClusterManifestHashSummary? _cachedHashSummary;
 
         public ClusterManifestSystemTarget(
             IClusterMembershipService clusterMembershipService,
@@ -39,13 +41,22 @@ namespace Orleans.Runtime
         public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary()
         {
             var manifest = _clusterManifestProvider.Current;
-            var hashes = new Dictionary<SiloAddress, ManifestHash>();
-            foreach (var siloManifest in manifest.Silos)
+
+            // Recompute the per-silo hashes only when the manifest version changes, so the SHA-256 over every
+            // silo manifest is not repeated on each summary request.
+            if (_cachedHashSummary is null || manifest.Version != _cachedHashSummaryVersion)
             {
-                hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
+                var hashes = new Dictionary<SiloAddress, ManifestHash>();
+                foreach (var siloManifest in manifest.Silos)
+                {
+                    hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
+                }
+
+                _cachedHashSummary = new ClusterManifestHashSummary(manifest.Version, hashes.ToFrozenDictionary());
+                _cachedHashSummaryVersion = manifest.Version;
             }
 
-            return new(new ClusterManifestHashSummary(manifest.Version, hashes.ToFrozenDictionary()));
+            return new(_cachedHashSummary);
         }
 
         public ValueTask<ManifestHash> GetSiloManifestHash() => new(_siloManifestHash);
