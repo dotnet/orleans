@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.GrainReferences;
 using Orleans.Serialization.TypeSystem;
@@ -35,16 +36,18 @@ namespace Orleans.Serialization
         public static JsonSerializerSettings GetDefaultSerializerSettings(IServiceProvider services)
         {
             var settings = GetDefaultSerializerSettings();
-            Configure(services, settings);
+            var allowAllTypes = services.GetService<IOptions<OrleansJsonSerializerOptions>>()?.Value.AllowAllTypes ?? false;
+            Configure(services, settings, allowAllTypes);
             return settings;
         }
 
-        internal static void Configure(IServiceProvider services, JsonSerializerSettings jsonSerializerSettings)
+        internal static void Configure(IServiceProvider services, JsonSerializerSettings jsonSerializerSettings, bool allowAllTypes = false)
         {
             if (jsonSerializerSettings.SerializationBinder == null)
             {
                 var typeResolver = services.GetRequiredService<TypeResolver>();
-                jsonSerializerSettings.SerializationBinder = new OrleansJsonSerializationBinder(typeResolver);
+                var typeConverter = services.GetRequiredService<TypeConverter>();
+                jsonSerializerSettings.SerializationBinder = new OrleansJsonSerializationBinder(typeConverter, typeResolver, allowAllTypes);
             }
 
             jsonSerializerSettings.Converters.Add(new IPAddressConverter());
