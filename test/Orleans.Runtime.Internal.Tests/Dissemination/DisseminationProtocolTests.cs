@@ -310,9 +310,12 @@ public class DisseminationProtocolTests
             ns,
             ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
             CancellationToken.None));
+        using var schedule = new BroadcastScheduleObserver();
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         await firstAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(50));
+        await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5));
 
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         await secondAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -363,12 +366,17 @@ public class DisseminationProtocolTests
             ns,
             ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
             CancellationToken.None));
+        using var schedule = new BroadcastScheduleObserver();
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         await firstAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(50));
+        await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Retry && e.Attempt == 1,
+            TimeSpan.FromSeconds(5));
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         await secondAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(50));
+        await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Retry && e.Attempt == 2,
+            TimeSpan.FromSeconds(5));
 
         Assert.True(await PublishValue(
             protocol,
@@ -3509,6 +3517,88 @@ public class DisseminationProtocolTests
                 return result;
             }
         }
+    }
+
+    // Subscribes to the dissemination DiagnosticListener and lets a test deterministically await the moment a
+    // peer pump (re)arms its flush timer, replacing wall-clock Task.Delay bridges. Buffered, consume-once
+    // semantics mean an event emitted before the wait is registered is still observed.
+    private sealed class BroadcastScheduleObserver : IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly object _lock = new();
+        private readonly List<DisseminationBroadcastScheduledEvent> _events = new();
+        private readonly HashSet<DisseminationBroadcastScheduledEvent> _consumed = new();
+        private readonly List<Waiter> _waiters = new();
+        private readonly IDisposable _subscription;
+
+        public BroadcastScheduleObserver()
+        {
+            _subscription = DisseminationEvents.Listener.Subscribe(
+                this,
+                static name => name == DisseminationEvents.BroadcastScheduledEventName);
+        }
+
+        public Task<DisseminationBroadcastScheduledEvent> WaitAsync(
+            Func<DisseminationBroadcastScheduledEvent, bool> predicate,
+            TimeSpan timeout)
+        {
+            TaskCompletionSource<DisseminationBroadcastScheduledEvent> completion;
+            lock (_lock)
+            {
+                foreach (var scheduled in _events)
+                {
+                    if (!_consumed.Contains(scheduled) && predicate(scheduled))
+                    {
+                        _consumed.Add(scheduled);
+                        return Task.FromResult(scheduled);
+                    }
+                }
+
+                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _waiters.Add(new Waiter(predicate, completion));
+            }
+
+            return completion.Task.WaitAsync(timeout);
+        }
+
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            if (value.Value is not DisseminationBroadcastScheduledEvent scheduled)
+            {
+                return;
+            }
+
+            TaskCompletionSource<DisseminationBroadcastScheduledEvent>? completion = null;
+            lock (_lock)
+            {
+                _events.Add(scheduled);
+                for (var i = 0; i < _waiters.Count; i++)
+                {
+                    if (_waiters[i].Predicate(scheduled))
+                    {
+                        completion = _waiters[i].Completion;
+                        _waiters.RemoveAt(i);
+                        _consumed.Add(scheduled);
+                        break;
+                    }
+                }
+            }
+
+            completion?.TrySetResult(scheduled);
+        }
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void Dispose() => _subscription.Dispose();
+
+        private sealed record Waiter(
+            Func<DisseminationBroadcastScheduledEvent, bool> Predicate,
+            TaskCompletionSource<DisseminationBroadcastScheduledEvent> Completion);
     }
 }
 
