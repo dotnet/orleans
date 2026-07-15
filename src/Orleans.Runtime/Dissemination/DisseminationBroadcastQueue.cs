@@ -109,7 +109,15 @@ internal sealed partial class DisseminationBroadcastQueue
             _peers.Clear();
         }
 
-        await Task.WhenAll(peers.Select(peer => peer.StopAsync(drain: true, cancellationToken).AsTask()));
+        try
+        {
+            await Task.WhenAll(peers.Select(peer => peer.StopAsync(drain: true, cancellationToken).AsTask()));
+        }
+        finally
+        {
+            // Pumps have stopped, so no further send can acquire the gate.
+            _sendGate.Dispose();
+        }
     }
 
     public async Task Prune(
