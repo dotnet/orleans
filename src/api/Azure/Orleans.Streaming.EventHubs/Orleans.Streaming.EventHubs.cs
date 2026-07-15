@@ -464,6 +464,8 @@ namespace Orleans.Streaming.EventHubs
 
         public int GetMaxAddCount() { throw null; }
 
+        public void Refresh(object cursor, Streams.StreamSequenceToken sequenceToken) { }
+
         public void SignalPurge() { }
 
         public bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer message) { throw null; }
@@ -546,6 +548,7 @@ namespace Orleans.Streaming.EventHubs
         System.Collections.Generic.List<Streams.StreamPosition> Add(System.Collections.Generic.List<Azure.Messaging.EventHubs.EventData> message, System.DateTime dequeueTimeUtc);
         void AddCachePressureMonitor(ICachePressureMonitor monitor);
         object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken sequenceToken);
+        void Refresh(object cursor, Streams.StreamSequenceToken sequenceToken);
         void SignalPurge();
         bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer message);
     }

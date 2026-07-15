@@ -137,6 +137,12 @@ namespace Orleans.Streaming.EventHubs
             return cache.GetCursor(streamId, sequenceToken);
         }
 
+        /// <inheritdoc />
+        public void Refresh(object cursor, StreamSequenceToken sequenceToken)
+        {
+            cache.Refresh(cursor, sequenceToken);
+        }
+
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.
         /// </summary>

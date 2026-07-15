@@ -809,6 +809,8 @@ namespace Orleans.Providers.Streams.Common
 
         public object GetCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) { throw null; }
 
+        public void Refresh(object cursorObj, Orleans.Streams.StreamSequenceToken sequenceToken) { }
+
         public void RemoveOldestMessage() { }
 
         public bool TryGetNextMessage(object cursorObj, out Orleans.Streams.IBatchContainer message) { throw null; }

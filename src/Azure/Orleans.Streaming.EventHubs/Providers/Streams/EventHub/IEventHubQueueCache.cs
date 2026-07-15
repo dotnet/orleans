@@ -26,6 +26,14 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
         object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken);
+
+        /// <summary>
+        /// Refreshes an inactive cursor at the provided sequence token.
+        /// </summary>
+        /// <param name="cursor">The cursor to refresh.</param>
+        /// <param name="sequenceToken">The sequence token to position the cursor at.</param>
+        void Refresh(object cursor, StreamSequenceToken sequenceToken) { }
+
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.
         /// </summary>

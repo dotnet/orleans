@@ -182,6 +182,111 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void RefreshIdleCursorStartsAtProvidedTokenAfterPurge()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            // Disable purge metadata to reproduce a cursor outliving both cached data and its token metadata.
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null);
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+
+            AddMessage(1);
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(1));
+            Assert.True(cache.TryGetNextMessage(cursor, out _));
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            cache.RemoveOldestMessage();
+            AddMessage(2);
+            var newEventToken = new EventSequenceTokenV2(2);
+
+            cache.Refresh(cursor, newEventToken);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(newEventToken, message.SequenceToken);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            void AddMessage(long sequenceNumber)
+            {
+                var now = DateTime.UtcNow;
+                var message = new TestQueueMessage
+                {
+                    StreamId = stream,
+                    SequenceNumber = sequenceNumber,
+                };
+                cache.Add([converter.ToCachedMessage(message, now)], now);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void RefreshDoesNotRepositionActiveCursor()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null);
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 1 }, now),
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 2 }, now),
+            ], now);
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(1));
+
+            cache.Refresh(cursor, new EventSequenceTokenV2(2));
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var firstMessage));
+            Assert.Equal(1, firstMessage.SequenceToken.SequenceNumber);
+            Assert.True(cache.TryGetNextMessage(cursor, out var secondMessage));
+            Assert.Equal(2, secondMessage.SequenceToken.SequenceNumber);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void RefreshDoesNotRewindCursorHoldingFutureToken()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null);
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+
+            // Position an unset cursor on a token that is still in the future relative to the cache.
+            AddMessage(1);
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(5));
+
+            // A refresh with an older token must not rewind the cursor behind its requested start.
+            cache.Refresh(cursor, new EventSequenceTokenV2(2));
+
+            AddMessage(2);
+            AddMessage(3);
+            AddMessage(4);
+            AddMessage(5);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(5, message.SequenceToken.SequenceNumber);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            void AddMessage(long sequenceNumber)
+            {
+                var now = DateTime.UtcNow;
+                var message = new TestQueueMessage
+                {
+                    StreamId = stream,
+                    SequenceNumber = sequenceNumber,
+                };
+                cache.Add([converter.ToCachedMessage(message, now)], now);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void AvoidCacheMissMultipleStreamsActive()
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));

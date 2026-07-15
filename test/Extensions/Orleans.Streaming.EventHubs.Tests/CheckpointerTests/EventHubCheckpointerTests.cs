@@ -69,12 +69,21 @@ public class EventHubCheckpointerTests
 
         public int DisposeCount { get; private set; }
         public string PurgeOffsetToReport { get; set; }
+        public object Cursor { get; } = new();
+        public object RefreshedCursor { get; private set; }
+        public StreamSequenceToken RefreshToken { get; private set; }
 
         public int GetMaxAddCount() => 1_000;
 
         public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc) => [];
 
-        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken) => new();
+        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken) => Cursor;
+
+        public void Refresh(object cursor, StreamSequenceToken sequenceToken)
+        {
+            RefreshedCursor = cursor;
+            RefreshToken = sequenceToken;
+        }
 
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
@@ -167,6 +176,20 @@ public class EventHubCheckpointerTests
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         return receiver;
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task CursorRefresh_DelegatesToEventHubCache()
+    {
+        var cache = new TestEventHubQueueCache();
+        var receiver = await CreateReceiver(new TestCheckpointer(), cache);
+        var cursor = receiver.GetCacheCursor(StreamId.Create("namespace", Guid.NewGuid()), MakeToken(1));
+        var refreshToken = MakeToken(2);
+
+        cursor.Refresh(refreshToken);
+
+        Assert.Same(cache.Cursor, cache.RefreshedCursor);
+        Assert.Same(refreshToken, cache.RefreshToken);
     }
 
     [Fact, TestCategory("BVT")]
