@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -248,11 +249,42 @@ namespace Orleans.Runtime.Metadata
             var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
             if (modified)
             {
-                var manifest = CreateClusterManifest(version, builder.ToImmutable());
+                var silos = builder.ToImmutable();
+                PruneManifestCache(silos);
+                var manifest = CreateClusterManifest(version, silos);
                 var publishSuccess = TryPublishManifest(manifest);
                 return publishSuccess && fetchSuccess;
             }
             return fetchSuccess;
+        }
+
+        private void PruneManifestCache(ImmutableDictionary<SiloAddress, GrainManifest> silos)
+        {
+            // The cache only accelerates hash lookups for manifests currently in use, so drop entries that no
+            // longer correspond to any silo in the cluster manifest. The local manifest is always retained.
+            // Recomputing the live hashes is skipped until the cache has actually outgrown the live set.
+            if (_manifestCache.Count <= silos.Count + 1)
+            {
+                return;
+            }
+
+            var live = new HashSet<ManifestHash>(silos.Count + 1)
+            {
+                ManifestHashCalculator.ComputeHash(LocalGrainManifest),
+            };
+
+            foreach (var manifest in silos.Values)
+            {
+                live.Add(ManifestHashCalculator.ComputeHash(manifest));
+            }
+
+            foreach (var hash in _manifestCache.Keys.ToArray())
+            {
+                if (!live.Contains(hash))
+                {
+                    _manifestCache.Remove(hash);
+                }
+            }
         }
 
         private async Task<bool> TryFillMissingManifestsFromPeers(
