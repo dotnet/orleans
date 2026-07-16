@@ -16,7 +16,7 @@ public class GrainDirectoryCacheFactoryTests
     {
         var timeProvider = new FakeTimeProvider();
         var services = new ServiceCollection()
-            .AddSingleton<TimeProvider>(timeProvider)
+            .AddKeyedSingleton<TimeProvider>(TimeProviderNames.GrainDirectory, timeProvider)
             .BuildServiceProvider();
         var options = new GrainDirectoryOptions
         {
