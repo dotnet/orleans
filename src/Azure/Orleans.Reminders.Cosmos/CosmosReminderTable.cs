@@ -79,18 +79,14 @@ internal partial class CosmosReminderTable : IReminderTable
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
 
                 var reminders = new List<ReminderEntity>();
-                do
+                while (query.HasMoreResults)
                 {
                     var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
                     }
-                    else
-                    {
-                        break;
-                    }
-                } while (query.HasMoreResults);
+                }
 
                 return reminders;
             },
@@ -122,18 +118,14 @@ internal partial class CosmosReminderTable : IReminderTable
 
                 var iterator = query.ToFeedIterator();
                 var reminders = new List<ReminderEntity>();
-                do
+                while (iterator.HasMoreResults)
                 {
                     var queryResponse = await iterator.ReadNextAsync().ConfigureAwait(false);
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
                     }
-                    else
-                    {
-                        break;
-                    }
-                } while (iterator.HasMoreResults);
+                }
 
                 return reminders;
             },
