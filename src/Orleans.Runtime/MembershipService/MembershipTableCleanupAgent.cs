@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
             IMembershipTable membershipTableProvider,
             IMembershipManager membershipManager,
             ILocalSiloDetails localSiloDetails,
-            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider,
             ILogger<MembershipTableCleanupAgent> log)
         {
             _clusterMembershipOptions = clusterMembershipOptions.Value;

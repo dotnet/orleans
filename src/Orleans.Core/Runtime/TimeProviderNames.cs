@@ -34,9 +34,16 @@ public static class TimeProviderNames
 
     /// <summary>
     /// The clock used by silo background maintenance loops driven by <c>IAsyncTimerFactory</c>
-    /// (cluster membership, grain directory maintenance, health checks, and similar).
+    /// (grain directory maintenance and similar), excluding cluster membership, which uses
+    /// <see cref="Membership"/>.
     /// </summary>
     public const string SystemTimers = "Orleans.SystemTimers";
+
+    /// <summary>
+    /// The clock used by cluster membership loops, including the membership agent, membership table
+    /// maintenance and cleanup, and silo health monitoring and probing.
+    /// </summary>
+    public const string Membership = "Orleans.Membership";
 
     /// <summary>
     /// The clock used by activation lifecycle management, including activation collection, migratability checks,

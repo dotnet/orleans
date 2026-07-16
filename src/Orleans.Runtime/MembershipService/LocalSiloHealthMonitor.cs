@@ -73,7 +73,7 @@ namespace Orleans.Runtime.MembershipService
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IAsyncTimerFactory timerFactory,
             ILoggerFactory loggerFactory,
-            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             _healthCheckParticipants = healthCheckParticipants.ToList();
             _membershipManager = membershipManager;

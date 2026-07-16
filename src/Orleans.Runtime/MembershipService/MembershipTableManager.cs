@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
             ILogger<MembershipTableManager> log,
             IAsyncTimerFactory timerFactory,
             ISiloLifecycle siloLifecycle,
-            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;

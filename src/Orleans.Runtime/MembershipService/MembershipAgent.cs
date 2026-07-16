@@ -38,7 +38,7 @@ namespace Orleans.Runtime.MembershipService
             ILogger<MembershipAgent> log,
             IAsyncTimerFactory timerFactory,
             IRemoteSiloProber siloProber,
-            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             this.membershipManager = membershipManager;
             this.localSilo = localSilo;

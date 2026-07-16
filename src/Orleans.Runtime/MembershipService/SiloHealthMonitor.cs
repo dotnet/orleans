@@ -67,7 +67,7 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloHealthMonitor localSiloHealthMonitor,
             IMembershipManager membershipService,
             ILocalSiloDetails localSiloDetails,
-            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider,
             MessagingInstruments? messagingInstruments = null)
         {
             TargetSiloAddress = siloAddress;
