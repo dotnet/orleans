@@ -167,6 +167,11 @@ namespace Orleans
                 await messageCenter.StopAsync(cancellationToken);
             }
 
+            // Once messaging has stopped the client can no longer receive responses, so any requests
+            // which are still outstanding will never complete. Fault them now so that in-flight grain
+            // calls observe a terminal result instead of hanging forever.
+            BreakOutstandingMessages();
+
             if (_manifestProvider is { } provider)
             {
                 await provider.StopAsync(cancellationToken);
@@ -429,6 +434,21 @@ namespace Orleans
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
                     callback.Value.OnTargetSiloFail();
+                }
+            }
+        }
+
+        private void BreakOutstandingMessages()
+        {
+            foreach (var (_, callback) in callbacks)
+            {
+                try
+                {
+                    callback.OnHostShutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorWhileProcessingCallbackExpiry(logger, exception);
                 }
             }
         }

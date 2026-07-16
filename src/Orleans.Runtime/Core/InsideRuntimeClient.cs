@@ -523,6 +523,27 @@ namespace Orleans.Runtime
             {
                 await task.WaitAsync(tc);
             }
+
+            // Once the silo is shutting down it can no longer receive responses, so any requests which
+            // are still outstanding will never complete. Fault them now so that in-flight grain calls
+            // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
+            // deactivation and host disposal during an ungraceful shutdown.
+            BreakOutstandingMessages();
+        }
+
+        private void BreakOutstandingMessages()
+        {
+            foreach (var (_, callback) in callbacks)
+            {
+                try
+                {
+                    callback.OnHostShutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningWhileProcessingCallbackExpiry(this.logger, exception);
+                }
+            }
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)

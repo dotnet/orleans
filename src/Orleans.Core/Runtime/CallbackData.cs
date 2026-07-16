@@ -166,6 +166,23 @@ namespace Orleans.Runtime
             this.context.Complete(Response.FromException(exception));
         }
 
+        public void OnHostShutdown()
+        {
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            {
+                return;
+            }
+
+            this.stopwatch.Stop();
+            this.shared.Unregister(this.Message);
+            _cancellationTokenRegistration.Dispose();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+
+            var msg = this.Message;
+            var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
+            this.context.Complete(Response.FromException(exception));
+        }
+
         public void DoCallback(Message response)
         {
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
