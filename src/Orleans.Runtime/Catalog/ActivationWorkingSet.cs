@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
@@ -34,10 +35,11 @@ namespace Orleans.Runtime
             IAsyncTimerFactory asyncTimerFactory,
             ILogger<ActivationWorkingSet> logger,
             IEnumerable<IActivationWorkingSetObserver> observers,
-            CatalogInstruments catalogInstruments)
+            CatalogInstruments catalogInstruments,
+            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
             _logger = logger;
-            _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(5_000), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet));
+            _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(5_000), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet), timeProvider);
             _observers = observers.ToList();
             catalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
         }

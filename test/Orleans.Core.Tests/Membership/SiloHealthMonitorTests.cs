@@ -85,8 +85,9 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: fatalErrorHandler,
                 gossiper: membershipGossiper,
                 log: _loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(_loggerFactory, TimeProvider.System),
-                lifecycle);
+                timerFactory: new AsyncTimerFactory(_loggerFactory),
+                lifecycle,
+                timeProvider: TimeProvider.System);
 
             _probeResults = Channel.CreateBounded<ProbeResult>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait });
             Task onProbeResult(SiloHealthMonitor mon, ProbeResult res) => _probeResults.Writer.WriteAsync(res).AsTask();
@@ -100,7 +101,8 @@ namespace NonSilo.Tests.Membership
                 _timerFactory,
                 _localSiloHealthMonitor,
                 _membershipService,
-                _localSiloDetails);
+                _localSiloDetails,
+                TimeProvider.System);
         }
 
         private async Task Shutdown()

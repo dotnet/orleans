@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Core.Diagnostics;
@@ -55,7 +56,8 @@ namespace Orleans.Runtime.MembershipService
             IMembershipGossiper gossiper,
             ILogger<MembershipTableManager> log,
             IAsyncTimerFactory timerFactory,
-            ISiloLifecycle siloLifecycle)
+            ISiloLifecycle siloLifecycle,
+            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
@@ -76,7 +78,8 @@ namespace Orleans.Runtime.MembershipService
 
             this.membershipUpdateTimer = timerFactory.Create(
                 this.clusterMembershipOptions.TableRefreshTimeout,
-                nameof(PeriodicallyRefreshMembershipTable));
+                nameof(PeriodicallyRefreshMembershipTable),
+                timeProvider);
 
             _suspectOrKillsListTask = Task.Run(ProcessSuspectOrKillLists);
         }

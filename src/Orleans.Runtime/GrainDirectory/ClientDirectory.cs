@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -68,6 +69,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         IClusterMembershipService clusterMembershipService,
         IAsyncTimerFactory timerFactory,
         IConnectedClientCollection connectedClients,
+        [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider,
         SystemTargetShared shared)
         : base(Constants.ClientDirectoryType, shared)
     {
@@ -77,7 +79,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         _clusterMembershipService = clusterMembershipService;
         _messagingOptions = messagingOptions.Value;
         _logger = loggerFactory.CreateLogger<ClientDirectory>();
-        _refreshTimer = timerFactory.Create(_messagingOptions.ClientRegistrationRefresh, "ClientDirectory.RefreshTimer");
+        _refreshTimer = timerFactory.Create(_messagingOptions.ClientRegistrationRefresh, "ClientDirectory.RefreshTimer", timeProvider);
         _connectedClients = connectedClients;
         _localHostedClientId = HostedClient.CreateHostedClientGrainId(_localSilo).GrainId;
         _schedulePublishUpdate = SchedulePublishUpdates;

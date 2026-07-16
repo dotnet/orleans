@@ -94,6 +94,7 @@ namespace NonSilo.Tests.Directory
                 clusterMembershipService: _clusterMembershipService,
                 timerFactory: _timerFactory,
                 connectedClients: _connectedClientCollection,
+                timeProvider: TimeProvider.System,
                 shared: systemTargetShared);
             _testAccessor = new ClientDirectory.TestAccessor(_directory);
 

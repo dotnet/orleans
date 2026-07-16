@@ -65,7 +65,7 @@ namespace Orleans.Runtime.ReminderService
             _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
-            this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
+            this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher", _timeProvider);
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
@@ -1034,7 +1034,7 @@ namespace Orleans.Runtime.ReminderService
 
             private IAsyncTimer CreateTimer(ReminderEntry entry)
             {
-                return _shared.asyncTimerFactory.Create(entry.Period, "ReminderService.LocalReminder");
+                return _shared.asyncTimerFactory.Create(entry.Period, "ReminderService.LocalReminder", _shared._timeProvider);
             }
 
             private TimeSpan GetInitialDueTime(ReminderEntry entry)
