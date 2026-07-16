@@ -676,6 +676,11 @@ namespace Orleans.Transactions
 
         public double Limit { get { throw null; } set { } }
     }
+
+    public static partial class TransactionTimeProviderNames
+    {
+        public const string Transactions = "Orleans.Transactions";
+    }
 }
 
 namespace Orleans.Transactions.Abstractions

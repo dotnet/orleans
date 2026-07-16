@@ -119,6 +119,11 @@ namespace Orleans.Hosting
 
 namespace Orleans.Reminders
 {
+    public static partial class ReminderTimeProviderNames
+    {
+        public const string Reminders = "Orleans.Reminders";
+    }
+
     public enum RSErrorCode
     {
         ReminderServiceBase = 102900,

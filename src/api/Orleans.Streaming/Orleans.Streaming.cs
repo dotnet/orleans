@@ -1838,6 +1838,11 @@ namespace Orleans.Streams
         public override int GetHashCode() { throw null; }
     }
 
+    public static partial class StreamingTimeProviderNames
+    {
+        public const string Streaming = "Orleans.Streaming";
+    }
+
     public partial class StreamPosition
     {
         public StreamPosition(Runtime.StreamId streamId, StreamSequenceToken sequenceToken) { }

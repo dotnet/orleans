@@ -32,7 +32,7 @@ public partial class LeaseBasedQueueBalancer(
     ILeaseProvider leaseProvider,
     IServiceProvider services,
     ILoggerFactory loggerFactory,
-    [FromKeyedServices(TimeProviderNames.Streaming)] TimeProvider timeProvider) : QueueBalancerBase(services, loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}.{name}")), IStreamQueueBalancer
+    [FromKeyedServices(StreamingTimeProviderNames.Streaming)] TimeProvider timeProvider) : QueueBalancerBase(services, loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}.{name}")), IStreamQueueBalancer
 {
     private sealed class AcquiredQueue(int order, QueueId queueId, AcquiredLease lease)
     {

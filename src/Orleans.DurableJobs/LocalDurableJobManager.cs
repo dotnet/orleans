@@ -56,7 +56,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         IInternalGrainFactory grainFactory,
         IClusterMembershipService clusterMembership,
         IOverloadDetector overloadDetector,
-        [FromKeyedServices(TimeProviderNames.DurableJobs)] TimeProvider timeProvider,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
         IOptions<DurableJobsOptions> options,
         SystemTargetShared shared,
         ILogger<LocalDurableJobManager> logger,

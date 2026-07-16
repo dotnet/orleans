@@ -10,7 +10,7 @@ internal sealed class JournaledStateManagerShared
     public JournaledStateManagerShared(
         ILogger<JournaledStateManager> logger,
         IOptions<JournaledStateManagerOptions> options,
-        [FromKeyedServices(TimeProviderNames.Journaling)] TimeProvider timeProvider,
+        [FromKeyedServices(JournalingTimeProviderNames.Journaling)] TimeProvider timeProvider,
         IServiceProvider serviceProvider,
         JournalingInstruments? instruments = null)
         : this(logger, CreateOptions(options), timeProvider, instruments, serviceProvider)

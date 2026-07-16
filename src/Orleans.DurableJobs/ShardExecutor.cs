@@ -40,7 +40,7 @@ internal sealed partial class ShardExecutor
         IOptions<DurableJobsOptions> options,
         IOverloadDetector overloadDetector,
         ILogger<ShardExecutor> logger,
-        [FromKeyedServices(TimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null,
         DurableJobsInstruments? durableJobsInstruments = null)
     {
         _grainFactory = grainFactory;

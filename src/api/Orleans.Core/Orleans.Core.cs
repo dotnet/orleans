@@ -1580,18 +1580,12 @@ namespace Orleans.Runtime
 
     public static partial class TimeProviderNames
     {
-        public const string ActivationManagement = "Orleans.TimeProvider.ActivationManagement";
-        public const string Caching = "Orleans.TimeProvider.Caching";
-        public const string DurableJobs = "Orleans.TimeProvider.DurableJobs";
-        public const string GrainDirectory = "Orleans.TimeProvider.GrainDirectory";
-        public const string Grains = "Orleans.TimeProvider.Grains";
-        public const string Journaling = "Orleans.TimeProvider.Journaling";
-        public const string Messaging = "Orleans.TimeProvider.Messaging";
-        public const string Reminders = "Orleans.TimeProvider.Reminders";
-        public const string Streaming = "Orleans.TimeProvider.Streaming";
-        public const string SystemTimers = "Orleans.TimeProvider.SystemTimers";
-        public const string Transactions = "Orleans.TimeProvider.Transactions";
-        public static System.Collections.Generic.IReadOnlyList<string> BackgroundAreas { get { throw null; } }
+        public const string ActivationManagement = "Orleans.ActivationManagement";
+        public const string Caching = "Orleans.Caching";
+        public const string GrainDirectory = "Orleans.GrainDirectory";
+        public const string Grains = "Orleans.Grains";
+        public const string Messaging = "Orleans.Messaging";
+        public const string SystemTimers = "Orleans.SystemTimers";
     }
 }
 

@@ -7,6 +7,7 @@ using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Internal;
 using Orleans.Metadata;
+using Orleans.Reminders;
 using Orleans.Reminders.Diagnostics;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
@@ -46,7 +47,7 @@ namespace Orleans.Runtime.ReminderService
             IAsyncTimerFactory asyncTimerFactory,
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
-            [FromKeyedServices(TimeProviderNames.Reminders)] TimeProvider timeProvider,
+            [FromKeyedServices(ReminderTimeProviderNames.Reminders)] TimeProvider timeProvider,
             ReminderInstruments reminderInstruments,
             SystemTargetShared shared)
             : base(

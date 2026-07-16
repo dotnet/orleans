@@ -35,7 +35,7 @@ internal static class FakeTimeSilo
     /// thread. The result is a CPU-bound spin that never returns from <c>Advance</c>, hanging the test
     /// until CI's blame-hang timeout (observed as <c>TimerOrleansTest_*</c> hanging for 10 minutes).
     /// Calling <see cref="TimeProviderTestingExtensions.UseTimeProviderForBackgroundAreas"/> pins every
-    /// background area (see <see cref="TimeProviderNames.BackgroundAreas"/>) to
+    /// keyed area except <see cref="TimeProviderNames.Grains"/> to
     /// <see cref="TimeProvider.System"/>, keeping those loops off the fake clock entirely, so advancing
     /// the fake clock only ever fires the grain timers under test. Grain timers and grain-side delays
     /// continue to use the unkeyed (fake) <see cref="TimeProvider"/>, so tests retain full control over
