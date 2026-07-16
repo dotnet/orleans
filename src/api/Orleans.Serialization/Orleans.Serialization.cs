@@ -1824,6 +1824,64 @@ namespace Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
+    [RegisterSerializer]
+    public sealed partial class FrozenDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<System.Collections.Frozen.FrozenDictionary<TKey, TValue>, FrozenDictionarySurrogate<TKey, TValue>>
+    {
+        public FrozenDictionaryCodec(Serializers.IValueSerializer<FrozenDictionarySurrogate<TKey, TValue>> surrogateSerializer) : base(default!) { }
+
+        public override System.Collections.Frozen.FrozenDictionary<TKey, TValue> ConvertFromSurrogate(ref FrozenDictionarySurrogate<TKey, TValue> surrogate) { throw null; }
+
+        public override void ConvertToSurrogate(System.Collections.Frozen.FrozenDictionary<TKey, TValue> value, ref FrozenDictionarySurrogate<TKey, TValue> surrogate) { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class FrozenDictionaryCopier<TKey, TValue> : Cloning.IDeepCopier<System.Collections.Frozen.FrozenDictionary<TKey, TValue>>, Cloning.IDeepCopier, Cloning.IOptionalDeepCopier, Cloning.IDerivedTypeCopier
+    {
+        public FrozenDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
+
+        public System.Collections.Frozen.FrozenDictionary<TKey, TValue> DeepCopy(System.Collections.Frozen.FrozenDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+
+        public bool IsShallowCopyable() { throw null; }
+    }
+
+    [GenerateSerializer]
+    public partial struct FrozenDictionarySurrogate<TKey, TValue>
+    {
+        [Id(1)]
+        public System.Collections.Generic.IEqualityComparer<TKey> KeyComparer;
+        [Id(0)]
+        public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
+    }
+
+    [RegisterSerializer]
+    public sealed partial class FrozenSetCodec<T> : GeneralizedReferenceTypeSurrogateCodec<System.Collections.Frozen.FrozenSet<T>, FrozenSetSurrogate<T>>
+    {
+        public FrozenSetCodec(Serializers.IValueSerializer<FrozenSetSurrogate<T>> surrogateSerializer) : base(default!) { }
+
+        public override System.Collections.Frozen.FrozenSet<T> ConvertFromSurrogate(ref FrozenSetSurrogate<T> surrogate) { throw null; }
+
+        public override void ConvertToSurrogate(System.Collections.Frozen.FrozenSet<T> value, ref FrozenSetSurrogate<T> surrogate) { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class FrozenSetCopier<T> : Cloning.IDeepCopier<System.Collections.Frozen.FrozenSet<T>>, Cloning.IDeepCopier, Cloning.IOptionalDeepCopier, Cloning.IDerivedTypeCopier
+    {
+        public FrozenSetCopier(Cloning.IDeepCopier<T> copier) { }
+
+        public System.Collections.Frozen.FrozenSet<T> DeepCopy(System.Collections.Frozen.FrozenSet<T> input, Cloning.CopyContext context) { throw null; }
+
+        public bool IsShallowCopyable() { throw null; }
+    }
+
+    [GenerateSerializer]
+    public partial struct FrozenSetSurrogate<T>
+    {
+        [Id(1)]
+        public System.Collections.Generic.IEqualityComparer<T> KeyComparer;
+        [Id(0)]
+        public System.Collections.Generic.List<T> Values;
+    }
+
     public abstract partial class GeneralizedReferenceTypeSurrogateCodec<TField, TSurrogate> : IFieldCodec<TField>, IFieldCodec, IDerivedTypeCodec where TField : class where TSurrogate : struct
     {
         protected GeneralizedReferenceTypeSurrogateCodec(Serializers.IValueSerializer<TSurrogate> surrogateSerializer) { }
@@ -4761,6 +4819,42 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_FrozenDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_FrozenDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> instance) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_FrozenSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_FrozenSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> instance) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableArraySurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableArraySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5054,6 +5148,26 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public Copier_ConcurrentQueueSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_FrozenDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_FrozenDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_FrozenSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_FrozenSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
