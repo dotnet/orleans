@@ -72,7 +72,7 @@ namespace Orleans
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
         {

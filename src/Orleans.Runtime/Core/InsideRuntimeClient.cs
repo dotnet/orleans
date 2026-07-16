@@ -64,7 +64,7 @@ namespace Orleans.Runtime
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
         {

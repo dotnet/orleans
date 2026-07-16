@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -48,7 +49,7 @@ namespace Orleans.Messaging
             IGatewayListProvider gatewayListProvider,
             ILoggerFactory loggerFactory,
             ConnectionManager connectionManager,
-            TimeProvider timeProvider)
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider)
         {
             this.gatewayOptions = gatewayOptions.Value;
             this.logger = loggerFactory.CreateLogger<GatewayManager>();

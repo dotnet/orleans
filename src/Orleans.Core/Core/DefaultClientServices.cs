@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.GrainReferences;
+using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Metadata;
 using Orleans.Networking.Shared;
@@ -50,6 +51,7 @@ namespace Orleans
             services.AddOptions();
             services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+            services.AddKeyedTimeProviders();
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<ClientInstruments>();
             services.TryAddSingleton<MessagingInstruments>();

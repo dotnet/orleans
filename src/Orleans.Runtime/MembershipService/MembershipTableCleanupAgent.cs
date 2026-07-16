@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
             IMembershipTable membershipTableProvider,
             IMembershipManager membershipManager,
             ILocalSiloDetails localSiloDetails,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider,
             ILogger<MembershipTableCleanupAgent> log)
         {
             _clusterMembershipOptions = clusterMembershipOptions.Value;

@@ -511,6 +511,7 @@ public class JournaledJobShardManagerTests
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
         builder.Services.AddSingleton((IJournalStorageCatalog)storageProvider);
         return builder.Services.BuildServiceProvider();

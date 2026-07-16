@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
@@ -45,7 +46,7 @@ namespace Orleans.Runtime.ReminderService
             IAsyncTimerFactory asyncTimerFactory,
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Reminders)] TimeProvider timeProvider,
             ReminderInstruments reminderInstruments,
             SystemTargetShared shared)
             : base(

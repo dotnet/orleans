@@ -65,6 +65,7 @@ namespace Orleans.Hosting
             services.AddOptions();
             services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+            services.AddKeyedTimeProviders();
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<SchedulerInstruments>();
             services.TryAddSingleton<ConsistentRingInstruments>();

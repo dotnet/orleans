@@ -15,6 +15,7 @@ using System.Runtime.InteropServices;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Orleans.Placement.Repartitioning;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
@@ -96,7 +97,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         ActivationDirectory activationDirectory,
         DeactivatedGrainQueue deactivatedGrainQueue,
         IOptions<ActivationRepartitionerOptions> options,
-        TimeProvider timeProvider,
+        [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
         SystemTargetShared shared)
         : base(Constants.ActivationRepartitionerType, shared)
     {

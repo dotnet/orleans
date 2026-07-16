@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 
 namespace DefaultCluster.Tests;
 
@@ -23,9 +23,10 @@ internal static class FakeTimeSilo
     /// This isolation is essential. <see cref="FakeTimeProvider.Advance"/> invokes every due timer
     /// callback synchronously and inline on the thread which calls it. The silo's infrastructure
     /// maintenance loops (cluster membership, gateway and grain-directory maintenance, activation
-    /// working-set monitoring, incoming-request monitoring, reminders and health checks) are all driven
-    /// by <see cref="IAsyncTimer"/> instances created by <see cref="IAsyncTimerFactory"/>. Those loops
-    /// repeatedly await <c>Task.Delay</c> against the ambient <see cref="TimeProvider"/>.
+    /// working-set monitoring, incoming-request monitoring, reminders and health checks) resolve their
+    /// <see cref="TimeProvider"/> from keyed DI using the per-area keys in
+    /// <see cref="TimeProviderNames"/>, and each of those keys defaults to the unkeyed default
+    /// <see cref="TimeProvider"/>.
     /// </para>
     /// <para>
     /// If those loops were driven by the fake clock, a single <see cref="FakeTimeProvider.Advance"/>
@@ -33,10 +34,12 @@ internal static class FakeTimeSilo
     /// re-arm a fresh <c>Task.Delay</c> and run its body again, all synchronously on the advancing
     /// thread. The result is a CPU-bound spin that never returns from <c>Advance</c>, hanging the test
     /// until CI's blame-hang timeout (observed as <c>TimerOrleansTest_*</c> hanging for 10 minutes).
-    /// Pointing the infrastructure timer factory at <see cref="TimeProvider.System"/> keeps those loops
-    /// off the fake clock entirely, so advancing the fake clock only ever fires the grain timers under
-    /// test. Grain timers continue to use the ambient (fake) <see cref="TimeProvider"/> via
-    /// <c>ITimerRegistry</c>, so tests retain full control over them.
+    /// Calling <see cref="TimeProviderTestingExtensions.UseTimeProviderForBackgroundAreas"/> pins every
+    /// background area (see <see cref="TimeProviderNames.BackgroundAreas"/>) to
+    /// <see cref="TimeProvider.System"/>, keeping those loops off the fake clock entirely, so advancing
+    /// the fake clock only ever fires the grain timers under test. Grain timers and grain-side delays
+    /// continue to use the unkeyed (fake) <see cref="TimeProvider"/>, so tests retain full control over
+    /// them.
     /// </para>
     /// </remarks>
     public static ISiloBuilder UseFakeTimeProviderForGrainTimers(this ISiloBuilder siloBuilder, FakeTimeProvider timeProvider)
@@ -45,8 +48,7 @@ internal static class FakeTimeSilo
         siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(sp => sp.GetRequiredService<FakeTimeProvider>()));
 
         // Keep the silo's own background timers on real time so they are never fired inline by Advance.
-        siloBuilder.Services.Replace(ServiceDescriptor.Singleton<IAsyncTimerFactory>(
-            sp => new AsyncTimerFactory(sp.GetRequiredService<ILoggerFactory>(), TimeProvider.System)));
+        siloBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
 
         return siloBuilder;
     }

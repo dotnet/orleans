@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
 using Orleans.Runtime.Scheduler;
+using Microsoft.Extensions.DependencyInjection;
 
 #nullable enable
 
@@ -28,7 +29,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
 
     public ActivationRebalancerMonitor(
-        TimeProvider timeProvider,
+        [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
         ActivationDirectory activationDirectory,
         ILoggerFactory loggerFactory,
         IGrainFactory grainFactory,

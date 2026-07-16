@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
@@ -15,7 +16,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
-
 namespace Orleans.DurableJobs;
 
 /// <inheritdoc/>
@@ -56,7 +56,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         IInternalGrainFactory grainFactory,
         IClusterMembershipService clusterMembership,
         IOverloadDetector overloadDetector,
-        TimeProvider timeProvider,
+        [FromKeyedServices(TimeProviderNames.DurableJobs)] TimeProvider timeProvider,
         IOptions<DurableJobsOptions> options,
         SystemTargetShared shared,
         ILogger<LocalDurableJobManager> logger,

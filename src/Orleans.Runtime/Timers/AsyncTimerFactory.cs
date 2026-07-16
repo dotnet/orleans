@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
@@ -8,7 +9,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeProvider _timeProvider;
 
-        public AsyncTimerFactory(ILoggerFactory loggerFactory, TimeProvider timeProvider)
+        public AsyncTimerFactory(ILoggerFactory loggerFactory, [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
             this.loggerFactory = loggerFactory;
             _timeProvider = timeProvider;
