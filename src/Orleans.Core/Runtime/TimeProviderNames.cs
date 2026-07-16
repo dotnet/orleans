@@ -55,9 +55,4 @@ public static class TimeProviderNames
     /// The clock used by the grain directory cache for entry expiration.
     /// </summary>
     public const string GrainDirectory = "Orleans.GrainDirectory";
-
-    /// <summary>
-    /// The clock used by internal caches with time-based expiration.
-    /// </summary>
-    public const string Caching = "Orleans.Caching";
 }

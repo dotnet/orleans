@@ -1581,7 +1581,6 @@ namespace Orleans.Runtime
     public static partial class TimeProviderNames
     {
         public const string ActivationManagement = "Orleans.ActivationManagement";
-        public const string Caching = "Orleans.Caching";
         public const string GrainDirectory = "Orleans.GrainDirectory";
         public const string Grains = "Orleans.Grains";
         public const string Messaging = "Orleans.Messaging";
