@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -234,12 +232,11 @@ namespace DefaultCluster.Tests.TimerTests
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("MemoryStore");
 
-                    siloBuilder.Services.AddSingleton(timeProvider);
-                    siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(sp => sp.GetRequiredService<FakeTimeProvider>()));
+                    siloBuilder.UseFakeTimeProviderForGrainTimers(timeProvider);
                 });
             }
 
-            public void AdvanceTime(TimeSpan duration) => timeProvider.Advance(duration);
+            public void AdvanceTime(TimeSpan duration) => FakeTimeSilo.Advance(timeProvider, duration);
         }
 
         /// <summary>

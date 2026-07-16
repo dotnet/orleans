@@ -25,6 +25,7 @@
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs" />
     <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling" />
