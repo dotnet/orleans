@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,7 +51,7 @@ namespace Orleans.Runtime
                     hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
                 }
 
-                _cachedHashSummary = new ClusterManifestHashSummary(manifest.Version, hashes.ToFrozenDictionary());
+                _cachedHashSummary = new ClusterManifestHashSummary(manifest.Version, hashes);
                 _cachedHashSummaryVersion = manifest.Version;
             }
 
