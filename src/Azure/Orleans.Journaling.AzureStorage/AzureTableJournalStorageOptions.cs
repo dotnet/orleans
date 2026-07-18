@@ -20,7 +20,8 @@ public sealed class AzureTableJournalStorageOptions
     /// </summary>
     /// <remarks>
     /// The returned value must be a valid Azure Table partition key. The default value percent-encodes
-    /// <see cref="JournalId.Value"/> so that any journal id maps to a valid partition key reversibly.
+    /// <see cref="JournalId.Value"/> reversibly and rejects values whose encoded form exceeds the Azure
+    /// Table partition-key limit.
     /// </remarks>
     public Func<JournalId, string> GetPartitionKey { get; set; } = DefaultGetPartitionKey;
 
@@ -105,8 +106,10 @@ public sealed class AzureTableJournalStorageOptions
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        var partitionKey = GetPartitionKey(journalId);
+        var mapper = GetPartitionKey ?? throw new ArgumentNullException(nameof(GetPartitionKey));
+        var partitionKey = mapper(journalId);
         ArgumentException.ThrowIfNullOrWhiteSpace(partitionKey);
+        ValidatePartitionKey(partitionKey, nameof(partitionKey));
         return partitionKey;
     }
 
@@ -118,9 +121,56 @@ public sealed class AzureTableJournalStorageOptions
         }
 
         // Percent-encoding escapes every character disallowed in partition keys ('/', '\', '#', '?',
-        // control characters) and is reversible, so catalog listing can decode journal ids.
-        return Uri.EscapeDataString(journalId.Value);
+        // control characters) and is reversible.
+        var partitionKey = Uri.EscapeDataString(journalId.Value);
+        ValidatePartitionKey(partitionKey, nameof(journalId));
+        return partitionKey;
     }
+
+    internal static void ValidateTableName(string? tableName)
+    {
+        if (tableName is not { Length: >= 3 and <= 63 } || !IsAsciiLetter(tableName[0]))
+        {
+            throw new ArgumentException(
+                "Azure Table names must contain 3 to 63 alphanumeric characters and begin with a letter.",
+                nameof(TableName));
+        }
+
+        foreach (var character in tableName)
+        {
+            if (!IsAsciiLetter(character) && character is not (>= '0' and <= '9'))
+            {
+                throw new ArgumentException(
+                    "Azure Table names must contain 3 to 63 alphanumeric characters and begin with a letter.",
+                    nameof(TableName));
+            }
+        }
+    }
+
+    private static void ValidatePartitionKey(string partitionKey, string parameterName)
+    {
+        if (partitionKey.Length > 1024)
+        {
+            throw new ArgumentException(
+                "Azure Table partition keys must not exceed 1,024 characters.",
+                parameterName);
+        }
+
+        foreach (var character in partitionKey)
+        {
+            if (character is '/' or '\\' or '#' or '?'
+                or >= '\u0000' and <= '\u001F'
+                or >= '\u007F' and <= '\u009F')
+            {
+                throw new ArgumentException(
+                    "Azure Table partition keys must not contain '/', '\\', '#', '?', or control characters.",
+                    parameterName);
+            }
+        }
+    }
+
+    private static bool IsAsciiLetter(char character)
+        => character is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 
     /// <summary>
     /// Configures the <see cref="TableServiceClient"/> using a connection string.

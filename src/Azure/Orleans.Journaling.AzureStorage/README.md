@@ -29,6 +29,8 @@ siloBuilder.AddAzureTableJournalStorage(options =>
 });
 ```
 
+`AzureTableJournalStorageOptions.GetPartitionKey` can be used to apply a custom partition layout. The returned key must be unique per journal, satisfy Azure Table partition-key restrictions, and contain at most 1,024 characters. The canonical journal id is stored in the header so catalog listing remains accurate with custom mappings.
+
 ## Getting Started
 To use this package, install it via NuGet:
 

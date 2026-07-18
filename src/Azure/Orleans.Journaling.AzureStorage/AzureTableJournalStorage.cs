@@ -6,6 +6,7 @@ using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Serialization.Buffers;
 using Orleans.Storage;
 
 namespace Orleans.Journaling;
@@ -20,6 +21,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     // The header row uses this property to declare which journal format the data rows contain.
     internal const string FormatPropertyName = "Format";
 
+    // The header row stores the canonical journal id so catalog listing is independent of partition-key mapping.
+    internal const string JournalIdPropertyName = "JournalId";
+
     // The header row uses this property to point recovery at the current generation of data rows.
     // Generations are random so rows orphaned by a failed replace can never collide with, or be
     // mistaken for, rows of any later generation.
@@ -30,6 +34,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
     // The header row uses this property to record how many journal bytes the current generation contains.
     internal const string LengthPropertyName = "Length";
+
+    // The header row tracks append activity separately from the current generation manifest so a large
+    // replacement snapshot does not immediately request another compaction.
+    internal const string AppendRowCountPropertyName = "AppendRowCount";
+    internal const string AppendLengthPropertyName = "AppendLength";
 
     // The header row stores caller-owned metadata as a JSON object in this property so caller keys
     // can never collide with provider-owned header properties.
@@ -62,8 +71,8 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     private bool HeaderExists => _headerETag != default;
 
     public bool IsCompactionRequested
-        => _headerProviderState.RowCount >= _shared.Options.CompactionRowCountThreshold
-            || _headerProviderState.Length >= _shared.Options.CompactionSizeThreshold;
+        => _headerProviderState.AppendRowCount >= _shared.Options.CompactionRowCountThreshold
+            || _headerProviderState.AppendLength >= _shared.Options.CompactionSizeThreshold;
 
     internal AzureTableJournalStorage(
         AzureTableJournalStorageShared shared,
@@ -100,8 +109,15 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             succeeded = true;
             return true;
         }
-        catch (RequestFailedException exception) when (exception.Status is 409)
+        catch (RequestFailedException exception) when (IsEntityAlreadyExists(exception))
         {
+            var existing = await GetHeaderEntityAsync(cancellationToken).ConfigureAwait(false);
+            if (existing is null)
+            {
+                throw;
+            }
+
+            ValidateHeaderJournalId(existing);
             succeeded = true;
             return false;
         }
@@ -173,6 +189,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
                 var patch = new TableEntity(_partitionKey, HeaderRowKey)
                 {
+                    [JournalIdPropertyName] = _journalId.Value,
+                    [AppendRowCountPropertyName] = headerState.ProviderState.AppendRowCount,
+                    [AppendLengthPropertyName] = headerState.ProviderState.AppendLength,
                     [MetadataPropertyName] = SerializeCallerMetadata(metadata),
                 };
 
@@ -237,8 +256,10 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                 var entities = CreateDataEntities(value, generation, firstSequence: expectedProviderState.RowCount);
                 var newProviderState = expectedProviderState with
                 {
-                    RowCount = expectedProviderState.RowCount + entities.Count,
-                    Length = expectedProviderState.Length + value.Length,
+                    RowCount = checked(expectedProviderState.RowCount + entities.Count),
+                    Length = checked(expectedProviderState.Length + value.Length),
+                    AppendRowCount = checked(expectedProviderState.AppendRowCount + entities.Count),
+                    AppendLength = checked(expectedProviderState.AppendLength + value.Length),
                 };
 
                 // Guard the whole batch with the last observed header ETag so appends fail if the
@@ -387,8 +408,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             // Recovery refreshes the cached ETag and compaction counters from the header manifest.
             SetHeader(headerState.ETag, headerState.ProviderState);
 
-            var chunks = new List<ReadOnlyMemory<byte>>();
             var rowCount = 0L;
+            var metadata = new JournalMetadata(headerState.ProviderState.Format, eTag: null, headerState.CallerMetadata);
+            using var buffer = new ArcBufferWriter();
             if (headerState.ProviderState is { Generation: { Length: > 0 } generation, RowCount: > 0 and var expectedRowCount })
             {
                 // A single range query returns the current generation in sequence order. The upper bound
@@ -397,8 +419,16 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                     $"PartitionKey eq {_partitionKey} and RowKey ge {FormatRowKey(generation, 0)} and RowKey le {FormatRowKey(generation, expectedRowCount - 1)}");
                 await foreach (var row in Table.QueryAsync<TableEntity>(filter, cancellationToken: cancellationToken).ConfigureAwait(false))
                 {
+                    var expectedRowKey = FormatRowKey(generation, rowCount);
+                    if (!string.Equals(row.RowKey, expectedRowKey, StringComparison.Ordinal))
+                    {
+                        throw CreateInconsistentHeaderStateException(
+                            $"Azure Table journal row sequence is invalid: expected \"{expectedRowKey}\", found \"{row.RowKey}\"; recovery is required.",
+                            headerState.ETag);
+                    }
+
                     rowCount++;
-                    bytes += CollectChunks(row, chunks);
+                    bytes += ReadChunks(row, buffer, consumer, metadata);
                 }
             }
 
@@ -410,8 +440,12 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                     headerState.ETag);
             }
 
-            var metadata = new JournalMetadata(headerState.ProviderState.Format, eTag: null, headerState.CallerMetadata);
-            consumer.Read(chunks, metadata, complete: true);
+            consumer.Read(new JournalBufferReader(buffer.Reader, isCompleted: true), metadata);
+            if (buffer.Length > 0)
+            {
+                throw new InvalidOperationException("The journal storage consumer did not read all supplied journal data.");
+            }
+
             LogRead(_shared.Logger, bytes, Table.Name, _partitionKey);
             succeeded = true;
         }
@@ -447,44 +481,62 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             var previousGeneration = _shared.Options.DeleteOldGenerations ? headerState.Value.ProviderState.Generation : null;
 
             // The new generation is invisible to recovery until the header flip below publishes it, so its
-            // rows may span multiple transactions. Rows orphaned by a failure here are unreachable and are
-            // removed by a later replace, delete, or row cleanup.
+            // rows may span multiple transactions.
             var newGeneration = Guid.NewGuid().ToString("N");
-            var entities = CreateDataEntities(value, newGeneration, firstSequence: 0);
-            await SubmitDataEntitiesAsync(entities, cancellationToken).ConfigureAwait(false);
-
-            for (var attempt = 0; ; attempt++)
+            var published = false;
+            try
             {
-                var publishState = headerState.Value;
-                try
-                {
-                    // Flip the header under its ETag to publish the new generation only if the journal is unchanged.
-                    var response = await Table.UpdateEntityAsync(
-                        CreateHeaderFlipPatch(newGeneration, entities.Count, value.Length),
-                        publishState.ETag,
-                        TableUpdateMode.Merge,
-                        cancellationToken).ConfigureAwait(false);
-                    SetHeaderFromResponse(
-                        response,
-                        new HeaderProviderState(NormalizeFormat(_shared.JournalFormatKey), newGeneration, entities.Count, value.Length));
-                    break;
-                }
-                catch (RequestFailedException exception) when (IsHeaderMutationConflict(exception))
-                {
-                    var refreshed = attempt < _shared.Options.MaxMetadataOnlyConflictRetries
-                        ? await RetryAfterMetadataOnlyConflictAsync(attempt, publishState.ProviderState, cancellationToken).ConfigureAwait(false)
-                        : null;
-                    if (refreshed is { } refreshedState)
-                    {
-                        headerState = refreshedState;
-                        continue;
-                    }
+                var rowCount = await SubmitDataEntitiesAsync(value, newGeneration, cancellationToken).ConfigureAwait(false);
 
-                    throw CreateInconsistentHeaderStateException(
-                        "Azure Table journal header changed while replacing the journal; recovery is required.",
-                        publishState.ETag,
-                        exception);
+                for (var attempt = 0; ; attempt++)
+                {
+                    var publishState = headerState.Value;
+                    try
+                    {
+                        // Flip the header under its ETag to publish the new generation only if the journal is unchanged.
+                        var response = await Table.UpdateEntityAsync(
+                            CreateHeaderFlipPatch(newGeneration, rowCount, value.Length),
+                            publishState.ETag,
+                            TableUpdateMode.Merge,
+                            cancellationToken).ConfigureAwait(false);
+                        published = true;
+                        SetHeaderFromResponse(
+                            response,
+                            new HeaderProviderState(
+                                NormalizeFormat(_shared.JournalFormatKey),
+                                newGeneration,
+                                rowCount,
+                                value.Length,
+                                AppendRowCount: 0,
+                                AppendLength: 0));
+                        break;
+                    }
+                    catch (RequestFailedException exception) when (IsHeaderMutationConflict(exception))
+                    {
+                        var refreshed = attempt < _shared.Options.MaxMetadataOnlyConflictRetries
+                            ? await RetryAfterMetadataOnlyConflictAsync(attempt, publishState.ProviderState, cancellationToken).ConfigureAwait(false)
+                            : null;
+                        if (refreshed is { } refreshedState)
+                        {
+                            headerState = refreshedState;
+                            continue;
+                        }
+
+                        throw CreateInconsistentHeaderStateException(
+                            "Azure Table journal header changed while replacing the journal; recovery is required.",
+                            publishState.ETag,
+                            exception);
+                    }
                 }
+            }
+            catch
+            {
+                if (!published)
+                {
+                    await TryDeleteUnpublishedGenerationAsync(newGeneration).ConfigureAwait(false);
+                }
+
+                throw;
             }
 
             if (previousGeneration is not null && !string.Equals(previousGeneration, newGeneration, StringComparison.Ordinal))
@@ -552,16 +604,25 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         var entity = new TableEntity(_partitionKey, HeaderRowKey)
         {
             [FormatPropertyName] = _shared.JournalFormatKey ?? string.Empty,
+            [JournalIdPropertyName] = _journalId.Value,
             [GenerationPropertyName] = generation,
             [RowCountPropertyName] = 0L,
             [LengthPropertyName] = 0L,
+            [AppendRowCountPropertyName] = 0L,
+            [AppendLengthPropertyName] = 0L,
             [MetadataPropertyName] = SerializeCallerMetadata(callerMetadata),
         };
 
         var response = await Table.AddEntityAsync(entity, cancellationToken).ConfigureAwait(false);
         return (
             response.Headers.ETag ?? default,
-            new HeaderProviderState(NormalizeFormat(_shared.JournalFormatKey), generation, RowCount: 0, Length: 0));
+            new HeaderProviderState(
+                NormalizeFormat(_shared.JournalFormatKey),
+                generation,
+                RowCount: 0,
+                Length: 0,
+                AppendRowCount: 0,
+                AppendLength: 0));
     }
 
     private async ValueTask<HeaderState?> TryLoadHeaderStateAsync(CancellationToken cancellationToken, bool updateCache = true)
@@ -629,7 +690,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             }
 
             var multiplier = 1L << Math.Min(attempt, 16);
-            var scaledTicks = initial.Ticks * multiplier;
+            var scaledTicks = initial.Ticks > max.Ticks / multiplier
+                ? max.Ticks
+                : initial.Ticks * multiplier;
             var cappedTicks = Math.Min(scaledTicks, max.Ticks);
             await Task.Delay(TimeSpan.FromTicks(cappedTicks), cancellationToken).ConfigureAwait(false);
         }
@@ -673,12 +736,18 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         }
     }
 
-    private async ValueTask SubmitDataEntitiesAsync(List<TableEntity> entities, CancellationToken cancellationToken)
+    private async ValueTask<long> SubmitDataEntitiesAsync(
+        ReadOnlySequence<byte> value,
+        string generation,
+        CancellationToken cancellationToken)
     {
-        var actions = new List<TableTransactionAction>(Math.Min(entities.Count, MaxEntitiesPerTransaction));
+        var actions = new List<TableTransactionAction>(MaxEntitiesPerTransaction);
         var actionBytes = 0L;
-        foreach (var entity in entities)
+        var remaining = value;
+        var sequence = 0L;
+        while (!remaining.IsEmpty)
         {
+            var entity = CreateDataEntity(ref remaining, generation, sequence++);
             var entityBytes = GetEntityPayloadLength(entity);
             if (actions.Count > 0 && (actions.Count == MaxEntitiesPerTransaction || actionBytes + entityBytes > MaxAppendBytes))
             {
@@ -694,6 +763,30 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         if (actions.Count > 0)
         {
             await Table.SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
+        }
+
+        return sequence;
+    }
+
+    private async ValueTask TryDeleteUnpublishedGenerationAsync(string generation)
+    {
+        try
+        {
+            var header = await GetHeaderEntityAsync(CancellationToken.None).ConfigureAwait(false);
+            if (header is not null
+                && string.Equals(header.GetString(GenerationPropertyName), generation, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var rowKeys = await TryCollectRowKeysAsync(
+                CreateGenerationRangeFilter(generation),
+                CancellationToken.None).ConfigureAwait(false);
+            await TryDeleteRowsAsync(rowKeys, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (RequestFailedException exception)
+        {
+            LogRowCleanupFailure(_shared.Logger, Table.Name, _partitionKey, exception);
         }
     }
 
@@ -763,18 +856,23 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         var sequence = firstSequence;
         while (!remaining.IsEmpty)
         {
-            var entity = new TableEntity(_partitionKey, FormatRowKey(generation, sequence++));
-            for (var chunk = 0; chunk < MaxChunksPerEntity && !remaining.IsEmpty; chunk++)
-            {
-                var chunkLength = (int)Math.Min(ChunkBytes, remaining.Length);
-                entity[ChunkPropertyNames[chunk]] = remaining.Slice(0, chunkLength).ToArray();
-                remaining = remaining.Slice(chunkLength);
-            }
-
-            entities.Add(entity);
+            entities.Add(CreateDataEntity(ref remaining, generation, sequence++));
         }
 
         return entities;
+    }
+
+    private TableEntity CreateDataEntity(ref ReadOnlySequence<byte> remaining, string generation, long sequence)
+    {
+        var entity = new TableEntity(_partitionKey, FormatRowKey(generation, sequence));
+        for (var chunk = 0; chunk < MaxChunksPerEntity && !remaining.IsEmpty; chunk++)
+        {
+            var chunkLength = (int)Math.Min(ChunkBytes, remaining.Length);
+            entity[ChunkPropertyNames[chunk]] = remaining.Slice(0, chunkLength).ToArray();
+            remaining = remaining.Slice(chunkLength);
+        }
+
+        return entity;
     }
 
     private static long GetEntityPayloadLength(TableEntity entity)
@@ -791,14 +889,27 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         return length;
     }
 
-    private static long CollectChunks(TableEntity entity, List<ReadOnlyMemory<byte>> chunks)
+    private static long ReadChunks(
+        TableEntity entity,
+        ArcBufferWriter buffer,
+        IJournalStorageConsumer consumer,
+        IJournalMetadata metadata)
     {
         var length = 0L;
+        var foundChunk = false;
+        var foundGap = false;
         foreach (var propertyName in ChunkPropertyNames)
         {
             if (!entity.TryGetValue(propertyName, out var value))
             {
-                break;
+                foundGap = true;
+                continue;
+            }
+
+            if (foundGap)
+            {
+                throw new InvalidOperationException(
+                    $"Azure Table journal row \"{entity.RowKey}\" contains a non-contiguous binary property \"{propertyName}\".");
             }
 
             ReadOnlyMemory<byte> chunk = value switch
@@ -809,8 +920,21 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                     $"Azure Table journal row \"{entity.RowKey}\" property \"{propertyName}\" is not a binary value."),
             };
 
-            chunks.Add(chunk);
+            if (chunk.IsEmpty)
+            {
+                throw new InvalidOperationException(
+                    $"Azure Table journal row \"{entity.RowKey}\" property \"{propertyName}\" is empty.");
+            }
+
+            foundChunk = true;
+            buffer.Write(chunk.Span);
             length += chunk.Length;
+            consumer.Read(new JournalBufferReader(buffer.Reader, isCompleted: false), metadata);
+        }
+
+        if (!foundChunk)
+        {
+            throw new InvalidOperationException($"Azure Table journal row \"{entity.RowKey}\" does not contain journal data.");
         }
 
         return length;
@@ -819,17 +943,23 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     private TableEntity CreateHeaderCountsPatch(HeaderProviderState providerState)
         => new(_partitionKey, HeaderRowKey)
         {
+            [JournalIdPropertyName] = _journalId.Value,
             [RowCountPropertyName] = providerState.RowCount,
             [LengthPropertyName] = providerState.Length,
+            [AppendRowCountPropertyName] = providerState.AppendRowCount,
+            [AppendLengthPropertyName] = providerState.AppendLength,
         };
 
     private TableEntity CreateHeaderFlipPatch(string generation, long rowCount, long length)
         => new(_partitionKey, HeaderRowKey)
         {
             [FormatPropertyName] = _shared.JournalFormatKey ?? string.Empty,
+            [JournalIdPropertyName] = _journalId.Value,
             [GenerationPropertyName] = generation,
             [RowCountPropertyName] = rowCount,
             [LengthPropertyName] = length,
+            [AppendRowCountPropertyName] = 0L,
+            [AppendLengthPropertyName] = 0L,
         };
 
     private void SetHeader(ETag eTag, HeaderProviderState providerState)
@@ -872,8 +1002,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         return names;
     }
 
-    private static HeaderState CreateHeaderState(TableEntity entity)
+    private HeaderState CreateHeaderState(TableEntity entity)
     {
+        ValidateHeaderJournalId(entity);
         var generation = entity.GetString(GenerationPropertyName);
         if (generation is not { Length: > 0 })
         {
@@ -884,20 +1015,51 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         var length = entity.GetInt64(LengthPropertyName);
         if (rowCount is not >= 0 || length is not >= 0)
         {
-            throw new InvalidOperationException("Azure Table journal header row count or length properties are invalid.");
+            throw new InvalidOperationException("Azure Table journal header count or length properties are invalid.");
+        }
+
+        // Headers written by the original provider schema did not have separate compaction counters.
+        // Conservatively treat the current generation as uncompacted until the next replacement resets them.
+        var appendRowCount = entity.GetInt64(AppendRowCountPropertyName) ?? rowCount.Value;
+        var appendLength = entity.GetInt64(AppendLengthPropertyName) ?? length.Value;
+        if (appendRowCount < 0 || appendLength < 0)
+        {
+            throw new InvalidOperationException("Azure Table journal header count or length properties are invalid.");
         }
 
         return new HeaderState(
             entity.ETag,
-            new HeaderProviderState(NormalizeFormat(entity.GetString(FormatPropertyName)), generation, rowCount.Value, length.Value),
+            new HeaderProviderState(
+                NormalizeFormat(entity.GetString(FormatPropertyName)),
+                generation,
+                rowCount.Value,
+                length.Value,
+                appendRowCount,
+                appendLength),
             DeserializeCallerMetadata(entity.GetString(MetadataPropertyName)));
     }
 
     private IJournalMetadata CreateJournalMetadata(ETag eTag, TableEntity entity)
-        => new JournalMetadata(
+    {
+        ValidateHeaderJournalId(entity);
+        return new JournalMetadata(
             NormalizeFormat(entity.GetString(FormatPropertyName)),
             eTag == default ? null : eTag.ToString(),
             DeserializeCallerMetadata(entity.GetString(MetadataPropertyName)));
+    }
+
+    private void ValidateHeaderJournalId(TableEntity entity)
+    {
+        var journalId = entity.GetString(JournalIdPropertyName);
+        // Legacy headers did not store the canonical journal id. They remain addressable through the
+        // configured partition mapping and are backfilled by the next append, replace, or metadata update.
+        if (journalId is not null && !string.Equals(journalId, _journalId.Value, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Azure Table journal header belongs to journal id \"{journalId ?? "<missing>"}\", not \"{_journalId.Value}\". " +
+                "Ensure that configured partition keys are unique.");
+        }
+    }
 
     private static string? NormalizeFormat(string? format) => format is { Length: > 0 } ? format : null;
 
@@ -1077,7 +1239,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         string? Format,
         string? Generation,
         long RowCount,
-        long Length);
+        long Length,
+        long AppendRowCount,
+        long AppendLength);
 
     private readonly record struct HeaderState(
         ETag ETag,
@@ -1100,6 +1264,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             Logger = logger;
             Options = options.Value;
             ArgumentNullException.ThrowIfNull(Options);
+            AzureTableJournalStorageOptions.ValidateTableName(Options.TableName);
             if (Options.CompactionRowCountThreshold <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(options), $"{nameof(AzureTableJournalStorageOptions.CompactionRowCountThreshold)} must be positive.");

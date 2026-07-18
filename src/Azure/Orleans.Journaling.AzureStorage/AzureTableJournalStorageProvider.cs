@@ -9,7 +9,7 @@ namespace Orleans.Journaling;
 
 internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
 {
-    private static readonly string[] PartitionKeySelect = [nameof(ITableEntity.PartitionKey)];
+    private static readonly string[] JournalIdSelect = [AzureTableJournalStorage.JournalIdPropertyName];
 
     private readonly AzureTableJournalStorageOptions _options;
     private readonly AzureTableJournalStorage.InitializedTableClientProvider _tableClientProvider = new();
@@ -35,7 +35,12 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
 
     private async Task Initialize(CancellationToken cancellationToken)
     {
-        var client = await _options.CreateClient!(cancellationToken);
+        var createClient = _options.CreateClient
+            ?? throw new InvalidOperationException(
+                $"No Azure Table service client was configured. Set {nameof(AzureTableJournalStorageOptions.TableServiceClient)} " +
+                $"or call {nameof(AzureTableJournalStorageOptions.ConfigureTableServiceClient)}.");
+        var client = await createClient(cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The configured Azure Table service client factory returned null.");
         var table = client.GetTableClient(_options.TableName);
         await table.CreateIfNotExistsAsync(cancellationToken).ConfigureAwait(false);
         _tableClientProvider.SetTableClient(table);
@@ -56,15 +61,11 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var table = _tableClientProvider.GetTableClient();
-        var filter = prefix.IsDefault
-            ? TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}")
-            : TableClient.CreateQueryFilter(
-                $"RowKey eq {AzureTableJournalStorage.HeaderRowKey} and PartitionKey ge {AzureTableJournalStorageOptions.GetDefaultPartitionKey(prefix)}");
+        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
         var journalIds = new List<JournalId>();
-        await foreach (var entity in table.QueryAsync<TableEntity>(filter, select: PartitionKeySelect, cancellationToken: cancellationToken))
+        await foreach (var entity in table.QueryAsync<TableEntity>(filter, select: JournalIdSelect, cancellationToken: cancellationToken))
         {
-            var storageIdValue = Uri.UnescapeDataString(entity.PartitionKey);
-            if (TryParseJournalId(storageIdValue, out var journalId) && prefix.IsPrefixOf(journalId))
+            if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
             {
                 journalIds.Add(journalId);
             }
@@ -75,6 +76,28 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             cancellationToken.ThrowIfCancellationRequested();
             yield return journalId;
         }
+    }
+
+    private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)
+    {
+        if (entity.GetString(AzureTableJournalStorage.JournalIdPropertyName) is { } journalIdValue)
+        {
+            return TryParseJournalId(journalIdValue, out journalId);
+        }
+
+        // Legacy headers can only be listed when they use the reversible default partition mapping.
+        var decodedPartitionKey = Uri.UnescapeDataString(entity.PartitionKey);
+        if (TryParseJournalId(decodedPartitionKey, out journalId)
+            && string.Equals(
+                Uri.EscapeDataString(journalId.Value),
+                entity.PartitionKey,
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        journalId = default;
+        return false;
     }
 
     public void Participate(ISiloLifecycle observer)
