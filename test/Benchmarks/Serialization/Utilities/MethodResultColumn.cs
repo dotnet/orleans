@@ -1,7 +1,7 @@
+using System.Reflection;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
-using System.Reflection;
 
 namespace Benchmarks.Serialization.Utilities;
 
@@ -13,7 +13,7 @@ public class MethodResultColumn : IColumn
     {
         ColumnName = columnName;
         _formatter = formatter;
-        Legend = legend!;
+        Legend = legend;
     }
 
     public string GetValue(Summary summary, BenchmarkCase benchmarkCase) => GetValue(summary, benchmarkCase, null);
@@ -62,5 +62,8 @@ public class MethodResultColumn : IColumn
     public int PriorityInCategory => 0;
     public bool IsNumeric => true;
     public UnitType UnitType => UnitType.Size;
-    public string Legend { get; }
+    // BenchmarkDotNet's contract is non-nullable, but its optional legend is null when not supplied.
+#pragma warning disable CS8766
+    public string? Legend { get; }
+#pragma warning restore CS8766
 }
