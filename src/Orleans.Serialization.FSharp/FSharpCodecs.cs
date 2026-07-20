@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
@@ -11,7 +12,6 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization
 {
     /// <summary>
@@ -20,9 +20,10 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     public sealed class FSharpUnitCodec : IFieldCodec<Unit>
     {
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Unit value) where TBufferWriter : IBufferWriter<byte> =>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] Unit value) where TBufferWriter : IBufferWriter<byte> =>
             ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
 
+        [return: MaybeNull]
         public Unit ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireType(WireType.Reference);
@@ -59,7 +60,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpOption<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpOption<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
                 return;
@@ -73,6 +74,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
+        [return: MaybeNull]
         public FSharpOption<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -95,7 +97,7 @@ namespace Orleans.Serialization
                 switch (fieldId)
                 {
                     case 0:
-                        result = _fieldCodec.ReadValue(ref reader, header);
+                        result = _fieldCodec.ReadValue(ref reader, header)!;
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -127,21 +129,21 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpOption<T> DeepCopy(FSharpOption<T> input, CopyContext context)
+        public FSharpOption<T> DeepCopy([AllowNull] FSharpOption<T> input, CopyContext context)
         {
             if (input is null || FSharpOption<T>.get_IsNone(input))
             {
-                return input;
+                return input!;
             }
 
             if (context.TryGetCopy<FSharpOption<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
-            result = _valueCopier.DeepCopy(input.Value, context);
+            result = _valueCopier.DeepCopy(input.Value, context)!;
             context.RecordCopy(input, result);
-            return result;
+            return result!;
         }
     }
 
@@ -164,7 +166,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<FSharpValueOption<T>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpValueOption<T> value)
+        void IFieldCodec<FSharpValueOption<T>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, FSharpValueOption<T> value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
 
@@ -196,7 +198,7 @@ namespace Orleans.Serialization
                 switch (fieldId)
                 {
                     case 0:
-                        result = _valueCodec.ReadValue(ref reader, header);
+                        result = _valueCodec.ReadValue(ref reader, header)!;
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -264,7 +266,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<FSharpChoice<T1, T2>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpChoice<T1, T2> value)
+        void IFieldCodec<FSharpChoice<T1, T2>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -282,6 +284,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        [return: MaybeNull]
         FSharpChoice<T1, T2> IFieldCodec<FSharpChoice<T1, T2>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -292,7 +295,7 @@ namespace Orleans.Serialization
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            FSharpChoice<T1, T2> result = default;
+            FSharpChoice<T1, T2>? result = default;
             uint fieldId = 0;
             while (true)
             {
@@ -305,8 +308,8 @@ namespace Orleans.Serialization
                 fieldId += header.FieldIdDelta;
                 switch (fieldId)
                 {
-                    case 1: result = FSharpChoice<T1, T2>.NewChoice1Of2(_item1Codec.ReadValue(ref reader, header)); break;
-                    case 2: result = FSharpChoice<T1, T2>.NewChoice2Of2(_item2Codec.ReadValue(ref reader, header)); break;
+                    case 1: result = FSharpChoice<T1, T2>.NewChoice1Of2(_item1Codec.ReadValue(ref reader, header)!); break;
+                    case 2: result = FSharpChoice<T1, T2>.NewChoice2Of2(_item2Codec.ReadValue(ref reader, header)!); break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
@@ -332,9 +335,9 @@ namespace Orleans.Serialization
 
         public FSharpChoice<T1, T2> DeepCopy(FSharpChoice<T1, T2> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out FSharpChoice<T1, T2> result))
+            if (context.TryGetCopy(input, out FSharpChoice<T1, T2>? result))
             {
-                return result;
+                return result!;
             }
 
             result = input switch
@@ -369,7 +372,7 @@ namespace Orleans.Serialization
             _item3Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item3Codec);
         }
 
-        void IFieldCodec<FSharpChoice<T1, T2, T3>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpChoice<T1, T2, T3> value)
+        void IFieldCodec<FSharpChoice<T1, T2, T3>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -388,6 +391,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        [return: MaybeNull]
         FSharpChoice<T1, T2, T3> IFieldCodec<FSharpChoice<T1, T2, T3>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -398,7 +402,7 @@ namespace Orleans.Serialization
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            FSharpChoice<T1, T2, T3> result = default;
+            FSharpChoice<T1, T2, T3>? result = default;
             uint fieldId = 0;
             while (true)
             {
@@ -411,9 +415,9 @@ namespace Orleans.Serialization
                 fieldId += header.FieldIdDelta;
                 switch (fieldId)
                 {
-                    case 1: result = FSharpChoice<T1, T2, T3>.NewChoice1Of3(_item1Codec.ReadValue(ref reader, header)); break;
-                    case 2: result = FSharpChoice<T1, T2, T3>.NewChoice2Of3(_item2Codec.ReadValue(ref reader, header)); break;
-                    case 3: result = FSharpChoice<T1, T2, T3>.NewChoice3Of3(_item3Codec.ReadValue(ref reader, header)); break;
+                    case 1: result = FSharpChoice<T1, T2, T3>.NewChoice1Of3(_item1Codec.ReadValue(ref reader, header)!); break;
+                    case 2: result = FSharpChoice<T1, T2, T3>.NewChoice2Of3(_item2Codec.ReadValue(ref reader, header)!); break;
+                    case 3: result = FSharpChoice<T1, T2, T3>.NewChoice3Of3(_item3Codec.ReadValue(ref reader, header)!); break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
@@ -444,9 +448,9 @@ namespace Orleans.Serialization
 
         public FSharpChoice<T1, T2, T3> DeepCopy(FSharpChoice<T1, T2, T3> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3> result))
+            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3>? result))
             {
-                return result;
+                return result!;
             }
 
             result = input switch
@@ -486,7 +490,7 @@ namespace Orleans.Serialization
             _item4Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item4Codec);
         }
 
-        void IFieldCodec<FSharpChoice<T1, T2, T3, T4>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpChoice<T1, T2, T3, T4> value)
+        void IFieldCodec<FSharpChoice<T1, T2, T3, T4>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3, T4> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -506,6 +510,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        [return: MaybeNull]
         FSharpChoice<T1, T2, T3, T4> IFieldCodec<FSharpChoice<T1, T2, T3, T4>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -516,7 +521,7 @@ namespace Orleans.Serialization
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            FSharpChoice<T1, T2, T3, T4> result = default;
+            FSharpChoice<T1, T2, T3, T4>? result = default;
             uint fieldId = 0;
             while (true)
             {
@@ -529,10 +534,10 @@ namespace Orleans.Serialization
                 fieldId += header.FieldIdDelta;
                 switch (fieldId)
                 {
-                    case 1: result = FSharpChoice<T1, T2, T3, T4>.NewChoice1Of4(_item1Codec.ReadValue(ref reader, header)); break;
-                    case 2: result = FSharpChoice<T1, T2, T3, T4>.NewChoice2Of4(_item2Codec.ReadValue(ref reader, header)); break;
-                    case 3: result = FSharpChoice<T1, T2, T3, T4>.NewChoice3Of4(_item3Codec.ReadValue(ref reader, header)); break;
-                    case 4: result = FSharpChoice<T1, T2, T3, T4>.NewChoice4Of4(_item4Codec.ReadValue(ref reader, header)); break;
+                    case 1: result = FSharpChoice<T1, T2, T3, T4>.NewChoice1Of4(_item1Codec.ReadValue(ref reader, header)!); break;
+                    case 2: result = FSharpChoice<T1, T2, T3, T4>.NewChoice2Of4(_item2Codec.ReadValue(ref reader, header)!); break;
+                    case 3: result = FSharpChoice<T1, T2, T3, T4>.NewChoice3Of4(_item3Codec.ReadValue(ref reader, header)!); break;
+                    case 4: result = FSharpChoice<T1, T2, T3, T4>.NewChoice4Of4(_item4Codec.ReadValue(ref reader, header)!); break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
@@ -566,9 +571,9 @@ namespace Orleans.Serialization
 
         public FSharpChoice<T1, T2, T3, T4> DeepCopy(FSharpChoice<T1, T2, T3, T4> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4> result))
+            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4>? result))
             {
-                return result;
+                return result!;
             }
 
             result = input switch
@@ -613,7 +618,7 @@ namespace Orleans.Serialization
             _item5Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item5Codec);
         }
 
-        void IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpChoice<T1, T2, T3, T4, T5> value)
+        void IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3, T4, T5> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -634,6 +639,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        [return: MaybeNull]
         FSharpChoice<T1, T2, T3, T4, T5> IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -644,7 +650,7 @@ namespace Orleans.Serialization
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            FSharpChoice<T1, T2, T3, T4, T5> result = default;
+            FSharpChoice<T1, T2, T3, T4, T5>? result = default;
             uint fieldId = 0;
             while (true)
             {
@@ -657,11 +663,11 @@ namespace Orleans.Serialization
                 fieldId += header.FieldIdDelta;
                 switch (fieldId)
                 {
-                    case 1: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice1Of5(_item1Codec.ReadValue(ref reader, header)); break;
-                    case 2: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice2Of5(_item2Codec.ReadValue(ref reader, header)); break;
-                    case 3: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice3Of5(_item3Codec.ReadValue(ref reader, header)); break;
-                    case 4: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice4Of5(_item4Codec.ReadValue(ref reader, header)); break;
-                    case 5: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice5Of5(_item5Codec.ReadValue(ref reader, header)); break;
+                    case 1: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice1Of5(_item1Codec.ReadValue(ref reader, header)!); break;
+                    case 2: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice2Of5(_item2Codec.ReadValue(ref reader, header)!); break;
+                    case 3: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice3Of5(_item3Codec.ReadValue(ref reader, header)!); break;
+                    case 4: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice4Of5(_item4Codec.ReadValue(ref reader, header)!); break;
+                    case 5: result = FSharpChoice<T1, T2, T3, T4, T5>.NewChoice5Of5(_item5Codec.ReadValue(ref reader, header)!); break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
@@ -698,9 +704,9 @@ namespace Orleans.Serialization
 
         public FSharpChoice<T1, T2, T3, T4, T5> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5> result))
+            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5>? result))
             {
-                return result;
+                return result!;
             }
 
             result = input switch
@@ -750,7 +756,7 @@ namespace Orleans.Serialization
             _item6Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item6Codec);
         }
 
-        void IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5, T6>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpChoice<T1, T2, T3, T4, T5, T6> value)
+        void IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5, T6>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FSharpChoice<T1, T2, T3, T4, T5, T6> value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -772,6 +778,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        [return: MaybeNull]
         FSharpChoice<T1, T2, T3, T4, T5, T6> IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5, T6>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -782,7 +789,7 @@ namespace Orleans.Serialization
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            FSharpChoice<T1, T2, T3, T4, T5, T6> result = default;
+            FSharpChoice<T1, T2, T3, T4, T5, T6>? result = default;
             uint fieldId = 0;
             while (true)
             {
@@ -795,12 +802,12 @@ namespace Orleans.Serialization
                 fieldId += header.FieldIdDelta;
                 switch (fieldId)
                 {
-                    case 1: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice1Of6(_item1Codec.ReadValue(ref reader, header)); break;
-                    case 2: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice2Of6(_item2Codec.ReadValue(ref reader, header)); break;
-                    case 3: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice3Of6(_item3Codec.ReadValue(ref reader, header)); break;
-                    case 4: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice4Of6(_item4Codec.ReadValue(ref reader, header)); break;
-                    case 5: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice5Of6(_item5Codec.ReadValue(ref reader, header)); break;
-                    case 6: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice6Of6(_item6Codec.ReadValue(ref reader, header)); break;
+                    case 1: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice1Of6(_item1Codec.ReadValue(ref reader, header)!); break;
+                    case 2: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice2Of6(_item2Codec.ReadValue(ref reader, header)!); break;
+                    case 3: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice3Of6(_item3Codec.ReadValue(ref reader, header)!); break;
+                    case 4: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice4Of6(_item4Codec.ReadValue(ref reader, header)!); break;
+                    case 5: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice5Of6(_item5Codec.ReadValue(ref reader, header)!); break;
+                    case 6: result = FSharpChoice<T1, T2, T3, T4, T5, T6>.NewChoice6Of6(_item6Codec.ReadValue(ref reader, header)!); break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
@@ -840,9 +847,9 @@ namespace Orleans.Serialization
 
         public FSharpChoice<T1, T2, T3, T4, T5, T6> DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5, T6> result))
+            if (context.TryGetCopy(input, out FSharpChoice<T1, T2, T3, T4, T5, T6>? result))
             {
-                return result;
+                return result!;
             }
 
             result = input switch
@@ -856,7 +863,7 @@ namespace Orleans.Serialization
                 _ => throw new NotSupportedException($"Type {input.GetType()} is not supported"),
             };
             context.RecordCopy(input, result);
-            return result;
+            return result!;
         }
     }
 
@@ -894,7 +901,7 @@ namespace Orleans.Serialization
         {
             if (context.TryGetCopy<FSharpRef<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             result = input switch
@@ -903,8 +910,8 @@ namespace Orleans.Serialization
                 null => null
             };
 
-            context.RecordCopy(input, result);
-            return result;
+            context.RecordCopy(input!, result!);
+            return result!;
         }
     }
 
@@ -915,6 +922,7 @@ namespace Orleans.Serialization
         {
         }
 
+        [return: MaybeNull]
         public override FSharpList<T> ConvertFromSurrogate(ref FSharpListSurrogate<T> surrogate)
         {
             if (surrogate.Value is null) return null;
@@ -934,7 +942,7 @@ namespace Orleans.Serialization
     public struct FSharpListSurrogate<T>
     {
         [Id(0)]
-        public List<T> Value { get; set; }
+        public List<T>? Value { get; set; }
     }
 
     [RegisterCopier]
@@ -947,7 +955,7 @@ namespace Orleans.Serialization
         {
             if (context.TryGetCopy<FSharpList<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             result = ListModule.OfSeq(CopyElements(input, context));
@@ -971,6 +979,7 @@ namespace Orleans.Serialization
         {
         }
 
+        [return: MaybeNull]
         public override FSharpSet<T> ConvertFromSurrogate(ref FSharpSetSurrogate<T> surrogate)
         {
             if (surrogate.Value is null) return null;
@@ -988,7 +997,7 @@ namespace Orleans.Serialization
     public struct FSharpSetSurrogate<T>
     {
         [Id(0)]
-        public List<T> Value { get; set; }
+        public List<T>? Value { get; set; }
     }
 
     [RegisterCopier]
@@ -1001,7 +1010,7 @@ namespace Orleans.Serialization
         {
             if (context.TryGetCopy<FSharpSet<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             result = SetModule.OfSeq(CopyElements(input, context));
@@ -1025,6 +1034,7 @@ namespace Orleans.Serialization
         {
         }
 
+        [return: MaybeNull]
         public override FSharpMap<TKey, TValue> ConvertFromSurrogate(ref FSharpMapSurrogate<TKey, TValue> surrogate)
         {
             if (surrogate.Value is null) return null;
@@ -1045,7 +1055,7 @@ namespace Orleans.Serialization
     public struct FSharpMapSurrogate<TKey, TValue>
     {
         [Id(0)]
-        public List<Tuple<TKey, TValue>> Value { get; set; }
+        public List<Tuple<TKey, TValue>>? Value { get; set; }
     }
 
     [RegisterCopier]
@@ -1064,7 +1074,7 @@ namespace Orleans.Serialization
         {
             if (context.TryGetCopy<FSharpMap<TKey, TValue>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             result = MapModule.OfSeq(CopyElements(input, context));
@@ -1096,7 +1106,7 @@ namespace Orleans.Serialization
             _item2Codec = OrleansGeneratedCodeHelper.UnwrapService(this, item2Codec);
         }
 
-        void IFieldCodec<FSharpResult<T, TError>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpResult<T, TError> value)
+        void IFieldCodec<FSharpResult<T, TError>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, FSharpResult<T, TError> value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(FSharpResult<T, TError>), WireType.TagDelimited);
@@ -1130,8 +1140,8 @@ namespace Orleans.Serialization
                 fieldId += header.FieldIdDelta;
                 switch (fieldId)
                 {
-                    case 1: result = FSharpResult<T, TError>.NewOk(_item1Codec.ReadValue(ref reader, header)); break;
-                    case 2: result = FSharpResult<T, TError>.NewError(_item2Codec.ReadValue(ref reader, header)); break;
+                    case 1: result = FSharpResult<T, TError>.NewOk(_item1Codec.ReadValue(ref reader, header)!); break;
+                    case 2: result = FSharpResult<T, TError>.NewError(_item2Codec.ReadValue(ref reader, header)!); break;
                     default:
                         reader.ConsumeUnknownField(header);
                         break;
