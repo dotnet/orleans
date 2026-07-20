@@ -5,16 +5,15 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime.Hosting.ProviderConfiguration;
 
-#nullable disable
 [assembly: RegisterProvider("Development", "Clustering", "Silo", typeof(DevelopmentClusteringProvider))]
 
 namespace Orleans.Runtime.Hosting.ProviderConfiguration;
 
 internal sealed class DevelopmentClusteringProvider : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        IPEndPoint primarySiloEndPoint = null;
+        IPEndPoint? primarySiloEndPoint = null;
         if (configurationSection["PrimarySiloEndPoint"] is { Length: > 0 } primarySiloEndPointValue && !IPEndPoint.TryParse(primarySiloEndPointValue, out primarySiloEndPoint))
         {
             throw new OrleansConfigurationException($"Unable to parse configuration value at path {configurationSection.Path}:PrimarySiloEndPoint as an IPEndPoint. Value: '{primarySiloEndPointValue}'.");

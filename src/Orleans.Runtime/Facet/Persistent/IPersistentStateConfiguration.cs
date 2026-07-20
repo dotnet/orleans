@@ -17,6 +17,6 @@ namespace Orleans.Runtime
         /// Gets the name of the storage provider.
         /// </summary>
         /// <value>The name of the storage provider.</value>
-        string StorageName { get; }
+        string? StorageName { get; }
     }
 }

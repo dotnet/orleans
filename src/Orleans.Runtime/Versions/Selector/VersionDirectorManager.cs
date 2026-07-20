@@ -5,7 +5,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Versions.Selector;
 
-#nullable disable
 namespace Orleans.Runtime.Versions.Selector
 {
     internal class VersionSelectorManager
@@ -26,19 +25,18 @@ namespace Orleans.Runtime.Versions.Selector
 
         public IVersionSelector GetSelector(GrainInterfaceType interfaceType)
         {
-            IVersionSelector selector;
-            return this.versionSelectors.TryGetValue(interfaceType, out selector)
+            return this.versionSelectors.TryGetValue(interfaceType, out var selector)
                 ? selector
                 : Default;
         }
 
-        public void SetSelector(VersionSelectorStrategy strategy)
+        public void SetSelector(VersionSelectorStrategy? strategy)
         {
             var selector = ResolveVersionSelector(this.serviceProvider, strategy ?? this.strategyFromConfig);
             Default = selector;
         }
 
-        public void SetSelector(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
+        public void SetSelector(GrainInterfaceType interfaceType, VersionSelectorStrategy? strategy)
         {
             if (strategy == null)
             {

@@ -4,7 +4,6 @@ using Orleans.Providers;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 
-#nullable disable
 namespace Orleans.Runtime.Versions
 {
     internal interface IVersionStoreGrain : IGrainWithStringKey
@@ -27,9 +26,9 @@ namespace Orleans.Runtime.Versions
         [Id(1)]
         public readonly Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies = new();
         [Id(2)]
-        public VersionSelectorStrategy SelectorOverride;
+        public VersionSelectorStrategy SelectorOverride = null!;
         [Id(3)]
-        public CompatibilityStrategy CompatibilityOverride;
+        public CompatibilityStrategy CompatibilityOverride = null!;
     }
 
     [StorageProvider(ProviderName = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]

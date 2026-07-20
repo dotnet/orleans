@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -13,7 +12,7 @@ namespace Orleans.Runtime
     public class GrainConstructorArgumentFactory
     {
         private static readonly Type FacetMarkerInterfaceType = typeof(IFacetMetadata);
-        private static readonly MethodInfo GetFactoryMethod = typeof(GrainConstructorArgumentFactory).GetMethod(nameof(GetArgumentFactory), BindingFlags.NonPublic | BindingFlags.Static);
+        private static readonly MethodInfo GetFactoryMethod = typeof(GrainConstructorArgumentFactory).GetMethod(nameof(GetArgumentFactory), BindingFlags.NonPublic | BindingFlags.Static)!;
         private readonly List<Factory<IGrainContext, object>> _argumentFactories;
 
         /// <summary>
@@ -38,7 +37,7 @@ namespace Orleans.Runtime
 
                 // Since the IAttributeToFactoryMapper is specific to the attribute specialization, we create a generic method to provide a attribute independent call pattern.
                 var getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
-                var argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, [serviceProvider, parameter, attribute, grainType]);
+                var argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, [serviceProvider, parameter, attribute, grainType])!;
 
                 // Record the argument factory
                 _argumentFactories.Add(argumentFactory);
