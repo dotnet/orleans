@@ -161,8 +161,8 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             .ToList()
             .ForEach(streamId =>
                 adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                    events.Take(NumMessagesPerBatch).ToArray(), null,
-                    RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
+                    events.Take(NumMessagesPerBatch).ToArray(), null!,
+                    RequestContextExtensions.Export(this.fixture.DeepCopier)!).Wait())));
         await Task.WhenAll(work);
 
         // Make sure we got back everything we sent
@@ -181,7 +181,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
                 // read all messages in cache for stream
                 IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
                 int messageCount = 0;
-                StreamSequenceToken tenthInCache = null;
+                StreamSequenceToken? tenthInCache = null;
                 StreamSequenceToken lastToken = firstInCache;
                 while (cursor.MoveNext())
                 {

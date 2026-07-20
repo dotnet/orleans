@@ -16,7 +16,7 @@ public class NatsClientStreamTests : TestClusterPerTest
     private const string NatsStreamProviderName = "NatsProvider-Client-Test";
     private const string StreamNamespace = "NatsSubscriptionMultiplicityTestsNamespace";
     private const string TestStreamName = "test-client-stream";
-    private ClientStreamTestRunner runner;
+    private ClientStreamTestRunner runner = null!;
     private readonly NatsConnection natsConnection;
     private readonly NatsJSContext natsContext;
 

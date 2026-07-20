@@ -18,7 +18,7 @@ public class NatsStreamTests : TestClusterPerTest
 
     private readonly NatsConnection natsConnection;
     private readonly NatsJSContext natsContext;
-    private SingleStreamTestRunner runner;
+    private SingleStreamTestRunner runner = null!;
 
     public NatsStreamTests()
     {
