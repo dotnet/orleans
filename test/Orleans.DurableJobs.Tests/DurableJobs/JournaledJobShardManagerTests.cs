@@ -574,16 +574,16 @@ public class JournaledJobShardManagerTests
         {
             public bool IsCompactionRequested => inner.IsCompactionRequested;
 
-            public ValueTask<bool> CreateIfNotExistsAsync(IReadOnlyDictionary<string, string> metadata = null, CancellationToken cancellationToken = default)
+            public ValueTask<bool> CreateIfNotExistsAsync(IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default)
                 => inner.CreateIfNotExistsAsync(metadata, cancellationToken);
 
-            public ValueTask<IJournalMetadata> GetMetadataAsync(CancellationToken cancellationToken = default)
+            public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
                 => inner.GetMetadataAsync(cancellationToken);
 
-            public ValueTask<IJournalMetadata> UpdateMetadataAsync(
-                IReadOnlyDictionary<string, string> set = null,
-                IEnumerable<string> remove = null,
-                string expectedETag = null,
+            public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+                IReadOnlyDictionary<string, string>? set = null,
+                IEnumerable<string>? remove = null,
+                string? expectedETag = null,
                 CancellationToken cancellationToken = default)
                 => inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
 
@@ -608,7 +608,7 @@ public class JournaledJobShardManagerTests
         IServiceProvider services,
         TestClusterMembershipService membership,
         SiloAddress siloAddress,
-        DurableJobsOptions options = null)
+        DurableJobsOptions? options = null)
         => new(
             new TestLocalSiloDetails(siloAddress),
             services.GetRequiredService<IJournaledStateManagerFactory>(),

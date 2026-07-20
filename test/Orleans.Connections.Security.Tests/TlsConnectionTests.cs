@@ -62,10 +62,10 @@ namespace Orleans.Connections.Security.Tests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 var encodedCertificate = configuration[CertificateConfigKey];
-                var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate);
+                var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate!);
 
                 var certificateModeString = configuration[ClientCertificateModeKey];
-                var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString);
+                var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString!);
 
                 clientBuilder.UseTls(options =>
                 {
@@ -102,10 +102,10 @@ namespace Orleans.Connections.Security.Tests
             {
                 var config = hostBuilder.GetConfiguration();
                 var encodedCertificate = config[CertificateConfigKey];
-                var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate);
+                var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate!);
 
                 var certificateModeString = config[ClientCertificateModeKey];
-                var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString);
+                var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString!);
 
                 hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
@@ -149,9 +149,9 @@ namespace Orleans.Connections.Security.Tests
         [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
         [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
         [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate)]
-        public async Task TlsEndToEnd(string[] oids, RemoteCertificateMode certificateMode)
+        public async Task TlsEndToEnd(string[]? oids, RemoteCertificateMode certificateMode)
         {
-            TestCluster testCluster = default;
+            TestCluster? testCluster = default;
             try
             {
                 var builder = new TestClusterBuilder()
