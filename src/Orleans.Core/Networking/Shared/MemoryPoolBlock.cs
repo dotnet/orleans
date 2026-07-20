@@ -24,7 +24,7 @@ namespace Orleans.Networking.Shared
             Pool = pool;
             Slab = slab;
 
-            Memory = MemoryMarshal.CreateFromPinnedArray(slab.Array, _offset, _length);
+            Memory = MemoryMarshal.CreateFromPinnedArray(slab.Array!, _offset, _length);
         }
 
         /// <summary>

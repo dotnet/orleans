@@ -5,7 +5,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
@@ -21,8 +20,8 @@ namespace Orleans.Runtime.Messaging
         private readonly object initializationLock = new();
 #endif
         private volatile bool isInitialized;
-        private ClientMessageCenter messageCenter;
-        private ConnectionManager connectionManager;
+        private ClientMessageCenter messageCenter = null!;
+        private ConnectionManager connectionManager = null!;
 
         public ClientOutboundConnectionFactory(
             IOptions<ConnectionOptions> connectionOptions,

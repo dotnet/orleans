@@ -5,14 +5,13 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class ConnectionFactory
     {
         private readonly IConnectionFactory connectionFactory;
         private readonly IServiceProvider serviceProvider;
-        private ConnectionDelegate connectionDelegate;
+        private ConnectionDelegate? connectionDelegate;
 
         protected ConnectionFactory(
             IConnectionFactory connectionFactory,

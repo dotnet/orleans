@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
@@ -15,7 +14,7 @@ namespace Orleans.Networking.Shared
 
         private readonly PipeScheduler _ioScheduler;
 
-        private Action _callback;
+        private Action? _callback;
 
         public SocketAwaitableEventArgs(PipeScheduler ioScheduler)
         {
@@ -69,7 +68,7 @@ namespace Orleans.Networking.Shared
 
             if (continuation != null)
             {
-                _ioScheduler.Schedule(state => ((Action)state)(), continuation);
+                _ioScheduler.Schedule(state => ((Action)state!)(), continuation);
             }
         }
     }

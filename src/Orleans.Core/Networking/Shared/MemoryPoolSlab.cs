@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
 
-#nullable disable
 namespace Orleans.Networking.Shared
 {
     /// <summary>
@@ -36,7 +35,7 @@ namespace Orleans.Networking.Shared
 
         public IntPtr NativePointer { get; private set; }
 
-        public byte[] Array { get; private set; }
+        public byte[]? Array { get; private set; }
 
         public static MemoryPoolSlab Create(int length)
         {

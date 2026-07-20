@@ -1,6 +1,5 @@
 using System.IO.Pipelines;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     /// <summary>
@@ -20,6 +19,6 @@ namespace Orleans.Runtime.Messaging
     internal class UnderlyingConnectionTransportFeature : IUnderlyingTransportFeature
     {
         /// <inheritdoc />
-        public IDuplexPipe Transport { get; set; }
+        public IDuplexPipe Transport { get; set; } = null!;
     }
 }
