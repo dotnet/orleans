@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Providers.Streams.AzureQueue
 {
     internal sealed class AzureQueueAdapter : IQueueAdapter
@@ -40,7 +39,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId) => AzureQueueAdapterReceiver.Create(loggerFactory, streamQueueMapper.QueueToPartition(queueId), queueOptions, dataAdapter);
 
-        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             if(token != null) throw new ArgumentException("AzureQueue stream provider currently does not support non-null StreamSequenceToken.", nameof(token));
             var queueId = streamQueueMapper.GetQueueForStream(streamId);

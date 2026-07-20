@@ -9,7 +9,6 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-#nullable disable
 [assembly: RegisterProvider("AzureQueueStorage", "Streaming", "Silo", typeof(AzureQueueStreamProviderBuilder))]
 [assembly: RegisterProvider("AzureQueueStorage", "Streaming", "Client", typeof(AzureQueueStreamProviderBuilder))]
 
@@ -17,14 +16,14 @@ namespace Orleans.Hosting;
 
 public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureQueueStreams(name, GetQueueOptionBuilder(configurationSection));
+        builder.AddAzureQueueStreams(name!, GetQueueOptionBuilder(configurationSection));
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureQueueStreams(name, GetQueueOptionBuilder(configurationSection));
+        builder.AddAzureQueueStreams(name!, GetQueueOptionBuilder(configurationSection));
     }
 
     private static Action<OptionsBuilder<AzureQueueOptions>> GetQueueOptionBuilder(IConfigurationSection configurationSection)

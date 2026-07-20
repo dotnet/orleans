@@ -9,7 +9,6 @@ using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary>
@@ -17,9 +16,9 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// </summary>
     internal partial class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
-        private AzureQueueDataManager queue;
+        private AzureQueueDataManager? queue;
         private long lastReadMessage;
-        private Task outstandingTask;
+        private Task? outstandingTask;
         private readonly ILogger logger;
         private readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
         private readonly List<PendingDelivery> pending;
@@ -69,7 +68,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             }
         }
 
-        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
         {
             const int MaxNumberOfMessagesToPeek = 32;
 
@@ -83,10 +82,10 @@ namespace Orleans.Providers.Streams.AzureQueue
 
                 var task = queueRef.GetQueueMessages(count);
                 outstandingTask = task;
-                IEnumerable<QueueMessage> messages = await task;
+                IEnumerable<QueueMessage>? messages = await task;
 
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
-                foreach (var message in messages)
+                foreach (var message in messages!)
                 {
                     IBatchContainer container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
                     azureQueueMessages.Add(container);
@@ -108,9 +107,9 @@ namespace Orleans.Providers.Streams.AzureQueue
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef==null) return;
                 // get sequence tokens of delivered messages
-                List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken).ToList();
+                List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken!).ToList();
                 // find oldest delivered message
-                StreamSequenceToken oldest = deliveredTokens.Max();
+                StreamSequenceToken oldest = deliveredTokens.Max()!;
                 // finalize all pending messages at or befor the oldest
                 List<PendingDelivery> finalizedDeliveries = pending
                     .Where(pendingDelivery => !pendingDelivery.Token.Newer(oldest))

@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
             var rawBytes = this.serializer.SerializeToArray(azureQueueBatchMessage);
@@ -72,7 +72,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamId, events.Cast<object>().ToList(), requestContext);
             var rawBytes = this.serializer.SerializeToArray(azureQueueBatchMessage);

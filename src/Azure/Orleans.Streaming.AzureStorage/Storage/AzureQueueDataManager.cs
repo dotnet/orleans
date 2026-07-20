@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.AzureUtils
 {
     /// <summary>
@@ -54,7 +53,7 @@ namespace Orleans.AzureUtils
         private readonly ILogger logger;
         private readonly TimeSpan? messageVisibilityTimeout;
         private readonly AzureQueueOptions options;
-        private QueueClient _queueClient;
+        private QueueClient? _queueClient;
 
         /// <summary>
         /// Constructor.
@@ -213,7 +212,7 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Peeks in the queue for latest message, without dequeuing it.
         /// </summary>
-        public async Task<PeekedMessage> PeekQueueMessage()
+        public async Task<PeekedMessage?> PeekQueueMessage()
         {
             var startTime = DateTime.UtcNow;
             LogTracePeekingMessage(QueueName);
@@ -239,7 +238,7 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Gets a new message from the queue.
         /// </summary>
-        public async Task<QueueMessage> GetQueueMessage()
+        public async Task<QueueMessage?> GetQueueMessage()
         {
                var startTime = DateTime.UtcNow;
             LogTraceGettingMessage(QueueName);
@@ -267,7 +266,7 @@ namespace Orleans.AzureUtils
         /// Gets a number of new messages from the queue.
         /// </summary>
         /// <param name="count">Number of messages to get from the queue.</param>
-        public async Task<IEnumerable<QueueMessage>> GetQueueMessages(int? count = null)
+        public async Task<IEnumerable<QueueMessage>?> GetQueueMessages(int? count = null)
         {
             var startTime = DateTime.UtcNow;
             if (count == -1)
@@ -327,7 +326,7 @@ namespace Orleans.AzureUtils
         internal async Task GetAndDeleteQueueMessage()
         {
             var message = await GetQueueMessage();
-            await DeleteQueueMessage(message);
+            await DeleteQueueMessage(message!);
         }
 
         /// <summary>
@@ -377,7 +376,7 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                var client = await options.CreateClient();
+                var client = await options.CreateClient!();
                 return client.GetQueueClient(QueueName);
             }
             catch (Exception exc)
