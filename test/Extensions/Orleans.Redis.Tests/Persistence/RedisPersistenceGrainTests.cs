@@ -71,7 +71,7 @@ namespace Tester.Redis.Persistence
 
             this.fixture.EnsurePreconditionsMet();
 
-            var redisOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+            var redisOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString!);
             var redis = ConnectionMultiplexer.ConnectAsync(redisOptions).Result;
             this.database = redis.GetDatabase();
 

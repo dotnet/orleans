@@ -53,7 +53,7 @@ namespace Tester.Redis.Reminders
             return reminderTable;
         }
 
-        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
+        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 
         [SkippableFact]
         public void RemindersTable_Redis_Init()

@@ -27,7 +27,7 @@ namespace Tester.Redis.GrainDirectory
                         CustomDirectoryGrain.DIRECTORY,
                         options =>
                         {
-                            options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                            options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString!);
                             options.EntryExpiry = TimeSpan.FromMinutes(5);
                         })
                     .ConfigureLogging(builder => builder.AddFilter(typeof(RedisGrainDirectory).FullName, LogLevel.Debug));

@@ -52,7 +52,7 @@ namespace Tester.Redis.Clustering
                 this._gatewayOptions);
         }
 
-        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
+        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 
         [SkippableFact]
         public async Task GetGateways()

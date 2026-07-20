@@ -5,7 +5,7 @@ namespace Tester.Redis.Streaming;
 
 internal static class RedisStreamTestUtils
 {
-    public static ConfigurationOptions GetConfigurationOptions() => ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+    public static ConfigurationOptions GetConfigurationOptions() => ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString!);
 
     public static async Task DeleteServiceKeysAsync(string? serviceId)
     {

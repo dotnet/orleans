@@ -44,7 +44,7 @@ public class CommonFixture : TestEnvironmentFixture
                                                                               : new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!);
         var options = new RedisStorageOptions()
         {
-            ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString),
+            ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString!),
             GrainStorageSerializer = grainStorageSerializer,
             DeleteStateOnClear = deleteStateOnClear,
         };
