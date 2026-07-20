@@ -12,7 +12,7 @@ namespace Orleans.Streaming.EventHubs
 
         StreamPosition GetStreamPosition(string partition, EventData queueMessage);
 
-        string GetOffset(CachedMessage cachedMessage);
+        string? GetOffset(CachedMessage cachedMessage);
 
         string GetPartitionKey(StreamId streamId);
 

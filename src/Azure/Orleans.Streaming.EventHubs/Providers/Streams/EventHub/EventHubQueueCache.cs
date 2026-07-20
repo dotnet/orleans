@@ -3,10 +3,10 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Azure.Messaging.EventHubs;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -32,7 +32,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
         private readonly ICacheMonitor cacheMonitor;
-        private FixedSizeBuffer currentBuffer;
+        private FixedSizeBuffer currentBuffer = null!;
 
         /// <summary>
         /// EventHub queue cache.
@@ -132,13 +132,13 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken)
+        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
         {
             return cache.GetCursor(streamId, sequenceToken);
         }
 
         /// <inheritdoc />
-        public void Refresh(object cursor, StreamSequenceToken sequenceToken)
+        public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
             cache.Refresh(cursor, sequenceToken);
         }
@@ -149,7 +149,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="cursorObj"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
+        public bool TryGetNextMessage(object cursorObj, [NotNullWhen(true)] out IBatchContainer? message)
         {
             if (!cache.TryGetNextMessage(cursorObj, out message))
                 return false;
@@ -178,7 +178,7 @@ namespace Orleans.Streaming.EventHubs
             }
             if (lastItemPurged.HasValue)
             {
-                checkpointer.Update(this.dataAdapter.GetOffset(lastItemPurged.Value), DateTime.UtcNow);
+                checkpointer.Update(this.dataAdapter.GetOffset(lastItemPurged.Value)!, DateTime.UtcNow);
             }
         }
 

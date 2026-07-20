@@ -1,6 +1,7 @@
 using System;
 using Orleans.Streams;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Azure.Messaging.EventHubs;
 using Orleans.Runtime;
 
@@ -25,14 +26,14 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken);
+        object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken);
 
         /// <summary>
         /// Refreshes an inactive cursor at the provided sequence token.
         /// </summary>
         /// <param name="cursor">The cursor to refresh.</param>
         /// <param name="sequenceToken">The sequence token to position the cursor at.</param>
-        void Refresh(object cursor, StreamSequenceToken sequenceToken) { }
+        void Refresh(object cursor, StreamSequenceToken? sequenceToken) { }
 
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.
@@ -40,7 +41,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="cursorObj"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        bool TryGetNextMessage(object cursorObj, out IBatchContainer message);
+        bool TryGetNextMessage(object cursorObj, [NotNullWhen(true)] out IBatchContainer? message);
 
         /// <summary>
         /// Add cache pressure monitor to the cache's back pressure algorithm

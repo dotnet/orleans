@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Overrides;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory

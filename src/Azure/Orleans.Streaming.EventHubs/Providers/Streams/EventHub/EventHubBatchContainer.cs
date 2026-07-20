@@ -7,7 +7,6 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -19,15 +18,15 @@ namespace Orleans.Streaming.EventHubs
     {
         [JsonProperty]
         [Id(0)]
-        private readonly EventHubMessage eventHubMessage;
+        private readonly EventHubMessage eventHubMessage = null!;
 
         [JsonIgnore]
         [field: NonSerialized]
-        internal Serializer Serializer { get; set; }
+        internal Serializer Serializer { get; set; } = null!;
 
         [JsonProperty]
         [Id(1)]
-        private readonly EventHubSequenceToken token;
+        private readonly EventHubSequenceToken token = null!;
 
         /// <summary>
         /// Stream identifier for the stream this batch is part of.
@@ -41,7 +40,7 @@ namespace Orleans.Streaming.EventHubs
 
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized]
-        private Body payload;
+        private Body? payload;
 
         private Body GetPayload() => payload ?? (payload = this.Serializer.Deserialize<Body>(eventHubMessage.Payload));
 
@@ -50,9 +49,9 @@ namespace Orleans.Streaming.EventHubs
         internal class Body
         {
             [Id(0)]
-            public List<object> Events { get; set; }
+            public List<object> Events { get; set; } = null!;
             [Id(1)]
-            public Dictionary<string, object> RequestContext { get; set; }
+            public Dictionary<string, object>? RequestContext { get; set; }
         }
 
         /// <summary>
@@ -99,7 +98,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Put events list and its context into a EventData object
         /// </summary>
-        public static EventData ToEventData<T>(Serializer bodySerializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public static EventData ToEventData<T>(Serializer bodySerializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object>? requestContext)
         {
             var eventData = new EventData();
 
@@ -115,13 +114,13 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="streamId">The stream identifier to associate with the event context.</param>
         /// <param name="events">The events list to use for the payload.</param>
         /// <param name="requestContext">The request context to associate with the event.</param>
-        public static void UpdateEventData<T>(EventData eventData, Serializer bodySerializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public static void UpdateEventData<T>(EventData eventData, Serializer bodySerializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object>? requestContext)
         {
             eventData.EventBody = CreateEventDataBody(bodySerializer, events, requestContext);
             eventData.SetStreamNamespaceProperty(streamId.GetNamespace());
         }
 
-        private static BinaryData CreateEventDataBody<T>(Serializer bodySerializer, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        private static BinaryData CreateEventDataBody<T>(Serializer bodySerializer, IEnumerable<T> events, Dictionary<string, object>? requestContext)
         {
             var payload = new Body
             {

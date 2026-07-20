@@ -11,7 +11,6 @@ using Orleans.Runtime;
 using Orleans.Statistics;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>
@@ -165,7 +164,7 @@ namespace Orleans.Streaming.EventHubs.Testing
             switch (command)
             {
                 case (int)Commands.Randomly_Place_Stream_To_Queue:
-                    this.RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
+                    this.RandomlyPlaceStreamToQueue((arg as StreamRandomPlacementArg)!);
                     break;
                 case (int)Commands.Stop_Producing_On_Stream:
                     this.StopProducingOnStream((StreamId) arg);

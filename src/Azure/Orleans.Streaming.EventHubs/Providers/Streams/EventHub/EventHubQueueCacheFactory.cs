@@ -6,7 +6,6 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs.StatisticMonitors;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -21,8 +20,8 @@ namespace Orleans.Streaming.EventHubs
         private readonly TimePurgePredicate timePurge;
         private readonly EventHubMonitorAggregationDimensions sharedDimensions;
         private readonly OrleansInstruments orleansInstruments;
-        private IObjectPool<FixedSizeBuffer> bufferPool;
-        private string bufferPoolId;
+        private IObjectPool<FixedSizeBuffer> bufferPool = null!;
+        private string bufferPoolId = null!;
 
         /// <summary>
         /// Create a cache monitor to report performance metrics.
@@ -46,8 +45,8 @@ namespace Orleans.Streaming.EventHubs
             IEventHubDataAdapter dataAdater,
             EventHubMonitorAggregationDimensions sharedDimensions,
             OrleansInstruments instruments,
-            Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
-            Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+            Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor>? cacheMonitorFactory = null,
+            Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor>? blockPoolMonitorFactory = null)
         {
             this.cacheOptions = cacheOptions;
             this.evictionOptions = evictionOptions;

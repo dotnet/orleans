@@ -53,7 +53,7 @@ namespace Orleans.Streaming.EventHubs
             return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
         }
 
-        public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
             return EventHubBatchContainer.ToEventData(this.serializer, streamId, events, requestContext);
@@ -83,7 +83,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Get offset from cached message.  Left to derived class, as only it knows how to get this from the cached message.
         /// </summary>
-        public virtual string GetOffset(CachedMessage lastItemPurged)
+        public virtual string? GetOffset(CachedMessage lastItemPurged)
         {
             // TODO figure out how to get this from the adapter
             int readOffset = 0;
@@ -105,7 +105,7 @@ namespace Orleans.Streaming.EventHubs
         public virtual StreamId GetStreamIdentity(EventData queueMessage)
         {
             string streamKey = queueMessage.PartitionKey;
-            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            string? streamNamespace = queueMessage.GetStreamNamespaceProperty();
             return StreamId.Create(streamNamespace, streamKey);
         }
 

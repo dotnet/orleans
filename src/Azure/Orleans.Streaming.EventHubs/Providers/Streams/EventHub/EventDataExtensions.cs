@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Azure.Messaging.EventHubs;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -18,7 +17,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="eventData"></param>
         /// <param name="streamNamespace"></param>
-        public static void SetStreamNamespaceProperty(this EventData eventData, string streamNamespace)
+        public static void SetStreamNamespaceProperty(this EventData eventData, string? streamNamespace)
         {
             eventData.Properties[EventDataPropertyStreamNamespaceKey] = streamNamespace;
         }
@@ -28,9 +27,9 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="eventData"></param>
         /// <returns></returns>
-        public static string GetStreamNamespaceProperty(this EventData eventData)
+        public static string? GetStreamNamespaceProperty(this EventData eventData)
         {
-            object namespaceObj;
+            object? namespaceObj;
             if (eventData.Properties.TryGetValue(EventDataPropertyStreamNamespaceKey, out namespaceObj))
             {
                 return (string)namespaceObj;

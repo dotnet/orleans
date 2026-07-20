@@ -4,7 +4,6 @@ using System.Globalization;
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -41,7 +40,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         [Id(0)]
         [JsonProperty]
-        public string EventHubOffset { get; }
+        public string EventHubOffset { get; } = null!;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventHubSequenceToken" /> class.
