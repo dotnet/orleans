@@ -5,7 +5,7 @@ namespace DistributedTests
 {
     public static class OptionHelper
     {
-        public static Option<T> CreateOption<T>(string alias, string description = null, bool isRequired = false, T defaultValue = default, Func<T, bool> validator = null)
+        public static Option<T> CreateOption<T>(string alias, string? description = null, bool isRequired = false, T defaultValue = default!, Func<T, bool>? validator = null)
         {
             var options = new Option<T>(alias, description) { IsRequired = isRequired };
             if (!isRequired)
@@ -22,7 +22,9 @@ namespace DistributedTests
         public static string Validator<T>(OptionResult result, Func<T, bool> validator)
         {
             var value = result.GetValueOrDefault<T>();
-            if (!validator(value))
+            // The validator operates on the parsed value exactly as before; the null-forgiving
+            // operator only suppresses the unconstrained-generic warning and emits no IL.
+            if (!validator(value!))
             {
                 return $"Option {result.Token?.Value} cannot be set to {value}";
             }

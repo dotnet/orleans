@@ -109,7 +109,8 @@ namespace DistributedTests.Common.MessageChannel
                 if (msg != null)
                 {
                     await queueClient.DeleteMessageAsync(msg.MessageId, msg.PopReceipt);
-                    return JsonSerializer.Deserialize<T>(msg.MessageText);
+                    // A message that was just dequeued is expected to deserialize to a valid T.
+                    return JsonSerializer.Deserialize<T>(msg.MessageText)!;
                 }
 
                 await Task.Delay(1000, ct);

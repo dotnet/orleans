@@ -76,7 +76,7 @@ namespace DistributedTests.Server.Configurator
     {
         public Type StreamGeneratorType => typeof(TimeBoundEventGenerator);
 
-        public string StreamNamespace { get; set; }
+        public string StreamNamespace { get; set; } = null!;
 
         public int NumberOfStreams { get; set; }
 
@@ -93,7 +93,7 @@ namespace DistributedTests.Server.Configurator
         private DateTime _endTime;
         private readonly List<StreamId> _streamIds = new List<StreamId>();
         private int _sequenceId = 0;
-        private object _payload;
+        private object _payload = null!;
 
         public void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig)
         {
@@ -104,14 +104,16 @@ namespace DistributedTests.Server.Configurator
             {
                 _streamIds.Add(StreamId.Create(config.StreamNamespace, Guid.NewGuid()));
             }
-            _payload = Activator.CreateInstance(config.PayloadType);
+            // PayloadType defaults to a concrete type, so CreateInstance returns a non-null instance.
+            _payload = Activator.CreateInstance(config.PayloadType)!;
         }
 
         public bool TryReadEvents(DateTime utcNow, int maxCount, out List<IBatchContainer> events)
         {
             if (utcNow < _startTime || utcNow > _endTime)
             {
-                events = null;
+                // Per IStreamGenerator, events is only read when the method returns true.
+                events = null!;
                 return false;
             }
 

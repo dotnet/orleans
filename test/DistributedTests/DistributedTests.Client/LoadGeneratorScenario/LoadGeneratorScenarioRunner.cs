@@ -10,11 +10,11 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 {
     public class ClientParameters
     {
-        public string ServiceId { get; set; }
-        public string ClusterId { get; set; }
+        public string ServiceId { get; set; } = null!;
+        public string ClusterId { get; set; } = null!;
         public int ConnectionsPerEndpoint { get; set; }
-        public Uri AzureTableUri { get; set; }
-        public Uri AzureQueueUri { get; set; }
+        public Uri AzureTableUri { get; set; } = null!;
+        public Uri AzureQueueUri { get; set; } = null!;
     }
 
     public class LoadGeneratorParameters
@@ -53,7 +53,8 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 
             _logger.LogInformation("Connecting to cluster...");
             await host.StartAsync();
-            var client = host.Services.GetService<IClusterClient>();
+            // The Orleans client is always registered by UseOrleansClient above.
+            var client = host.Services.GetService<IClusterClient>()!;
 
             var generator = new ConcurrentLoadGenerator<T>(
                 numWorkers: loadParams.NumWorkers,

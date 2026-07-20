@@ -10,12 +10,12 @@ namespace DistributedTests.Server
 {
     public class CommonParameters
     {
-        public string ServiceId { get; set; }
-        public string ClusterId { get; set; }
+        public string ServiceId { get; set; } = null!;
+        public string ClusterId { get; set; } = null!;
         public int SiloPort { get; set; }
         public int GatewayPort { get; set; }
-        public Uri AzureTableUri { get; set; }
-        public Uri AzureQueueUri { get; set; }
+        public Uri AzureTableUri { get; set; } = null!;
+        public Uri AzureQueueUri { get; set; } = null!;
         public bool ActivationRepartitioning { get; set; }
     }
 
@@ -34,7 +34,7 @@ namespace DistributedTests.Server
         {
             var channel = await Channels.CreateReceiveChannel(_siloName, commonParameters.ClusterId, commonParameters.AzureQueueUri);
 
-            ServerMessage msg = null;
+            ServerMessage? msg = null;
 
             while (true)
             {

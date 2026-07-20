@@ -11,10 +11,10 @@ namespace DistributedTests.Client.Commands
 
         private class Parameters
         {
-            public string ServiceId { get; set; }
-            public string ClusterId { get; set; }
-            public Uri AzureTableUri { get; set; }
-            public Uri AzureQueueUri { get; set; }
+            public string ServiceId { get; set; } = null!;
+            public string ClusterId { get; set; } = null!;
+            public Uri AzureTableUri { get; set; } = null!;
+            public Uri AzureQueueUri { get; set; } = null!;
             public int Wait { get; set; }
             public int ServersPerRound { get; set; }
             public int Rounds { get; set; }
