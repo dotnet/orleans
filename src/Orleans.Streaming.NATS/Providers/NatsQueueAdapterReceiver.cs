@@ -79,7 +79,7 @@ internal sealed partial class NatsQueueAdapterReceiver : IQueueAdapterReceiver
         }
     }
 
-    public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+    public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
     {
         try
         {

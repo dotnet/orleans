@@ -23,8 +23,8 @@ internal sealed class NatsAdapter(
         NatsQueueAdapterReceiver.Create(providerName, loggerFactory, natsConnectionManager, queueId.GetNumericId(),
             options, serializer);
 
-    public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
-        Dictionary<string, object> requestContext)
+    public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token,
+        Dictionary<string, object>? requestContext)
     {
         var batchContainer = new NatsBatchContainer(streamId, events.Cast<object>().ToArray(), requestContext);
         var raw = serializer.GetSerializer<NatsBatchContainer>().SerializeToArray(batchContainer);
