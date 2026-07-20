@@ -106,7 +106,7 @@ namespace Orleans.AzureUtils
             if (!string.IsNullOrEmpty(gateway.Generation))
                 int.TryParse(gateway.Generation, out gen);
 
-            SiloAddress address = SiloAddress.New(IPAddress.Parse(gateway.Address), proxyPort, gen);
+            SiloAddress address = SiloAddress.New(IPAddress.Parse(gateway.Address!), proxyPort, gen);
             return address.ToGatewayUri();
         }
 
@@ -162,7 +162,7 @@ namespace Orleans.AzureUtils
             return storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG); // we merge this without checking eTags.
         }
 
-        internal Task<(SiloInstanceTableEntry, string)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        internal Task<(SiloInstanceTableEntry? Entity, string? ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -371,12 +371,12 @@ namespace Orleans.AzureUtils
             Level = LogLevel.Trace,
             Message = "InsertSiloEntryConditionally failed with httpStatusCode={HttpStatusCode}, restStatus={RestStatus}"
         )]
-        private partial void LogTraceInsertSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string restStatus);
+        private partial void LogTraceInsertSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string? restStatus);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "UpdateSiloEntryConditionally failed with httpStatusCode={HttpStatusCode}, restStatus={RestStatus}"
         )]
-        private partial void LogTraceUpdateSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string restStatus);
+        private partial void LogTraceUpdateSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string? restStatus);
     }
 }

@@ -9,21 +9,20 @@ using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Orleans.Reminders.AzureStorage;
 
-#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     internal sealed class ReminderTableEntry : ITableEntity
     {
-        public string GrainReference        { get; set; }    // Part of RowKey
-        public string ReminderName          { get; set; }    // Part of RowKey
-        public string ServiceId             { get; set; }    // Part of PartitionKey
-        public string DeploymentId          { get; set; }
-        public string StartAt               { get; set; }
-        public string Period                { get; set; }
-        public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
+        public string? GrainReference        { get; set; }    // Part of RowKey
+        public string? ReminderName          { get; set; }    // Part of RowKey
+        public string? ServiceId             { get; set; }    // Part of PartitionKey
+        public string? DeploymentId          { get; set; }
+        public string? StartAt               { get; set; }
+        public string? Period                { get; set; }
+        public string? GrainRefConsistentHash { get; set; }    // Part of PartitionKey
 
-        public string PartitionKey { get; set; }
-        public string RowKey { get; set; }
+        public string PartitionKey { get; set; } = null!;
+        public string RowKey { get; set; } = null!;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
@@ -118,7 +117,7 @@ namespace Orleans.Runtime.ReminderService
             return await ReadTableEntriesAndEtagsAsync(query);
         }
 
-        internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainId grainId, string reminderName)
+        internal async Task<(ReminderTableEntry? Entity, string? ETag)> FindReminderEntry(GrainId grainId, string reminderName)
         {
             string partitionKey = ReminderTableEntry.ConstructPartitionKey(_serviceId, grainId);
             string rowKey = ReminderTableEntry.ConstructRowKey(grainId, reminderName);
@@ -131,7 +130,7 @@ namespace Orleans.Runtime.ReminderService
             return FindReminderEntries(0, 0);
         }
 
-        internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry)
+        internal async Task<string?> UpsertRow(ReminderTableEntry reminderEntry)
         {
             try
             {
@@ -174,9 +173,9 @@ namespace Orleans.Runtime.ReminderService
             // group by grain hashcode so each query goes to different partition
             var tasks = new List<Task>();
             var groupedByHash = entries
-                .Where(tuple => tuple.Entity.ServiceId.Equals(_serviceId))
-                .Where(tuple => tuple.Entity.DeploymentId.Equals(_clusterId))  // delete only entries that belong to our DeploymentId.
-                .GroupBy(x => x.Entity.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
+                .Where(tuple => tuple.Entity.ServiceId!.Equals(_serviceId))
+                .Where(tuple => tuple.Entity.DeploymentId!.Equals(_clusterId))  // delete only entries that belong to our DeploymentId.
+                .GroupBy(x => x.Entity.GrainRefConsistentHash!).ToDictionary(g => g.Key, g => g.ToList());
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {
@@ -193,12 +192,12 @@ namespace Orleans.Runtime.ReminderService
             Level = LogLevel.Trace,
             Message = "UpsertRow failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}"
         )]
-        private static partial void LogTraceUpsertRowFailed(ILogger logger, HttpStatusCode httpStatusCode, string restStatus);
+        private static partial void LogTraceUpsertRowFailed(ILogger logger, HttpStatusCode httpStatusCode, string? restStatus);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "DeleteReminderEntryConditionally failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}"
         )]
-        private static partial void LogTraceDeleteReminderEntryConditionallyFailed(ILogger logger, HttpStatusCode httpStatusCode, string restStatus);
+        private static partial void LogTraceDeleteReminderEntryConditionallyFailed(ILogger logger, HttpStatusCode httpStatusCode, string? restStatus);
     }
 }

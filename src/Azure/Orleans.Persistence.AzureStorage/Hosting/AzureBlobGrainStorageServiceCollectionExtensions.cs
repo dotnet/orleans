@@ -9,7 +9,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
-#nullable disable
 namespace Orleans.Hosting
 {
     /// <summary>
@@ -36,7 +35,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure blob storage as the default grain storage.
         /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
+        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AzureBlobStorageOptions>>? configureOptions = null)
         {
             return services.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -45,7 +44,7 @@ namespace Orleans.Hosting
         /// Configure silo to use azure blob storage for grain storage.
         /// </summary>
         public static IServiceCollection AddAzureBlobGrainStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<AzureBlobStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureBlobStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new AzureBlobStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>().Get(name), name));

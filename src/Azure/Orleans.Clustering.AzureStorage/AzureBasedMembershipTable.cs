@@ -13,14 +13,13 @@ using Orleans.Clustering.AzureStorage.Utilities;
 using Orleans.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal partial class AzureBasedMembershipTable : IMembershipTable
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private OrleansSiloInstanceManager tableManager;
+        private OrleansSiloInstanceManager tableManager = null!;
         private readonly AzureStorageClusteringOptions options;
         private readonly string clusterId;
 
@@ -168,13 +167,13 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var memEntries = new List<Tuple<MembershipEntry, string>>();
-                TableVersion tableVersion = null;
+                TableVersion? tableVersion = null;
                 foreach (var tuple in entries)
                 {
                     var tableEntry = tuple.Entity;
                     if (tableEntry.RowKey.Equals(SiloInstanceTableEntry.TABLE_VERSION_ROW))
                     {
-                        tableVersion = new TableVersion(int.Parse(tableEntry.MembershipVersion), tuple.ETag);
+                        tableVersion = new TableVersion(int.Parse(tableEntry.MembershipVersion!), tuple.ETag);
                     }
                     else
                     {
@@ -205,7 +204,7 @@ namespace Orleans.Runtime.MembershipService
             var parse = new MembershipEntry
             {
                 HostName = tableEntry.HostName,
-                Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), tableEntry.Status)
+                Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), tableEntry.Status!)
             };
 
             if (!string.IsNullOrEmpty(tableEntry.ProxyPort))
@@ -219,7 +218,7 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrEmpty(tableEntry.Generation))
                 int.TryParse(tableEntry.Generation, out gen);
 
-            parse.SiloAddress = SiloAddress.New(IPAddress.Parse(tableEntry.Address), port, gen);
+            parse.SiloAddress = SiloAddress.New(IPAddress.Parse(tableEntry.Address!), port, gen);
 
             parse.RoleName = tableEntry.RoleName;
             if (!string.IsNullOrEmpty(tableEntry.SiloName))

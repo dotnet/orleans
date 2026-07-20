@@ -10,14 +10,13 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Reminders.AzureStorage;
 
-#nullable disable
 [assembly: RegisterProvider("AzureTableStorage", "Reminders", "Silo", typeof(AzureTableStorageRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
 internal sealed class AzureTableStorageRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAzureTableReminderService((OptionsBuilder<AzureTableReminderStorageOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>

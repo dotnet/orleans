@@ -9,7 +9,6 @@ using Azure.Data.Tables.Models;
 // Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambiguous types and build errors.
 //
 
-#nullable disable
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
@@ -79,7 +78,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="exc">Exception to be inspected.</param>
         /// <returns>Returns REST error code if found, otherwise <c>null</c></returns>
-        private static string ExtractRestErrorCode(Exception exc)
+        private static string? ExtractRestErrorCode(Exception? exc)
         {
             while (exc != null && exc is not RequestFailedException)
             {
@@ -99,9 +98,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns>Returns <c>true</c> if HTTP status code and REST error were extracted.</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static bool EvaluateException(
-            Exception e,
+            Exception? e,
             out HttpStatusCode httpStatusCode,
-            out string restStatus,
+            out string? restStatus,
             bool getRESTErrors = false)
         {
             httpStatusCode = HttpStatusCode.Unused;
@@ -137,7 +136,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="httpStatusCode">HTTP error code value</param>
         /// <param name="restStatusCode">REST error code value</param>
         /// <returns><c>true</c> if this is a transient / retriable error condition</returns>
-        public static bool IsRetriableHttpError(HttpStatusCode httpStatusCode, string restStatusCode)
+        public static bool IsRetriableHttpError(HttpStatusCode httpStatusCode, string? restStatusCode)
         {
             // Note: We ignore the 20X values as they are successful outcomes, not errors
 

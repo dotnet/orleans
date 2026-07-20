@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -393,7 +394,7 @@ namespace Orleans.Storage
                     }
 
                     var record = data.Entity;
-                    record.ETag = new ETag(data.ETag);
+                    record.ETag = new ETag(data.ETag!);
                     LogTraceDataRead(record.PartitionKey, record.RowKey, TableName, record.ETag.ToString());
 
                     return record;
@@ -479,7 +480,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Decodes Storage exceptions.</summary>
-        public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false)
+        public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, [MaybeNull] out string restStatus, bool getRESTErrors = false)
         {
             return AzureTableUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
         }

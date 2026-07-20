@@ -13,7 +13,6 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 // Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.
 //
 
-#nullable disable
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
@@ -50,7 +49,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get; }
 
-        public TableClient Table { get; private set; }
+        public TableClient Table { get; private set; } = null!;
 
         /// <summary>
         /// Creates a new <see cref="AzureTableDataManager{T}"/> instance.
@@ -211,7 +210,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<(bool isSuccess, string eTag)> InsertTableEntryAsync(T data)
+        public async Task<(bool isSuccess, string? eTag)> InsertTableEntryAsync(T data)
         {
             const string operation = "InsertTableEntry";
             var startTime = DateTime.UtcNow;
@@ -373,7 +372,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="partitionKey">The partition key for the entry.</param>
         /// <param name="rowKey">The row key for the entry.</param>
         /// <returns>Value promise for tuple containing the data entry and its corresponding etag.</returns>
-        public async Task<(T Entity, string ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        public async Task<(T? Entity, string? ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
@@ -386,7 +385,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     if (result.HasValue)
                     {
                         //The ETag of data is needed in further operations.
-                        return (result.Value, result.Value.ETag.ToString());
+                        return (result.Value!, result.Value!.ETag.ToString());
                     }
                 }
                 catch (RequestFailedException exception)
@@ -484,7 +483,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="filter">Filter string to use for querying the table and filtering the results.</param>
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-        public async Task<List<(T Entity, string ETag)>> ReadTableEntriesAndEtagsAsync(string filter)
+        public async Task<List<(T Entity, string ETag)>> ReadTableEntriesAndEtagsAsync(string? filter)
         {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
@@ -563,7 +562,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         internal async Task<(string, string)> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
             const string operation = "InsertTableEntryConditionally";
-            string data2Str = data2 == null ? "null" : data2.ToString();
+            string? data2Str = data2 == null ? "null" : data2.ToString();
             var startTime = DateTime.UtcNow;
 
             LogTraceTableEntries(Logger, operation, data1, data2Str, TableName);
@@ -571,7 +570,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    data2.ETag = new ETag(data2Etag);
+                    data2!.ETag = new ETag(data2Etag);
                     var opResults = await Table.SubmitTransactionAsync(new TableTransactionAction[]
                     {
                         new TableTransactionAction(TableTransactionActionType.Add, data1),
@@ -597,10 +596,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
+        internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T? data2, string? data2Etag)
         {
             const string operation = "UpdateTableEntryConditionally";
-            string data2Str = data2 == null ? "null" : data2.ToString();
+            string? data2Str = data2 == null ? "null" : data2.ToString();
             var startTime = DateTime.UtcNow;
             LogTraceTableEntries(Logger, operation, data1, data2Str, TableName);
 
@@ -652,7 +651,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        private void CheckAlertWriteError(string operation, object data1, string data2, Exception exc)
+        private void CheckAlertWriteError(string operation, object? data1, string? data2, Exception exc)
         {
             HttpStatusCode httpStatusCode;
             if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out _) && AzureTableUtils.IsContentionError(httpStatusCode))
@@ -804,7 +803,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             Level = LogLevel.Trace,
             Message = "{Operation} data1 {Data1} data2 {Data2} table {TableName}"
         )]
-        private static partial void LogTraceTableEntries(ILogger logger, string operation, T data1, string data2, string tableName);
+        private static partial void LogTraceTableEntries(ILogger logger, string operation, T data1, string? data2, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Error,
@@ -824,7 +823,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             EventId = (int)Utilities.ErrorCode.AzureTable_14,
             Message = "Azure table access write error {Operation} to table {TableName} entry {Data1}"
         )]
-        private static partial void LogErrorTableWrite(ILogger logger, Exception exception, string operation, string tableName, object data1);
+        private static partial void LogErrorTableWrite(ILogger logger, Exception exception, string operation, string tableName, object? data1);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

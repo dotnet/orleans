@@ -9,15 +9,14 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Storage;
 
-#nullable disable
 [assembly: RegisterProvider("AzureBlobStorage", "GrainStorage", "Silo", typeof(AzureBlobStorageGrainStorageProviderBuilder))]
 namespace Orleans.Hosting;
 
 internal sealed class AzureBlobStorageGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureBlobGrainStorage(name, (OptionsBuilder<AzureBlobStorageOptions> optionsBuilder) =>
+        builder.AddAzureBlobGrainStorage(name!, (OptionsBuilder<AzureBlobStorageOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
                 var containerName = configurationSection["ContainerName"];

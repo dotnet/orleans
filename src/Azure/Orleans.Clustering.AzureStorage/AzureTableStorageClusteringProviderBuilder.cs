@@ -9,7 +9,6 @@ using Orleans.Clustering.AzureStorage;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-#nullable disable
 [assembly: RegisterProvider("AzureTableStorage", "Clustering", "Silo", typeof(AzureTableStorageClusteringProviderBuilder))]
 [assembly: RegisterProvider("AzureTableStorage", "Clustering", "Client", typeof(AzureTableStorageClusteringProviderBuilder))]
 
@@ -17,7 +16,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAzureStorageClustering((OptionsBuilder<AzureStorageClusteringOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
@@ -60,7 +59,7 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
             }));
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAzureStorageClustering((OptionsBuilder<AzureStorageGatewayOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>

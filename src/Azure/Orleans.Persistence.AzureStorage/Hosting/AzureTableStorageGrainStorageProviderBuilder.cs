@@ -10,16 +10,15 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Storage;
 
-#nullable disable
 [assembly: RegisterProvider("AzureTableStorage", "GrainStorage", "Silo", typeof(AzureTableStorageGrainStorageProviderBuilder))]
 
 namespace Orleans.Hosting;
 
 internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureTableGrainStorage(name, (OptionsBuilder<AzureTableStorageOptions> optionsBuilder) =>
+        builder.AddAzureTableGrainStorage(name!, (OptionsBuilder<AzureTableStorageOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
                 var tableName = configurationSection["TableName"];
