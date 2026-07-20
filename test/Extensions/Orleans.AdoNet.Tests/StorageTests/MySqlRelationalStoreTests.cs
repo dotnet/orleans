@@ -19,7 +19,7 @@ namespace UnitTests.StorageTests.AdoNet
 
         public class Fixture
         {
-            private readonly ExceptionDispatchInfo preconditionsException;
+            private readonly ExceptionDispatchInfo? preconditionsException;
 
             public void EnsurePreconditionsMet()
             {
@@ -39,13 +39,13 @@ namespace UnitTests.StorageTests.AdoNet
                 }
             }
 
-            public RelationalStorageForTesting Storage { get; private set; }
+            public RelationalStorageForTesting? Storage { get; private set; }
         }
 
         public MySqlRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
         {
             fixture.EnsurePreconditionsMet();
-            _storage = fixture.Storage;
+            _storage = fixture.Storage!;
         }
 
         [SkippableFact, TestCategory("Functional")]

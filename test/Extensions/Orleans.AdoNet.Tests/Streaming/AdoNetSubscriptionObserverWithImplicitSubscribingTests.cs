@@ -44,7 +44,7 @@ public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() 
 public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(AdoNetSubscriptionObserverWithImplicitSubscribingTests.Fixture fixture) : SubscriptionObserverWithImplicitSubscribingTestRunner(fixture), IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
-    private static RelationalStorageForTesting _testing;
+    private static RelationalStorageForTesting _testing = null!;
     private readonly Fixture _fixture = fixture;
 
     public async Task InitializeAsync()
@@ -58,7 +58,7 @@ public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(Ado
 
     public class Fixture : BaseTestClusterFixture
     {
-        private static string _invariant;
+        private static string _invariant = null!;
 
         public Fixture(string invariant)
         {

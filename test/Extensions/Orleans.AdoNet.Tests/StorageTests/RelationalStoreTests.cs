@@ -13,7 +13,7 @@ namespace UnitTests.StorageTests.AdoNet
     {
         public int Id { get; set; }
 
-        public byte[] StreamData { get; set; }
+        public byte[]? StreamData { get; set; }
     }
 
     /// <summary>

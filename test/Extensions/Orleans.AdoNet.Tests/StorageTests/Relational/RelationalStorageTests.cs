@@ -19,7 +19,7 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// The tests and assertions common across all back-ends are here.
         /// </summary>
-        internal CommonStorageTests PersistenceStorageTests { get; }
+        internal CommonStorageTests PersistenceStorageTests { get; } = null!;
 
         /// <summary>
         /// The tests and assertions common across all back-ends are here.

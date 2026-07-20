@@ -42,9 +42,9 @@ public class PostgreSqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHa
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsyncLifetime
 {
-    private RelationalStorageForTesting _testing;
-    private IRelationalStorage _storage;
-    private RelationalOrleansQueries _queries;
+    private RelationalStorageForTesting _testing = null!;
+    private IRelationalStorage _storage = null!;
+    private RelationalOrleansQueries _queries = null!;
 
     private const string TestDatabaseName = "OrleansStreamTest";
 

@@ -15,7 +15,7 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
     public const string StreamNamespace = "RedisClientStreamTestsNamespace";
 
     private readonly ITestOutputHelper _output;
-    private ClientStreamTestRunner _runner;
+    private ClientStreamTestRunner _runner = null!;
 
     public RedisClientStreamTests(ITestOutputHelper output)
     {

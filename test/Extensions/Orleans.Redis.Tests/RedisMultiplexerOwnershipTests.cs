@@ -65,14 +65,14 @@ public sealed class RedisMultiplexerOwnershipTests
     {
         TestUtils.CheckForRedis();
 
-        ConnectionMultiplexer connection = null;
+        ConnectionMultiplexer? connection = null;
         var (provider, initialize) = CreateStorage(async _ =>
         {
             connection = await ConnectionMultiplexer.ConnectAsync(GetConfigurationOptions());
             return ((IConnectionMultiplexer)connection, false);
         });
 
-        await AssertExclusiveMultiplexerDisposed(() => connection, initialize, GetDispose(provider, useAsyncDispose));
+        await AssertExclusiveMultiplexerDisposed(() => connection!, initialize, GetDispose(provider, useAsyncDispose));
     }
 
     [SkippableTheory]
@@ -96,14 +96,14 @@ public sealed class RedisMultiplexerOwnershipTests
     {
         TestUtils.CheckForRedis();
 
-        ConnectionMultiplexer connection = null;
+        ConnectionMultiplexer? connection = null;
         var (provider, initialize) = CreateMembershipTable(async _ =>
         {
             connection = await ConnectionMultiplexer.ConnectAsync(GetConfigurationOptions());
             return ((IConnectionMultiplexer)connection, false);
         });
 
-        await AssertExclusiveMultiplexerDisposed(() => connection, initialize, GetDispose(provider, useAsyncDispose));
+        await AssertExclusiveMultiplexerDisposed(() => connection!, initialize, GetDispose(provider, useAsyncDispose));
     }
 
     [SkippableTheory]
@@ -127,14 +127,14 @@ public sealed class RedisMultiplexerOwnershipTests
     {
         TestUtils.CheckForRedis();
 
-        ConnectionMultiplexer connection = null;
+        ConnectionMultiplexer? connection = null;
         var (provider, initialize) = CreateReminderTable(async _ =>
         {
             connection = await ConnectionMultiplexer.ConnectAsync(GetConfigurationOptions());
             return ((IConnectionMultiplexer)connection, false);
         });
 
-        await AssertExclusiveMultiplexerDisposed(() => connection, initialize, GetDispose(provider, useAsyncDispose));
+        await AssertExclusiveMultiplexerDisposed(() => connection!, initialize, GetDispose(provider, useAsyncDispose));
     }
 
     [SkippableTheory]
@@ -158,20 +158,20 @@ public sealed class RedisMultiplexerOwnershipTests
     {
         TestUtils.CheckForRedis();
 
-        ConnectionMultiplexer connection = null;
+        ConnectionMultiplexer? connection = null;
         var (provider, initialize) = CreateDirectory(async _ =>
         {
             connection = await ConnectionMultiplexer.ConnectAsync(GetConfigurationOptions());
             return ((IConnectionMultiplexer)connection, false);
         });
 
-        await AssertExclusiveMultiplexerDisposed(() => connection, initialize, GetDispose(provider, useAsyncDispose));
+        await AssertExclusiveMultiplexerDisposed(() => connection!, initialize, GetDispose(provider, useAsyncDispose));
     }
 
     [Fact]
     public async Task RedisGrainDirectory_DisposeBeforeInitialize_BehavesAsDisposed()
     {
-        var (provider, _) = CreateDirectory(_ => Task.FromResult((Multiplexer: (IConnectionMultiplexer)null, IsShared: false)));
+        var (provider, _) = CreateDirectory(_ => Task.FromResult((Multiplexer: (IConnectionMultiplexer)null!, IsShared: false)));
 
         provider.Dispose();
 
@@ -182,7 +182,7 @@ public sealed class RedisMultiplexerOwnershipTests
     [Fact]
     public async Task RedisGrainDirectory_DisposeAsyncBeforeInitialize_BehavesAsDisposed()
     {
-        var (provider, _) = CreateDirectory(_ => Task.FromResult((Multiplexer: (IConnectionMultiplexer)null, IsShared: false)));
+        var (provider, _) = CreateDirectory(_ => Task.FromResult((Multiplexer: (IConnectionMultiplexer)null!, IsShared: false)));
 
         await provider.DisposeAsync();
 
@@ -243,7 +243,7 @@ public sealed class RedisMultiplexerOwnershipTests
         Func<RedisStorageOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> createMultiplexer)
     {
         var services = _fixture.Services;
-        var serializer = new JsonGrainStorageSerializer(services.GetService<OrleansJsonSerializer>());
+        var serializer = new JsonGrainStorageSerializer(services.GetService<OrleansJsonSerializer>()!);
         var options = new RedisStorageOptions
         {
             ConfigurationOptions = GetConfigurationOptions(),

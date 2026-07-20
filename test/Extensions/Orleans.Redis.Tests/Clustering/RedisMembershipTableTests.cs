@@ -27,7 +27,7 @@ namespace Tester.Redis.Clustering
             return filters;
         }
 
-        internal RedisMembershipTable membershipTable;
+        internal RedisMembershipTable membershipTable = null!;
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {

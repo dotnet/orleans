@@ -52,8 +52,8 @@ public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 [TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
-    private RelationalStorageForTesting _testing;
-    private IRelationalStorage _storage;
+    private RelationalStorageForTesting _testing = null!;
+    private IRelationalStorage _storage = null!;
 
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";
 

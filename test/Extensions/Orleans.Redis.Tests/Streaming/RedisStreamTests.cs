@@ -12,7 +12,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
 {
     public const string StreamProviderName = "RedisProvider";
 
-    private SingleStreamTestRunner _runner;
+    private SingleStreamTestRunner _runner = null!;
 
     [SkippableFact]
     public async Task Redis_01_OneProducerGrainOneConsumerGrain() => await _runner.StreamTest_01_OneProducerGrainOneConsumerGrain();

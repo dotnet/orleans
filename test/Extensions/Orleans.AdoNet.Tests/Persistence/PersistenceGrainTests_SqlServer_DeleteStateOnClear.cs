@@ -35,7 +35,7 @@ namespace Tester.AdoNet.Persistence
             {
                 var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
-                    new Dictionary<string, string>
+                    new Dictionary<string, string?>
                     {
                         {ConnectionStringKey, relationalStorage.CurrentConnectionString}
                     }));

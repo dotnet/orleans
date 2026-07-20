@@ -45,8 +45,8 @@ public class PostgreSqlAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fix
 public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvironmentFixture fixture) : IAsyncLifetime
 {
     private readonly TestEnvironmentFixture _fixture = fixture;
-    private RelationalStorageForTesting _testing;
-    private IRelationalStorage _storage;
+    private RelationalStorageForTesting _testing = null!;
+    private IRelationalStorage _storage = null!;
 
     private const string TestDatabaseName = "OrleansStreamTest";
 

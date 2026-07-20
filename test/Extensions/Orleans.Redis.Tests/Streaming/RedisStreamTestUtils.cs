@@ -7,7 +7,7 @@ internal static class RedisStreamTestUtils
 {
     public static ConfigurationOptions GetConfigurationOptions() => ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
 
-    public static async Task DeleteServiceKeysAsync(string serviceId)
+    public static async Task DeleteServiceKeysAsync(string? serviceId)
     {
         if (string.IsNullOrWhiteSpace(serviceId) || string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
         {
