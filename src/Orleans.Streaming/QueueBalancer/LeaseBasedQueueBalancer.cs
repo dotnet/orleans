@@ -284,33 +284,34 @@ public partial class LeaseBasedQueueBalancer(
             for (var i = 0; i < results.Length; i++)
             {
                 AcquireLeaseResult result = results[i];
+                // The balancer requires a lease identity in every result and an acquired lease on success.
                 switch (result.StatusCode)
                 {
                     case ResponseCode.OK:
                         {
-                            _myQueues.Add(new AcquiredQueue(_leaseOrder++, expectedQueues[i], result.AcquiredLease));
+                            _myQueues.Add(new AcquiredQueue(_leaseOrder++, expectedQueues[i], result.AcquiredLease!));
                             break;
                         }
                     case ResponseCode.TransientFailure:
                         {
-                            LogWarningFailedToAcquireLeaseTransient(Logger, result.FailureException, result.AcquiredLease.ResourceKey);
+                            LogWarningFailedToAcquireLeaseTransient(Logger, result.FailureException, result.AcquiredLease!.ResourceKey);
                             break;
                         }
                     // This is expected much of the time.
                     case ResponseCode.LeaseNotAvailable:
                         {
-                            LogDebugFailedToAcquireLeaseNotAvailable(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
+                            LogDebugFailedToAcquireLeaseNotAvailable(Logger, result.FailureException, result.AcquiredLease!.ResourceKey, result.StatusCode);
                             break;
                         }
                     // An acquire call should not return this code, so log as error
                     case ResponseCode.InvalidToken:
                         {
-                            LogErrorFailedToAcquireLeaseInvalidToken(Logger, result.FailureException, result.AcquiredLease.ResourceKey);
+                            LogErrorFailedToAcquireLeaseInvalidToken(Logger, result.FailureException, result.AcquiredLease!.ResourceKey);
                             break;
                         }
                     default:
                         {
-                            LogErrorUnexpectedAcquireLease(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
+                            LogErrorUnexpectedAcquireLease(Logger, result.FailureException, result.AcquiredLease!.ResourceKey, result.StatusCode);
                             break;
                         }
                 }
@@ -351,18 +352,19 @@ public partial class LeaseBasedQueueBalancer(
         for (var i = results.Length - 1; i >= 0; i--)
         {
             AcquireLeaseResult result = results[i];
+            // The balancer requires a lease identity in every result and an acquired lease on success.
             switch (result.StatusCode)
             {
                 case ResponseCode.OK:
                     {
-                        _myQueues[i].AcquiredLease = result.AcquiredLease;
+                        _myQueues[i].AcquiredLease = result.AcquiredLease!;
                         break;
                     }
                 case ResponseCode.TransientFailure:
                     {
                         _myQueues.RemoveAt(i);
                         allRenewed = false;
-                        LogWarningFailedToRenewLeaseTransient(Logger, result.FailureException, result.AcquiredLease.ResourceKey);
+                        LogWarningFailedToRenewLeaseTransient(Logger, result.FailureException, result.AcquiredLease!.ResourceKey);
                         break;
                     }
                 // These can occur if lease has expired and/or someone else has taken it.
@@ -371,14 +373,14 @@ public partial class LeaseBasedQueueBalancer(
                     {
                         _myQueues.RemoveAt(i);
                         allRenewed = false;
-                        LogWarningFailedToRenewLeaseReason(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
+                        LogWarningFailedToRenewLeaseReason(Logger, result.FailureException, result.AcquiredLease!.ResourceKey, result.StatusCode);
                         break;
                     }
                 default:
                     {
                         _myQueues.RemoveAt(i);
                         allRenewed = false;
-                        LogErrorUnexpectedRenewLease(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
+                        LogErrorUnexpectedRenewLease(Logger, result.FailureException, result.AcquiredLease!.ResourceKey, result.StatusCode);
                         break;
                     }
             }
@@ -505,25 +507,25 @@ public partial class LeaseBasedQueueBalancer(
         Level = LogLevel.Warning,
         Message = "Failed to acquire lease {LeaseKey} due to transient error."
     )]
-    private static partial void LogWarningFailedToAcquireLeaseTransient(ILogger logger, Exception exception, string leaseKey);
+    private static partial void LogWarningFailedToAcquireLeaseTransient(ILogger logger, Exception? exception, string leaseKey);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Failed to acquire lease {LeaseKey} due to {Reason}."
     )]
-    private static partial void LogDebugFailedToAcquireLeaseNotAvailable(ILogger logger, Exception exception, string leaseKey, ResponseCode reason);
+    private static partial void LogDebugFailedToAcquireLeaseNotAvailable(ILogger logger, Exception? exception, string leaseKey, ResponseCode reason);
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Failed to acquire acquire {LeaseKey} unexpected invalid token."
     )]
-    private static partial void LogErrorFailedToAcquireLeaseInvalidToken(ILogger logger, Exception exception, string leaseKey);
+    private static partial void LogErrorFailedToAcquireLeaseInvalidToken(ILogger logger, Exception? exception, string leaseKey);
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Unexpected response to acquire request of lease {LeaseKey}. StatusCode {StatusCode}."
     )]
-    private static partial void LogErrorUnexpectedAcquireLease(ILogger logger, Exception exception, string leaseKey, ResponseCode statusCode);
+    private static partial void LogErrorUnexpectedAcquireLease(ILogger logger, Exception? exception, string leaseKey, ResponseCode statusCode);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
@@ -547,19 +549,19 @@ public partial class LeaseBasedQueueBalancer(
         Level = LogLevel.Warning,
         Message = "Failed to renew lease {LeaseKey} due to transient error."
     )]
-    private static partial void LogWarningFailedToRenewLeaseTransient(ILogger logger, Exception exception, string leaseKey);
+    private static partial void LogWarningFailedToRenewLeaseTransient(ILogger logger, Exception? exception, string leaseKey);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "Failed to renew lease {LeaseKey} due to {Reason}."
     )]
-    private static partial void LogWarningFailedToRenewLeaseReason(ILogger logger, Exception exception, string leaseKey, ResponseCode reason);
+    private static partial void LogWarningFailedToRenewLeaseReason(ILogger logger, Exception? exception, string leaseKey, ResponseCode reason);
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Unexpected response to renew of lease {LeaseKey}. StatusCode {StatusCode}."
     )]
-    private static partial void LogErrorUnexpectedRenewLease(ILogger logger, Exception exception, string leaseKey, ResponseCode statusCode);
+    private static partial void LogErrorUnexpectedRenewLease(ILogger logger, Exception? exception, string leaseKey, ResponseCode statusCode);
 
     [LoggerMessage(
         Level = LogLevel.Debug,

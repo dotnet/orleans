@@ -128,6 +128,7 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
+            // The LINQ query is non-null, so ToSet cannot return null.
             return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
         }
 

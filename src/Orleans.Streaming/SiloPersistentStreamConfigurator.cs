@@ -70,6 +70,7 @@ namespace Orleans.Hosting
         {
             this.ConfigureDelegate(services => services.AddSiloStreaming());
             this.ConfigureComponent(PersistentStreamProvider.Create);
+            // PersistentStreamProvider implements IControllable.
             this.ConfigureComponent((s,n) => (s.GetRequiredKeyedService<IStreamProvider>(n) as IControllable)!);
             this.ConfigureDelegate(services => services.AddSingleton(sp => PersistentStreamProvider.ParticipateIn<ISiloLifecycle>(sp, this.Name)));
             this.ConfigureComponent(adapterFactory);

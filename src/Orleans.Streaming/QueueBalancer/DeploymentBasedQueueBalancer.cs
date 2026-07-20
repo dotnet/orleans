@@ -111,7 +111,7 @@ namespace Orleans.Streams
                 bool immatureBit;
                 if (!(immatureSilos.TryGetValue(kvp.Key, out immatureBit) && immatureBit)) // if not immature now or any more
                 {
-                    string siloName;
+                    string? siloName;
                     if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
                     {
                         activeSiloNames.Add(siloName);
@@ -140,7 +140,7 @@ namespace Orleans.Streams
             HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();
             foreach (var silo in immatureSilos.Where(s => s.Value)) // take only those from immature set that have their immature status bit set
             {
-                string siloName;
+                string? siloName;
                 if (siloStatusOracle.TryGetSiloName(silo.Key, out siloName))
                 {
                     if (idealDistribution.TryGetValue(siloName, out var queues))

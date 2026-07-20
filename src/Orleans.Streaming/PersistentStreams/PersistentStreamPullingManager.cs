@@ -194,7 +194,8 @@ namespace Orleans.Streams
 
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
-            HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
+            // GetMyQueues is non-null, so ToSet cannot return null.
+            HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet()!;
             IReadOnlyCollection<QueueId>? previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
             LogInfoExecutingQueueChangeNotification(
                 notificationSeqNumber,
