@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -60,7 +61,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
                 ReportFor(
                     context,
-                    interfaceDeclaration!.GetLocation(),
+                    interfaceDeclaration.GetLocation(),
                     interfaceDeclaration.Identifier.ToString(),
                     GetArity(interfaceDeclaration),
                     GetNamespaceAndNesting(interfaceDeclaration));
@@ -80,7 +81,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                         continue;
                     }
 
-                    ReportFor(context, methodDeclaration!.GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
+                    ReportFor(context, methodDeclaration.GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
                 }
             }
 
@@ -112,7 +113,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
             ReportFor(
                 context,
-                typeDeclaration!.GetLocation(),
+                typeDeclaration.GetLocation(),
                 typeDeclaration.Identifier.ToString(),
                 GetArity(typeDeclaration),
                 GetNamespaceAndNesting(typeDeclaration));
@@ -165,7 +166,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         return sb.ToString();
     }
 
-    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, out TSyntax? syntax)
+    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, [NotNullWhen(true)] out TSyntax? syntax)
         where TSyntax : SyntaxNode
     {
         syntax = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TSyntax;

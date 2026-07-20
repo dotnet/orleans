@@ -12,7 +12,7 @@ internal sealed class LifecycleObserverInfo
     /// The observer name supplied when the observer subscribed to the lifecycle.
     /// </summary>
     [Id(0)]
-    public string? Name { get; set; }
+    public string Name { get; set; } = null!;
 
     /// <summary>
     /// The type of the underlying observer (typically the concrete
@@ -20,7 +20,7 @@ internal sealed class LifecycleObserverInfo
     /// the registered delegate when subscribing via delegate-based extensions).
     /// </summary>
     [Id(1)]
-    public string? ObserverType { get; set; }
+    public string ObserverType { get; set; } = null!;
 
     /// <summary>
     /// True when the observer has a non-default <c>OnStart</c> action.

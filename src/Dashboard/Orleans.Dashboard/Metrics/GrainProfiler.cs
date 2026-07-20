@@ -107,7 +107,7 @@ internal sealed partial class GrainProfiler(
 
             foreach (var item in items)
             {
-                item.Grain = TypeFormatter.Parse(item.Grain!);
+                item.Grain = TypeFormatter.Parse(item.Grain);
             }
 
             try

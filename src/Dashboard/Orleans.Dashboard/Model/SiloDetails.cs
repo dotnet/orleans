@@ -22,16 +22,16 @@ internal class SiloDetails
     public string? RoleName { get; set; }
 
     [Id(5)]
-    public string? SiloAddress { get; set; }
+    public string SiloAddress { get; set; } = null!;
 
     [Id(6)]
-    public string? SiloName { get; set; }
+    public string SiloName { get; set; } = null!;
 
     [Id(7)]
     public string? StartTime { get; set; }
 
     [Id(8)]
-    public string? Status { get; set; }
+    public string Status { get; set; } = null!;
 
     [Id(9)]
     public int UpdateZone { get; set; }

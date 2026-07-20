@@ -105,7 +105,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
 
         foreach (var siloAddress in silos.Select(x => x.SiloAddress))
         {
-            await _siloGrainClient.GrainService(SiloAddress.FromParsableString(siloAddress!)).Enable(_isEnabled);
+            await _siloGrainClient.GrainService(SiloAddress.FromParsableString(siloAddress)).Enable(_isEnabled);
         }
     }
 
@@ -149,9 +149,9 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
 
         _counters.TotalActiveHostCount = hosts.Count(x => x.SiloStatus == SiloStatus.Active);
         _counters.TotalActivationCountHistory =
-            _counters.TotalActivationCountHistory!.Enqueue(activationCount).Dequeue();
+            _counters.TotalActivationCountHistory.Enqueue(activationCount).Dequeue();
         _counters.TotalActiveHostCountHistory =
-            _counters.TotalActiveHostCountHistory!.Enqueue(_counters.TotalActiveHostCount).Dequeue();
+            _counters.TotalActiveHostCountHistory.Enqueue(_counters.TotalActiveHostCount).Dequeue();
 
         var elapsedTime = Math.Min((DateTime.UtcNow - _startTime).TotalSeconds, 100);
 
@@ -190,7 +190,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         await EnsureCountersAreUpToDate();
 
         var simpleGrainStats = exclusions != null && exclusions.Length > 0
-            ? [.. _counters.SimpleGrainStats.Where(x => !exclusions.Any(f => x.GrainType!.StartsWith(f, StringComparison.OrdinalIgnoreCase)))]
+            ? [.. _counters.SimpleGrainStats.Where(x => !exclusions.Any(f => x.GrainType.StartsWith(f, StringComparison.OrdinalIgnoreCase)))]
             : _counters.SimpleGrainStats;
 
         return new DashboardCounters
@@ -354,12 +354,12 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }).AsImmutable();
     }
 
-    public Task<Immutable<string?[]>> GetGrainTypes(string[]? exclusions)
+    public Task<Immutable<string[]>> GetGrainTypes(string[]? exclusions)
     {
         return Task.FromResult(_typeManifestOptions.InterfaceImplementations
             .Where(s => s.GetInterfaces().Any(i => i == typeof(IGrain) || i == typeof(ISystemTarget)))
             .Where(s => exclusions == null || !exclusions.Any(e => s.FullName!.StartsWith(e, StringComparison.OrdinalIgnoreCase)))
-            .Select(s => s.FullName)
+            .Select(s => s.FullName!)
             .ToArray()
             .AsImmutable());
     }

@@ -1,10 +1,11 @@
 using Microsoft.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Analyzers
 {
     internal static class SymbolHelpers
     {
-        public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeSymbol, out Location? location)
+        public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeSymbol, [NotNullWhen(true)] out Location? location)
         {
             foreach (var attribute in symbol.GetAttributes())
             {

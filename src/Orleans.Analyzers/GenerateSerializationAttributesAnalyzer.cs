@@ -50,10 +50,10 @@ namespace Orleans.Analyzers
                     if (analysis.UnannotatedMembers.Count > 0)
                     {
                         // Check if GenerateFieldIds is set to PublicProperties
-                        var generateFieldIds = GetGenerateFieldIdsValue(attribute!);
+                        var generateFieldIds = GetGenerateFieldIdsValue(attribute);
                         if (generateFieldIds != GenerateFieldIds.PublicProperties)
                         {
-                            context.ReportDiagnostic(Diagnostic.Create(Rule, attribute!.GetLocation()));
+                            context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
                         }
                     }
                 }

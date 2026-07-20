@@ -2,6 +2,7 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Diagnostics;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.CodeGenerator;
 
@@ -265,7 +266,7 @@ internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
         }
     }
 
-    public bool Equals(ProxyInterfaceDescription? other) => other is not null && SymbolEqualityComparer.Default.Equals(InterfaceType, other.InterfaceType) && SymbolEqualityComparer.Default.Equals(ProxyBaseType, other.ProxyBaseType);
+    public bool Equals([DisallowNull] ProxyInterfaceDescription? other) => other is not null && SymbolEqualityComparer.Default.Equals(InterfaceType, other.InterfaceType) && SymbolEqualityComparer.Default.Equals(ProxyBaseType, other.ProxyBaseType);
     public override bool Equals(object? obj) => obj is ProxyInterfaceDescription other && Equals(other);
     public override int GetHashCode() => SymbolEqualityComparer.Default.GetHashCode(InterfaceType) * 17 ^ SymbolEqualityComparer.Default.GetHashCode(ProxyBaseType);
     public override string ToString() => $"Type: {InterfaceType}, ProxyBaseType: {ProxyBaseType}";

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Analyzers
 {
@@ -47,7 +48,7 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static bool TryGetAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol? expectedAttribute, out AttributeSyntax? attribute)
+        public static bool TryGetAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol? expectedAttribute, [NotNullWhen(true)] out AttributeSyntax? attribute)
         {
             foreach (var list in member.AttributeLists)
             {

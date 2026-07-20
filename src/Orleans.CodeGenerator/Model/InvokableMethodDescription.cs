@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace Orleans.CodeGenerator;
@@ -214,7 +215,7 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
     /// </summary>
     public bool IsCancellable => Method.Parameters.Any(parameterSymbol => SymbolEqualityComparer.Default.Equals(GenerationContext.LibraryTypes.CancellationToken, parameterSymbol.Type));
 
-    public bool Equals(InvokableMethodDescription? other) => other is not null && Key.Equals(other.Key);
+    public bool Equals([DisallowNull] InvokableMethodDescription? other) => other is not null && Key.Equals(other.Key);
     public override bool Equals(object? obj) => obj is InvokableMethodDescription imd && Equals(imd);
     public override int GetHashCode() => Key.GetHashCode();
     public override string ToString() => $"{ProxyBase}/{ContainingInterface.Name}/{Method.Name}";

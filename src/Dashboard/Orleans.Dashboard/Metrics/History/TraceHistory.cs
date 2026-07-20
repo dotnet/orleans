@@ -88,7 +88,7 @@ internal sealed class TraceHistory(int capacity = 100) : ITraceHistory
 
         foreach (var trace in grainTrace)
         {
-            var key = new HistoryKey(siloAddress, trace.Grain!, trace.Method!);
+            var key = new HistoryKey(siloAddress, trace.Grain, trace.Method);
 
             if (!_history.TryGetValue(key, out var historyBuffer))
             {

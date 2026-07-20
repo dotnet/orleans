@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -299,6 +300,7 @@ internal static class LifecycleStageInspector
         return FormatType(declaring);
     }
 
+    [return: NotNullIfNotNull(nameof(type))]
     private static string? FormatType(Type? type)
     {
         if (type is null) return null;

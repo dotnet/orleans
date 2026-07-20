@@ -8,10 +8,10 @@ internal sealed class SimpleGrainStatisticCounter
     public int ActivationCount { get; set; }
 
     [Id(1)]
-    public string? GrainType { get; set; }
+    public string GrainType { get; set; } = null!;
 
     [Id(2)]
-    public string? SiloAddress { get; set; }
+    public string SiloAddress { get; set; } = null!;
 
     [Id(3)]
     public double TotalAwaitTime { get; set; }

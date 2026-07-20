@@ -21,7 +21,7 @@ internal sealed class LifecycleStageInfo
     /// numeric stage value as a string.
     /// </summary>
     [Id(1)]
-    public string? StageName { get; set; }
+    public string StageName { get; set; } = null!;
 
     /// <summary>
     /// Indicates whether the stage corresponds to a named field on
@@ -34,5 +34,5 @@ internal sealed class LifecycleStageInfo
     /// The observers that participate in this stage.
     /// </summary>
     [Id(3)]
-    public LifecycleObserverInfo[]? Observers { get; set; }
+    public LifecycleObserverInfo[] Observers { get; set; } = null!;
 }

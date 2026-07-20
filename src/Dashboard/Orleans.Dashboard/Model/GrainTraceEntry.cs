@@ -7,7 +7,7 @@ namespace Orleans.Dashboard.Model;
 internal class GrainTraceEntry
 {
     [Id(0)]
-    public string? PeriodKey { get; set; }
+    public string PeriodKey { get; set; } = null!;
 
     [Id(1)]
     public DateTime Period { get; set; }

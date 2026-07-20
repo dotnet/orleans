@@ -39,7 +39,7 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
 
     public async Task<Immutable<string>> GetGrainState(string? id, string? grainType) => await _dashboardGrain.GetGrainState(id, grainType);
 
-    public async Task<Immutable<string?[]>> GetGrainTypes(string[]? exclusions = null) => await _dashboardGrain.GetGrainTypes(exclusions);
+    public async Task<Immutable<string[]>> GetGrainTypes(string[]? exclusions = null) => await _dashboardGrain.GetGrainTypes(exclusions);
 
     public async Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages()
     {
