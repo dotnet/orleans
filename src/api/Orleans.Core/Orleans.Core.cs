@@ -1583,8 +1583,8 @@ namespace Orleans.Runtime
         public const string ActivationManagement = "Orleans.ActivationManagement";
         public const string GrainDirectory = "Orleans.GrainDirectory";
         public const string Grains = "Orleans.Grains";
-        public const string Messaging = "Orleans.Messaging";
         public const string Membership = "Orleans.Membership";
+        public const string Messaging = "Orleans.Messaging";
         public const string SystemTimers = "Orleans.SystemTimers";
     }
 }
