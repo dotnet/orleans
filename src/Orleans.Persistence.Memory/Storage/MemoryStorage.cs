@@ -89,7 +89,7 @@ namespace Orleans.Storage
         public virtual async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var key = MakeKey(grainType, grainId);
-            LogTraceWrite(key, grainState.State!, grainState.ETag);
+            LogTraceWrite(key, grainState.State, grainState.ETag);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
@@ -200,13 +200,13 @@ namespace Orleans.Storage
             Level = LogLevel.Trace,
             Message = "Write Keys={Keys} Data={Data} Etag={Etag}"
         )]
-        private partial void LogTraceWrite(string keys, object data, string etag);
+        private partial void LogTraceWrite(string keys, object? data, string? etag);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "Delete Keys={Keys} Etag={Etag}"
         )]
-        private partial void LogTraceDelete(string keys, string etag);
+        private partial void LogTraceDelete(string keys, string? etag);
 
         [LoggerMessage(
             Level = LogLevel.Error,

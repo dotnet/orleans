@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Serialization.Serializers;
 
-#nullable disable
 namespace Orleans.Storage
 {
 
@@ -91,7 +90,7 @@ namespace Orleans.Storage
         private async Task MakeFixedLatencyCall(Func<Task> action)
         {
             var sw = Stopwatch.StartNew();
-            Exception error = null;
+            Exception? error = null;
             try
             {
                 if (this.options.MockCallsOnly)

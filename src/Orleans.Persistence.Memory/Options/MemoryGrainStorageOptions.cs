@@ -1,7 +1,6 @@
 using Orleans.Runtime;
 using Orleans.Storage;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -25,7 +24,7 @@ namespace Orleans.Configuration
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
 
         /// <inheritdoc/>
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
 
         /// <summary>
         /// Default init stage
