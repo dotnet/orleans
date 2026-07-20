@@ -495,8 +495,8 @@ namespace NonSilo.Tests.Membership
             }
 
             table = await this.membershipTable.ReadAll();
-            var joiningEntry = GetEntryFromTable(table, joiningSilo)!;
-            var createdEntry = GetEntryFromTable(table, createdSilo)!;
+            var joiningEntry = GetEntryFromTable(table, joiningSilo);
+            var createdEntry = GetEntryFromTable(table, createdSilo);
 
             Assert.NotNull(joiningEntry);
             Assert.NotNull(createdEntry);
@@ -513,12 +513,14 @@ namespace NonSilo.Tests.Membership
             while (votesNeeded > 0)
             {
                 table = await this.membershipTable.ReadAll();
-                joiningEntry = GetEntryFromTable(table, joiningSilo)!;
+                joiningEntry = GetEntryFromTable(table, joiningSilo);
+                Assert.NotNull(joiningEntry);
                 joiningEntry.Item1.AddSuspector(otherSilos[0].SiloAddress, DateTime.UtcNow);
                 Assert.True(await this.membershipTable.UpdateRow(joiningEntry.Item1, joiningEntry.Item2, table.Version.Next()));
 
                 table = await this.membershipTable.ReadAll();
-                createdEntry = GetEntryFromTable(table, createdSilo)!;
+                createdEntry = GetEntryFromTable(table, createdSilo);
+                Assert.NotNull(createdEntry);
                 createdEntry.Item1.AddSuspector(otherSilos[0].SiloAddress, DateTime.UtcNow);
                 Assert.True(await this.membershipTable.UpdateRow(createdEntry.Item1, createdEntry.Item2, table.Version.Next()));
 
@@ -526,14 +528,20 @@ namespace NonSilo.Tests.Membership
             }
 
             table = await this.membershipTable.ReadAll();
-            joiningEntry = GetEntryFromTable(table, joiningSilo)!;
-            createdEntry = GetEntryFromTable(table, createdSilo)!;
+            joiningEntry = GetEntryFromTable(table, joiningSilo);
+            createdEntry = GetEntryFromTable(table, createdSilo);
+            Assert.NotNull(joiningEntry);
+            Assert.NotNull(createdEntry);
 
             // Suspect time will be null if numVotesForDeathDeclaration == 1
             if (totalRequiredVotes > 1 && evictWhenMaxJoinAttemptTimeExceeded)
             {
-                Assert.Equal(totalRequiredVotes - 1, joiningEntry.Item1.SuspectTimes.Count);
-                Assert.Equal(totalRequiredVotes - 1, createdEntry.Item1.SuspectTimes.Count);
+                var initialJoiningSuspectTimes = joiningEntry.Item1.SuspectTimes;
+                var initialCreatedSuspectTimes = createdEntry.Item1.SuspectTimes;
+                Assert.NotNull(initialJoiningSuspectTimes);
+                Assert.NotNull(initialCreatedSuspectTimes);
+                Assert.Equal(totalRequiredVotes - 1, initialJoiningSuspectTimes.Count);
+                Assert.Equal(totalRequiredVotes - 1, initialCreatedSuspectTimes.Count);
             }
 
             // now we start the lifecycle and let the local silo add the final vote.
@@ -557,8 +565,10 @@ namespace NonSilo.Tests.Membership
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
             table = await this.membershipTable.ReadAll();
-            joiningEntry = GetEntryFromTable(table, joiningSilo)!;
-            createdEntry = GetEntryFromTable(table, createdSilo)!;
+            joiningEntry = GetEntryFromTable(table, joiningSilo);
+            createdEntry = GetEntryFromTable(table, createdSilo);
+            Assert.NotNull(joiningEntry);
+            Assert.NotNull(createdEntry);
 
             var expectedVotes = totalRequiredVotes == 1
                 ? 2
@@ -568,8 +578,12 @@ namespace NonSilo.Tests.Membership
                 ? totalRequiredVotes
                 : totalRequiredVotes - 1;
 
-            Assert.True(expectedVotes <= joiningEntry.Item1.SuspectTimes.Count);
-            Assert.True(expectedVotes <= createdEntry.Item1.SuspectTimes.Count);
+            var joiningSuspectTimes = joiningEntry.Item1.SuspectTimes;
+            var createdSuspectTimes = createdEntry.Item1.SuspectTimes;
+            Assert.NotNull(joiningSuspectTimes);
+            Assert.NotNull(createdSuspectTimes);
+            Assert.True(expectedVotes <= joiningSuspectTimes.Count);
+            Assert.True(expectedVotes <= createdSuspectTimes.Count);
 
             Assert.Equal(expected: evictWhenMaxJoinAttemptTimeExceeded ? SiloStatus.Dead : SiloStatus.Joining, actual: joiningEntry.Item1.Status);
             Assert.Equal(expected: evictWhenMaxJoinAttemptTimeExceeded ? SiloStatus.Dead : SiloStatus.Created, actual: createdEntry.Item1.Status);
@@ -665,7 +679,7 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 optionsMonitor,
                 this.fatalErrorHandler,
-                null);
+                null!);
 
             ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(this.lifecycle);
 

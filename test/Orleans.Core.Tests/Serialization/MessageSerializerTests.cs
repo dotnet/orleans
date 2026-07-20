@@ -327,7 +327,9 @@ namespace UnitTests.Serialization
                     var list = new List<GrainAddress>(n);
                     for (int i = 0; i < n; i++)
                     {
-                        list.Add(_grainAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
+                        var address = _grainAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                        Assert.NotNull(address);
+                        list.Add(address);
                     }
 
                     return list;

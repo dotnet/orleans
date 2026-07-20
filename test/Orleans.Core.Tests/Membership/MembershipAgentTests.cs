@@ -51,7 +51,7 @@ namespace NonSilo.Tests.Membership
             this.localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
 
             this.fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
-            this.fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
+            this.fatalErrorHandler.IsUnexpected(default!).ReturnsForAnyArgs(true);
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             this.timers = new List<DelegateAsyncTimer>();
@@ -93,7 +93,7 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 optionsMonitor,
                 this.fatalErrorHandler,
-                null);
+                null!);
             ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
 
             this.remoteSiloProber = Substitute.For<IRemoteSiloProber>();

@@ -19,7 +19,7 @@ public class OrleansJsonSerializerStreamTests
         serializer.Serialize(payload, typeof(TestPayload), stream);
         stream.Position = 0;
 
-        var result = (TestPayload)serializer.Deserialize(typeof(TestPayload), stream);
+        TestPayload? result = (TestPayload?)serializer.Deserialize(typeof(TestPayload), stream);
 
         Assert.NotNull(result);
         Assert.Equal(payload.Name, result.Name);

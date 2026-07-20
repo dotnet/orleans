@@ -180,6 +180,7 @@ namespace UnitTests.Serialization
 
             var deserialized = serializer.Deserialize<JsonPoco>(serialized);
 
+            Assert.NotNull(deserialized);
             Assert.Equal(data.Prop, deserialized.Prop);
         }
 

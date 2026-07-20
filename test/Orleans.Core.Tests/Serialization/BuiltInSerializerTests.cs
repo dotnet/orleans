@@ -96,14 +96,26 @@ namespace UnitTests.Serialization
             expected.SetObsoleteInt(38);
 
             var actual = (AnotherConcreteClass)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, expected);
+            var expectedClasses = expected.Classes;
+            var expectedInterfaces = expected.Interfaces;
+            var actualClasses = actual.Classes;
+            var actualInterfaces = actual.Interfaces;
+            Assert.NotNull(expectedClasses);
+            Assert.NotNull(expectedInterfaces);
+            Assert.NotNull(actualClasses);
+            Assert.NotNull(actualInterfaces);
+            var expectedNestedInterfaces = expectedClasses[1].Interfaces;
+            var actualNestedInterfaces = actualClasses[1].Interfaces;
+            Assert.NotNull(expectedNestedInterfaces);
+            Assert.NotNull(actualNestedInterfaces);
 
             Assert.Equal(expected.Int, actual.Int);
             Assert.Equal(expected.Enum, actual.Enum);
             Assert.Equal(expected.AnotherString, actual.AnotherString);
-            Assert.Equal(expected.Classes.Length, actual.Classes.Length);
-            Assert.Equal(expected.Classes[1].Interfaces[0].Int, actual.Classes[1].Interfaces[0].Int);
-            Assert.Equal(expected.Interfaces[0].Int, actual.Interfaces[0].Int);
-            Assert.Equal(actual.Interfaces[0], actual.Classes[1]);
+            Assert.Equal(expectedClasses.Length, actualClasses.Length);
+            Assert.Equal(expectedNestedInterfaces[0].Int, actualNestedInterfaces[0].Int);
+            Assert.Equal(expectedInterfaces[0].Int, actualInterfaces[0].Int);
+            Assert.Equal(actualInterfaces[0], actualClasses[1]);
             Assert.NotEqual(expected.NonSerializedInt, actual.NonSerializedInt);
             Assert.Equal(0, actual.NonSerializedInt);
             Assert.Equal(expected.GetObsoleteInt(), actual.GetObsoleteInt());
@@ -514,9 +526,9 @@ namespace UnitTests.Serialization
         public void Serialize_Immutable()
         {
             var test1 = new ImmutableType(3, 27);
-            var raw = environment.DeepCopier.Copy<object>(test1);
-            Assert.IsAssignableFrom<ImmutableType>(raw); //Type is wrong after deep copy of [Immutable] type
-            Assert.Same(test1, raw); //Deep copy of [Immutable] object made a copy instead of just copying the pointer
+            object? raw = environment.DeepCopier.Copy<object>(test1);
+            var copiedTest1 = Assert.IsAssignableFrom<ImmutableType>(raw); //Type is wrong after deep copy of [Immutable] type
+            Assert.Same(test1, copiedTest1); //Deep copy of [Immutable] object made a copy instead of just copying the pointer
 
             var test2list = new List<int>();
             for (int i = 0; i < 3; i++)
@@ -525,25 +537,25 @@ namespace UnitTests.Serialization
             }
             var test2 = new Immutable<List<int>>(test2list);
             raw = environment.DeepCopier.Copy<object>(test2);
-            Assert.IsAssignableFrom<Immutable<List<int>>>(raw); //Type is wrong after round trip of array of Immutable<>
-            Assert.Same(test2.Value, ((Immutable<List<int>>)raw).Value); //Deep copy of Immutable<> object made a copy instead of just copying the pointer
+            var copiedTest2 = Assert.IsAssignableFrom<Immutable<List<int>>>(raw); //Type is wrong after round trip of array of Immutable<>
+            Assert.Same(test2.Value, copiedTest2.Value); //Deep copy of Immutable<> object made a copy instead of just copying the pointer
 
             var test3 = new EmbeddedImmutable("test", 1, 2, 3, 4);
             raw = environment.DeepCopier.Copy<object>(test3);
-            Assert.IsAssignableFrom<EmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
-            Assert.Same(test3.B.Value, ((EmbeddedImmutable)raw).B.Value); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            var copiedTest3 = Assert.IsAssignableFrom<EmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test3.B.Value, copiedTest3.B.Value); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
 
             var test4 = new ClassWithEmbeddedImmutable { Immutable = new byte[] { 1 }, Mutable = new byte[] { 2 } };
             raw = environment.DeepCopier.Copy<object>(test4);
-            Assert.IsAssignableFrom<ClassWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
-            Assert.Same(test4.Immutable, ((ClassWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
-            Assert.NotSame(test4.Mutable, ((ClassWithEmbeddedImmutable)raw).Mutable);
+            var copiedTest4 = Assert.IsAssignableFrom<ClassWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test4.Immutable, copiedTest4.Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            Assert.NotSame(test4.Mutable, copiedTest4.Mutable);
 
             var test5 = new StructWithEmbeddedImmutable { Immutable = new byte[] { 1 }, Mutable = new byte[] { 2 } };
             raw = environment.DeepCopier.Copy<object>(test5);
-            Assert.IsAssignableFrom<StructWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
-            Assert.Same(test5.Immutable, ((StructWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
-            Assert.NotSame(test5.Mutable, ((StructWithEmbeddedImmutable)raw).Mutable);
+            var copiedTest5 = Assert.IsAssignableFrom<StructWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test5.Immutable, copiedTest5.Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            Assert.NotSame(test5.Mutable, copiedTest5.Mutable);
         }
 
         [Fact, TestCategory("Functional")]
@@ -575,11 +587,13 @@ namespace UnitTests.Serialization
 
         internal static object OrleansSerializationLoop(Serializer serializer, DeepCopier copier, object input, bool includeWire = true)
         {
-            var copy = copier.Copy(input);
+            object? copy = copier.Copy(input);
             if (includeWire)
             {
                 copy = serializer.RoundTripSerializationForTesting(copy);
             }
+
+            Assert.NotNull(copy);
             return copy;
         }
 
@@ -702,12 +716,16 @@ namespace UnitTests.Serialization
             c1.CircularTest2 = c2;
 
             var deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  c1);
-            Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            var deserializedCircularTest2 = deserialized.CircularTest2;
+            Assert.NotNull(deserializedCircularTest2);
+            Assert.Equal(c2.CircularTest1List.Count, deserializedCircularTest2.CircularTest1List.Count);
+            Assert.Same(deserialized, deserializedCircularTest2.CircularTest1List[0]);
 
             deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  c1, true);
-            Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            deserializedCircularTest2 = deserialized.CircularTest2;
+            Assert.NotNull(deserializedCircularTest2);
+            Assert.Equal(c2.CircularTest1List.Count, deserializedCircularTest2.CircularTest1List.Count);
+            Assert.Same(deserialized, deserializedCircularTest2.CircularTest1List[0]);
         }
         
         [Fact, TestCategory("Functional")]
