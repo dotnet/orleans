@@ -64,7 +64,7 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
 
     protected override Task<string> GetConnectionString()
     {
-        return Task.FromResult(TestDefaultConfiguration.CosmosDBAccountKey);
+        return Task.FromResult(TestDefaultConfiguration.CosmosDBAccountKey!);
     }
 
     [SkippableFact, TestCategory("Functional")]

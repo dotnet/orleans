@@ -166,6 +166,8 @@ public class PersistenceProviderTests_Cosmos
         output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
         var storedState = storedGrainState.State;
+        Assert.NotNull(grainState.State);
+        Assert.NotNull(storedState);
         Assert.Equal(grainState.State.A, storedState.A);
         Assert.Equal(grainState.State.B, storedState.B);
         Assert.Equal(grainState.State.C, storedState.C);
@@ -191,6 +193,8 @@ public class PersistenceProviderTests_Cosmos
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
         TimeSpan readTime = sw.Elapsed;
         output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        Assert.NotNull(grainState.State);
+        Assert.NotNull(storedGrainState.State);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
         Assert.Equal(grainState.State.B, storedGrainState.State.B);
         Assert.Equal(grainState.State.C, storedGrainState.State.C);

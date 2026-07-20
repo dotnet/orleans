@@ -24,7 +24,7 @@ namespace Tester.ZooKeeperUtils
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString; });
+                hostBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString!; });
             }
         }
 
