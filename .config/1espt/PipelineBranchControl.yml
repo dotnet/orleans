@@ -1,0 +1,8 @@
+pipelines:
+  1152:
+    allowedBranches:
+    - main
+    - '^3\.x$'
+  1397:
+    allowedBranches:
+    - main

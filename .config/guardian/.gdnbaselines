@@ -11,250 +11,141 @@
     }
   },
   "results": {
-    "492bb9459285aa02a23f6a6779e5be2eb5abf65a32cc613280b7ed722cd4a98e": {
-      "signature": "492bb9459285aa02a23f6a6779e5be2eb5abf65a32cc613280b7ed722cd4a98e",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/nuget.config",
-      "line": 9,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0060",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "caaa03f03b1c7c073308d50dd596413120a75aa9f7188f1747597683f6e3b436": {
-      "signature": "caaa03f03b1c7c073308d50dd596413120a75aa9f7188f1747597683f6e3b436",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/dlabnugetcert.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "37bf0118bbd656e6d30e7e3f731bac3e88caa0067868f32526cba611de7fb34a": {
-      "signature": "37bf0118bbd656e6d30e7e3f731bac3e88caa0067868f32526cba611de7fb34a",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/dynamicsha1.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "0df13d5b0e02d27610c5d26fbf8ada8c29161046087a88e59971d1fdea20c88d": {
-      "signature": "0df13d5b0e02d27610c5d26fbf8ada8c29161046087a88e59971d1fdea20c88d",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/dynamicsha2.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "709b4fdd6d0142712f9f69b3192563e149ccc7cb8762be291bbb567bb2d42d86": {
-      "signature": "709b4fdd6d0142712f9f69b3192563e149ccc7cb8762be291bbb567bb2d42d86",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/testdlab.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "4eaff6af7a166277db7356b713f44571532010adcfa3b81e77d34370f054a692": {
-      "signature": "4eaff6af7a166277db7356b713f44571532010adcfa3b81e77d34370f054a692",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/testdlabsha2.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "bf291646a1ae462fe07d1e4fe7cf682ececdbac480c9242a9fe60b5607842dbc": {
-      "signature": "bf291646a1ae462fe07d1e4fe7cf682ececdbac480c9242a9fe60b5607842dbc",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/vsmsappx.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "f85ca33e9ffc2662390548a77947fa9c1c0a66aa194a61d381fdbce391769435": {
-      "signature": "f85ca33e9ffc2662390548a77947fa9c1c0a66aa194a61d381fdbce391769435",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/WinBlue.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "f64a177dcdd266dfecc33e3a55c01c58ec6c097f3453a70cf7b9be0bb40ea30c": {
-      "signature": "f64a177dcdd266dfecc33e3a55c01c58ec6c097f3453a70cf7b9be0bb40ea30c",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/WP223.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
-    "26564b328f56f22a3050e620db0d9bc693ba20720e04e99e76625da1bacc92b8": {
-      "signature": "26564b328f56f22a3050e620db0d9bc693ba20720e04e99e76625da1bacc92b8",
-      "alternativeSignatures": [],
-      "target": "MicroBuild/Plugins/MicroBuild.Plugins.Signing.1.1.950/build/tools/MobileTools/7Sign/tcb.pfx",
-      "line": 1,
-      "memberOf": [
-        "default"
-      ],
-      "tool": "credscan",
-      "ruleId": "CSCAN-GENERAL0020",
-      "createdDate": "2024-08-02 00:42:13Z",
-      "expirationDate": "2025-01-19 00:45:11Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2024-08-02 00:45:11Z"
-    },
     "cabf6781f05e5d25c364458eaadda6629bf4612fb1b716cdb7c6ef25b28248e6": {
       "signature": "cabf6781f05e5d25c364458eaadda6629bf4612fb1b716cdb7c6ef25b28248e6",
       "alternativeSignatures": [
-        "646f2f7b87094a419f9fc5a2c101316f7dc70eaa70b95df3c139275533eea538"
+        "20b6f4aa21b629a356a66e7e28ea33796dc3078991f080f53ec9f028db7cc456",
+        "a71c18c3b472f78a91856fbbb2f2a0f261b044e98f03f8fbb24145fb289077fe"
       ],
       "target": "vswhere.2.6.7/tools/vswhere.exe",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
       "memberOf": [
         "default"
       ],
       "tool": "binskim",
       "ruleId": "BA2008",
-      "createdDate": "2025-01-09 00:31:08Z",
-      "expirationDate": "2025-06-28 00:35:03Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
+    },
+    "b450fd2d5cb315dafd5901b7fbb3cc217f47c0302122d8feba6ca38cfd6938a0": {
+      "signature": "b450fd2d5cb315dafd5901b7fbb3cc217f47c0302122d8feba6ca38cfd6938a0",
+      "alternativeSignatures": [
+        "fbac4ea86dcf5ae19562171d3b4799b8aef9bd5c56f776abb3265b2a19b6a0c2",
+        "43ddd56013bbd08b80e817c8d7bd0a643e612827a09bbe1e116f215a6eafe771"
+      ],
+      "target": "test/Benchmarks/bin/Release/net10.0/runtimes/win-x64/native/capstone.dll",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2008",
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
     },
     "d08c7702b82da26b4796ed979da06bb3e5425d06a3c1e9e7f7b14c8d740390c8": {
       "signature": "d08c7702b82da26b4796ed979da06bb3e5425d06a3c1e9e7f7b14c8d740390c8",
       "alternativeSignatures": [
-        "65c0cfcf671599df8692063ff5ee1b3c77d016958ea772962c289b414139dae0"
+        "45fc5c897a079d2a4e06f60549e2263cd646998a913002f0a985b0b0b75efc93",
+        "f249440d49bad9019573441d51ac1227b471094f53a00eef30977ae927652348"
       ],
       "target": "test/Benchmarks/bin/Release/net8.0/runtimes/win-arm64/native/capstone.dll",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
       "memberOf": [
         "default"
       ],
       "tool": "binskim",
       "ruleId": "BA2008",
-      "createdDate": "2025-01-09 00:31:08Z",
-      "expirationDate": "2025-06-28 00:35:03Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
     },
     "a5db0cc6cb155071fec6f71c852507035008468d7121284cc819f937e3247815": {
       "signature": "a5db0cc6cb155071fec6f71c852507035008468d7121284cc819f937e3247815",
       "alternativeSignatures": [
-        "52c415eb464471a05a07969512053498a175e487e9d85c8b831176b3b920a9fe"
+        "adcfc48626f0dbc562537308e3a467bf5e67ed894fb74960cf09090f85d92fa1",
+        "108cf7819930fbf390f71124f4cb91c45035518a2f3ea165bee340ba7065939c"
       ],
       "target": "test/Benchmarks/bin/Release/net8.0/runtimes/win-x64/native/capstone.dll",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
       "memberOf": [
         "default"
       ],
       "tool": "binskim",
       "ruleId": "BA2008",
-      "createdDate": "2025-01-09 00:31:08Z",
-      "expirationDate": "2025-06-28 00:35:03Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
     },
     "446b34f6111339557b69440e43f772cf3c0eaf2072a048a5878eaf5ec52ced1b": {
       "signature": "446b34f6111339557b69440e43f772cf3c0eaf2072a048a5878eaf5ec52ced1b",
       "alternativeSignatures": [
-        "6cf662335bc501de4d47bea44af5021d502f5b87e944554c46377d5fee5faf43"
+        "806ce5d38d763112afd5817e43d8ca05954da1c311381bb0abc372239bad4bbb",
+        "dd4b9b3c2548e2982087fe595cdde7ff1d95b2b5f929eff4fbb9ec7522284604"
       ],
       "target": "test/Benchmarks/bin/Release/net8.0/runtimes/win-x86/native/capstone.dll",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
       "memberOf": [
         "default"
       ],
       "tool": "binskim",
       "ruleId": "BA2008",
-      "createdDate": "2025-01-09 00:31:08Z",
-      "expirationDate": "2025-06-28 00:35:03Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
     },
     "551d9c232b0582ea5586cc554c39e22e5765d7b5bab6463205daf12cc3bdc200": {
       "signature": "551d9c232b0582ea5586cc554c39e22e5765d7b5bab6463205daf12cc3bdc200",
       "alternativeSignatures": [
-        "90036af9a88461082f332bb6b7d21e76ea9f787723bab492be183e5fbcf888a9"
+        "7ff3a2724c9ad65b1cf55dd15966dfac325d425e869710122ff1f695f2cd2b0b",
+        "9c37a4b12a966ebc537617989ff34331678612cb6aebe6797b09f920457234a3"
       ],
       "target": "test/Benchmarks.AdoNet/bin/Release/net8.0/runtimes/win-arm64/native/capstone.dll",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
       "memberOf": [
         "default"
       ],
       "tool": "binskim",
       "ruleId": "BA2008",
-      "createdDate": "2025-01-09 00:31:08Z",
-      "expirationDate": "2025-06-28 00:35:03Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
     },
     "5e2c7d0b68b6409f8d2e377d4080974a9557ba3c4d175e7031ebb6ea763a38cc": {
       "signature": "5e2c7d0b68b6409f8d2e377d4080974a9557ba3c4d175e7031ebb6ea763a38cc",
       "alternativeSignatures": [
-        "92400697d6a7c7a35f664f4c29345cfb3921c9b98d5f938cc1a42b3e498bbcc8"
+        "1ac0d9ae3c889065eb3cb648cceb1701a728dfe1cde7711b3e92436cf8836830",
+        "4c24a97b2f93e27efe6ece2797ad2a43df2012f035193122cc1475bd1d8ee5f8"
       ],
       "target": "test/Benchmarks.AdoNet/bin/Release/net8.0/runtimes/win-x64/native/capstone.dll",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
       "memberOf": [
         "default"
       ],
       "tool": "binskim",
       "ruleId": "BA2008",
-      "createdDate": "2025-01-09 00:31:08Z",
-      "expirationDate": "2025-06-28 00:35:03Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
     },
     "f189723b12d346d27f95598ee97f8e6cdaf07dcaf450702476bfea91adc0f499": {
       "signature": "f189723b12d346d27f95598ee97f8e6cdaf07dcaf450702476bfea91adc0f499",
       "alternativeSignatures": [
-        "af70a99d4c41ae5cca1eb00158335851f2ec3cc18e07f79edc2d4004ea6a6bd2"
+        "366eed213f4fdc0fae4a0d6c3a203bae059e205beee05b59cee84a73ee93d8fd",
+        "f15af2a250a081dec298a1c9a8a6ed5dc80b23061bfd9cb071ffc67bcf281420"
       ],
       "target": "test/Benchmarks.AdoNet/bin/Release/net8.0/runtimes/win-x86/native/capstone.dll",
+      "uriBaseId": "file:///D:/a/_work/1/s/",
       "memberOf": [
         "default"
       ],
       "tool": "binskim",
       "ruleId": "BA2008",
-      "createdDate": "2025-01-09 00:31:08Z",
-      "expirationDate": "2025-06-28 00:35:03Z",
-      "justification": "This error is baselined with an expiration date of 180 days from 2025-01-09 00:35:03Z"
+      "createdDate": "2026-07-10 02:14:39Z",
+      "expirationDate": "2026-12-27 02:17:33Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-10 02:17:33Z"
     }
   }
 }
