@@ -144,7 +144,8 @@ namespace Tester.AzureUtils.TimerTests
 
         private static async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
         {
-            ReminderTableData data = await table.ReadRows(0, 0xffffffff);
+            var data = await table.ReadRows(0, 0xffffffff);
+            Assert.NotNull(data);
             return data.Reminders;
         }
     }

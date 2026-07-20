@@ -44,12 +44,13 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.Conflict, exc.Status);  // "Creating an already existing entry."
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.Conflict, httpStatusCode);
                 Assert.Equal("EntityAlreadyExists", restStatus);
             }
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.NotNull(tuple.Entity);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
         }
 
@@ -59,12 +60,14 @@ namespace Tester.AzureUtils
             var data = GenerateNewData();
             await manager.UpsertTableEntryAsync(data);
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.NotNull(tuple.Entity);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
             await manager.UpsertTableEntryAsync(data2);
             tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            Assert.NotNull(tuple.Entity);
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
         }
 
@@ -82,7 +85,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.NotFound, exc.Status);  // "Update before insert."
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
@@ -90,18 +93,21 @@ namespace Tester.AzureUtils
 
             await manager.UpsertTableEntryAsync(data);
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.NotNull(tuple.Entity);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
             string eTag1 = await manager.UpdateTableEntryAsync(data2, AzureTableUtils.ANY_ETAG);
             tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            Assert.NotNull(tuple.Entity);
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
 
             var data3 = data.Clone();
             data3.StringData = "EvenNewerData";
             _ = await manager.UpdateTableEntryAsync(data3, eTag1);
             tuple = await manager.ReadSingleTableEntryAsync(data3.PartitionKey, data3.RowKey);
+            Assert.NotNull(tuple.Entity);
             Assert.Equal(data3.StringData, tuple.Entity.StringData);
 
             try
@@ -113,7 +119,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.PreconditionFailed, exc.Status);  // "Wrong eTag"
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.PreconditionFailed, httpStatusCode);
                 Assert.True(restStatus == TableErrorCode.UpdateConditionNotSatisfied.ToString());
@@ -171,7 +177,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.NotFound, exc.Status);  // "Merge before create."
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
@@ -191,13 +197,14 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.PreconditionFailed, exc.Status);  // "Wrong eTag."
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.PreconditionFailed, httpStatusCode);
                 Assert.True(restStatus == TableErrorCode.UpdateConditionNotSatisfied.ToString());
             }
 
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.NotNull(tuple.Entity);
             Assert.Equal("NewData", tuple.Entity.StringData);
         }
 
@@ -224,7 +231,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.NotFound, exc.Status);  // "Upadte item 2 before created it."
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
@@ -241,7 +248,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.Conflict, exc.Status);  // "Inserting an already existing item 1."
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.Conflict, httpStatusCode);
                 Assert.Equal("EntityAlreadyExists", restStatus);
@@ -256,7 +263,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.Conflict, exc.Status);  // "Inserting an already existing item 1 AND wring eTag"
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.Conflict, httpStatusCode);
                 Assert.Equal("EntityAlreadyExists", restStatus);
@@ -279,7 +286,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.NotFound, exc.Status);  // "Update before insert."
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
@@ -298,7 +305,7 @@ namespace Tester.AzureUtils
             {
                 Assert.Equal((int)HttpStatusCode.PreconditionFailed, exc.Status);  // "Wrong eTag"
                 HttpStatusCode httpStatusCode;
-                string restStatus;
+                string? restStatus;
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.PreconditionFailed, httpStatusCode);
                 Assert.True(restStatus == TableErrorCode.UpdateConditionNotSatisfied.ToString());

@@ -81,6 +81,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(2, states.Length);
             foreach (var state in states)
             {
+                Assert.NotNull(state);
                 StreamLifecycleOptions.RunState providerState;
                 Enum.TryParse(state.ToString(), out providerState);
                 Assert.Equal(expectedState, providerState);

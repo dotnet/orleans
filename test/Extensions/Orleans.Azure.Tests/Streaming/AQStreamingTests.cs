@@ -42,7 +42,7 @@ namespace Tester.AzureUtils.Streaming
                 builder.ConfigureHost(cb =>
                 {
                     Dictionary<string, string?> queueConfig = [];
-                    void ConfigureStreaming(string option, string value)
+                    void ConfigureStreaming(string option, string? value)
                     {
                         var prefix = $"Orleans:Streaming:{AzureQueueStreamProviderName}:";
                         queueConfig[$"{prefix}{option}"] = value;

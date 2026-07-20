@@ -276,7 +276,9 @@ namespace Tester.AzureUtils
             var data = await manager.ReadSingleTableEntryAsync(partitionKey, rowKey);
 
             output.WriteLine("FindSiloEntry returning Data={0}", data);
-            return data;
+            Assert.NotNull(data.Entity);
+            Assert.NotNull(data.ETag);
+            return (data.Entity, data.ETag);
         }
 
         private static void CheckSiloInstanceTableEntry(SiloInstanceTableEntry referenceEntry, SiloInstanceTableEntry entry)

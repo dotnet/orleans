@@ -142,7 +142,7 @@ namespace Tester.AzureUtils.Lease
 
         private static async Task<int[]> GetRunningAgentCounts(IManagementGrain mgmtGrain)
         {
-            object[] agentStarted = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null!);
+            object?[] agentStarted = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null!);
             return agentStarted.Select(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo)).ToArray();
         }
 

@@ -222,6 +222,7 @@ namespace Tester.AzureUtils.Persistence
 
             var storage = await InitAzureTableGrainStorage(useJson);
             var initialState = state.State;
+            Assert.NotNull(initialState);
 
             var entity = new TableEntity();
 
@@ -229,9 +230,10 @@ namespace Tester.AzureUtils.Persistence
 
             var convertedState = storage.ConvertFromStorageFormat<TestStoreGrainState>(entity);
             Assert.NotNull(convertedState);
-            Assert.Equal(initialState.A, convertedState.A);
-            Assert.Equal(initialState.B, convertedState.B);
-            Assert.Equal(initialState.C, convertedState.C);
+            var actualState = convertedState!;
+            Assert.Equal(initialState.A, actualState.A);
+            Assert.Equal(initialState.B, actualState.B);
+            Assert.Equal(initialState.C, actualState.C);
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
@@ -242,6 +244,7 @@ namespace Tester.AzureUtils.Persistence
 
             var storage = await InitAzureTableGrainStorage(useJson: true, typeNameHandling: TypeNameHandling.None);
             var initialState = state.State;
+            Assert.NotNull(initialState);
 
             var entity = new TableEntity();
 
@@ -249,7 +252,7 @@ namespace Tester.AzureUtils.Persistence
 
             var convertedState = storage.ConvertFromStorageFormat<TestStoreGrainStateWithCustomJsonProperties>(entity);
             Assert.NotNull(convertedState);
-            Assert.Equal(initialState.String, convertedState.String);
+            Assert.Equal(initialState.String, convertedState!.String);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
@@ -267,7 +270,7 @@ namespace Tester.AzureUtils.Persistence
                 NullLoggerFactory.Instance,
                 providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>(),
                 providerRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
-                providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
+                providerRuntime.ServiceProvider.GetRequiredService<IGrainStorageSerializer>());
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();
@@ -348,10 +351,13 @@ namespace Tester.AzureUtils.Persistence
             TimeSpan readTime = sw.Elapsed;
             this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
+            var expectedState = grainState.State;
             var storedState = storedGrainState.State;
-            Assert.Equal(grainState.State.A, storedState.A);
-            Assert.Equal(grainState.State.B, storedState.B);
-            Assert.Equal(grainState.State.C, storedState.C);
+            Assert.NotNull(expectedState);
+            Assert.NotNull(storedState);
+            Assert.Equal(expectedState.A, storedState.A);
+            Assert.Equal(expectedState.B, storedState.B);
+            Assert.Equal(expectedState.C, storedState.C);
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
@@ -379,9 +385,13 @@ namespace Tester.AzureUtils.Persistence
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
             this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.Equal(grainState.State.A, storedGrainState.State.A);
-            Assert.Equal(grainState.State.B, storedGrainState.State.B);
-            Assert.Equal(grainState.State.C, storedGrainState.State.C);
+            var expectedState = grainState.State;
+            var actualState = storedGrainState.State;
+            Assert.NotNull(expectedState);
+            Assert.NotNull(actualState);
+            Assert.Equal(expectedState.A, actualState.A);
+            Assert.Equal(expectedState.B, actualState.B);
+            Assert.Equal(expectedState.C, actualState.C);
 
             return storedGrainState;
         }
@@ -423,7 +433,10 @@ namespace Tester.AzureUtils.Persistence
 
         private static void EnsureEnvironmentSupportsState(GrainState<TestStoreGrainState> grainState)
         {
-            if (grainState.State.A.Length > 400 * 1024)
+            var state = grainState.State;
+            Assert.NotNull(state);
+            Assert.NotNull(state.A);
+            if (state.A.Length > 400 * 1024)
             {
                 StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
             }

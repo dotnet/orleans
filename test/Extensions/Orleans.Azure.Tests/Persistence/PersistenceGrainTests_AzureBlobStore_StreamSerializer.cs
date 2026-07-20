@@ -90,19 +90,19 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializer : IClassFixtu
                 ?? throw new InvalidOperationException("Inner serializer must support stream operations for this test.");
         }
 
-        public BinaryData Serialize<T>(T input)
+        public BinaryData Serialize<T>(T? input)
         {
             Interlocked.Increment(ref BinarySerializeCount);
             return _inner.Serialize(input);
         }
 
-        public T Deserialize<T>(BinaryData input)
+        public T? Deserialize<T>(BinaryData input)
         {
             Interlocked.Increment(ref BinaryDeserializeCount);
             return _inner.Deserialize<T>(input);
         }
 
-        public ValueTask SerializeAsync<T>(T input, Stream destination, CancellationToken cancellationToken = default)
+        public ValueTask SerializeAsync<T>(T? input, Stream destination, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref StreamSerializeCount);
             return _inner.SerializeAsync(input, destination, cancellationToken);

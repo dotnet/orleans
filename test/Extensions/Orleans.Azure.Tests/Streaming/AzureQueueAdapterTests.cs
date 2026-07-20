@@ -97,7 +97,9 @@ namespace Tester.AzureUtils.Streaming
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = receiver.GetQueueMessagesAsync(QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG).Result.ToArray();
+                        var receivedMessages = receiver.GetQueueMessagesAsync(QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG).Result;
+                        Assert.NotNull(receivedMessages);
+                        var messages = receivedMessages.ToArray();
                         if (!messages.Any())
                         {
                             continue;
@@ -152,9 +154,10 @@ namespace Tester.AzureUtils.Streaming
                     StreamSequenceToken lastToken = firstInCache;
                     while (cursor.MoveNext())
                     {
-                        Exception ex;
+                        Exception? ex;
                         messageCount++;
-                        IBatchContainer batch = cursor.GetCurrent(out ex);
+                        var batch = cursor.GetCurrent(out ex);
+                        Assert.NotNull(batch);
                         this.output.WriteLine("Token: {0}", batch.SequenceToken);
                         Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;
