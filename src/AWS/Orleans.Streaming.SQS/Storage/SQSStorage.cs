@@ -10,7 +10,6 @@ using Orleans;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
 
-#nullable disable
 namespace OrleansAWSUtils.Storage
 {
     /// <summary>
@@ -26,11 +25,11 @@ namespace OrleansAWSUtils.Storage
         private const string SecretKeyPropertyName = "SecretKey";
         private const string ServicePropertyName = "Service";
         private readonly ILogger Logger;
-        private string accessKey;
-        private string secretKey;
-        private string service;
-        private string queueUrl;
-        private AmazonSQSClient sqsClient;
+        private string? accessKey;
+        private string? secretKey;
+        private string service = null!;
+        private string? queueUrl;
+        private AmazonSQSClient sqsClient = null!;
 
         /// <summary>
         /// The queue Name
@@ -103,7 +102,7 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        private async Task<string> GetQueueUrl()
+        private async Task<string?> GetQueueUrl()
         {
             try
             {
@@ -183,7 +182,7 @@ namespace OrleansAWSUtils.Storage
         /// </summary>
         /// <param name="count">The number of messages to peak. Min 1 and max 10</param>
         /// <returns>Collection with messages from the queue</returns>
-        public async Task<IEnumerable<SQSMessage>> GetMessages(int count = 1)
+        public async Task<IEnumerable<SQSMessage>?> GetMessages(int count = 1)
         {
             try
             {

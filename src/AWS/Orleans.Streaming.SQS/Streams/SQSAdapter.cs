@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     internal class SQSAdapter : IQueueAdapter
@@ -41,15 +40,14 @@ namespace OrleansAWSUtils.Streams
             return SQSAdapterReceiver.Create(this.serializer, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
         }
 
-        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             if (token != null)
             {
                 throw new ArgumentException("SQSStream stream provider currently does not support non-null StreamSequenceToken.", nameof(token));
             }
             var queueId = streamQueueMapper.GetQueueForStream(streamId);
-            SQSStorage queue;
-            if (!Queues.TryGetValue(queueId, out queue))
+            if (!Queues.TryGetValue(queueId, out var queue))
             {
                 var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), DataConnectionString, this.ServiceId);
                 await tmpQueue.InitQueueAsync();

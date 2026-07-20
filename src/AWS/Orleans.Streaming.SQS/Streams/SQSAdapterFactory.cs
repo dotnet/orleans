@@ -10,7 +10,6 @@ using Orleans;
 using Orleans.Configuration.Overrides;
 using Orleans.Serialization;
 
-#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
@@ -27,7 +26,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>
         /// Application level failure handler override.
         /// </summary>
-        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
+        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; } = null!;
 
         public SQSAdapterFactory(
             string name, 

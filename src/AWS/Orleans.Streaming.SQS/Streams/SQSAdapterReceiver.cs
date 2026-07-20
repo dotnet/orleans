@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 using SQSMessage = Amazon.SQS.Model.Message;
 
-#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     /// <summary>
@@ -17,9 +16,9 @@ namespace OrleansAWSUtils.Streams
     /// </summary>
     internal partial class SQSAdapterReceiver : IQueueAdapterReceiver
     {
-        private SQSStorage queue;
+        private SQSStorage? queue;
         private long lastReadMessage;
-        private Task outstandingTask;
+        private Task? outstandingTask;
         private readonly ILogger logger;
         private readonly Serializer<SQSBatchContainer> serializer;
 
@@ -71,7 +70,7 @@ namespace OrleansAWSUtils.Streams
             }
         }
 
-        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
         {
             try
             {
@@ -83,7 +82,7 @@ namespace OrleansAWSUtils.Streams
 
                 var task = queueRef.GetMessages(count);
                 outstandingTask = task;
-                IEnumerable<SQSMessage> messages = await task;
+                IEnumerable<SQSMessage>? messages = await task;
                 if (messages == null || !messages.Any())
                     return Array.Empty<IBatchContainer>();
 
