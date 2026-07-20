@@ -320,7 +320,8 @@ namespace Orleans.Runtime
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    response = this.responseCopier.Copy(response);
+                                    // The copier preserves the null state of its input.
+                                    response = this.responseCopier.Copy(response)!;
                                 }
 
                                 invokable.Dispose();
@@ -381,7 +382,8 @@ namespace Orleans.Runtime
         {
             try
             {
-                SendResponse(message, (Response)this._deepCopier.Copy(response));
+                // The copier preserves the null state of its input.
+                SendResponse(message, (Response)this._deepCopier.Copy(response)!);
             }
             catch (Exception exc)
             {
