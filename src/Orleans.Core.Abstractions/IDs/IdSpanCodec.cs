@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -20,7 +21,7 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     public void WriteField<TBufferWriter>(
         ref Writer<TBufferWriter> writer,
         uint fieldIdDelta,
-        Type expectedType,
+        [AllowNull] Type expectedType,
         IdSpan value)
         where TBufferWriter : IBufferWriter<byte>
     {

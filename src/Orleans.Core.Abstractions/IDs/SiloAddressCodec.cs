@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
@@ -17,7 +18,7 @@ namespace Orleans.Runtime.Serialization
     {
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SiloAddress? value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, SiloAddress? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -36,6 +37,7 @@ namespace Orleans.Runtime.Serialization
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: MaybeNull]
         public SiloAddress ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -72,7 +74,7 @@ namespace Orleans.Runtime.Serialization
                 reader.ConsumeEndBaseOrEndObject(ref header);
             }
 
-            return SiloAddress.New(address, port, generation);
+            return SiloAddress.New(address!, port, generation);
         }
     }
 }
