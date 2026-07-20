@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -14,7 +15,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>
@@ -56,7 +56,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
     }
 
     /// <inheritdoc/>
-    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] object? value)
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -93,7 +93,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
     }
 
     /// <inheritdoc/>
-    object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.IsReference)
         {
@@ -103,8 +103,8 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        object result = null;
-        Type type = null;
+        object? result = null;
+        Type? type = null;
         uint fieldId = 0;
         while (true)
         {
@@ -134,7 +134,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
                     try
                     {
                         reader.ReadBytes(ref bufferWriter, (int)length);
-                        result = MessagePackSerializer.Deserialize(type, bufferWriter.Value.AsReadOnlySequence(), _options.SerializerOptions);
+                        result = MessagePackSerializer.Deserialize(type!, bufferWriter.Value.AsReadOnlySequence(), _options.SerializerOptions);
                     }
                     finally
                     {
@@ -148,7 +148,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
             }
         }
 
-        ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+        ReferenceCodec.RecordObject(reader.Session, result!, placeholderReferenceId);
         return result;
     }
 
@@ -182,9 +182,9 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
     }
 
     /// <inheritdoc/>
-    object IDeepCopier.DeepCopy(object input, CopyContext context)
+    object? IDeepCopier.DeepCopy(object? input, CopyContext context)
     {
-        if (context.TryGetCopy(input, out object result))
+        if (context.TryGetCopy(input!, out object? result))
         {
             return result;
         }
@@ -193,7 +193,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
         try
         {
             var msgPackWriter = new MessagePackWriter(bufferWriter);
-            MessagePackSerializer.Serialize(input.GetType(), ref msgPackWriter, input, _options.SerializerOptions);
+            MessagePackSerializer.Serialize(input!.GetType(), ref msgPackWriter, input, _options.SerializerOptions);
             msgPackWriter.Flush();
 
             var sequence = bufferWriter.Value.AsReadOnlySequence();
@@ -204,7 +204,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
             bufferWriter.Value.Dispose();
         }
 
-        context.RecordCopy(input, result);
+        context.RecordCopy(input!, result!);
         return result;
     }
 
