@@ -22,7 +22,7 @@
     /// </summary>
     public interface IExampleStorageConfig
     {
-        string StateName { get; }
+        string? StateName { get; }
     }
 
     /// <summary>
@@ -51,6 +51,6 @@
     /// </summary>
     public interface INamedExampleStorageFactory
     {
-        IExampleStorage<TState> Create<TState>(string name, IExampleStorageConfig config);
+        IExampleStorage<TState> Create<TState>(string? name, IExampleStorageConfig config);
     }
 }

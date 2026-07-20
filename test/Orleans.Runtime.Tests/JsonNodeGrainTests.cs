@@ -19,8 +19,8 @@ namespace DefaultCluster.Tests
     /// </summary>
     public interface IJsonNodeTestGrain : IGrainWithIntegerKey
     {
-        Task<JsonNode> ProcessJsonNode(JsonNode node);
-        Task<string> GetJsonString(JsonNode node);
+        Task<JsonNode?> ProcessJsonNode(JsonNode? node);
+        Task<string> GetJsonString(JsonNode? node);
     }
 
     /// <summary>
@@ -30,13 +30,13 @@ namespace DefaultCluster.Tests
     /// </summary>
     public class JsonNodeTestGrain : Grain, IJsonNodeTestGrain
     {
-        public Task<JsonNode> ProcessJsonNode(JsonNode node)
+        public Task<JsonNode?> ProcessJsonNode(JsonNode? node)
         {
             // Simply return the node - serialization should handle it
             return Task.FromResult(node);
         }
 
-        public Task<string> GetJsonString(JsonNode node)
+        public Task<string> GetJsonString(JsonNode? node)
         {
             // Convert to string to verify we received the correct data
             return Task.FromResult(node?.ToJsonString() ?? "null");
@@ -122,17 +122,17 @@ namespace DefaultCluster.Tests
 
             // Test JsonValue with int
             JsonNode intValue = JsonValue.Create(42);
-            var intResult = await grain.ProcessJsonNode(intValue);
+            var intResult = (await grain.ProcessJsonNode(intValue))!;
             Assert.Equal(42, intResult.GetValue<int>());
 
             // Test JsonValue with string
             JsonNode stringValue = JsonValue.Create("hello");
-            var stringResult = await grain.ProcessJsonNode(stringValue);
+            var stringResult = (await grain.ProcessJsonNode(stringValue))!;
             Assert.Equal("hello", stringResult.GetValue<string>());
 
             // Test JsonValue with bool
             JsonNode boolValue = JsonValue.Create(true);
-            var boolResult = await grain.ProcessJsonNode(boolValue);
+            var boolResult = (await grain.ProcessJsonNode(boolValue))!;
             Assert.True(boolResult.GetValue<bool>());
 
             // Test JsonArray
@@ -228,7 +228,7 @@ namespace DefaultCluster.Tests
         {
             var grain = _fixture.GrainFactory.GetGrain<IJsonNodeTestGrain>(5);
 
-            JsonNode nullNode = null;
+            JsonNode? nullNode = null;
             var result = await grain.ProcessJsonNode(nullNode);
             Assert.Null(result);
 
@@ -254,7 +254,7 @@ namespace DefaultCluster.Tests
                 {
                     var grain = _fixture.GrainFactory.GetGrain<IJsonNodeTestGrain>(grainId);
                     JsonNode node = JsonValue.Create(value);
-                    var result = await grain.ProcessJsonNode(node);
+                    var result = (await grain.ProcessJsonNode(node))!;
                     Assert.Equal(value, result.GetValue<int>());
                 });
             }

@@ -102,7 +102,7 @@ namespace UnitTests.General
                 Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
 
                 // Verify all expected spans are present and properly parented under test-parent
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 // Find the placement span - should be parented to the grain call which is parented to test-parent
                 var placementSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.PlaceGrain);
@@ -130,7 +130,7 @@ namespace UnitTests.General
             }
             finally
             {
-                parent.Stop();
+                parent!.Stop();
                 AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
@@ -155,7 +155,7 @@ namespace UnitTests.General
                 Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
 
                 // Verify all expected spans are present and properly parented under test-parent
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 // Find the placement span - should be parented to the grain call which is parented to test-parent
                 var placementSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.PlaceGrain);
@@ -187,7 +187,7 @@ namespace UnitTests.General
             }
             finally
             {
-                parent.Stop();
+                parent!.Stop();
                 AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
@@ -208,7 +208,7 @@ namespace UnitTests.General
                 _ = await grain.GetActivityId();
 
                 // Verify all expected spans are present and properly parented under test-parent
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
                 var testParentSpanId = parent.SpanId.ToString();
 
                 // Find the placement span
@@ -240,7 +240,7 @@ namespace UnitTests.General
             }
             finally
             {
-                parent.Stop();
+                parent!.Stop();
                 AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
@@ -265,7 +265,7 @@ namespace UnitTests.General
                 Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
 
                 // Verify all expected spans are present and properly parented under test-parent
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 // Find the activation span - should be parented to the grain call which is parented to test-parent
                 var activationSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.ActivateGrain && a.Tags.First(kv => kv.Key == "orleans.grain.type").Value == "persistentstateactivity");
@@ -288,7 +288,7 @@ namespace UnitTests.General
             }
             finally
             {
-                parent.Stop();
+                parent!.Stop();
                 AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
@@ -332,7 +332,7 @@ namespace UnitTests.General
                 // Give some time for all activities to complete
                 await Task.Delay(500);
 
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 // Verify dehydrate span was created
                 var dehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationDehydrate).ToList();
@@ -408,7 +408,7 @@ namespace UnitTests.General
                 // Give some time for all activities to complete
                 await Task.Delay(500);
 
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 // Find the PlaceGrain span created during migration's PlaceGrainAsync call
                 var placementSpans = Started.Where(a => a.OperationName == ActivityNames.PlaceGrain).ToList();
@@ -504,7 +504,7 @@ namespace UnitTests.General
             }
             finally
             {
-                parent.Stop();
+                parent!.Stop();
                 AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
@@ -597,7 +597,7 @@ namespace UnitTests.General
                 Assert.Equal(elementCount, values.Count);
 
                 // Verify all expected spans are present and properly parented under test-parent
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
                 var testParentSpanId = parent.SpanId.ToString();
 
                 // Find all activities with the ApplicationGrainActivitySourceName
@@ -875,7 +875,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IFilteredActivityGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
     }
 
     /// <summary>
@@ -884,7 +884,7 @@ namespace UnitTests.General
     [TracingTestPlacementFilter]
     public class FilteredActivityGrain : Grain, IFilteredActivityGrain
     {
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -899,7 +899,7 @@ namespace UnitTests.General
                 Baggage = activity.Baggage.ToList(),
             };
 
-            return Task.FromResult(result);
+            return Task.FromResult<ActivityData?>(result);
         }
     }
 
@@ -908,7 +908,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IMultiFilteredActivityGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
     }
 
     /// <summary>
@@ -918,7 +918,7 @@ namespace UnitTests.General
     [SecondTracingTestPlacementFilter]
     public class MultiFilteredActivityGrain : Grain, IMultiFilteredActivityGrain
     {
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -933,7 +933,7 @@ namespace UnitTests.General
                 Baggage = activity.Baggage.ToList(),
             };
 
-            return Task.FromResult(result);
+            return Task.FromResult<ActivityData?>(result);
         }
     }
 
@@ -944,7 +944,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IPersistentStateActivityGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
         Task<int> GetStateValue();
     }
 
@@ -972,7 +972,7 @@ namespace UnitTests.General
             _state = state;
         }
 
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -987,7 +987,7 @@ namespace UnitTests.General
                 Baggage = activity.Baggage.ToList(),
             };
 
-            return Task.FromResult(result);
+            return Task.FromResult<ActivityData?>(result);
         }
 
         public Task<int> GetStateValue()

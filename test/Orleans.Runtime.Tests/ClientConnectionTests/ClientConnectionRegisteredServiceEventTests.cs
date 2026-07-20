@@ -14,9 +14,9 @@ namespace Tester
     /// </summary>
     public class ClientConnectionRegisteredServiceEventTests : TestClusterPerTest
     {
-        private EventNotifier<EventArgs> clusterConnectionLostNotifier;
+        private EventNotifier<EventArgs> clusterConnectionLostNotifier = null!;
 
-        private EventNotifier<GatewayCountChangedEventArgs> gatewayCountChangedNotifier;
+        private EventNotifier<GatewayCountChangedEventArgs> gatewayCountChangedNotifier = null!;
 
         public override async Task InitializeAsync()
         {

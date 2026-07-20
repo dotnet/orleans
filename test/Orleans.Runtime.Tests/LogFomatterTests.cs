@@ -415,12 +415,12 @@ namespace Tester
         private class TestOptionsWithSecrets
         {
             [Redact()]
-            public string Password { get; set; }
+            public string Password { get; set; } = null!;
 
-            public string Data { get; set; }
+            public string Data { get; set; } = null!;
 
             [RedactConnectionString()]
-            public string SomeConnectionString { get; set; }
+            public string SomeConnectionString { get; set; } = null!;
         }
 
         private class TestOptions
@@ -434,9 +434,9 @@ namespace Tester
 
             public Dictionary<string, string> SomeDictionary { get; set; } = new Dictionary<string, string>();
 
-            public List<int> NullList { get; set; } = null;
+            public List<int>? NullList { get; set; } = null;
 
-            public Dictionary<string, string> NullDictionary { get; set; } = null;
+            public Dictionary<string, string>? NullDictionary { get; set; } = null;
         }
 
         private class TestOptionsFormatter2 : IOptionFormatter<TestOptions>
@@ -490,7 +490,7 @@ namespace Tester
             public TestOptionsFormatter(IOptions<TestOptions> options)
             {
                 this.options = options.Value;
-                this.Name = typeof(TestOptions).FullName;
+                this.Name = typeof(TestOptions).FullName!;
             }
 
             public static TestOptionsFormatter CreateNamed(string name, IOptions<TestOptions> options)
@@ -550,7 +550,7 @@ namespace Tester
             {
                 private readonly List<string> entries = new List<string>();
 
-                public IDisposable BeginScope<TState>(TState state)
+                public IDisposable? BeginScope<TState>(TState state) where TState : notnull
                 {
                     throw new NotImplementedException();
                 }
@@ -565,7 +565,7 @@ namespace Tester
                     return true;
                 }
 
-                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
                 {
                     entries.Add(formatter(state, exception));
                 }
@@ -581,7 +581,7 @@ namespace Tester
                 this.logger = loggerFactory.CreateLogger<T>();
             }
 
-            public IDisposable BeginScope<TState>(TState state)
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull
             {
                 return logger.BeginScope<TState>(state);
             }
@@ -591,7 +591,7 @@ namespace Tester
                 return logger.IsEnabled(logLevel);
             }
 
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
                 logger.Log<TState>(logLevel, eventId, state, exception, formatter);
             }

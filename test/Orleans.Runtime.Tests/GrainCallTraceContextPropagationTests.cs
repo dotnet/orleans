@@ -1416,25 +1416,25 @@ namespace UnitTests.General
     public class TraceContextInfo
     {
         [Id(0)]
-        public string ActivityId { get; set; }
+        public string? ActivityId { get; set; }
 
         [Id(1)]
-        public string TraceId { get; set; }
+        public string? TraceId { get; set; }
 
         [Id(2)]
-        public string SpanId { get; set; }
+        public string? SpanId { get; set; }
 
         [Id(3)]
-        public string ParentSpanId { get; set; }
+        public string? ParentSpanId { get; set; }
 
         [Id(4)]
-        public string ParentId { get; set; }
+        public string? ParentId { get; set; }
 
         [Id(5)]
-        public string OperationName { get; set; }
+        public string? OperationName { get; set; }
 
         [Id(6)]
-        public string TraceParentFromRequestContext { get; set; }
+        public string? TraceParentFromRequestContext { get; set; }
 
         [Id(7)]
         public bool HasActivity { get; set; }

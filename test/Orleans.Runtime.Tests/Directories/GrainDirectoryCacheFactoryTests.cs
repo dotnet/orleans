@@ -227,7 +227,7 @@ public class GrainDirectoryCacheFactoryTests
 
         public bool LookUp(GrainId key, out GrainAddress result, out int version)
         {
-            result = default;
+            result = default!;
             version = default;
             return false;
         }

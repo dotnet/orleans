@@ -105,7 +105,7 @@ namespace UnitTests.General
             });
             var aggEx = Assert.IsType<AggregateException>(originalException);
 
-            var exception = aggEx.InnerException;
+            var exception = aggEx.InnerException!;
             output.WriteLine(exception.ToString());
             Assert.IsAssignableFrom<InvalidOperationException>(exception);
             Assert.Equal("Test exception", exception.Message);

@@ -117,7 +117,7 @@ namespace UnitTests.General
                             // This shows filters can modify method arguments before execution
                             if (string.Equals(context.InterfaceMethod.Name, nameof(IMyGrainExtension.SetExtensionValue)))
                             {
-                                context.Request.SetArgument(0, (int)context.Request.GetArgument(0) * -1);
+                                context.Request.SetArgument(0, (int)context.Request.GetArgument(0)! * -1);
                             }
 
                             return context.Invoke();
@@ -130,7 +130,7 @@ namespace UnitTests.General
                             if (ctx.InterfaceMethod?.Name == "Echo")
                             {
                                 // Concatenate the input to itself.
-                                var orig = (string)ctx.Request.GetArgument(0);
+                                var orig = (string)ctx.Request.GetArgument(0)!;
                                 ctx.Request.SetArgument(0, orig + orig);
                             }
 
@@ -193,7 +193,7 @@ namespace UnitTests.General
                             if (context.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
                                 && context.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
                             {
-                                context.Request.SetArgument(1, ((string)context.Request.GetArgument(1)).ToUpperInvariant());
+                                context.Request.SetArgument(1, ((string)context.Request.GetArgument(1)!).ToUpperInvariant());
                             }
 
                             await context.Invoke();
@@ -201,7 +201,7 @@ namespace UnitTests.General
                             if (context.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
                                 && context.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
                             {
-                                var result = (Dictionary<string, object>)context.Result;
+                                var result = (Dictionary<string, object>)context.Result!;
                                 result["orig"] = result["result"];
                                 result["result"] = "intercepted!";
                             }

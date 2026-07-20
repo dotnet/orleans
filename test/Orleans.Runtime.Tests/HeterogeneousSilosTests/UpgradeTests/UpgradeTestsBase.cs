@@ -34,8 +34,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         private readonly List<SiloHandle> deployedSilos = new List<SiloHandle>();
         private int siloIdx = 0;
-        private TestClusterBuilder builder;
-        private TestCluster cluster;
+        private TestClusterBuilder builder = null!;
+        private TestCluster cluster = null!;
 
         protected abstract Type VersionSelectorStrategy { get; }
 
@@ -49,7 +49,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             while (string.Compare(testDirectory.Name, CommonParentDirectory, StringComparison.OrdinalIgnoreCase) != 0 || testDirectory.Parent == null)
             {
-                testDirectory = testDirectory.Parent;
+                testDirectory = testDirectory.Parent!;
             }
 
             if (testDirectory.Parent == null)
@@ -218,7 +218,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 {
                     new MemoryConfigurationSource
                     {
-                        InitialData = new Dictionary<string, string>
+                        InitialData = new Dictionary<string, string?>
                         {
                             [StandaloneSiloHandle.ExecutablePathConfigKey] = grainAssembly.FullName
                         }
@@ -236,7 +236,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         protected async Task StopSilo(SiloHandle handle)
         {
-            await handle?.StopSiloAsync(true);
+            await handle?.StopSiloAsync(true)!;
             this.deployedSilos.Remove(handle);
             await WaitForActiveSilosAsync();
         }

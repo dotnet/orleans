@@ -6,10 +6,10 @@ namespace Tester.StorageFacet.Implementations
 {
     public class BlobExampleStorage<TState> : IExampleStorage<TState>
     {
-        private IExampleStorageConfig config;
+        private IExampleStorageConfig config = null!;
 
-        public string Name => this.config.StateName;
-        public TState State { get; set; }
+        public string Name => this.config.StateName!;
+        public TState State { get; set; } = default!;
 
         public Task Save()
         {

@@ -13,9 +13,9 @@ namespace Tester.StorageFacet.Infrastructure
             this.services = services;
         }
 
-        public IExampleStorage<TState> Create<TState>(string name, IExampleStorageConfig cfg)
+        public IExampleStorage<TState> Create<TState>(string? name, IExampleStorageConfig cfg)
         {
-            IExampleStorageFactory factory = string.IsNullOrEmpty(name)
+            IExampleStorageFactory? factory = string.IsNullOrEmpty(name)
                 ? this.services.GetService<IExampleStorageFactory>()
                 : this.services.GetKeyedService<IExampleStorageFactory>(name);
             if (factory != null) return factory.Create<TState>(cfg);

@@ -22,7 +22,7 @@ namespace Tester.HeterogeneousSilosTests
     {
         private static readonly TimeSpan ClientRefreshDelay = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(200);
-        private TestCluster cluster;
+        private TestCluster? cluster;
 
         private void SetupAndDeployCluster(Type defaultPlacementStrategy, params Type[] blackListedTypes)
         {
@@ -51,16 +51,16 @@ namespace Tester.HeterogeneousSilosTests
                         // The blocklist is only intended for the primary silo in these tests.
                         if (string.Equals(siloOptions.Value.SiloName, Silo.PrimarySiloName))
                         {
-                            var typeNames = cfg["BlockedGrainTypes"].Split('|').ToList();
+                            var typeNames = cfg["BlockedGrainTypes"]!.Split('|').ToList();
                             foreach (var typeName in typeNames)
                             {
-                                var type = Type.GetType(typeName);
+                                var type = Type.GetType(typeName)!;
                                 options.Classes.Remove(type);
                             }
                         }
                     });
 
-                    var defaultPlacementStrategy = Type.GetType(hostBuilder.GetConfiguration()["DefaultPlacementStrategy"]);
+                    var defaultPlacementStrategy = Type.GetType(hostBuilder.GetConfiguration()["DefaultPlacementStrategy"]!)!;
                     services.AddSingleton(typeof(PlacementStrategy), defaultPlacementStrategy);
                 });
             }
@@ -86,11 +86,11 @@ namespace Tester.HeterogeneousSilosTests
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory.GetGrain<ITestGrain>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Should not fail
-            this.cluster.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
+            this.cluster!.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
 
@@ -149,7 +149,7 @@ namespace Tester.HeterogeneousSilosTests
             {
                 try
                 {
-                    this.cluster.GrainFactory.GetGrain<T>(0);
+                    this.cluster!.GrainFactory.GetGrain<T>(0);
                     return;
                 }
                 catch (ArgumentException)
@@ -172,7 +172,7 @@ namespace Tester.HeterogeneousSilosTests
             {
                 try
                 {
-                    this.cluster.GrainFactory.GetGrain<T>(0);
+                    this.cluster!.GrainFactory.GetGrain<T>(0);
                 }
                 catch (ArgumentException)
                 {
@@ -192,11 +192,11 @@ namespace Tester.HeterogeneousSilosTests
             var delayTimeout = RefreshInterval.Add(RefreshInterval);
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Start a new silo with TestGrain
-            await cluster.StartAdditionalSiloAsync();
+            await cluster!.StartAdditionalSiloAsync();
             await Task.Delay(delayTimeout);
 
             if (restartClient)

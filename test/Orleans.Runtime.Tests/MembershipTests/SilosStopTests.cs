@@ -58,7 +58,7 @@ namespace UnitTests.MembershipTests
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
 
-        private async Task<ILongRunningTaskGrain<bool>> GetGrainOnTargetSilo(SiloHandle siloHandle)
+        private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)
         {
             const int maxRetry = 10;
             for (int i = 0; i < maxRetry; i++)

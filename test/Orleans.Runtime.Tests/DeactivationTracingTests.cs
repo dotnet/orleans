@@ -58,7 +58,7 @@ namespace UnitTests.General
 
                 _ = await grain.GetActivityId();
 
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
                 Started.Clear();
 
                 await _fixture.HostedCluster.DeactivateAsync(grain);
@@ -184,7 +184,7 @@ namespace UnitTests.General
                 var newState = await grain.GetState();
                 Assert.Equal(expectedState, newState);
 
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 var onDeactivateSpans = Started.Where(a => a.OperationName == ActivityNames.OnDeactivate).ToList();
                 Assert.True(onDeactivateSpans.Count > 0, "Expected at least one OnDeactivate span during migration");
@@ -256,7 +256,7 @@ namespace UnitTests.General
 
                 _ = await grain.GetActivityId();
 
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 await _fixture.HostedCluster.DeactivateAsync(grain);
 
@@ -286,7 +286,7 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IAsyncEnumerableDeactivationGrain>(Random.Shared.Next());
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
                 const int elementCount = 3;
 
                 var deactivated = _fixture.HostedCluster.WaitForDeactivationAsync(grain);
@@ -340,7 +340,7 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationMigrationTracingTestGrain>(Random.Shared.Next());
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
                 await grain.SetState(42);
                 var originalAddress = await grain.GetGrainAddress();
                 var originalHost = originalAddress.SiloAddress;
@@ -471,7 +471,7 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IGrainContextDeactivationGrain>(Random.Shared.Next());
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 _ = await grain.GetActivityId();
                 Started.Clear();
@@ -514,7 +514,7 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationTracingTestGrain>(Random.Shared.Next());
-                var testParentTraceId = parent.TraceId.ToString();
+                var testParentTraceId = parent!.TraceId.ToString();
 
                 _ = await grain.GetActivityId();
                 Started.Clear();
@@ -576,7 +576,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IDeactivationTracingTestGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
         Task TriggerDeactivation();
     }
 
@@ -586,7 +586,7 @@ namespace UnitTests.General
     /// </summary>
     public class DeactivationTracingTestGrain : Grain, IDeactivationTracingTestGrain
     {
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -594,7 +594,7 @@ namespace UnitTests.General
                 return Task.FromResult(default(ActivityData));
             }
 
-            return Task.FromResult(new ActivityData
+            return Task.FromResult<ActivityData?>(new ActivityData
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
@@ -619,7 +619,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IDeactivationWithWorkTracingTestGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
         Task TriggerDeactivation();
         Task<bool> WasDeactivated();
     }
@@ -634,7 +634,7 @@ namespace UnitTests.General
         public bool WasDeactivated { get; set; }
 
         [Id(1)]
-        public string DeactivationReason { get; set; }
+        public string? DeactivationReason { get; set; }
     }
 
     /// <summary>
@@ -651,7 +651,7 @@ namespace UnitTests.General
             _state = state;
         }
 
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -659,7 +659,7 @@ namespace UnitTests.General
                 return Task.FromResult(default(ActivityData));
             }
 
-            return Task.FromResult(new ActivityData
+            return Task.FromResult<ActivityData?>(new ActivityData
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
@@ -688,7 +688,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IDeactivationWithExceptionTracingTestGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
         Task TriggerDeactivation();
     }
 
@@ -698,7 +698,7 @@ namespace UnitTests.General
     /// </summary>
     public class DeactivationWithExceptionTracingTestGrain : Grain, IDeactivationWithExceptionTracingTestGrain
     {
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -706,7 +706,7 @@ namespace UnitTests.General
                 return Task.FromResult(default(ActivityData));
             }
 
-            return Task.FromResult(new ActivityData
+            return Task.FromResult<ActivityData?>(new ActivityData
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
@@ -787,7 +787,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IInconsistentStateDeactivationGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
         Task ThrowInconsistentStateException();
     }
 
@@ -797,7 +797,7 @@ namespace UnitTests.General
     /// </summary>
     public class InconsistentStateDeactivationGrain : Grain, IInconsistentStateDeactivationGrain
     {
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -805,7 +805,7 @@ namespace UnitTests.General
                 return Task.FromResult(default(ActivityData));
             }
 
-            return Task.FromResult(new ActivityData
+            return Task.FromResult<ActivityData?>(new ActivityData
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
@@ -832,7 +832,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IActivationFailureDeactivationGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
     }
 
     /// <summary>
@@ -847,7 +847,7 @@ namespace UnitTests.General
             throw new InvalidOperationException("Simulated activation failure for testing deactivation tracing");
         }
 
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -855,7 +855,7 @@ namespace UnitTests.General
                 return Task.FromResult(default(ActivityData));
             }
 
-            return Task.FromResult(new ActivityData
+            return Task.FromResult<ActivityData?>(new ActivityData
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
@@ -875,7 +875,7 @@ namespace UnitTests.General
     /// </summary>
     public interface IGrainContextDeactivationGrain : IGrainWithIntegerKey
     {
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
         Task DeactivateWithCustomReason(string reason);
     }
 
@@ -885,7 +885,7 @@ namespace UnitTests.General
     /// </summary>
     public class GrainContextDeactivationGrain : Grain, IGrainContextDeactivationGrain
     {
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -893,7 +893,7 @@ namespace UnitTests.General
                 return Task.FromResult(default(ActivityData));
             }
 
-            return Task.FromResult(new ActivityData
+            return Task.FromResult<ActivityData?>(new ActivityData
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
@@ -921,7 +921,7 @@ namespace UnitTests.General
     public interface IAsyncEnumerableDeactivationGrain : IGrainWithIntegerKey
     {
         IAsyncEnumerable<int> GetValuesAndDeactivate(int count);
-        Task<ActivityData> GetActivityId();
+        Task<ActivityData?> GetActivityId();
     }
 
 
@@ -940,7 +940,7 @@ namespace UnitTests.General
             }
         }
 
-        public Task<ActivityData> GetActivityId()
+        public Task<ActivityData?> GetActivityId()
         {
             var activity = Activity.Current;
             if (activity is null)
@@ -948,7 +948,7 @@ namespace UnitTests.General
                 return Task.FromResult(default(ActivityData));
             }
 
-            return Task.FromResult(new ActivityData
+            return Task.FromResult<ActivityData?>(new ActivityData
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
