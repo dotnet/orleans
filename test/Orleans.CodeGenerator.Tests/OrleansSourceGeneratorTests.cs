@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -2044,7 +2045,7 @@ public class DemoClass
             _options = options;
         }
 
-        public override bool TryGetValue(string key, out string value) => _options.TryGetValue(key, out value!);
+        public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) => _options.TryGetValue(key, out value);
     }
 
     private sealed class NamespaceMembers(SyntaxList<UsingDirectiveSyntax> usings)
