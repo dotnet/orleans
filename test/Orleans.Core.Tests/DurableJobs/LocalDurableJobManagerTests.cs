@@ -1,11 +1,13 @@
 #nullable enable
 #pragma warning disable ORLEANSEXP005
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Net;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -24,6 +26,72 @@ namespace NonSilo.Tests.DurableJobs;
 [TestCategory("BVT"), TestCategory("DurableJobs")]
 public class LocalDurableJobManagerTests
 {
+    [Fact]
+    public async Task Stop_WhenActiveShardWaitsForQueueChange_CompletesAfterCleanupWithoutLifecycleError()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var lifecycleLogger = new RecordingLogger<SiloLifecycleSubject>();
+        var lifecycle = new SiloLifecycleSubject(lifecycleLogger);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = new BlockingQueueShard("active-shard", shardKey, shardKey.Add(options.ShardDuration));
+
+        manager.Participate(lifecycle);
+        await lifecycle.OnStart();
+        accessor.AddWritableShard(shardKey, shard);
+        accessor.TryActivateShard(shard);
+
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
+        Assert.False(runTask!.IsCompleted);
+
+        var stopTask = lifecycle.OnStop();
+        await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(stopTask.IsCompleted);
+
+        shard.AllowDispose.SetResult();
+        await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        Assert.DoesNotContain(
+            lifecycleLogger.Entries,
+            entry => entry.Level == LogLevel.Error && entry.EventId.Id == (int)ErrorCode.LifecycleStartFailure);
+    }
+
+    [Fact]
+    public async Task Stop_WhenActiveShardFails_ReportsLifecycleError()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var lifecycleLogger = new RecordingLogger<SiloLifecycleSubject>();
+        var lifecycle = new SiloLifecycleSubject(lifecycleLogger);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = new FaultingOnCancellationShard("faulting-shard", shardKey, shardKey.Add(options.ShardDuration));
+
+        manager.Participate(lifecycle);
+        await lifecycle.OnStart();
+        accessor.AddWritableShard(shardKey, shard);
+        accessor.TryActivateShard(shard);
+
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await lifecycle.OnStop().WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Contains(
+            lifecycleLogger.Entries,
+            entry => entry.Level == LogLevel.Error
+                && entry.EventId.Id == (int)ErrorCode.LifecycleStartFailure
+                && entry.Exception is InvalidOperationException { Message: "Unexpected shard failure" });
+    }
+
     [Fact]
     public async Task ProcessShardCheckCycleAsync_MarksExpiredWritableShardComplete()
     {
@@ -731,6 +799,118 @@ public class LocalDurableJobManagerTests
             await Task.Yield();
             timeProvider.Advance(advanceBy);
         }
+    }
+
+    private sealed class BlockingQueueShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
+    {
+        private readonly InMemoryJobQueue _queue = new();
+
+        public TaskCompletionSource ConsumeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource DisposeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowDispose { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DisposeCallCount;
+
+        public string Id { get; } = id;
+
+        public DateTimeOffset StartTime { get; } = start;
+
+        public DateTimeOffset EndTime { get; } = end;
+
+        public IDictionary<string, string>? Metadata => null;
+
+        public bool IsAddingCompleted => false;
+
+        public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync()
+        {
+            ConsumeStarted.TrySetResult();
+            return _queue;
+        }
+
+        public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
+
+        public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
+
+        public async ValueTask DisposeAsync()
+        {
+            DisposeStarted.TrySetResult();
+            await AllowDispose.Task;
+            Interlocked.Increment(ref DisposeCallCount);
+        }
+    }
+
+    private sealed class FaultingOnCancellationShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
+    {
+        public TaskCompletionSource ConsumeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DisposeCallCount;
+
+        public string Id { get; } = id;
+
+        public DateTimeOffset StartTime { get; } = start;
+
+        public DateTimeOffset EndTime { get; } = end;
+
+        public IDictionary<string, string>? Metadata => null;
+
+        public bool IsAddingCompleted => false;
+
+        public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => ConsumeAsync();
+
+        public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
+
+        public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
+
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref DisposeCallCount);
+            return ValueTask.CompletedTask;
+        }
+
+        private async IAsyncEnumerable<IJobRunContext> ConsumeAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            ConsumeStarted.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException("Unexpected shard failure");
+            }
+
+            yield break;
+        }
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        public ConcurrentQueue<(LogLevel Level, EventId EventId, Exception? Exception)> Entries { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) => Entries.Enqueue((logLevel, eventId, exception));
     }
 
     private sealed class CompletingShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
