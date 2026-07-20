@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Buffers;
@@ -7,7 +8,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>
@@ -32,7 +32,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, RepeatedField<T> value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] RepeatedField<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -56,6 +56,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
     }
 
     /// <inheritdoc/>
+    [return: MaybeNull]
     public RepeatedField<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -66,7 +67,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        RepeatedField<T> result = null;
+        RepeatedField<T>? result = null;
         uint fieldId = 0;
         while (true)
         {
@@ -95,7 +96,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
                         ThrowLengthFieldMissing();
                     }
 
-                    result.Add(_fieldCodec.ReadValue(ref reader, header));
+                    result!.Add(_fieldCodec.ReadValue(ref reader, header)!);
                     break;
                 default:
                     reader.ConsumeUnknownField(header);

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -7,7 +8,6 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>
@@ -38,7 +38,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
     }
 
     /// <inheritdoc/>
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, MapField<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] MapField<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -63,6 +63,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
     }
 
     /// <inheritdoc/>
+    [return: MaybeNull]
     public MapField<TKey, TValue> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -73,9 +74,9 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        TKey key = default;
+        TKey? key = default;
         var valueExpected = false;
-        MapField<TKey, TValue> result = null;
+        MapField<TKey, TValue>? result = null;
         uint fieldId = 0;
         while (true)
         {
@@ -108,7 +109,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
                     }
                     else
                     {
-                        result.Add(key, _valueCodec.ReadValue(ref reader, header));
+                        result!.Add(key!, _valueCodec.ReadValue(ref reader, header)!);
                         valueExpected = false;
                     }
                     break;
