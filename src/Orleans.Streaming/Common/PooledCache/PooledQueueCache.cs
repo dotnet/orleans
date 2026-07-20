@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -297,7 +298,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cursorObj"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public bool TryGetNextMessage(object cursorObj, out IBatchContainer? message)
+        public bool TryGetNextMessage(object cursorObj, [NotNullWhen(true)] out IBatchContainer? message)
         {
             message = null;
 
