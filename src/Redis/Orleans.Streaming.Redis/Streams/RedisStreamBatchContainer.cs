@@ -19,14 +19,14 @@ internal sealed class RedisStreamBatchContainer : IBatchContainer
     [Id(1)]
     private readonly List<object> _events;
     [Id(2)]
-    private readonly Dictionary<string, object> _requestContext;
+    private readonly Dictionary<string, object>? _requestContext;
     [Id(3)]
     private RedisStreamSequenceToken _sequenceToken = new();
 
     private RedisStreamBatchContainer(
         StreamId streamId,
         List<object> events,
-        Dictionary<string, object> requestContext)
+        Dictionary<string, object>? requestContext)
     {
         _streamId = streamId;
         _events = events;
@@ -56,7 +56,7 @@ internal sealed class RedisStreamBatchContainer : IBatchContainer
         Serializer<RedisStreamBatchContainer> serializer,
         StreamId streamId,
         IEnumerable<T> events,
-        Dictionary<string, object> requestContext)
+        Dictionary<string, object>? requestContext)
     {
         var message = new RedisStreamBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
         var payload = serializer.SerializeToArray(message);

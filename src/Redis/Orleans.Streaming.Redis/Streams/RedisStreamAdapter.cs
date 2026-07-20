@@ -51,7 +51,7 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
         return receiver;
     }
 
-    public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+    public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
     {
         if (token is not null)
         {

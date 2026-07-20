@@ -56,7 +56,7 @@ internal sealed class RedisStreamSequenceToken : EventSequenceTokenV2
     public new RedisStreamSequenceToken CreateSequenceTokenForEvent(int eventIndex) => new(EntryId, SequenceNumber, RedisSequenceNumber, eventIndex);
 
     /// <inheritdoc />
-    public override bool Equals(StreamSequenceToken other)
+    public override bool Equals(StreamSequenceToken? other)
     {
         return other is RedisStreamSequenceToken token
             && token.SequenceNumber == SequenceNumber
@@ -66,7 +66,7 @@ internal sealed class RedisStreamSequenceToken : EventSequenceTokenV2
     }
 
     /// <inheritdoc />
-    public override int CompareTo(StreamSequenceToken other)
+    public override int CompareTo(StreamSequenceToken? other)
     {
         if (other is null)
         {
