@@ -18,9 +18,9 @@ namespace UnitTests.General
         private static readonly Dictionary<string, string> ConnectionStringsByInvariant =
             new()
             {
-                {AdoNetInvariants.InvariantNameSqlServer, TestDefaultConfiguration.MsSqlConnectionString},
-                {AdoNetInvariants.InvariantNameMySql, TestDefaultConfiguration.MySqlConnectionString},
-                {AdoNetInvariants.InvariantNamePostgreSql, TestDefaultConfiguration.PostgresConnectionString}
+                {AdoNetInvariants.InvariantNameSqlServer, TestDefaultConfiguration.MsSqlConnectionString!},
+                {AdoNetInvariants.InvariantNameMySql, TestDefaultConfiguration.MySqlConnectionString!},
+                {AdoNetInvariants.InvariantNamePostgreSql, TestDefaultConfiguration.PostgresConnectionString!}
             };
 
         public IRelationalStorage Storage { get; private set; }

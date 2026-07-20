@@ -46,7 +46,7 @@ namespace Tester.AdoNet.Persistence
             {
                 public void Configure(IHostBuilder hostBuilder)
                 {
-                    var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
+                    var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey]!;
 
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {

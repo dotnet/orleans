@@ -58,17 +58,17 @@ namespace UnitTests.StorageTests.Relational
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameSqlServer,
-                    ConnectionString = TestDefaultConfiguration.MsSqlConnectionString
+                    ConnectionString = TestDefaultConfiguration.MsSqlConnectionString!
                 },
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameMySql,
-                    ConnectionString = TestDefaultConfiguration.MySqlConnectionString
+                    ConnectionString = TestDefaultConfiguration.MySqlConnectionString!
                 },
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNamePostgreSql,
-                    ConnectionString = TestDefaultConfiguration.PostgresConnectionString
+                    ConnectionString = TestDefaultConfiguration.PostgresConnectionString!
                 }
             })),
             EnvironmentId = "Default"

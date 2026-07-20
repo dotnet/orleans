@@ -148,6 +148,8 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             Assert.Equal(item.VisibleOn, item.ModifiedOn);
 
             var serializedContainer = serializer.Deserialize(item.Payload);
+            Assert.NotNull(serializedContainer);
+            Assert.NotNull(serializedContainer.RequestContext);
             Assert.Equal(streamId, serializedContainer.StreamId);
             Assert.Null(serializedContainer.SequenceToken);
             Assert.Equal(new[] { new TestModel(i + 1) }, serializedContainer.Events);
@@ -201,6 +203,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var afterDequeued = DateTime.UtcNow;
 
         // assert - dequeued messages are as expected
+        Assert.NotNull(messages);
         Assert.Equal(3, messages.Count);
         for (var i = 0; i < messages.Count; i++)
         {
@@ -233,6 +236,8 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             Assert.True(item.ModifiedOn <= afterDequeued);
 
             var serializedContainer = serializer.Deserialize(item.Payload);
+            Assert.NotNull(serializedContainer);
+            Assert.NotNull(serializedContainer.RequestContext);
             Assert.Equal(streamId, serializedContainer.StreamId);
             Assert.Null(serializedContainer.SequenceToken);
             Assert.Equal(new[] { new TestModel(i + 1) }, serializedContainer.Events);

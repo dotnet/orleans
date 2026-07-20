@@ -103,6 +103,7 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
 
         // act - dequeue messages via receiver
         var dequeued = await receiver.GetQueueMessagesAsync(maxCount);
+        Assert.NotNull(dequeued);
         var storedDequeued = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToDictionary(x => x.MessageId);
 
         // act - confirm messages via receiver
@@ -110,8 +111,8 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
         var storedConfirmed = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToDictionary(x => x.MessageId);
 
         // assert - dequeued messages are as expected
-        Assert.NotNull(dequeued);
         var single = Assert.IsType<AdoNetBatchContainer>(Assert.Single(dequeued));
+        Assert.NotNull(single.RequestContext);
         Assert.Equal(streamId, single.StreamId);
         Assert.Equal(events, single.Events);
         Assert.Equal(context.Select(x => (x.Key, x.Value)), single.RequestContext.Select(x => (x.Key, x.Value)));
