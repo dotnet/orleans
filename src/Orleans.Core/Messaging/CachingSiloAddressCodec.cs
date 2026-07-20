@@ -47,7 +47,8 @@ namespace Orleans.Runtime.Messaging
                 payloadSpan = payloadArray = reader.ReadBytes((uint)length);
             }
 
-            var innerReader = Reader.Create(payloadSpan, null);
+            // This payload only contains primitive values, so no serializer session is required.
+            var innerReader = Reader.Create(payloadSpan, null!);
             var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);

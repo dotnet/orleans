@@ -108,7 +108,8 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                var preamble = _preambleSerializer.Deserialize(payloadBuffer);
+                // A valid connection preamble payload always deserializes to an instance.
+                var preamble = _preambleSerializer.Deserialize(payloadBuffer)!;
                 return preamble;
             }
             finally
