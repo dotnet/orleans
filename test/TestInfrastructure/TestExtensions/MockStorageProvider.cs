@@ -272,7 +272,7 @@ namespace UnitTests.StorageTests
                     return Task.FromResult<object?>(initCount);
                 case Commands.SetValue:
                     SetValue((SetValueArgs)arg!);
-                    return Task.FromResult<object?>(true); 
+                    return Task.FromResult<object?>(true);
                 case Commands.GetProvideState:
                     return Task.FromResult<object?>(GetProviderState());
                 case Commands.GetLastState:
