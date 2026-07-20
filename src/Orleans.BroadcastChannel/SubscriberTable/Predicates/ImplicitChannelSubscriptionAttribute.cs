@@ -68,13 +68,13 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
+        public IEnumerable<Dictionary<string, string?>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
         {
-            var binding = new Dictionary<string, string>
+            var binding = new Dictionary<string, string?>
             {
                 [WellKnownGrainTypeProperties.BindingTypeKey] = WellKnownGrainTypeProperties.BroadcastChannelBindingTypeValue,
                 [WellKnownGrainTypeProperties.BroadcastChannelBindingPatternKey] = this.Predicate.PredicatePattern,
-                [WellKnownGrainTypeProperties.ChannelIdMapperKey] = this.ChannelIdMapper!,
+                [WellKnownGrainTypeProperties.ChannelIdMapperKey] = this.ChannelIdMapper,
             };
 
             if (LegacyGrainId.IsLegacyGrainType(grainClass))

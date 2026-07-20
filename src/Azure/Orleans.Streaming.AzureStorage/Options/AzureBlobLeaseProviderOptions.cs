@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
@@ -34,13 +35,14 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the client used to access the Azure Blob Service.
         /// </summary>
+        [DisallowNull]
         public BlobServiceClient? BlobServiceClient
         {
             get => _blobServiceClient;
             set
             {
                 _blobServiceClient = value;
-                CreateClient = () => Task.FromResult(value!);
+                CreateClient = () => Task.FromResult(value);
             }
         }
 

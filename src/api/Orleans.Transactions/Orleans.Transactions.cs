@@ -74,7 +74,7 @@ namespace Orleans
         public bool IsTransactionRequired { get { throw null; } }
 
         [Id(1)]
-        public Transactions.TransactionInfo TransactionInfo { get { throw null; } set { } }
+        public Transactions.TransactionInfo? TransactionInfo { get { throw null; } set { } }
 
         [Id(0)]
         public TransactionOption TransactionOption { get { throw null; } set { } }
@@ -111,20 +111,20 @@ namespace Orleans
     [GenerateSerializer]
     public sealed partial class TransactionResponse : Serialization.Invocation.Response
     {
-        public override System.Exception Exception { get { throw null; } set { } }
+        public override System.Exception? Exception { get { throw null; } set { } }
 
         public Serialization.Invocation.Response InnerResponse { get { throw null; } }
 
-        public override object Result { get { throw null; } set { } }
+        public override object? Result { get { throw null; } set { } }
 
         [Id(1)]
-        public Transactions.TransactionInfo TransactionInfo { get { throw null; } set { } }
+        public Transactions.TransactionInfo? TransactionInfo { get { throw null; } set { } }
 
         public static TransactionResponse Create(Serialization.Invocation.Response response, Transactions.TransactionInfo transactionInfo) { throw null; }
 
         public override void Dispose() { }
 
-        public System.Exception GetException() { throw null; }
+        public System.Exception? GetException() { throw null; }
 
         public override T GetResult<T>() { throw null; }
 
@@ -236,7 +236,7 @@ namespace Orleans.Transactions
     public partial interface ITransactionAgent
     {
         System.Threading.Tasks.Task Abort(TransactionInfo transactionInfo);
-        System.Threading.Tasks.Task<(TransactionalStatus Status, System.Exception exception)> Resolve(TransactionInfo transactionInfo);
+        System.Threading.Tasks.Task<(TransactionalStatus Status, System.Exception? exception)> Resolve(TransactionInfo transactionInfo);
         System.Threading.Tasks.Task<TransactionInfo> StartTransaction(bool readOnly, System.TimeSpan timeout);
     }
 
@@ -263,14 +263,14 @@ namespace Orleans.Transactions
 
         public NamedTransactionalStateStorageFactory(Runtime.IGrainContextAccessor contextAccessor) { }
 
-        public Abstractions.ITransactionalStateStorage<TState> Create<TState>(string storageName, string stateName)
+        public Abstractions.ITransactionalStateStorage<TState> Create<TState>(string? storageName, string stateName)
             where TState : class, new() { throw null; }
     }
 
     [GenerateSerializer]
     public sealed partial class OrleansBrokenTransactionLockException : OrleansTransactionTransientFailureException
     {
-        public OrleansBrokenTransactionLockException(string transactionId, string situation, System.Exception innerException) : base(default!, default(string)!) { }
+        public OrleansBrokenTransactionLockException(string transactionId, string situation, System.Exception? innerException) : base(default!, default(string)!) { }
 
         public OrleansBrokenTransactionLockException(string transactionId, string situation) : base(default!, default(string)!) { }
     }
@@ -278,14 +278,14 @@ namespace Orleans.Transactions
     [GenerateSerializer]
     public sealed partial class OrleansCascadingAbortException : OrleansTransactionTransientFailureException
     {
-        public OrleansCascadingAbortException(string transactionId, System.Exception innerException) : base(default!, default(string)!) { }
+        public OrleansCascadingAbortException(string transactionId, System.Exception? innerException) : base(default!, default(string)!) { }
 
         public OrleansCascadingAbortException(string transactionId, string dependentId) : base(default!, default(string)!) { }
 
         public OrleansCascadingAbortException(string transactionId) : base(default!, default(string)!) { }
 
         [Id(0)]
-        public string DependentTransactionId { get { throw null; } }
+        public string? DependentTransactionId { get { throw null; } }
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
@@ -315,9 +315,9 @@ namespace Orleans.Transactions
         [System.Obsolete]
         protected OrleansTransactionAbortedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
 
-        public OrleansTransactionAbortedException(string transactionId, System.Exception innerException) { }
+        public OrleansTransactionAbortedException(string transactionId, System.Exception? innerException) { }
 
-        public OrleansTransactionAbortedException(string transactionId, string msg, System.Exception innerException) { }
+        public OrleansTransactionAbortedException(string transactionId, string msg, System.Exception? innerException) { }
 
         public OrleansTransactionAbortedException(string transactionId, string msg) { }
 
@@ -336,7 +336,7 @@ namespace Orleans.Transactions
         [System.Obsolete]
         protected OrleansTransactionException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
 
-        public OrleansTransactionException(string message, System.Exception innerException) { }
+        public OrleansTransactionException(string message, System.Exception? innerException) { }
 
         public OrleansTransactionException(string message) { }
     }
@@ -344,9 +344,9 @@ namespace Orleans.Transactions
     [GenerateSerializer]
     public sealed partial class OrleansTransactionInDoubtException : OrleansTransactionException
     {
-        public OrleansTransactionInDoubtException(string transactionId, System.Exception exc) { }
+        public OrleansTransactionInDoubtException(string transactionId, System.Exception? exc) { }
 
-        public OrleansTransactionInDoubtException(string transactionId, string msg, System.Exception innerException) { }
+        public OrleansTransactionInDoubtException(string transactionId, string msg, System.Exception? innerException) { }
 
         public OrleansTransactionInDoubtException(string transactionId) { }
 
@@ -371,7 +371,7 @@ namespace Orleans.Transactions
     [GenerateSerializer]
     public sealed partial class OrleansTransactionPrepareTimeoutException : OrleansTransactionTransientFailureException
     {
-        public OrleansTransactionPrepareTimeoutException(string transactionId, System.Exception innerException) : base(default!, default(string)!) { }
+        public OrleansTransactionPrepareTimeoutException(string transactionId, System.Exception? innerException) : base(default!, default(string)!) { }
     }
 
     [GenerateSerializer]
@@ -390,7 +390,7 @@ namespace Orleans.Transactions
         [System.Obsolete]
         protected OrleansTransactionTransientFailureException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) : base(default!, default(string)!) { }
 
-        public OrleansTransactionTransientFailureException(string transactionId, string msg, System.Exception innerException) : base(default!, default(string)!) { }
+        public OrleansTransactionTransientFailureException(string transactionId, string msg, System.Exception? innerException) : base(default!, default(string)!) { }
 
         public OrleansTransactionTransientFailureException(string transactionId, string msg) : base(default!, default(string)!) { }
     }
@@ -560,7 +560,7 @@ namespace Orleans.Transactions
 
     public static partial class TransactionalStatusExtensions
     {
-        public static OrleansTransactionException ConvertToUserException(this TransactionalStatus status, string transactionId, System.Exception exception) { throw null; }
+        public static OrleansTransactionException ConvertToUserException(this TransactionalStatus status, string transactionId, System.Exception? exception) { throw null; }
 
         public static bool DefinitelyAborted(this TransactionalStatus status) { throw null; }
     }
@@ -595,7 +595,7 @@ namespace Orleans.Transactions
 
         public static TransactionInfo GetRequiredTransactionInfo() { throw null; }
 
-        public static TransactionInfo GetTransactionInfo() { throw null; }
+        public static TransactionInfo? GetTransactionInfo() { throw null; }
     }
 
     [GenerateSerializer]
@@ -614,7 +614,7 @@ namespace Orleans.Transactions
         public bool IsReadOnly { get { throw null; } }
 
         [Id(4)]
-        public byte[] OriginalException { get { throw null; } set { } }
+        public byte[]? OriginalException { get { throw null; } set { } }
 
         [Id(5)]
         public System.Collections.Generic.Dictionary<ParticipantId, Abstractions.AccessCounter> Participants { get { throw null; } }
@@ -638,7 +638,7 @@ namespace Orleans.Transactions
 
         public void Join(TransactionInfo x) { }
 
-        public OrleansTransactionAbortedException MustAbort(Serialization.Serializer<OrleansTransactionAbortedException> serializer) { throw null; }
+        public OrleansTransactionAbortedException? MustAbort(Serialization.Serializer<OrleansTransactionAbortedException> serializer) { throw null; }
 
         public void ReconcilePending() { }
 
@@ -708,7 +708,7 @@ namespace Orleans.Transactions.Abstractions
 
     public partial interface INamedTransactionalStateStorageFactory
     {
-        ITransactionalStateStorage<TState> Create<TState>(string storageName, string stateName)
+        ITransactionalStateStorage<TState>? Create<TState>(string? storageName, string stateName)
             where TState : class, new();
     }
 
@@ -761,7 +761,7 @@ namespace Orleans.Transactions.Abstractions
     {
         string StateName { get; }
 
-        string StorageName { get; }
+        string? StorageName { get; }
     }
 
     public partial interface ITransactionalStateFactory
@@ -780,7 +780,7 @@ namespace Orleans.Transactions.Abstractions
         where TState : class, new()
     {
         System.Threading.Tasks.Task<TransactionalStorageLoadResponse<TState>> Load();
-        System.Threading.Tasks.Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, System.Collections.Generic.List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter);
+        System.Threading.Tasks.Task<string?> Store(string? expectedETag, TransactionalStateMetaData metadata, System.Collections.Generic.List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter);
     }
 
     public partial interface ITransactionalState<TState>
@@ -800,7 +800,7 @@ namespace Orleans.Transactions.Abstractions
     {
         string ServiceName { get; }
 
-        string StorageName { get; }
+        string? StorageName { get; }
     }
 
     public partial interface ITransactionCommitterFactory
@@ -866,11 +866,11 @@ namespace Orleans.Transactions.Abstractions
     [System.AttributeUsage(System.AttributeTargets.Parameter)]
     public partial class TransactionalStateAttribute : System.Attribute, IFacetMetadata, ITransactionalStateConfiguration
     {
-        public TransactionalStateAttribute(string stateName, string storageName = null) { }
+        public TransactionalStateAttribute(string stateName, string? storageName = null) { }
 
         public string StateName { get { throw null; } }
 
-        public string StorageName { get { throw null; } }
+        public string? StorageName { get { throw null; } }
     }
 
     public partial class TransactionalStateConfiguration : ITransactionalStateConfiguration
@@ -879,7 +879,7 @@ namespace Orleans.Transactions.Abstractions
 
         public string StateName { get { throw null; } }
 
-        public string StorageName { get { throw null; } }
+        public string? StorageName { get { throw null; } }
 
         public ParticipantId.Role SupportedRoles { get { throw null; } }
     }
@@ -907,7 +907,7 @@ namespace Orleans.Transactions.Abstractions
     {
         public TransactionalStorageLoadResponse() { }
 
-        public TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, TransactionalStateMetaData metadata, System.Collections.Generic.IReadOnlyList<PendingTransactionState<TState>> pendingStates) { }
+        public TransactionalStorageLoadResponse(string? etag, TState committedState, long committedSequenceId, TransactionalStateMetaData metadata, System.Collections.Generic.IReadOnlyList<PendingTransactionState<TState>> pendingStates) { }
 
         [Id(2)]
         public long CommittedSequenceId { get { throw null; } set { } }
@@ -916,7 +916,7 @@ namespace Orleans.Transactions.Abstractions
         public TState CommittedState { get { throw null; } set { } }
 
         [Id(0)]
-        public string ETag { get { throw null; } set { } }
+        public string? ETag { get { throw null; } set { } }
 
         [Id(3)]
         public TransactionalStateMetaData Metadata { get { throw null; } set { } }
@@ -928,11 +928,11 @@ namespace Orleans.Transactions.Abstractions
     [System.AttributeUsage(System.AttributeTargets.Parameter)]
     public partial class TransactionCommitterAttribute : System.Attribute, IFacetMetadata, ITransactionCommitterConfiguration
     {
-        public TransactionCommitterAttribute(string serviceName, string storageName = null) { }
+        public TransactionCommitterAttribute(string serviceName, string? storageName = null) { }
 
         public string ServiceName { get { throw null; } }
 
-        public string StorageName { get { throw null; } }
+        public string? StorageName { get { throw null; } }
     }
 }
 

@@ -16,7 +16,7 @@ namespace Orleans.Configuration
 
     public partial class AzureTableGrainDirectoryOptionsValidator : GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<AzureTableGrainDirectoryOptions>
     {
-        public AzureTableGrainDirectoryOptionsValidator(AzureTableGrainDirectoryOptions options, string name) : base(default!, default!) { }
+        public AzureTableGrainDirectoryOptionsValidator(AzureTableGrainDirectoryOptions options, string name) : base(default!, default) { }
     }
 }
 
@@ -24,13 +24,13 @@ namespace Orleans.GrainDirectory.AzureStorage
 {
     public partial class AzureStorageOperationOptions
     {
-        public Azure.Data.Tables.TableClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Data.Tables.TableClientOptions? ClientOptions { get { throw null; } set { } }
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get { throw null; } }
 
         public virtual string TableName { get { throw null; } set { } }
 
-        public Azure.Data.Tables.TableServiceClient TableServiceClient { get { throw null; } set { } }
+        public Azure.Data.Tables.TableServiceClient? TableServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the TableServiceClient property directly.")]
         public void ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) { }
@@ -53,9 +53,9 @@ namespace Orleans.GrainDirectory.AzureStorage
 
     public partial class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null) { }
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null) { }
 
-        public string Name { get { throw null; } }
+        public string? Name { get { throw null; } }
 
         public TOptions Options { get { throw null; } }
 

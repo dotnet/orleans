@@ -49,10 +49,10 @@ namespace Orleans.Serialization
         public bool IsSupportedType(System.Type type) { throw null; }
 
         [System.Security.SecurityCritical]
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
         [System.Security.SecurityCritical]
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -61,7 +61,7 @@ namespace Orleans.Serialization
     [Alias("Exception")]
     public sealed partial class ExceptionCodec : Codecs.IFieldCodec<System.Exception>, Codecs.IFieldCodec, Serializers.IBaseCodec<System.Exception>, Serializers.IBaseCodec, Serializers.IGeneralizedCodec, Serializers.IGeneralizedBaseCodec, Serializers.IBaseCodec<object>, Cloning.IBaseCopier<System.Exception>, Cloning.IBaseCopier
     {
-        public ExceptionCodec(TypeSystem.TypeConverter typeConverter, Codecs.IFieldCodec<System.Collections.Generic.Dictionary<object, object>> dictionaryCodec, Cloning.IDeepCopier<System.Collections.Generic.Dictionary<object, object>> dictionaryCopier, Cloning.IDeepCopier<System.Exception> exceptionCopier, Microsoft.Extensions.Options.IOptions<ExceptionSerializationOptions> exceptionSerializationOptions) { }
+        public ExceptionCodec(TypeSystem.TypeConverter typeConverter, Codecs.IFieldCodec<System.Collections.Generic.Dictionary<object, object?>> dictionaryCodec, Cloning.IDeepCopier<System.Collections.Generic.Dictionary<object, object?>> dictionaryCopier, Cloning.IDeepCopier<System.Exception> exceptionCopier, Microsoft.Extensions.Options.IOptions<ExceptionSerializationOptions> exceptionSerializationOptions) { }
 
         public void DeepCopy(System.Exception input, System.Exception output, Cloning.CopyContext context) { }
 
@@ -71,13 +71,13 @@ namespace Orleans.Serialization
 
         public System.Exception DeserializeException<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public System.Collections.Generic.Dictionary<object, object> GetDataProperty(System.Exception exception) { throw null; }
+        public System.Collections.Generic.Dictionary<object, object?>? GetDataProperty(System.Exception exception) { throw null; }
 
         public System.Runtime.Serialization.SerializationInfo GetObjectData(System.Exception value) { throw null; }
 
         public bool IsSupportedType(System.Type type) { throw null; }
 
-        object Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        object? Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
         public System.Exception ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
@@ -90,12 +90,12 @@ namespace Orleans.Serialization
         public void SerializeException<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, System.Exception value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void SetBaseProperties(System.Exception value, string message, string stackTrace, System.Exception innerException, int hResult, System.Collections.Generic.Dictionary<object, object> data) { }
+        public void SetBaseProperties(System.Exception value, string? message, string? stackTrace, System.Exception? innerException, int hResult, System.Collections.Generic.Dictionary<object, object?>? data) { }
 
         public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, System.Exception value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -166,69 +166,69 @@ namespace Orleans.Serialization
 
         public bool CanSerialize(System.Type type) { throw null; }
 
-        public object Deserialize(System.ArraySegment<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.ArraySegment<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.ArraySegment<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.ArraySegment<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize(System.Buffers.ReadOnlySequence<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.Buffers.ReadOnlySequence<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.Buffers.ReadOnlySequence<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.Buffers.ReadOnlySequence<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize(byte[] source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(byte[] source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(byte[] source, System.Type type) { throw null; }
+        public object? Deserialize(byte[] source, System.Type type) { throw null; }
 
-        public object Deserialize(System.IO.Stream source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.IO.Stream source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.IO.Stream source, System.Type type) { throw null; }
+        public object? Deserialize(System.IO.Stream source, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlyMemory<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlyMemory<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlyMemory<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlyMemory<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlySpan<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlySpan<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlySpan<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlySpan<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize<TInput>(ref Buffers.Reader<TInput> source, System.Type type) { throw null; }
+        public object? Deserialize<TInput>(ref Buffers.Reader<TInput> source, System.Type type) { throw null; }
 
-        public int Serialize(object value, System.ArraySegment<byte> destination, Session.SerializerSession session, System.Type type) { throw null; }
+        public int Serialize(object? value, System.ArraySegment<byte> destination, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public int Serialize(object value, System.ArraySegment<byte> destination, System.Type type) { throw null; }
+        public int Serialize(object? value, System.ArraySegment<byte> destination, System.Type type) { throw null; }
 
-        public int Serialize(object value, byte[] destination, Session.SerializerSession session, System.Type type) { throw null; }
+        public int Serialize(object? value, byte[] destination, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public int Serialize(object value, byte[] destination, System.Type type) { throw null; }
+        public int Serialize(object? value, byte[] destination, System.Type type) { throw null; }
 
-        public void Serialize(object value, System.IO.Stream destination, Session.SerializerSession session, System.Type type, int sizeHint = 0) { }
+        public void Serialize(object? value, System.IO.Stream destination, Session.SerializerSession session, System.Type type, int sizeHint = 0) { }
 
-        public void Serialize(object value, System.IO.Stream destination, System.Type type, int sizeHint = 0) { }
+        public void Serialize(object? value, System.IO.Stream destination, System.Type type, int sizeHint = 0) { }
 
-        public void Serialize(object value, ref System.Memory<byte> destination, Session.SerializerSession session, System.Type type) { }
+        public void Serialize(object? value, ref System.Memory<byte> destination, Session.SerializerSession session, System.Type type) { }
 
-        public void Serialize(object value, ref System.Memory<byte> destination, System.Type type) { }
+        public void Serialize(object? value, ref System.Memory<byte> destination, System.Type type) { }
 
-        public void Serialize(object value, ref System.Span<byte> destination, Session.SerializerSession session, System.Type type) { }
+        public void Serialize(object? value, ref System.Span<byte> destination, Session.SerializerSession session, System.Type type) { }
 
-        public void Serialize(object value, ref System.Span<byte> destination, System.Type type) { }
+        public void Serialize(object? value, ref System.Span<byte> destination, System.Type type) { }
 
-        public void Serialize<TBufferWriter>(object value, TBufferWriter destination, Session.SerializerSession session, System.Type type)
+        public void Serialize<TBufferWriter>(object? value, TBufferWriter destination, Session.SerializerSession session, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void Serialize<TBufferWriter>(object value, TBufferWriter destination, System.Type type)
+        public void Serialize<TBufferWriter>(object? value, TBufferWriter destination, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void Serialize<TBufferWriter>(object value, ref Buffers.Writer<TBufferWriter> destination, System.Type type)
+        public void Serialize<TBufferWriter>(object? value, ref Buffers.Writer<TBufferWriter> destination, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
     [GenerateSerializer]
     public sealed partial class ReferenceFieldNotSupportedException : SerializerException
     {
-        public ReferenceFieldNotSupportedException(System.Type targetType) { }
+        public ReferenceFieldNotSupportedException(System.Type? targetType) { }
 
         [Id(0)]
-        public System.Type TargetReferenceType { get { throw null; } }
+        public System.Type? TargetReferenceType { get { throw null; } }
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
@@ -237,13 +237,13 @@ namespace Orleans.Serialization
     [GenerateSerializer]
     public sealed partial class ReferenceNotFoundException : SerializerException
     {
-        public ReferenceNotFoundException(System.Type targetType, uint targetId) { }
+        public ReferenceNotFoundException(System.Type? targetType, uint targetId) { }
 
         [Id(0)]
         public uint TargetReference { get { throw null; } }
 
         [Id(1)]
-        public System.Type TargetReferenceType { get { throw null; } }
+        public System.Type? TargetReferenceType { get { throw null; } }
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
@@ -456,7 +456,7 @@ namespace Orleans.Serialization
 
     public static partial class ServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder> configure = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder>? configure = null) { throw null; }
     }
 
     [GenerateSerializer]
@@ -474,9 +474,9 @@ namespace Orleans.Serialization
 
         public UnavailableExceptionFallbackException(string message, System.Exception innerException) { }
 
-        public string ExceptionType { get { throw null; } }
+        public string? ExceptionType { get { throw null; } }
 
-        public System.Collections.Generic.Dictionary<string, object> Properties { get { throw null; } }
+        public System.Collections.Generic.Dictionary<string, object?> Properties { get { throw null; } }
 
         public override string ToString() { throw null; }
     }
@@ -1143,7 +1143,7 @@ namespace Orleans.Serialization.Buffers
 
         public void WriteEndObject() { }
 
-        public void WriteFieldHeader(uint fieldId, System.Type expectedType, System.Type actualType, WireProtocol.WireType wireType) { }
+        public void WriteFieldHeader(uint fieldId, System.Type? expectedType, System.Type? actualType, WireProtocol.WireType wireType) { }
 
         public void WriteFieldHeaderExpected(uint fieldId, WireProtocol.WireType wireType) { }
 
@@ -1151,7 +1151,7 @@ namespace Orleans.Serialization.Buffers
 
         public void WriteInt64(long value) { }
 
-        public void WriteStartObject(uint fieldId, System.Type expectedType, System.Type actualType) { }
+        public void WriteStartObject(uint fieldId, System.Type? expectedType, System.Type actualType) { }
 
         public void WriteUInt32(uint value) { }
 
@@ -1364,7 +1364,6 @@ namespace Orleans.Serialization.Cloning
 
     public partial interface IDeepCopier<T> : IDeepCopier
     {
-        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
         T DeepCopy(T input, CopyContext context);
         object? IDeepCopier.DeepCopy(object? input, CopyContext context);
     }
@@ -1442,7 +1441,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ArrayListSurrogate
     {
         [Id(0)]
-        public object[] Values;
+        public object?[] Values;
     }
 
     [RegisterSerializer]
@@ -1849,7 +1848,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct FrozenDictionarySurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IEqualityComparer<TKey> KeyComparer;
+        public System.Collections.Generic.IEqualityComparer<TKey>? KeyComparer;
         [Id(0)]
         public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
     }
@@ -1878,7 +1877,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct FrozenSetSurrogate<T>
     {
         [Id(1)]
-        public System.Collections.Generic.IEqualityComparer<T> KeyComparer;
+        public System.Collections.Generic.IEqualityComparer<T>? KeyComparer;
         [Id(0)]
         public System.Collections.Generic.List<T> Values;
     }
@@ -1970,15 +1969,15 @@ namespace Orleans.Serialization.Codecs
 
     public partial interface IFieldCodec
     {
-        object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
-        void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
+        void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte>;
     }
 
     public partial interface IFieldCodec<T> : IFieldCodec
     {
-        object IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
-        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value);
+        object? IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
+        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value);
         T ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
         void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, T value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte>;
@@ -2003,14 +2002,14 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
     public partial struct ImmutableArraySurrogate<T>
     {
         [Id(0)]
-        public T[] Values;
+        public T[]? Values;
     }
 
     [RegisterSerializer]
@@ -2037,7 +2036,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ImmutableDictionarySurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IEqualityComparer<TValue> ValueComparer;
+        public System.Collections.Generic.IEqualityComparer<TValue>? ValueComparer;
         [Id(0)]
         public System.Collections.Generic.Dictionary<TKey, TValue> Values;
     }
@@ -2066,7 +2065,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ImmutableHashSetSurrogate<T>
     {
         [Id(1)]
-        public System.Collections.Generic.IEqualityComparer<T> KeyComparer;
+        public System.Collections.Generic.IEqualityComparer<T>? KeyComparer;
         [Id(0)]
         public System.Collections.Generic.List<T> Values;
     }
@@ -2149,9 +2148,9 @@ namespace Orleans.Serialization.Codecs
     public partial struct ImmutableSortedDictionarySurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<TKey> KeyComparer;
+        public System.Collections.Generic.IComparer<TKey>? KeyComparer;
         [Id(2)]
-        public System.Collections.Generic.IEqualityComparer<TValue> ValueComparer;
+        public System.Collections.Generic.IEqualityComparer<TValue>? ValueComparer;
         [Id(0)]
         public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
     }
@@ -2180,7 +2179,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ImmutableSortedSetSurrogate<T>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<T> KeyComparer;
+        public System.Collections.Generic.IComparer<T>? KeyComparer;
         [Id(0)]
         public System.Collections.Generic.List<T> Values;
     }
@@ -2334,7 +2333,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -2423,7 +2422,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct NameValueCollectionSurrogate
     {
         [Id(0)]
-        public System.Collections.Generic.Dictionary<string, string> Values;
+        public System.Collections.Generic.Dictionary<string, string?> Values;
     }
 
     [RegisterSerializer]
@@ -2446,7 +2445,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -2456,25 +2455,25 @@ namespace Orleans.Serialization.Codecs
 
         void IFieldCodec<object>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value) { }
 
-        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value) { }
+        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value) { }
 
-        public static object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public static object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, object value)
+        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
     [RegisterCopier]
     public sealed partial class ObjectCopier : Cloning.IDeepCopier<object>, Cloning.IDeepCopier
     {
-        public static object DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        public static object? DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
 
         object Cloning.IDeepCopier<object>.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -2611,18 +2610,18 @@ namespace Orleans.Serialization.Codecs
 
         public static void MarkValueField(Session.SerializerSession session) { }
 
-        public static object ReadReference<TInput>(ref Buffers.Reader<TInput> reader, System.Type fieldType) { throw null; }
+        public static object? ReadReference<TInput>(ref Buffers.Reader<TInput> reader, System.Type? fieldType) { throw null; }
 
         public static T ReadReference<T, TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public static void RecordObject(Session.SerializerSession session, object value, uint referenceId) { }
+        public static void RecordObject(Session.SerializerSession session, object? value, uint referenceId) { }
 
         public static void RecordObject(Session.SerializerSession session, object value) { }
 
-        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type expectedType, object value)
+        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type? expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { throw null; }
 
-        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type expectedType, System.Type actualType, object value)
+        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type? expectedType, System.Type actualType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { throw null; }
 
         public static void WriteNullReference<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId)
@@ -2659,9 +2658,9 @@ namespace Orleans.Serialization.Codecs
 
     public partial class SkipFieldCodec : IFieldCodec
     {
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -2694,7 +2693,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct SortedDictionarySurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<TKey> Comparer;
+        public System.Collections.Generic.IComparer<TKey>? Comparer;
         [Id(0)]
         public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
     }
@@ -2704,7 +2703,7 @@ namespace Orleans.Serialization.Codecs
     {
         public SortedListCodec(Serializers.IValueSerializer<SortedListSurrogate<TKey, TValue>> surrogateSerializer) : base(default!) { }
 
-        public override System.Collections.Generic.SortedList<TKey, TValue> ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate) { throw null; }
+        public override System.Collections.Generic.SortedList<TKey, TValue>? ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate) { throw null; }
 
         public override void ConvertToSurrogate(System.Collections.Generic.SortedList<TKey, TValue> value, ref SortedListSurrogate<TKey, TValue> surrogate) { }
     }
@@ -2723,9 +2722,9 @@ namespace Orleans.Serialization.Codecs
     public partial struct SortedListSurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<TKey> Comparer;
+        public System.Collections.Generic.IComparer<TKey>? Comparer;
         [Id(0)]
-        public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
+        public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>>? Values;
     }
 
     [RegisterSerializer]
@@ -2752,7 +2751,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct SortedSetSurrogate<T>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<T> Comparer;
+        public System.Collections.Generic.IComparer<T>? Comparer;
         [Id(0)]
         public System.Collections.Generic.List<T> Values;
     }
@@ -3192,7 +3191,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3204,7 +3203,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3216,7 +3215,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3228,7 +3227,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3240,7 +3239,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3252,7 +3251,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3264,7 +3263,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3276,7 +3275,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3288,7 +3287,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -3319,9 +3318,9 @@ namespace Orleans.Serialization.Codecs
     {
         public bool IsSupportedType(System.Type type) { throw null; }
 
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 }
@@ -3397,9 +3396,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field)
             where TField : class { throw null; }
 
-        public static System.Reflection.MethodInfo GetMethodInfoOrDefault(System.Type interfaceType, string methodName, System.Type[] methodTypeParameters, System.Type[] parameterTypes) { throw null; }
+        public static System.Reflection.MethodInfo? GetMethodInfoOrDefault(System.Type? interfaceType, string methodName, System.Type[]? methodTypeParameters, System.Type[]? parameterTypes) { throw null; }
 
-        public static Cloning.IDeepCopier<T> GetOptionalCopier<T>(Cloning.IDeepCopier<T> copier) { throw null; }
+        public static Cloning.IDeepCopier<T>? GetOptionalCopier<T>(Cloning.IDeepCopier<T> copier) { throw null; }
 
         public static TService GetService<TService>(object caller, Serializers.ICodecProvider codecProvider) { throw null; }
 
@@ -3416,7 +3415,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             public virtual void DeepCopy(T input, T output, Cloning.CopyContext context) { }
 
-            public T DeepCopy(T original, Cloning.CopyContext context) { throw null; }
+            public T? DeepCopy(T original, Cloning.CopyContext context) { throw null; }
         }
     }
 }
@@ -3427,11 +3426,11 @@ namespace Orleans.Serialization.Internal
     {
         public static void AddAssembly(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly assembly) { }
 
-        public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly assembly = null) { }
+        public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly? assembly = null) { }
 
         public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Runtime.Loader.AssemblyLoadContext context) { }
 
-        public static void AddFromDependencyContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly assembly = null) { }
+        public static void AddFromDependencyContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly? assembly = null) { }
 
         public static System.Collections.Generic.IEnumerable<System.Reflection.Assembly> GetRelevantAssemblies() { throw null; }
     }
@@ -3555,7 +3554,7 @@ namespace Orleans.Serialization.Invocation
 
         public System.Threading.Tasks.Sources.ValueTaskSourceStatus GetStatus(short token) { throw null; }
 
-        public void OnCompleted(System.Action<object> continuation, object state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
+        public void OnCompleted(System.Action<object?> continuation, object? state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
 
         public void Reset() { }
 
@@ -3593,7 +3592,7 @@ namespace Orleans.Serialization.Invocation
 
         public System.Threading.Tasks.Sources.ValueTaskSourceStatus GetStatus(short token) { throw null; }
 
-        public void OnCompleted(System.Action<object> continuation, object state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
+        public void OnCompleted(System.Action<object?> continuation, object? state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
 
         public void Reset() { }
 
@@ -3642,9 +3641,9 @@ namespace Orleans.Serialization.Serializers
     {
         protected internal AbstractTypeSerializer(System.Type fieldType) { }
 
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -3692,9 +3691,9 @@ namespace Orleans.Serialization.Serializers
 
         public Codecs.IFieldCodec<TField>? TryGetCodec<TField>() { throw null; }
 
-        public Cloning.IDeepCopier TryGetDeepCopier(System.Type fieldType) { throw null; }
+        public Cloning.IDeepCopier? TryGetDeepCopier(System.Type fieldType) { throw null; }
 
-        public Cloning.IDeepCopier<T> TryGetDeepCopier<T>() { throw null; }
+        public Cloning.IDeepCopier<T>? TryGetDeepCopier<T>() { throw null; }
     }
 
     public sealed partial class ConcreteTypeSerializer<TField, TBaseCodec> : Codecs.IFieldCodec<TField>, Codecs.IFieldCodec where TField : class where TBaseCodec : IBaseCodec<TField>
@@ -3872,32 +3871,32 @@ namespace Orleans.Serialization.Session
 
         public System.Collections.Generic.Dictionary<uint, object> CopyReferenceTable() { throw null; }
 
-        public bool GetOrAddReference(object value, out uint reference) { throw null; }
+        public bool GetOrAddReference(object? value, out uint reference) { throw null; }
 
-        public int GetReferenceIndex(object value) { throw null; }
+        public int GetReferenceIndex(object? value) { throw null; }
 
         public void MarkValueField() { }
 
-        public void RecordReferenceField(object value, uint referenceId) { }
+        public void RecordReferenceField(object? value, uint referenceId) { }
 
-        public void RecordReferenceField(object value) { }
+        public void RecordReferenceField(object? value) { }
 
         public void Reset() { }
 
-        public object TryGetReferencedObject(uint reference) { throw null; }
+        public object? TryGetReferencedObject(uint reference) { throw null; }
     }
 
     public sealed partial class ReferencedTypeCollection
     {
         public uint GetOrAddTypeReference(System.Type type) { throw null; }
 
-        public System.Type GetReferencedType(uint reference) { throw null; }
+        public System.Type? GetReferencedType(uint reference) { throw null; }
 
-        public void RecordReferencedType(System.Type type) { }
+        public void RecordReferencedType(System.Type? type) { }
 
         public void Reset() { }
 
-        public bool TryGetReferencedType(uint reference, out System.Type type) { throw null; }
+        public bool TryGetReferencedType(uint reference, out System.Type? type) { throw null; }
 
         public bool TryGetTypeReference(System.Type type, out uint reference) { throw null; }
     }
@@ -3938,9 +3937,9 @@ namespace Orleans.Serialization.Session
     {
         public WellKnownTypeCollection(Microsoft.Extensions.Options.IOptions<Configuration.TypeManifestOptions> config) { }
 
-        public System.Type GetWellKnownType(uint typeId) { throw null; }
+        public System.Type? GetWellKnownType(uint typeId) { throw null; }
 
-        public bool TryGetWellKnownType(uint typeId, out System.Type type) { throw null; }
+        public bool TryGetWellKnownType(uint typeId, out System.Type? type) { throw null; }
 
         public bool TryGetWellKnownTypeId(System.Type type, out uint typeId) { throw null; }
     }
@@ -4133,9 +4132,9 @@ namespace Orleans.Serialization.TypeSystem
 
         public System.Type ReadLengthPrefixed<TInput>(ref Buffers.Reader<TInput> reader) { throw null; }
 
-        public System.Type TryRead<TInput>(ref Buffers.Reader<TInput> reader) { throw null; }
+        public System.Type? TryRead<TInput>(ref Buffers.Reader<TInput> reader) { throw null; }
 
-        public bool TryReadForAnalysis<TInput>(ref Buffers.Reader<TInput> reader, out System.Type type, out string typeString) { throw null; }
+        public bool TryReadForAnalysis<TInput>(ref Buffers.Reader<TInput> reader, out System.Type? type, out string typeString) { throw null; }
 
         public void WriteEncodedType<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
@@ -4229,7 +4228,7 @@ namespace Orleans.Serialization.WireProtocol
     public partial struct Field
     {
         public uint FieldIdDeltaRaw;
-        public System.Type FieldTypeRaw;
+        public System.Type? FieldTypeRaw;
         public Tag Tag;
         public Field(Tag tag, uint extendedFieldIdDelta, System.Type type) { }
 
@@ -4239,7 +4238,7 @@ namespace Orleans.Serialization.WireProtocol
 
         public uint FieldIdDelta { get { throw null; } set { } }
 
-        public System.Type FieldType { get { throw null; } set { } }
+        public System.Type? FieldType { get { throw null; } set { } }
 
         public bool HasExtendedFieldId { get { throw null; } }
 

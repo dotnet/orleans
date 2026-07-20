@@ -19,7 +19,7 @@ namespace Orleans.Configuration
 
     public partial class AzureTableStreamCheckpointerOptionsValidator : Streaming.EventHubs.AzureStorageOperationOptionsValidator<AzureTableStreamCheckpointerOptions>
     {
-        public AzureTableStreamCheckpointerOptionsValidator(AzureTableStreamCheckpointerOptions options, string name) : base(default!, default!) { }
+        public AzureTableStreamCheckpointerOptionsValidator(AzureTableStreamCheckpointerOptions options, string name) : base(default!, default) { }
     }
 
     public partial class EventDataGeneratorStreamOptions
@@ -164,9 +164,9 @@ namespace Orleans.Streaming.EventHubs
 {
     public partial class AggregatedCachePressureMonitor : System.Collections.Generic.List<ICachePressureMonitor>, ICachePressureMonitor
     {
-        public AggregatedCachePressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor monitor = null) { }
+        public AggregatedCachePressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? monitor = null) { }
 
-        public Providers.Streams.Common.ICacheMonitor CacheMonitor { set { } }
+        public Providers.Streams.Common.ICacheMonitor? CacheMonitor { set { } }
 
         public void AddCachePressureMonitor(ICachePressureMonitor monitor) { }
 
@@ -177,11 +177,11 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class AveragingCachePressureMonitor : ICachePressureMonitor
     {
-        public AveragingCachePressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor monitor = null) { }
+        public AveragingCachePressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? monitor = null) { }
 
-        public AveragingCachePressureMonitor(double flowControlThreshold, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor monitor = null) { }
+        public AveragingCachePressureMonitor(double flowControlThreshold, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? monitor = null) { }
 
-        public Providers.Streams.Common.ICacheMonitor CacheMonitor { set { } }
+        public Providers.Streams.Common.ICacheMonitor? CacheMonitor { set { } }
 
         public bool IsUnderPressure(System.DateTime utcNow) { throw null; }
 
@@ -190,13 +190,13 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class AzureStorageOperationOptions
     {
-        public Azure.Data.Tables.TableClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Data.Tables.TableClientOptions? ClientOptions { get { throw null; } set { } }
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get { throw null; } }
 
         public virtual string TableName { get { throw null; } set { } }
 
-        public Azure.Data.Tables.TableServiceClient TableServiceClient { get { throw null; } set { } }
+        public Azure.Data.Tables.TableServiceClient? TableServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the TableServiceClient property directly.")]
         public void ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) { }
@@ -219,9 +219,9 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null) { }
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null) { }
 
-        public string Name { get { throw null; } }
+        public string? Name { get { throw null; } }
 
         public TOptions Options { get { throw null; } }
 
@@ -256,11 +256,11 @@ namespace Orleans.Streaming.EventHubs
     {
         public static System.Collections.Generic.IDictionary<string, object> DeserializeProperties(this System.ArraySegment<byte> bytes, Serialization.Serializer serializer) { throw null; }
 
-        public static string GetStreamNamespaceProperty(this Azure.Messaging.EventHubs.EventData eventData) { throw null; }
+        public static string? GetStreamNamespaceProperty(this Azure.Messaging.EventHubs.EventData eventData) { throw null; }
 
         public static byte[] SerializeProperties(this Azure.Messaging.EventHubs.EventData eventData, Serialization.Serializer serializer) { throw null; }
 
-        public static void SetStreamNamespaceProperty(this Azure.Messaging.EventHubs.EventData eventData, string streamNamespace) { }
+        public static void SetStreamNamespaceProperty(this Azure.Messaging.EventHubs.EventData eventData, string? streamNamespace) { }
     }
 
     public partial class EventHubAdapterFactory : Streams.IQueueAdapterFactory, Streams.IQueueAdapter, Streams.IQueueAdapterCache
@@ -307,7 +307,7 @@ namespace Orleans.Streaming.EventHubs
 
         protected virtual void InitEventHubClient() { }
 
-        public virtual System.Threading.Tasks.Task QueueMessageBatchAsync<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) { throw null; }
+        public virtual System.Threading.Tasks.Task QueueMessageBatchAsync<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 
     [GenerateSerializer]
@@ -323,9 +323,9 @@ namespace Orleans.Streaming.EventHubs
 
         public bool ImportRequestContext() { throw null; }
 
-        public static Azure.Messaging.EventHubs.EventData ToEventData<T>(Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object> requestContext) { throw null; }
+        public static Azure.Messaging.EventHubs.EventData ToEventData<T>(Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
 
-        public static void UpdateEventData<T>(Azure.Messaging.EventHubs.EventData eventData, Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object> requestContext) { }
+        public static void UpdateEventData<T>(Azure.Messaging.EventHubs.EventData eventData, Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object>? requestContext) { }
     }
 
     public partial class EventHubBlockPoolMonitorDimensions : EventHubMonitorAggregationDimensions
@@ -382,7 +382,7 @@ namespace Orleans.Streaming.EventHubs
 
         protected virtual Streams.IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage) { throw null; }
 
-        public virtual string GetOffset(Providers.Streams.Common.CachedMessage lastItemPurged) { throw null; }
+        public virtual string? GetOffset(Providers.Streams.Common.CachedMessage lastItemPurged) { throw null; }
 
         public virtual string GetPartitionKey(Runtime.StreamId streamId) { throw null; }
 
@@ -392,7 +392,7 @@ namespace Orleans.Streaming.EventHubs
 
         public virtual Streams.StreamPosition GetStreamPosition(string partition, Azure.Messaging.EventHubs.EventData queueMessage) { throw null; }
 
-        public virtual Azure.Messaging.EventHubs.EventData ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) { throw null; }
+        public virtual Azure.Messaging.EventHubs.EventData ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 
     [GenerateSerializer]
@@ -460,20 +460,20 @@ namespace Orleans.Streaming.EventHubs
 
         public void Dispose() { }
 
-        public object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken sequenceToken) { throw null; }
+        public object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
 
-        public void Refresh(object cursor, Streams.StreamSequenceToken sequenceToken) { }
+        public void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken) { }
 
         public void SignalPurge() { }
 
-        public bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer message) { throw null; }
+        public bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message) { throw null; }
     }
 
     public partial class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
-        public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, Runtime.OrleansInstruments instruments, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor> cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> blockPoolMonitorFactory = null) { }
+        public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, Runtime.OrleansInstruments instruments, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor>? cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor>? blockPoolMonitorFactory = null) { }
 
         public System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> BlockPoolMonitorFactory { get { throw null; } set { } }
 
@@ -521,7 +521,7 @@ namespace Orleans.Streaming.EventHubs
 
     public partial interface ICachePressureMonitor
     {
-        Providers.Streams.Common.ICacheMonitor CacheMonitor { set; }
+        Providers.Streams.Common.ICacheMonitor? CacheMonitor { set; }
 
         bool IsUnderPressure(System.DateTime utcNow);
         void RecordCachePressureContribution(double cachePressureContribution);
@@ -530,7 +530,7 @@ namespace Orleans.Streaming.EventHubs
     public partial interface IEventHubDataAdapter : Streams.IQueueDataAdapter<Azure.Messaging.EventHubs.EventData>, Providers.Streams.Common.ICacheDataAdapter
     {
         Providers.Streams.Common.CachedMessage FromQueueMessage(Streams.StreamPosition position, Azure.Messaging.EventHubs.EventData queueMessage, System.DateTime dequeueTime, System.Func<int, System.ArraySegment<byte>> getSegment);
-        string GetOffset(Providers.Streams.Common.CachedMessage cachedMessage);
+        string? GetOffset(Providers.Streams.Common.CachedMessage cachedMessage);
         string GetPartitionKey(Runtime.StreamId streamId);
         Runtime.StreamId GetStreamIdentity(Azure.Messaging.EventHubs.EventData queueMessage);
         Streams.StreamPosition GetStreamPosition(string partition, Azure.Messaging.EventHubs.EventData queueMessage);
@@ -547,10 +547,10 @@ namespace Orleans.Streaming.EventHubs
     {
         System.Collections.Generic.List<Streams.StreamPosition> Add(System.Collections.Generic.List<Azure.Messaging.EventHubs.EventData> message, System.DateTime dequeueTimeUtc);
         void AddCachePressureMonitor(ICachePressureMonitor monitor);
-        object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken sequenceToken);
-        void Refresh(object cursor, Streams.StreamSequenceToken sequenceToken);
+        object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken);
+        void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken);
         void SignalPurge();
-        bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer message);
+        bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message);
     }
 
     public partial interface IEventHubQueueCacheFactory
@@ -561,23 +561,23 @@ namespace Orleans.Streaming.EventHubs
     public partial interface IEventHubReceiver
     {
         System.Threading.Tasks.Task CloseAsync();
-        System.Threading.Tasks.Task CloseAsync(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime);
+        System.Threading.Tasks.Task CloseAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>?> ReceiveAsync(int maxCount, System.TimeSpan waitTime);
     }
 
     public partial class SlowConsumingPressureMonitor : ICachePressureMonitor
     {
         public const double DefaultFlowControlThreshold = 0.5D;
         public static System.TimeSpan DefaultPressureWindowSize;
-        public SlowConsumingPressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor monitor = null) { }
+        public SlowConsumingPressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? monitor = null) { }
 
-        public SlowConsumingPressureMonitor(double flowControlThreshold, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor monitor = null) { }
+        public SlowConsumingPressureMonitor(double flowControlThreshold, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? monitor = null) { }
 
-        public SlowConsumingPressureMonitor(double flowControlThreshold, System.TimeSpan pressureWindowSzie, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor monitor = null) { }
+        public SlowConsumingPressureMonitor(double flowControlThreshold, System.TimeSpan pressureWindowSzie, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? monitor = null) { }
 
-        public SlowConsumingPressureMonitor(System.TimeSpan pressureWindowSize, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor monitor = null) { }
+        public SlowConsumingPressureMonitor(System.TimeSpan pressureWindowSize, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? monitor = null) { }
 
-        public Providers.Streams.Common.ICacheMonitor CacheMonitor { set { } }
+        public Providers.Streams.Common.ICacheMonitor? CacheMonitor { set { } }
 
         public double FlowControlThreshold { get { throw null; } set { } }
 
@@ -647,7 +647,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public void StopProducingOnStream(Runtime.StreamId streamId) { }
 
-        public bool TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData> events) { throw null; }
+        public bool TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>? events) { throw null; }
     }
 
     public partial class EventHubPartitionGeneratorReceiver : IEventHubReceiver
@@ -658,14 +658,14 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public void ConfigureDataGeneratorForStream(Runtime.StreamId streamId) { }
 
-        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>?> ReceiveAsync(int maxCount, System.TimeSpan waitTime) { throw null; }
 
         public void StopProducingOnStream(Runtime.StreamId streamId) { }
     }
 
     public partial interface IDataGenerator<T>
     {
-        bool TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<T> events);
+        bool TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<T>? events);
     }
 
     public partial interface IIntCounter
@@ -718,7 +718,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public static System.Func<Runtime.StreamId, IStreamDataGenerator<Azure.Messaging.EventHubs.EventData>> CreateFactory(System.IServiceProvider services) { throw null; }
 
-        public bool TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData> events) { throw null; }
+        public bool TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>? events) { throw null; }
     }
 }
 

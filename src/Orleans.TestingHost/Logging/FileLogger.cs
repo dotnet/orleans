@@ -91,7 +91,7 @@ namespace Orleans.TestingHost.Logging
             if (logLevel == LogLevel.Error)
                 message = "!!!!!!!!!! " + message;
 
-            var exc = LogFormatter.PrintException(exception!);
+            var exc = LogFormatter.PrintException(exception);
             var msg = string.Format("[{0} {1}\t{2}\t{3}\t{4}]\t{5}\t{6}",
                 LogFormatter.PrintDate(timestamp),           //0
                 Environment.CurrentManagedThreadId,   //1

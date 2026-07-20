@@ -1,7 +1,6 @@
 using Orleans.EventSourcing.Common;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.EventSourcing.LogStorage
 {
@@ -18,7 +17,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// Gets and Sets StateAndMetaData
         /// </summary>
         [Id(0)]
-        public LogStateWithMetaData<TEntry> StateAndMetaData { get; set; }
+        public LogStateWithMetaData<TEntry>? StateAndMetaData { get; set; }
 
         /// <summary>
         /// Gets and Sets Etag
@@ -29,8 +28,7 @@ namespace Orleans.EventSourcing.LogStorage
         [Id(2)]
         public bool RecordExists { get; set; }
 
-        [AllowNull]
-        public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value!; }
+        public LogStateWithMetaData<TEntry>? State { get => StateAndMetaData; set => StateAndMetaData = value; }
 
         /// <summary>
         /// Initializes a new instance of GrainStateWithMetaDataAndETag class
@@ -45,7 +43,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         public override string ToString()
         {
-            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData.GlobalVersion, StateAndMetaData.WriteVector, ETag, StateAndMetaData.Log);
+            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData!.GlobalVersion, StateAndMetaData!.WriteVector, ETag, StateAndMetaData!.Log); // Preserve the legacy failure if state was explicitly set to null.
         }
     }
 

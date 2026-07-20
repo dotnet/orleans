@@ -193,9 +193,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void SerializeUnexpectedType<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object value) where TBufferWriter : IBufferWriter<byte>
+        public static void SerializeUnexpectedType<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
-            var specificSerializer = writer.Session.CodecProvider.GetCodec(value!.GetType());
+            var specificSerializer = writer.Session.CodecProvider.GetCodec(value.GetType());
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 

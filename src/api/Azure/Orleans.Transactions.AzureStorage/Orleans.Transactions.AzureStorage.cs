@@ -18,7 +18,7 @@ namespace Orleans.Configuration
 
     public partial class AzureTableTransactionalStateOptionsValidator : Transactions.AzureStorage.AzureStorageOperationOptionsValidator<AzureTableTransactionalStateOptions>
     {
-        public AzureTableTransactionalStateOptionsValidator(AzureTableTransactionalStateOptions options, string name) : base(default!, default!) { }
+        public AzureTableTransactionalStateOptionsValidator(AzureTableTransactionalStateOptions options, string name) : base(default!, default) { }
     }
 }
 
@@ -30,11 +30,11 @@ namespace Orleans.Hosting
 
     public static partial class AzureTableTransactionSiloBuilderExtensions
     {
-        public static ISiloBuilder AddAzureTableTransactionalStateStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableTransactionalStateOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAzureTableTransactionalStateStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableTransactionalStateOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAzureTableTransactionalStateStorage(this ISiloBuilder builder, string name, System.Action<Configuration.AzureTableTransactionalStateOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableTransactionalStateOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableTransactionalStateOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, System.Action<Configuration.AzureTableTransactionalStateOptions> configureOptions) { throw null; }
     }
@@ -44,13 +44,13 @@ namespace Orleans.Transactions.AzureStorage
 {
     public partial class AzureStorageOperationOptions
     {
-        public Azure.Data.Tables.TableClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Data.Tables.TableClientOptions? ClientOptions { get { throw null; } set { } }
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get { throw null; } }
 
         public virtual string TableName { get { throw null; } set { } }
 
-        public Azure.Data.Tables.TableServiceClient TableServiceClient { get { throw null; } set { } }
+        public Azure.Data.Tables.TableServiceClient? TableServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the TableServiceClient property directly.")]
         public void ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) { }
@@ -73,9 +73,9 @@ namespace Orleans.Transactions.AzureStorage
 
     public partial class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null) { }
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null) { }
 
-        public string Name { get { throw null; } }
+        public string? Name { get { throw null; } }
 
         public TOptions Options { get { throw null; } }
 
@@ -119,6 +119,6 @@ namespace Orleans.Transactions.AzureStorage
 
         public System.Threading.Tasks.Task<Abstractions.TransactionalStorageLoadResponse<TState>> Load() { throw null; }
 
-        public System.Threading.Tasks.Task<string> Store(string expectedETag, Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Abstractions.PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter) { throw null; }
+        public System.Threading.Tasks.Task<string?> Store(string? expectedETag, Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Abstractions.PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter) { throw null; }
     }
 }

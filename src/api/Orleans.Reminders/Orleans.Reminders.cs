@@ -34,7 +34,7 @@ namespace Orleans
 
     public partial interface IReminderService : Services.IGrainService, ISystemTarget, Runtime.IAddressable
     {
-        System.Threading.Tasks.Task<Runtime.IGrainReminder> GetReminder(Runtime.GrainId grainId, string reminderName);
+        System.Threading.Tasks.Task<Runtime.IGrainReminder?> GetReminder(Runtime.GrainId grainId, string reminderName);
         System.Threading.Tasks.Task<System.Collections.Generic.List<Runtime.IGrainReminder>> GetReminders(Runtime.GrainId grainId);
         System.Threading.Tasks.Task<Runtime.IGrainReminder> RegisterOrUpdateReminder(Runtime.GrainId grainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period);
         System.Threading.Tasks.Task Start();
@@ -46,21 +46,21 @@ namespace Orleans
     {
         [System.Obsolete("Implement and use StartAsync instead")]
         System.Threading.Tasks.Task Init();
-        System.Threading.Tasks.Task<ReminderEntry> ReadRow(Runtime.GrainId grainId, string reminderName);
+        System.Threading.Tasks.Task<ReminderEntry?> ReadRow(Runtime.GrainId grainId, string reminderName);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(Runtime.GrainId grainId);
-        System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end);
+        System.Threading.Tasks.Task<ReminderTableData?> ReadRows(uint begin, uint end);
         System.Threading.Tasks.Task<bool> RemoveRow(Runtime.GrainId grainId, string reminderName, string eTag);
         System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task TestOnlyClearTable();
-        System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry);
+        System.Threading.Tasks.Task<string?> UpsertRow(ReminderEntry entry);
     }
 
     [GenerateSerializer]
     public sealed partial class ReminderEntry
     {
         [Id(4)]
-        public string ETag { get { throw null; } set { } }
+        public string? ETag { get { throw null; } set { } }
 
         [Id(0)]
         public Runtime.GrainId GrainId { get { throw null; } set { } }
@@ -300,7 +300,7 @@ namespace Orleans.Timers
 {
     public partial interface IReminderRegistry : Services.IGrainServiceClient<IReminderService>
     {
-        System.Threading.Tasks.Task<Runtime.IGrainReminder> GetReminder(Runtime.GrainId callingGrainId, string reminderName);
+        System.Threading.Tasks.Task<Runtime.IGrainReminder?> GetReminder(Runtime.GrainId callingGrainId, string reminderName);
         System.Threading.Tasks.Task<System.Collections.Generic.List<Runtime.IGrainReminder>> GetReminders(Runtime.GrainId callingGrainId);
         System.Threading.Tasks.Task<Runtime.IGrainReminder> RegisterOrUpdateReminder(Runtime.GrainId callingGrainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period);
         System.Threading.Tasks.Task UnregisterReminder(Runtime.GrainId callingGrainId, Runtime.IGrainReminder reminder);

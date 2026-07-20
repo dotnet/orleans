@@ -115,7 +115,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag!);
+                await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
                 grainState.State = CreateInstance<T>();

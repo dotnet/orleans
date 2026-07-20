@@ -71,7 +71,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
+        public IEnumerable<Dictionary<string, string?>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
         {
             var binding = new Dictionary<string, string?>
             {
@@ -99,7 +99,7 @@ namespace Orleans
                 binding[WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey] = "true";
             }
 
-            yield return (Dictionary<string, string>)(object)binding; // Nullable annotations are erased at runtime and bindings may carry a null mapper name.
+            yield return binding;
         }
     }
 

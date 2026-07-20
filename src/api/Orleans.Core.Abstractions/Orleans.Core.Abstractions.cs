@@ -1652,7 +1652,7 @@ namespace Orleans.Metadata
 
     public partial interface IGrainBindingsProviderAttribute
     {
-        System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string>> GetBindings(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType);
+        System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string?>> GetBindings(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType);
     }
 
     public partial interface IGrainInterfacePropertiesProvider
@@ -2727,7 +2727,7 @@ namespace Orleans.Runtime
 
         public static string PrintDate(System.DateTime date) { throw null; }
 
-        public static string PrintException(System.Exception exception) { throw null; }
+        public static string PrintException(System.Exception? exception) { throw null; }
 
         public static string PrintTime(System.DateTime date) { throw null; }
 

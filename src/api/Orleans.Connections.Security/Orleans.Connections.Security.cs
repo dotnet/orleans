@@ -23,7 +23,7 @@ namespace Orleans.Connections.Security
         public static System.Security.Cryptography.X509Certificates.X509Certificate2 LoadFromStoreCert(string subject, string storeName, System.Security.Cryptography.X509Certificates.StoreLocation storeLocation, bool allowInvalid, bool server) { throw null; }
     }
 
-    public delegate System.Security.Cryptography.X509Certificates.X509Certificate ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate remoteCertificate, string[] acceptableIssuers);
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate? remoteCertificate, string[] acceptableIssuers);
     public partial interface ITlsApplicationProtocolFeature
     {
         System.ReadOnlyMemory<byte> ApplicationProtocol { get; }
@@ -31,9 +31,9 @@ namespace Orleans.Connections.Security
 
     public partial interface ITlsConnectionFeature
     {
-        System.Security.Cryptography.X509Certificates.X509Certificate2 RemoteCertificate { get; set; }
+        System.Security.Cryptography.X509Certificates.X509Certificate2? RemoteCertificate { get; set; }
 
-        System.Threading.Tasks.Task<System.Security.Cryptography.X509Certificates.X509Certificate2> GetRemoteCertificateAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<System.Security.Cryptography.X509Certificates.X509Certificate2?> GetRemoteCertificateAsync(System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface ITlsHandshakeFeature
@@ -64,21 +64,21 @@ namespace Orleans.Connections.Security
         RequireCertificate = 2
     }
 
-    public delegate bool RemoteCertificateValidator(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Security.Cryptography.X509Certificates.X509Chain chain, System.Net.Security.SslPolicyErrors policyErrors);
-    public delegate System.Security.Cryptography.X509Certificates.X509Certificate ServerCertificateSelectionCallback(object sender, string hostName);
+    public delegate bool RemoteCertificateValidator(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Security.Cryptography.X509Certificates.X509Chain? chain, System.Net.Security.SslPolicyErrors policyErrors);
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate ServerCertificateSelectionCallback(object sender, string? hostName);
     public partial class TlsClientAuthenticationOptions
     {
         public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
 
-        public System.Security.Cryptography.X509Certificates.X509CertificateCollection ClientCertificates { get { throw null; } set { } }
+        public System.Security.Cryptography.X509Certificates.X509CertificateCollection? ClientCertificates { get { throw null; } set { } }
 
         public System.Security.Authentication.SslProtocols EnabledSslProtocols { get { throw null; } set { } }
 
-        public ClientCertificateSelectionCallback LocalCertificateSelectionCallback { get { throw null; } set { } }
+        public ClientCertificateSelectionCallback? LocalCertificateSelectionCallback { get { throw null; } set { } }
 
         public object SslClientAuthenticationOptions { get { throw null; } }
 
-        public string TargetHost { get { throw null; } set { } }
+        public string? TargetHost { get { throw null; } set { } }
     }
 
     public partial class TlsOptions
@@ -89,19 +89,19 @@ namespace Orleans.Connections.Security
 
         public System.TimeSpan HandshakeTimeout { get { throw null; } set { } }
 
-        public System.Security.Cryptography.X509Certificates.X509Certificate2 LocalCertificate { get { throw null; } set { } }
+        public System.Security.Cryptography.X509Certificates.X509Certificate2? LocalCertificate { get { throw null; } set { } }
 
-        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate, string[], System.Security.Cryptography.X509Certificates.X509Certificate2> LocalClientCertificateSelector { get { throw null; } set { } }
+        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate?, string[], System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalClientCertificateSelector { get { throw null; } set { } }
 
-        public System.Func<Microsoft.AspNetCore.Connections.ConnectionContext, string, System.Security.Cryptography.X509Certificates.X509Certificate2> LocalServerCertificateSelector { get { throw null; } set { } }
+        public System.Func<Microsoft.AspNetCore.Connections.ConnectionContext, string?, System.Security.Cryptography.X509Certificates.X509Certificate2>? LocalServerCertificateSelector { get { throw null; } set { } }
 
-        public System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, TlsClientAuthenticationOptions> OnAuthenticateAsClient { get { throw null; } set { } }
+        public System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, TlsClientAuthenticationOptions>? OnAuthenticateAsClient { get { throw null; } set { } }
 
-        public System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, TlsServerAuthenticationOptions> OnAuthenticateAsServer { get { throw null; } set { } }
+        public System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, TlsServerAuthenticationOptions>? OnAuthenticateAsServer { get { throw null; } set { } }
 
         public RemoteCertificateMode RemoteCertificateMode { get { throw null; } set { } }
 
-        public RemoteCertificateValidator RemoteCertificateValidation { get { throw null; } set { } }
+        public RemoteCertificateValidator? RemoteCertificateValidation { get { throw null; } set { } }
 
         public System.Security.Authentication.SslProtocols SslProtocols { get { throw null; } set { } }
 
@@ -116,9 +116,9 @@ namespace Orleans.Connections.Security
 
         public System.Security.Authentication.SslProtocols EnabledSslProtocols { get { throw null; } set { } }
 
-        public System.Security.Cryptography.X509Certificates.X509Certificate ServerCertificate { get { throw null; } set { } }
+        public System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificate { get { throw null; } set { } }
 
-        public ServerCertificateSelectionCallback ServerCertificateSelectionCallback { get { throw null; } set { } }
+        public ServerCertificateSelectionCallback? ServerCertificateSelectionCallback { get { throw null; } set { } }
 
         public object SslServerAuthenticationOptions { get { throw null; } }
     }

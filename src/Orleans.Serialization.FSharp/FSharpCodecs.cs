@@ -129,11 +129,12 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public FSharpOption<T> DeepCopy([AllowNull] FSharpOption<T> input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public FSharpOption<T>? DeepCopy([AllowNull] FSharpOption<T> input, CopyContext context)
         {
             if (input is null || FSharpOption<T>.get_IsNone(input))
             {
-                return input!;
+                return input;
             }
 
             if (context.TryGetCopy<FSharpOption<T>>(input, out var result))

@@ -39,7 +39,7 @@ namespace Orleans.Clustering.Redis
 
     public partial class RedisClusteringOptions
     {
-        public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
+        public StackExchange.Redis.ConfigurationOptions? ConfigurationOptions { get { throw null; } set { } }
 
         public System.Func<RedisClusteringOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get { throw null; } set { } }
 

@@ -37,10 +37,7 @@ namespace Orleans.Streams
         }
         public bool Equals(PubSubPublisherState? other)
         {
-            if ((object?)other == null)
-                return false;
-
-            return Equals(other.Stream, other.Producer);
+            return Equals(other!.Stream, other.Producer); // Preserve the legacy null dereference behavior.
         }
         public bool Equals(QualifiedStreamId streamId, GrainId streamProducer)
         {
@@ -50,17 +47,11 @@ namespace Orleans.Streams
 
         public static bool operator ==(PubSubPublisherState? left, PubSubPublisherState? right)
         {
-            if ((object?)left == null && (object?)right == null)
-                return true;
-            if ((object?)left != null)
-            {
-                return left.Equals(right);
-            }
-            return false;
+            return left!.Equals(right); // Preserve the legacy null dereference behavior.
         }
         public static bool operator !=(PubSubPublisherState? left, PubSubPublisherState? right)
         {
-            return !(left == right);
+            return !left!.Equals(right); // Preserve the legacy null dereference behavior.
         }
         public override int GetHashCode() => HashCode.Combine(Stream, Producer);
 

@@ -10,7 +10,7 @@ namespace Orleans.Storage
         /// <summary>Async method to cause retrieval of the specified grain state data from memory store.</summary>
         /// <param name="grainStoreKey">Store key for this grain.</param>
         /// <returns>Value promise for the currently stored grain state for the specified grain.</returns>
-        Task<IGrainState<T>> ReadStateAsync<T>(string grainStoreKey);
+        Task<IGrainState<T>?> ReadStateAsync<T>(string grainStoreKey);
 
         /// <summary>Async method to cause update of the specified grain state data into memory store.</summary>
         /// <param name="grainStoreKey">Grain ID.</param>
@@ -21,6 +21,6 @@ namespace Orleans.Storage
         /// <param name="grainStoreKey">Store key for this grain.</param>
         /// <param name="eTag">The previous etag that was read.</param>
         /// <returns>Completion promise for the update operation for stored grain state for the specified grain.</returns>
-        Task DeleteStateAsync<T>(string grainStoreKey, string eTag);
+        Task DeleteStateAsync<T>(string grainStoreKey, string? eTag);
     }
 }

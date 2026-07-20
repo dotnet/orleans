@@ -14,13 +14,13 @@ namespace Orleans.Serialization
         public const string WellKnownAlias = "json";
         public JsonCodec(System.Collections.Generic.IEnumerable<Serializers.ICodecSelector> serializableTypeSelectors, System.Collections.Generic.IEnumerable<Serializers.ICopierSelector> copyableTypeSelectors, Microsoft.Extensions.Options.IOptions<JsonCodecOptions> options) { }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
 
         bool Cloning.IGeneralizedCopier.IsSupportedType(System.Type type) { throw null; }
 
-        object Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        object? Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        void Codecs.IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value) { }
+        void Codecs.IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value) { }
 
         bool? ITypeFilter.IsTypeAllowed(System.Type type) { throw null; }
 
@@ -29,9 +29,9 @@ namespace Orleans.Serialization
 
     public partial class JsonCodecOptions
     {
-        public System.Func<System.Type, bool?> IsCopyableType { get { throw null; } set { } }
+        public System.Func<System.Type, bool?>? IsCopyableType { get { throw null; } set { } }
 
-        public System.Func<System.Type, bool?> IsSerializableType { get { throw null; } set { } }
+        public System.Func<System.Type, bool?>? IsSerializableType { get { throw null; } set { } }
 
         public System.Text.Json.JsonReaderOptions ReaderOptions { get { throw null; } set { } }
 
@@ -42,8 +42,8 @@ namespace Orleans.Serialization
 
     public static partial class SerializationHostingExtensions
     {
-        public static ISerializerBuilder AddJsonSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable, System.Func<System.Type, bool> isCopyable, System.Action<Microsoft.Extensions.Options.OptionsBuilder<JsonCodecOptions>> configureOptions = null) { throw null; }
+        public static ISerializerBuilder AddJsonSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool>? isSerializable, System.Func<System.Type, bool>? isCopyable, System.Action<Microsoft.Extensions.Options.OptionsBuilder<JsonCodecOptions>>? configureOptions = null) { throw null; }
 
-        public static ISerializerBuilder AddJsonSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSupported, System.Text.Json.JsonSerializerOptions jsonSerializerOptions = null) { throw null; }
+        public static ISerializerBuilder AddJsonSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool>? isSupported, System.Text.Json.JsonSerializerOptions? jsonSerializerOptions = null) { throw null; }
     }
 }

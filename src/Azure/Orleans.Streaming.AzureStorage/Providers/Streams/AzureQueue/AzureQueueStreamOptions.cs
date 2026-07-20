@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
@@ -44,6 +45,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the <see cref="QueueServiceClient"/> used to access the Azure Queue Service.
         /// </summary>
+        [DisallowNull]
         public QueueServiceClient? QueueServiceClient
         {
             get => _queueServiceClient;
@@ -51,7 +53,7 @@ namespace Orleans.Configuration
             set
             {
                 _queueServiceClient = value;
-                CreateClient = () => Task.FromResult(value!);
+                CreateClient = () => Task.FromResult(value);
             }
         }
 

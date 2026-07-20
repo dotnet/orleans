@@ -13,17 +13,17 @@ namespace Orleans
     {
         public ImplicitChannelSubscriptionAttribute() { }
 
-        public ImplicitChannelSubscriptionAttribute(BroadcastChannel.IChannelNamespacePredicate predicate, string channelIdMapper = null) { }
+        public ImplicitChannelSubscriptionAttribute(BroadcastChannel.IChannelNamespacePredicate predicate, string? channelIdMapper = null) { }
 
-        public ImplicitChannelSubscriptionAttribute(string streamNamespace, string channelIdMapper = null) { }
+        public ImplicitChannelSubscriptionAttribute(string streamNamespace, string? channelIdMapper = null) { }
 
-        public ImplicitChannelSubscriptionAttribute(System.Type predicateType, string channelIdMapper = null) { }
+        public ImplicitChannelSubscriptionAttribute(System.Type predicateType, string? channelIdMapper = null) { }
 
-        public string ChannelIdMapper { get { throw null; } }
+        public string? ChannelIdMapper { get { throw null; } }
 
         public BroadcastChannel.IChannelNamespacePredicate Predicate { get { throw null; } }
 
-        public System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string>> GetBindings(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType) { throw null; }
+        public System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string?>> GetBindings(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType) { throw null; }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
@@ -86,9 +86,9 @@ namespace Orleans.BroadcastChannel
     public partial class ConstructorChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
     {
         public const string Prefix = "ctor";
-        public static string FormatPattern(System.Type predicateType, string constructorArgument) { throw null; }
+        public static string FormatPattern(System.Type predicateType, string? constructorArgument) { throw null; }
 
-        public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate) { throw null; }
+        public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate? predicate) { throw null; }
     }
 
     public sealed partial class DefaultChannelIdMapper : IChannelIdMapper
@@ -99,7 +99,7 @@ namespace Orleans.BroadcastChannel
 
     public partial class DefaultChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
     {
-        public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate) { throw null; }
+        public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate? predicate) { throw null; }
     }
 
     public partial interface IBroadcastChannelProvider
@@ -113,7 +113,7 @@ namespace Orleans.BroadcastChannel
 
         string ProviderName { get; }
 
-        System.Threading.Tasks.Task Attach<T>(System.Func<T, System.Threading.Tasks.Task> onPublished, System.Func<System.Exception, System.Threading.Tasks.Task> onError = null);
+        System.Threading.Tasks.Task Attach<T>(System.Func<T, System.Threading.Tasks.Task> onPublished, System.Func<System.Exception, System.Threading.Tasks.Task>? onError = null);
     }
 
     public partial interface IBroadcastChannelWriter<T>
@@ -135,7 +135,7 @@ namespace Orleans.BroadcastChannel
 
     public partial interface IChannelNamespacePredicateProvider
     {
-        bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate);
+        bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate? predicate);
     }
 
     public partial interface IOnBroadcastChannelSubscribed
@@ -186,11 +186,11 @@ namespace Orleans.Hosting
 {
     public static partial class ChannelHostingExtensions
     {
-        public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<BroadcastChannel.BroadcastChannelOptions>> configureOptions = null) { throw null; }
+        public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<BroadcastChannel.BroadcastChannelOptions>>? configureOptions = null) { throw null; }
 
         public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, System.Action<BroadcastChannel.BroadcastChannelOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<BroadcastChannel.BroadcastChannelOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<BroadcastChannel.BroadcastChannelOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, System.Action<BroadcastChannel.BroadcastChannelOptions> configureOptions) { throw null; }
 

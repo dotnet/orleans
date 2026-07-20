@@ -256,7 +256,7 @@ namespace Orleans.Runtime
 
             Task DisposePublishTimer(CancellationToken ct)
             {
-                _publishTimer!.Dispose();
+                _publishTimer!.Dispose(); // Preserve the existing lifecycle contract that publishing is enabled.
                 return Task.CompletedTask;
             }
         }

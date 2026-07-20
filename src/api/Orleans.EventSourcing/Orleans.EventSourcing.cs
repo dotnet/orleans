@@ -10,7 +10,7 @@ namespace Orleans.Configuration
 {
     public partial class CustomStorageLogConsistencyOptions
     {
-        public string PrimaryCluster { get { throw null; } set { } }
+        public string? PrimaryCluster { get { throw null; } set { } }
     }
 }
 
@@ -44,7 +44,7 @@ namespace Orleans.EventSourcing
     {
         void DisableStatsCollection();
         void EnableStatsCollection();
-        LogConsistencyStatistics GetStats();
+        LogConsistencyStatistics? GetStats();
     }
 
     public partial interface ILogConsistencyProtocolMessage
@@ -75,7 +75,7 @@ namespace Orleans.EventSourcing
     {
         bool UsesStorageProvider { get; }
 
-        ILogViewAdaptor<TLogView, TLogEntry> MakeLogViewAdaptor<TLogView, TLogEntry>(ILogViewAdaptorHost<TLogView, TLogEntry> hostGrain, TLogView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        ILogViewAdaptor<TLogView, TLogEntry> MakeLogViewAdaptor<TLogView, TLogEntry>(ILogViewAdaptorHost<TLogView, TLogEntry> hostGrain, TLogView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TLogView : class, new()
             where TLogEntry : class;
     }
@@ -142,9 +142,9 @@ namespace Orleans.EventSourcing
 
         protected void EnableStatsCollection() { }
 
-        protected LogConsistencyStatistics GetStats() { throw null; }
+        protected LogConsistencyStatistics? GetStats() { throw null; }
 
-        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services) { }
+        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services) { }
 
         public override System.Threading.Tasks.Task OnActivateAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
@@ -197,9 +197,9 @@ namespace Orleans.EventSourcing
 
     public abstract partial class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<Runtime.IGrainLifecycle>
     {
-        protected abstract ILogViewAdaptorFactory DefaultAdaptorFactory { get; }
+        protected abstract ILogViewAdaptorFactory? DefaultAdaptorFactory { get; }
 
-        protected abstract void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services);
+        protected abstract void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services);
         public virtual void Participate(Runtime.IGrainLifecycle lifecycle) { }
     }
 
@@ -239,7 +239,7 @@ namespace Orleans.EventSourcing.Common
         where TLogEntry : class where TSubmissionEntry : SubmissionEntry<TLogEntry>
     {
         protected RecordedConnectionIssue LastPrimaryIssue;
-        protected LogConsistencyStatistics stats;
+        protected LogConsistencyStatistics? stats;
         protected PrimaryBasedLogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialstate, ILogConsistencyProtocolServices services) { }
 
         public int ConfirmedVersion { get { throw null; } }
@@ -277,7 +277,7 @@ namespace Orleans.EventSourcing.Common
 
         protected int GetNumberPendingUpdates() { throw null; }
 
-        public LogConsistencyStatistics GetStats() { throw null; }
+        public LogConsistencyStatistics? GetStats() { throw null; }
 
         protected abstract void InitializeConfirmedView(TLogView initialstate);
         protected bool IsMyClusterJoined() { throw null; }
@@ -292,7 +292,7 @@ namespace Orleans.EventSourcing.Common
 
         protected virtual void OnNotificationReceived(INotificationMessage payload) { }
 
-        public System.Threading.Tasks.Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad) { throw null; }
+        public System.Threading.Tasks.Task<ILogConsistencyProtocolMessage?> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad) { throw null; }
 
         public virtual System.Threading.Tasks.Task PostOnActivate() { throw null; }
 
@@ -333,7 +333,7 @@ namespace Orleans.EventSourcing.Common
     {
         private object _dummy;
         private int _dummyPrimitive;
-        public ConnectionIssue Issue { get { throw null; } }
+        public ConnectionIssue? Issue { get { throw null; } }
 
         public readonly System.Threading.Tasks.Task DelayBeforeRetry() { throw null; }
 
@@ -341,7 +341,7 @@ namespace Orleans.EventSourcing.Common
 
         public void Resolve(IConnectionIssueListener listener, ILogConsistencyProtocolServices services) { }
 
-        public override readonly string ToString() { throw null; }
+        public override readonly string? ToString() { throw null; }
     }
 
     public static partial class StringEncodedWriteVector
@@ -354,8 +354,9 @@ namespace Orleans.EventSourcing.Common
     public partial class SubmissionEntry<TLogEntry>
     {
         public int ConditionalPosition;
+        [System.Diagnostics.CodeAnalysis.MaybeNull]
         public TLogEntry Entry;
-        public System.Threading.Tasks.TaskCompletionSource<bool> ResultPromise;
+        public System.Threading.Tasks.TaskCompletionSource<bool>? ResultPromise;
         public System.DateTime SubmissionTime;
     }
 
@@ -380,18 +381,18 @@ namespace Orleans.EventSourcing.CustomStorage
     {
         public LogConsistencyProvider(Configuration.CustomStorageLogConsistencyOptions options) { }
 
-        public string PrimaryCluster { get { throw null; } }
+        public string? PrimaryCluster { get { throw null; } }
 
         public bool UsesStorageProvider { get { throw null; } }
 
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class { throw null; }
     }
 
     public static partial class LogConsistencyProviderFactory
     {
-        public static ILogViewAdaptorFactory Create(System.IServiceProvider services, string name) { throw null; }
+        public static ILogViewAdaptorFactory Create(System.IServiceProvider services, string? name) { throw null; }
     }
 }
 
@@ -401,7 +402,7 @@ namespace Orleans.EventSourcing.LogStorage
     {
         public bool UsesStorageProvider { get { throw null; } }
 
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class { throw null; }
     }
@@ -410,15 +411,15 @@ namespace Orleans.EventSourcing.LogStorage
     public sealed partial class LogStateWithMetaDataAndETag<TEntry> : IGrainState<LogStateWithMetaData<TEntry>> where TEntry : class
     {
         [Id(1)]
-        public string ETag { get { throw null; } set { } }
+        public string? ETag { get { throw null; } set { } }
 
         [Id(2)]
         public bool RecordExists { get { throw null; } set { } }
 
-        public LogStateWithMetaData<TEntry> State { get { throw null; } set { } }
+        public LogStateWithMetaData<TEntry>? State { get { throw null; } set { } }
 
         [Id(0)]
-        public LogStateWithMetaData<TEntry> StateAndMetaData { get { throw null; } set { } }
+        public LogStateWithMetaData<TEntry>? StateAndMetaData { get { throw null; } set { } }
 
         public override string ToString() { throw null; }
     }
@@ -451,15 +452,15 @@ namespace Orleans.EventSourcing.StateStorage
         public GrainStateWithMetaDataAndETag(TView initialview) { }
 
         [Id(1)]
-        public string ETag { get { throw null; } set { } }
+        public string? ETag { get { throw null; } set { } }
 
         [Id(2)]
         public bool RecordExists { get { throw null; } set { } }
 
-        public GrainStateWithMetaData<TView> State { get { throw null; } set { } }
+        public GrainStateWithMetaData<TView>? State { get { throw null; } set { } }
 
         [Id(0)]
-        public GrainStateWithMetaData<TView> StateAndMetaData { get { throw null; } set { } }
+        public GrainStateWithMetaData<TView>? StateAndMetaData { get { throw null; } set { } }
 
         public override string ToString() { throw null; }
     }
@@ -490,7 +491,7 @@ namespace Orleans.EventSourcing.StateStorage
     {
         public bool UsesStorageProvider { get { throw null; } }
 
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class { throw null; }
     }
@@ -500,9 +501,9 @@ namespace Orleans.Hosting
 {
     public static partial class CustomStorageSiloBuilderExtensions
     {
-        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string primaryCluster = null) { throw null; }
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null) { throw null; }
 
-        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string primaryCluster = null) { throw null; }
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string? primaryCluster = null) { throw null; }
     }
 
     public static partial class LogStorageSiloBuilderExtensions

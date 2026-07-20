@@ -21,11 +21,11 @@ namespace Orleans.Storage
             _logger = logger;
         }
 
-        public Task<IGrainState<T>> ReadStateAsync<T>(string grainStoreKey)
+        public Task<IGrainState<T>?> ReadStateAsync<T>(string grainStoreKey)
         {
             LogDebugReadState(grainStoreKey);
             _store.TryGetValue(grainStoreKey, out var entry);
-            return Task.FromResult((IGrainState<T>)entry!);
+            return Task.FromResult((IGrainState<T>?)entry);
         }
 
         public Task<string> WriteStateAsync<T>(string grainStoreKey, IGrainState<T> grainState)
