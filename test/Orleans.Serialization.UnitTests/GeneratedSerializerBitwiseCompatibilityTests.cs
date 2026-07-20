@@ -546,7 +546,7 @@ public sealed class BaselineClass
     public int IntField;
 
     [Id(2)]
-    public object OtherObject { get; set; }
+    public object? OtherObject { get; set; }
 }
 
 [GenerateSerializer]
@@ -561,10 +561,10 @@ public enum BaselineEnum
 public sealed record BaselinePerson([property: Id(0)] int Age, [property: Id(1)] string Name)
 {
     [Id(2)]
-    public string FavouriteColor { get; init; }
+    public string? FavouriteColor { get; init; }
 
     [Id(3)]
-    public string StarSign { get; init; }
+    public string? StarSign { get; init; }
 }
 
 [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties)]
@@ -587,14 +587,14 @@ public sealed class BaselineAutoProperties
 public class BaselineBase
 {
     [Id(0)]
-    public BaselineValue BaseValue { get; set; }
+    public BaselineValue? BaseValue { get; set; }
 }
 
 [GenerateSerializer]
 public sealed class BaselineDerived : BaselineBase
 {
     [Id(0)]
-    public BaselineValue SubValue { get; set; }
+    public BaselineValue? SubValue { get; set; }
 }
 
 [GenerateSerializer]

@@ -1,4 +1,4 @@
-using CsCheck;
+﻿using CsCheck;
 #if NET8_0_OR_GREATER
 using Orleans;
 using Orleans.CodeGeneration;
@@ -39,6 +39,8 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
+// TestKit's legacy TestValues/CreateValue contracts cannot express intentionally nullable test values.
+#pragma warning disable CS8609, CS8764
 namespace Orleans.Serialization.UnitTests
 {
     internal static class CsCheckAdaptor
@@ -411,252 +413,209 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(BitVector32 left, BitVector32 right) => left.Equals(right) && left.GetHashCode() == right.GetHashCode();
     }
 
-    public class KeyValuePairTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<KeyValuePair<string, string>, KeyValuePairCodec<string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class KeyValuePairTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<KeyValuePair<string?, string?>, KeyValuePairCodec<string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override KeyValuePair<string, string> CreateValue() => KeyValuePair.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        protected override KeyValuePair<string?, string?> CreateValue() => KeyValuePair.Create<string?, string?>(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
 
-        protected override KeyValuePair<string, string>[] TestValues =>
+        protected override KeyValuePair<string?, string?>[] TestValues =>
         [
             default,
-            KeyValuePair.Create<string, string>(null, null),
-            KeyValuePair.Create<string, string>(string.Empty, "foo"),
-            KeyValuePair.Create<string, string>("foo", "bar"),
-            KeyValuePair.Create<string, string>("foo", "foo"),
+            KeyValuePair.Create<string?, string?>(null, null),
+            KeyValuePair.Create<string?, string?>(string.Empty, "foo"),
+            KeyValuePair.Create<string?, string?>("foo", "bar"),
+            KeyValuePair.Create<string?, string?>("foo", "foo"),
         ];
     }
 
-    public class KeyValuePairCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<KeyValuePair<string, string>, KeyValuePairCopier<string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class KeyValuePairCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<KeyValuePair<string?, string?>, KeyValuePairCopier<string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override KeyValuePair<string, string> CreateValue() => KeyValuePair.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        protected override KeyValuePair<string?, string?> CreateValue() => KeyValuePair.Create<string?, string?>(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
 
-        protected override KeyValuePair<string, string>[] TestValues =>
+        protected override KeyValuePair<string?, string?>[] TestValues =>
         [
             default,
-            KeyValuePair.Create<string, string>(null, null),
-            KeyValuePair.Create<string, string>(string.Empty, "foo"),
-            KeyValuePair.Create<string, string>("foo", "bar"),
-            KeyValuePair.Create<string, string>("foo", "foo"),
+            KeyValuePair.Create<string?, string?>(null, null),
+            KeyValuePair.Create<string?, string?>(string.Empty, "foo"),
+            KeyValuePair.Create<string?, string?>("foo", "bar"),
+            KeyValuePair.Create<string?, string?>("foo", "foo"),
         ];
     }
 
-    public class Tuple1Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string>, TupleCodec<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple1Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?>, TupleCodec<string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string> CreateValue() => Tuple.Create(Guid.NewGuid().ToString());
+        protected override Tuple<string?> CreateValue() => Tuple.Create<string?>(Guid.NewGuid().ToString());
 
-        protected override Tuple<string>[] TestValues =>
+        protected override Tuple<string?>?[] TestValues =>
         [
             null,
-            Tuple.Create<string>(null),
-            Tuple.Create<string>(string.Empty),
-            Tuple.Create<string>("foobar")
+            Tuple.Create<string?>(null),
+            Tuple.Create<string?>(string.Empty),
+            Tuple.Create<string?>("foobar")
         ];
     }
 
-    public class Tuple1CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string>, TupleCopier<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple1CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?>, TupleCopier<string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string> CreateValue() => Tuple.Create(Guid.NewGuid().ToString());
+        protected override Tuple<string?> CreateValue() => Tuple.Create<string?>(Guid.NewGuid().ToString());
 
-        protected override Tuple<string>[] TestValues =>
+        protected override Tuple<string?>?[] TestValues =>
         [
             null,
-            Tuple.Create<string>(null),
-            Tuple.Create<string>(string.Empty),
-            Tuple.Create<string>("foobar")
-        ];
-
-        protected override bool IsImmutable => true;
-    }
-
-    public class Tuple2Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string>, TupleCodec<string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
-    {
-        protected override Tuple<string, string> CreateValue() => Tuple.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
-
-        protected override Tuple<string, string>[] TestValues =>
-        [
-            null,
-            Tuple.Create<string, string>(null, null),
-            Tuple.Create<string, string>(string.Empty, "foo"),
-            Tuple.Create<string, string>("foo", "bar"),
-            Tuple.Create<string, string>("foo", "foo"),
-        ];
-    }
-
-    public class Tuple2CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string>, TupleCopier<string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
-    {
-        protected override Tuple<string, string> CreateValue() => Tuple.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
-
-        protected override Tuple<string, string>[] TestValues =>
-        [
-            null,
-            Tuple.Create<string, string>(null, null),
-            Tuple.Create<string, string>(string.Empty, "foo"),
-            Tuple.Create<string, string>("foo", "bar"),
-            Tuple.Create<string, string>("foo", "foo"),
+            Tuple.Create<string?>(null),
+            Tuple.Create<string?>(string.Empty),
+            Tuple.Create<string?>("foobar")
         ];
 
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple3Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string, string>, TupleCodec<string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple2Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?, string?>, TupleCodec<string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString());
+        protected override Tuple<string?, string?> CreateValue() => Tuple.Create<string?, string?>(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz"),
-            Tuple.Create("foo", "foo", "foo")
+            Tuple.Create<string?, string?>(null, null),
+            Tuple.Create<string?, string?>(string.Empty, "foo"),
+            Tuple.Create<string?, string?>("foo", "bar"),
+            Tuple.Create<string?, string?>("foo", "foo"),
         ];
     }
 
-    public class Tuple3CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string, string>, TupleCopier<string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple2CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?, string?>, TupleCopier<string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString());
+        protected override Tuple<string?, string?> CreateValue() => Tuple.Create<string?, string?>(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz"),
-            Tuple.Create("foo", "foo", "foo")
+            Tuple.Create<string?, string?>(null, null),
+            Tuple.Create<string?, string?>(string.Empty, "foo"),
+            Tuple.Create<string?, string?>("foo", "bar"),
+            Tuple.Create<string?, string?>("foo", "foo"),
         ];
 
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple4Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string, string, string>, TupleCodec<string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple3Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?, string?, string?>, TupleCodec<string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4"),
-            Tuple.Create("foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?>(default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?>(string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?>("foo", "bar", "baz"),
+            Tuple.Create<string?, string?, string?>("foo", "foo", "foo")
         ];
     }
 
-    public class Tuple4CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string, string, string>, TupleCopier<string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple3CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?, string?, string?>, TupleCopier<string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4"),
-            Tuple.Create("foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?>(default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?>(string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?>("foo", "bar", "baz"),
+            Tuple.Create<string?, string?, string?>("foo", "foo", "foo")
         ];
 
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple5Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string, string, string, string>, TupleCodec<string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple4Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?, string?, string?, string?>, TupleCodec<string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4", "5"),
-            Tuple.Create("foo", "foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?>("foo", "bar", "baz", "4"),
+            Tuple.Create<string?, string?, string?, string?>("foo", "foo", "foo", "foo")
         ];
     }
 
-    public class Tuple5CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string, string, string, string>, TupleCopier<string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple4CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?, string?, string?, string?>, TupleCopier<string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4", "5"),
-            Tuple.Create("foo", "foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?>("foo", "bar", "baz", "4"),
+            Tuple.Create<string?, string?, string?, string?>("foo", "foo", "foo", "foo")
         ];
 
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string,string, string, string, string>, TupleCodec<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple5Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?, string?, string?, string?, string?>, TupleCodec<string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4", "5", "6"),
-            Tuple.Create("foo", "foo", "foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5"),
+            Tuple.Create<string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class Tuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string,string, string, string, string>, TupleCopier<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple5CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?, string?, string?, string?, string?>, TupleCopier<string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4", "5", "6"),
-            Tuple.Create("foo", "foo", "foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5"),
+            Tuple.Create<string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo")
         ];
 
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple7Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string, string, string, string, string, string>, TupleCodec<string, string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?, string?,string?, string?, string?, string?>, TupleCodec<string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -664,20 +623,19 @@ namespace Orleans.Serialization.UnitTests
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4", "5", "6", "7"),
-            Tuple.Create("foo", "foo", "foo", "foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class Tuple7CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string, string, string, string, string, string>, TupleCopier<string, string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?, string?,string?, string?, string?, string?>, TupleCopier<string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string, string, string> CreateValue() => Tuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override Tuple<string?, string?, string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -685,59 +643,103 @@ namespace Orleans.Serialization.UnitTests
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string, string, string>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            Tuple.Create(default(string), default(string), default(string), default(string), default(string), default(string), default(string)),
-            Tuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            Tuple.Create("foo", "bar", "baz", "4", "5", "6", "7"),
-            Tuple.Create("foo", "foo", "foo", "foo", "foo", "foo", "foo")
+            Tuple.Create<string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo")
         ];
 
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple8Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string, string, string, string, string, string, Tuple<string>>, TupleCodec<string, string, string, string, string, string, string, Tuple<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple7Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?, string?, string?, string?, string?, string?, string?>, TupleCodec<string?, string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string, string, string, Tuple<string>> CreateValue() => new(
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString(),
-            new Tuple<string>(Guid.NewGuid().ToString()));
+            Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string, string, string, Tuple<string>>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>(default, default, default, default, default, default, default, new Tuple<string>(default)),
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", Tuple.Create("foo")),
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>("foo", "bar", "baz", "4", "5", "6", "7", Tuple.Create("8")),
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", Tuple.Create("foo"))
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6", "7"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class Tuple8CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string, string, string, string, string, string, Tuple<string>>, TupleCopier<string, string, string, string, string, string, string, Tuple<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple7CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?, string?, string?, string?, string?, string?, string?>, TupleCopier<string?, string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Tuple<string, string, string, string, string, string, string, Tuple<string>> CreateValue() => new(
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?> CreateValue() => Tuple.Create<string?, string?, string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString(),
-            new Tuple<string>(Guid.NewGuid().ToString()));
+            Guid.NewGuid().ToString());
 
-        protected override Tuple<string, string, string, string, string, string, string, Tuple<string>>[] TestValues =>
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?>?[] TestValues =>
         [
             null,
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>(default, default, default, default, default, default, default, new Tuple<string>(default)),
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", Tuple.Create("foo")),
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>("foo", "bar", "baz", "4", "5", "6", "7", Tuple.Create("8")),
-            new Tuple<string, string, string, string, string, string, string, Tuple<string>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", Tuple.Create("foo"))
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6", "7"),
+            Tuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo", "foo")
+        ];
+
+        protected override bool IsImmutable => true;
+    }
+
+    public class Tuple8Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>, TupleCodec<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>> CreateValue() => new(
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            new Tuple<string?>(Guid.NewGuid().ToString()));
+
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>?[] TestValues =>
+        [
+            null,
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>(default, default, default, default, default, default, default, new Tuple<string?>(default)),
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", Tuple.Create<string?>("foo")),
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>("foo", "bar", "baz", "4", "5", "6", "7", Tuple.Create<string?>("8")),
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", Tuple.Create<string?>("foo"))
+        ];
+    }
+
+    public class Tuple8CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>, TupleCopier<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>> CreateValue() => new(
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            new Tuple<string?>(Guid.NewGuid().ToString()));
+
+        protected override Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>?[] TestValues =>
+        [
+            null,
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>(default, default, default, default, default, default, default, new Tuple<string?>(default)),
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", Tuple.Create<string?>("foo")),
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>("foo", "bar", "baz", "4", "5", "6", "7", Tuple.Create<string?>("8")),
+            new Tuple<string?, string?, string?, string?, string?, string?, string?, Tuple<string?>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", Tuple.Create<string?>("foo"))
         ];
 
         protected override bool IsImmutable => true;
@@ -757,191 +759,171 @@ namespace Orleans.Serialization.UnitTests
         protected override ValueTuple[] TestValues => [ default ];
     }
 
-    public class ValueTuple1Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string>, ValueTupleCodec<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple1Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?>, ValueTupleCodec<string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString());
+        protected override ValueTuple<string?> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string>[] TestValues =>
+        protected override ValueTuple<string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create<string>(null),
-            ValueTuple.Create<string>(string.Empty),
-            ValueTuple.Create<string>("foobar")
+            ValueTuple.Create<string?>(null),
+            ValueTuple.Create<string?>(string.Empty),
+            ValueTuple.Create<string?>("foobar")
         ];
     }
 
-    public class ValueTuple1CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string>, ValueTupleCopier<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple1CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?>, ValueTupleCopier<string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString());
+        protected override ValueTuple<string?> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string>[] TestValues =>
+        protected override ValueTuple<string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create<string>(null),
-            ValueTuple.Create<string>(string.Empty),
-            ValueTuple.Create<string>("foobar")
+            ValueTuple.Create<string?>(null),
+            ValueTuple.Create<string?>(string.Empty),
+            ValueTuple.Create<string?>("foobar")
         ];
     }
 
-    public class ValueTuple2Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string>, ValueTupleCodec<string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple2Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?, string?>, ValueTupleCodec<string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        protected override ValueTuple<string?, string?> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create<string, string>(null, null),
-            ValueTuple.Create<string, string>(string.Empty, "foo"),
-            ValueTuple.Create<string, string>("foo", "bar"),
-            ValueTuple.Create<string, string>("foo", "foo"),
+            ValueTuple.Create<string?, string?>(null, null),
+            ValueTuple.Create<string?, string?>(string.Empty, "foo"),
+            ValueTuple.Create<string?, string?>("foo", "bar"),
+            ValueTuple.Create<string?, string?>("foo", "foo"),
         ];
     }
 
-    public class ValueTuple2CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string>, ValueTupleCopier<string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple2CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?, string?>, ValueTupleCopier<string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        protected override ValueTuple<string?, string?> CreateValue() => ValueTuple.Create(Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create<string, string>(null, null),
-            ValueTuple.Create<string, string>(string.Empty, "foo"),
-            ValueTuple.Create<string, string>("foo", "bar"),
-            ValueTuple.Create<string, string>("foo", "foo"),
+            ValueTuple.Create<string?, string?>(null, null),
+            ValueTuple.Create<string?, string?>(string.Empty, "foo"),
+            ValueTuple.Create<string?, string?>("foo", "bar"),
+            ValueTuple.Create<string?, string?>("foo", "foo"),
         ];
     }
 
-    public class ValueTuple3Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string, string>, ValueTupleCodec<string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple3Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?, string?, string?>, ValueTupleCodec<string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string> CreateValue() => ValueTuple.Create(
+        protected override ValueTuple<string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz"),
-            ValueTuple.Create("foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?>(default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?>(string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?>("foo", "bar", "baz"),
+            ValueTuple.Create<string?, string?, string?>("foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple3CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string, string>, ValueTupleCopier<string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple3CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?, string?, string?>, ValueTupleCopier<string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string> CreateValue() => ValueTuple.Create(
+        protected override ValueTuple<string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz"),
-            ValueTuple.Create("foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?>(default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?>(string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?>("foo", "bar", "baz"),
+            ValueTuple.Create<string?, string?, string?>("foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple4Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string, string, string>, ValueTupleCodec<string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple4Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?, string?, string?, string?>, ValueTupleCodec<string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string> CreateValue() => ValueTuple.Create(
-            Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString(),
-            Guid.NewGuid().ToString());
-
-        protected override ValueTuple<string, string, string, string>[] TestValues =>
-        [
-            default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4"),
-            ValueTuple.Create("foo", "foo", "foo", "foo")
-        ];
-    }
-
-    public class ValueTuple4CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string, string, string>, ValueTupleCopier<string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
-    {
-        protected override ValueTuple<string, string, string, string> CreateValue() => ValueTuple.Create(
+        protected override ValueTuple<string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4"),
-            ValueTuple.Create("foo", "foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?>("foo", "bar", "baz", "4"),
+            ValueTuple.Create<string?, string?, string?, string?>("foo", "foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple5Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string, string, string, string>, ValueTupleCodec<string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple4CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?, string?, string?, string?>, ValueTupleCopier<string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string> CreateValue() => ValueTuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override ValueTuple<string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4", "5"),
-            ValueTuple.Create("foo", "foo", "foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?>("foo", "bar", "baz", "4"),
+            ValueTuple.Create<string?, string?, string?, string?>("foo", "foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple5CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string, string, string, string>, ValueTupleCopier<string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple5Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?, string?, string?, string?, string?>, ValueTupleCodec<string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string> CreateValue() => ValueTuple.Create(
+        protected override ValueTuple<string?, string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4", "5"),
-            ValueTuple.Create("foo", "foo", "foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5"),
+            ValueTuple.Create<string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string,string, string, string, string>, ValueTupleCodec<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple5CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?, string?, string?, string?, string?>, ValueTupleCopier<string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string, string> CreateValue() => ValueTuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override ValueTuple<string?, string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string, string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4", "5", "6"),
-            ValueTuple.Create("foo", "foo", "foo", "foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty,string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5"),
+            ValueTuple.Create<string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string,string, string, string, string>, ValueTupleCopier<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?, string?,string?, string?, string?, string?>, ValueTupleCodec<string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string, string> CreateValue() => ValueTuple.Create(
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -949,20 +931,19 @@ namespace Orleans.Serialization.UnitTests
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string, string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4", "5", "6"),
-            ValueTuple.Create("foo", "foo", "foo", "foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple7Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string, string, string, string, string, string>, ValueTupleCodec<string, string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?, string?,string?, string?, string?, string?>, ValueTupleCopier<string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string, string, string> CreateValue() => ValueTuple.Create(
-            Guid.NewGuid().ToString(),
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -970,19 +951,19 @@ namespace Orleans.Serialization.UnitTests
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string, string, string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4", "5", "6", "7"),
-            ValueTuple.Create("foo", "foo", "foo", "foo", "foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple7opierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string, string, string, string, string, string>, ValueTupleCopier<string, string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple7Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?, string?, string?, string?, string?, string?, string?>, ValueTupleCodec<string?, string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string, string, string> CreateValue() => ValueTuple.Create(
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -991,19 +972,40 @@ namespace Orleans.Serialization.UnitTests
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString());
 
-        protected override ValueTuple<string, string, string, string, string, string, string>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?>[] TestValues =>
         [
             default,
-            ValueTuple.Create(default(string), default(string), default(string), default(string), default(string), default(string), default(string)),
-            ValueTuple.Create(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
-            ValueTuple.Create("foo", "bar", "baz", "4", "5", "6", "7"),
-            ValueTuple.Create("foo", "foo", "foo", "foo", "foo", "foo", "foo")
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6", "7"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo", "foo")
         ];
     }
 
-    public class ValueTuple8Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>, ValueTupleCodec<string, string, string, string, string, string, string, ValueTuple<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple7opierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?, string?, string?, string?, string?, string?, string?>, ValueTupleCopier<string?, string?, string?, string?, string?, string?, string?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>> CreateValue() => new(
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?> CreateValue() => ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>(
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString());
+
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?>[] TestValues =>
+        [
+            default,
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>(default(string?), default(string?), default(string?), default(string?), default(string?), default(string?), default(string?)),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "bar", "baz", "4", "5", "6", "7"),
+            ValueTuple.Create<string?, string?, string?, string?, string?, string?, string?>("foo", "foo", "foo", "foo", "foo", "foo", "foo")
+        ];
+    }
+
+    public class ValueTuple8Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>, ValueTupleCodec<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>> CreateValue() => new(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -1013,19 +1015,19 @@ namespace Orleans.Serialization.UnitTests
             Guid.NewGuid().ToString(),
             ValueTuple.Create(Guid.NewGuid().ToString()));
 
-        protected override ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>[] TestValues =>
         [
             default,
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>(default, default, default, default, default, default, default, ValueTuple.Create(default(string))),
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", ValueTuple.Create("foo")),
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>("foo", "bar", "baz", "4", "5", "6", "7", ValueTuple.Create("8")),
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", ValueTuple.Create("foo"))
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>(default, default, default, default, default, default, default, ValueTuple.Create(default(string?))),
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", ValueTuple.Create("foo")),
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>("foo", "bar", "baz", "4", "5", "6", "7", ValueTuple.Create("8")),
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", ValueTuple.Create("foo"))
         ];
     }
 
-    public class ValueTuple8CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>, ValueTupleCopier<string, string, string, string, string, string, string, ValueTuple<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple8CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>, ValueTupleCopier<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>> CreateValue() => new(
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>> CreateValue() => new(
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -1035,13 +1037,13 @@ namespace Orleans.Serialization.UnitTests
             Guid.NewGuid().ToString(),
             ValueTuple.Create(Guid.NewGuid().ToString()));
 
-        protected override ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>[] TestValues =>
+        protected override ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>[] TestValues =>
         [
             default,
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>(default, default, default, default, default, default, default, ValueTuple.Create(default(string))),
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", ValueTuple.Create("foo")),
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>("foo", "bar", "baz", "4", "5", "6", "7", ValueTuple.Create("8")),
-            new ValueTuple<string, string, string, string, string, string, string, ValueTuple<string>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", ValueTuple.Create("foo"))
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>(default, default, default, default, default, default, default, ValueTuple.Create(default(string?))),
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, "foo", ValueTuple.Create("foo")),
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>("foo", "bar", "baz", "4", "5", "6", "7", ValueTuple.Create("8")),
+            new ValueTuple<string?, string?, string?, string?, string?, string?, string?, ValueTuple<string?>>("foo", "foo", "foo", "foo", "foo", "foo", "foo", ValueTuple.Create("foo"))
         ];
     }
 
@@ -1063,14 +1065,14 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override string CreateValue() => Guid.NewGuid().ToString();
         protected override bool Equals(string left, string right) => StringComparer.Ordinal.Equals(left, right);
-        protected override string[] TestValues => [null, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!"];
+        protected override string?[] TestValues => [null, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!"];
     }
 
     public class StringCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<string, IDeepCopier<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override string CreateValue() => Guid.NewGuid().ToString();
         protected override bool Equals(string left, string right) => StringComparer.Ordinal.Equals(left, right);
-        protected override string[] TestValues => [null, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!"];
+        protected override string?[] TestValues => [null, string.Empty, new string('*', 6), new string('x', 4097), "Hello, World!"];
 
         protected override bool IsImmutable => true;
     }
@@ -1079,14 +1081,14 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override object CreateValue() => new();
         protected override bool Equals(object left, object right) => ReferenceEquals(left, right) || typeof(object) == left?.GetType() && typeof(object) == right?.GetType();
-        protected override object[] TestValues => [null, new object()];
+        protected override object?[] TestValues => [null, new object()];
     }
 
     public class ObjectCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<object, ObjectCopier>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override object CreateValue() => new();
         protected override bool Equals(object left, object right) => ReferenceEquals(left, right) || typeof(object) == left?.GetType() && typeof(object) == right?.GetType();
-        protected override object[] TestValues => [null, new object()];
+        protected override object?[] TestValues => [null, new object()];
         protected override bool IsImmutable => true;
     }
 
@@ -1096,7 +1098,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
 
-        protected override BitArray[] TestValues =>
+        protected override BitArray?[] TestValues =>
         [
             null,
             new BitArray(0, false),
@@ -1111,7 +1113,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
 
-        protected override BitArray[] TestValues =>
+        protected override BitArray?[] TestValues =>
         [
             null,
             new BitArray(0, false),
@@ -1126,7 +1128,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(byte[] left, byte[] right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
 
-        protected override byte[][] TestValues =>
+        protected override byte[]?[] TestValues =>
         [
             null,
             Array.Empty<byte>(),
@@ -1140,7 +1142,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(byte[] left, byte[] right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
 
-        protected override byte[][] TestValues =>
+        protected override byte[]?[] TestValues =>
         [
             null,
             Array.Empty<byte>(),
@@ -1236,14 +1238,14 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override int[] CreateValue() => Enumerable.Range(0, Random.Next(120) + 50).Select(_ => Guid.NewGuid().GetHashCode()).ToArray();
         protected override bool Equals(int[] left, int[] right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override int[][] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override int[]?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArrayCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<int[], ArrayCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override int[] CreateValue() => Enumerable.Range(0, Random.Next(120) + 50).Select(_ => Guid.NewGuid().GetHashCode()).ToArray();
         protected override bool Equals(int[] left, int[] right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override int[][] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override int[]?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableArrayCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ImmutableArray<int>, ImmutableArrayCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -1945,7 +1947,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class TypeCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Type, TypeSerializerCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        private readonly Type[] _values =
+        private readonly Type?[] _values =
         [
             null,
             typeof(Dictionary<Guid, List<string>>),
@@ -1963,13 +1965,13 @@ namespace Orleans.Serialization.UnitTests
 
         private int _valueIndex;
 
-        protected override Type CreateValue() => _values[_valueIndex++ % _values.Length];
-        protected override Type[] TestValues => _values;
+        protected override Type? CreateValue() => _values[_valueIndex++ % _values.Length];
+        protected override Type?[] TestValues => _values;
     }
 
     public class TypeCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Type, IDeepCopier<Type>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        private readonly Type[] _values =
+        private readonly Type?[] _values =
         [
             null,
             typeof(Dictionary<Guid, List<string>>),
@@ -1987,8 +1989,8 @@ namespace Orleans.Serialization.UnitTests
 
         private int _valueIndex;
 
-        protected override Type CreateValue() => _values[_valueIndex++ % _values.Length];
-        protected override Type[] TestValues => _values;
+        protected override Type? CreateValue() => _values[_valueIndex++ % _values.Length];
+        protected override Type?[] TestValues => _values;
 
         protected override bool IsImmutable => true;
     }
@@ -2072,7 +2074,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(List<int> left, List<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override List<int>[] TestValues => [null, new List<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override List<int>?[] TestValues => [null, new List<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     [GenerateSerializer]
@@ -2103,7 +2105,7 @@ namespace Orleans.Serialization.UnitTests
             return value;
         }
 
-        protected override TypeWithListBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+        protected override TypeWithListBase?[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
 
         protected override TypeWithListBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
         protected override bool Equals(TypeWithListBase left, TypeWithListBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
@@ -2119,7 +2121,7 @@ namespace Orleans.Serialization.UnitTests
             return value;
         }
 
-        protected override TypeWithListBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+        protected override TypeWithListBase?[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
 
         protected override TypeWithListBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
         protected override bool Equals(TypeWithListBase left, TypeWithListBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
@@ -2140,7 +2142,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(List<int> left, List<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override List<int>[] TestValues => [null, new List<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override List<int>?[] TestValues => [null, new List<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableListCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ImmutableList<int>, ImmutableListCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2158,7 +2160,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableList<int> left, ImmutableList<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableList<int>[] TestValues => [null, ImmutableList<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableList<int>?[] TestValues => [null, ImmutableList<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableListCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ImmutableList<int>, ImmutableListCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2177,7 +2179,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableList<int> left, ImmutableList<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableList<int>[] TestValues => [null, ImmutableList<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableList<int>?[] TestValues => [null, ImmutableList<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class SortedListCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<SortedList<int, string>, SortedListCodec<int, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2196,7 +2198,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(SortedList<int, string> left, SortedList<int, string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override SortedList<int, string>[] TestValues => [null, new SortedList<int, string>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override SortedList<int, string>?[] TestValues => [null, new SortedList<int, string>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class SortedListCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<SortedList<int, string>, SortedListCopier<int, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2215,7 +2217,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(SortedList<int, string> left, SortedList<int, string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override SortedList<int, string>[] TestValues => [null, new SortedList<int, string>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override SortedList<int, string>?[] TestValues => [null, new SortedList<int, string>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class SortedSetCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<SortedSet<int>, SortedSetCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2234,7 +2236,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(SortedSet<int> left, SortedSet<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override SortedSet<int>[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override SortedSet<int>?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class SortedSetCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<SortedSet<int>, SortedSetCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2253,7 +2255,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(SortedSet<int> left, SortedSet<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override SortedSet<int>[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override SortedSet<int>?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableSortedSetCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ImmutableSortedSet<int>, ImmutableSortedSetCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2272,7 +2274,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableSortedSet<int> left, ImmutableSortedSet<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableSortedSet<int>[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableSortedSet<int>?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableSortedSetCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ImmutableSortedSet<int>, ImmutableSortedSetCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2292,7 +2294,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableSortedSet<int> left, ImmutableSortedSet<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableSortedSet<int>[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableSortedSet<int>?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArrayListCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ArrayList, ArrayListCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2310,7 +2312,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ArrayList left, ArrayList right) => ReferenceEquals(left, right) || left.ToArray().SequenceEqual(right.ToArray());
-        protected override ArrayList[] TestValues => [null, new ArrayList(), CreateValue(), CreateValue(), CreateValue()];
+        protected override ArrayList?[] TestValues => [null, new ArrayList(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArrayListCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ArrayList, ArrayListCopier>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2328,7 +2330,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ArrayList left, ArrayList right) => ReferenceEquals(left, right) || left.ToArray().SequenceEqual(right.ToArray());
-        protected override ArrayList[] TestValues => [null, new ArrayList(), CreateValue(), CreateValue(), CreateValue()];
+        protected override ArrayList?[] TestValues => [null, new ArrayList(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class CollectionCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Collection<int>, CollectionCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2346,7 +2348,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Collection<int> left, Collection<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override Collection<int>[] TestValues => [null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Collection<int>?[] TestValues => [null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class CollectionCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Collection<int>, CollectionCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2364,7 +2366,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Collection<int> left, Collection<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override Collection<int>[] TestValues => [null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Collection<int>?[] TestValues => [null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     [GenerateSerializer]
@@ -2395,7 +2397,7 @@ namespace Orleans.Serialization.UnitTests
             return value;
         }
 
-        protected override TypeWithCollectionBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+        protected override TypeWithCollectionBase?[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
 
         protected override TypeWithCollectionBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
         protected override bool Equals(TypeWithCollectionBase left, TypeWithCollectionBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
@@ -2411,7 +2413,7 @@ namespace Orleans.Serialization.UnitTests
             return value;
         }
 
-        protected override TypeWithCollectionBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+        protected override TypeWithCollectionBase?[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
 
         protected override TypeWithCollectionBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
         protected override bool Equals(TypeWithCollectionBase left, TypeWithCollectionBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
@@ -2432,7 +2434,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ReadOnlyCollection<int> left, ReadOnlyCollection<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ReadOnlyCollection<int>[] TestValues => [null, new ReadOnlyCollection<int>([]), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyCollection<int>?[] TestValues => [null, new ReadOnlyCollection<int>([]), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ReadOnlyCollectionCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ReadOnlyCollection<int>, ReadOnlyCollectionCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2450,7 +2452,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ReadOnlyCollection<int> left, ReadOnlyCollection<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ReadOnlyCollection<int>[] TestValues => [null, new ReadOnlyCollection<int>([]), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyCollection<int>?[] TestValues => [null, new ReadOnlyCollection<int>([]), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class StackCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Stack<int>, StackCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2468,7 +2470,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Stack<int> left, Stack<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override Stack<int>[] TestValues => [null, new Stack<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Stack<int>?[] TestValues => [null, new Stack<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class StackCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Stack<int>, StackCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2486,7 +2488,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Stack<int> left, Stack<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override Stack<int>[] TestValues => [null, new Stack<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Stack<int>?[] TestValues => [null, new Stack<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableStackCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ImmutableStack<int>, ImmutableStackCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2504,7 +2506,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableStack<int> left, ImmutableStack<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableStack<int>[] TestValues => [null, ImmutableStack<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableStack<int>?[] TestValues => [null, ImmutableStack<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableStackCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ImmutableStack<int>, ImmutableStackCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2523,7 +2525,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableStack<int> left, ImmutableStack<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableStack<int>[] TestValues => [null, ImmutableStack<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableStack<int>?[] TestValues => [null, ImmutableStack<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class QueueCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Queue<int>, QueueCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2541,7 +2543,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Queue<int> left, Queue<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override Queue<int>[] TestValues => [null, new Queue<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Queue<int>?[] TestValues => [null, new Queue<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class QueueCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Queue<int>, QueueCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2559,7 +2561,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Queue<int> left, Queue<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override Queue<int>[] TestValues => [null, new Queue<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Queue<int>?[] TestValues => [null, new Queue<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ConcurrentQueueCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ConcurrentQueue<int>, ConcurrentQueueCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2577,7 +2579,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ConcurrentQueue<int> left, ConcurrentQueue<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ConcurrentQueue<int>[] TestValues => [null, new ConcurrentQueue<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override ConcurrentQueue<int>?[] TestValues => [null, new ConcurrentQueue<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ConcurrentQueueCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ConcurrentQueue<int>, ConcurrentQueueCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2595,7 +2597,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ConcurrentQueue<int> left, ConcurrentQueue<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ConcurrentQueue<int>[] TestValues => [null, new ConcurrentQueue<int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override ConcurrentQueue<int>?[] TestValues => [null, new ConcurrentQueue<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableQueueCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ImmutableQueue<int>, ImmutableQueueCodec<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2613,7 +2615,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableQueue<int> left, ImmutableQueue<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableQueue<int>[] TestValues => [null, ImmutableQueue<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableQueue<int>?[] TestValues => [null, ImmutableQueue<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ImmutableQueueCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ImmutableQueue<int>, ImmutableQueueCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2632,7 +2634,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ImmutableQueue<int> left, ImmutableQueue<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
-        protected override ImmutableQueue<int>[] TestValues => [null, ImmutableQueue<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableQueue<int>?[] TestValues => [null, ImmutableQueue<int>.Empty, CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class DictionaryCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Dictionary<string, int>, DictionaryCodec<string, int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -2649,7 +2651,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override Dictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Dictionary<string, int>?[] TestValues => [null, new Dictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -2667,7 +2669,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override Dictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Dictionary<string, int>?[] TestValues => [null, new Dictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -2675,7 +2677,7 @@ namespace Orleans.Serialization.UnitTests
     public class TypeWithDictionaryBase : Dictionary<string, int>
     {
         public TypeWithDictionaryBase() : this(true) { }
-        public TypeWithDictionaryBase(bool addDefaultValue, IEqualityComparer<string> comparer = null) : base(comparer)
+        public TypeWithDictionaryBase(bool addDefaultValue, IEqualityComparer<string>? comparer = null) : base(comparer)
         {
             if (addDefaultValue)
             {
@@ -2693,7 +2695,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class DictionaryBaseCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<TypeWithDictionaryBase, IFieldCodec<TypeWithDictionaryBase>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override TypeWithDictionaryBase[] TestValues =>
+        protected override TypeWithDictionaryBase?[] TestValues =>
         [
             null,
             new(),
@@ -2714,7 +2716,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class DictionaryBaseCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<TypeWithDictionaryBase, IDeepCopier<TypeWithDictionaryBase>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override TypeWithDictionaryBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { ["foo"] = 15 }, new() { ["foo"] = 15, OtherProperty = 123 }];
+        protected override TypeWithDictionaryBase?[] TestValues => [null, new(), new(addDefaultValue: false), new() { ["foo"] = 15 }, new() { ["foo"] = 15, OtherProperty = 123 }];
 
         protected override TypeWithDictionaryBase CreateValue() => new() { OtherProperty = Random.Next() };
         protected override bool Equals(TypeWithDictionaryBase left, TypeWithDictionaryBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
@@ -2755,7 +2757,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override Dictionary<string, int>[] TestValues => [
+        protected override Dictionary<string, int>?[] TestValues => [
             null,
             new Dictionary<string, int>(),
             CreateValue(),
@@ -2773,7 +2775,7 @@ namespace Orleans.Serialization.UnitTests
         [GenerateSerializer]
         public class CaseInsensitiveEqualityComparer : IEqualityComparer<string>
         {
-            public bool Equals(string left, string right)
+            public bool Equals(string? left, string? right)
             {
                 if (left == null && right == null)
                 {
@@ -2812,7 +2814,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override Dictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Dictionary<string, int>?[] TestValues => [null, new Dictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.Comparer?.GetType() == right.Comparer?.GetType();
     }
@@ -2831,7 +2833,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override ConcurrentDictionary<string, int>[] TestValues => [null, new ConcurrentDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override ConcurrentDictionary<string, int>?[] TestValues => [null, new ConcurrentDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(ConcurrentDictionary<string, int> left, ConcurrentDictionary<string, int> right)
         {
@@ -2871,7 +2873,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override ConcurrentDictionary<string, int>[] TestValues => [null, new ConcurrentDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override ConcurrentDictionary<string, int>?[] TestValues => [null, new ConcurrentDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(ConcurrentDictionary<string, int> left, ConcurrentDictionary<string, int> right)
         {
@@ -2911,7 +2913,7 @@ namespace Orleans.Serialization.UnitTests
             return new ReadOnlyDictionary<string, int>(dict);
         }
 
-        protected override ReadOnlyDictionary<string, int>[] TestValues => [null, new ReadOnlyDictionary<string, int>(new Dictionary<string, int>()), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyDictionary<string, int>?[] TestValues => [null, new ReadOnlyDictionary<string, int>(new Dictionary<string, int>()), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(ReadOnlyDictionary<string, int> left, ReadOnlyDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -2929,7 +2931,7 @@ namespace Orleans.Serialization.UnitTests
             return new ReadOnlyDictionary<string, int>(dict);
         }
 
-        protected override ReadOnlyDictionary<string, int>[] TestValues => [null, new ReadOnlyDictionary<string, int>(new Dictionary<string, int>()), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyDictionary<string, int>?[] TestValues => [null, new ReadOnlyDictionary<string, int>(new Dictionary<string, int>()), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(ReadOnlyDictionary<string, int> left, ReadOnlyDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -2947,7 +2949,7 @@ namespace Orleans.Serialization.UnitTests
             return result.ToImmutable();
         }
 
-        protected override ImmutableDictionary<string, int>[] TestValues => [null, ImmutableDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableDictionary<string, int>?[] TestValues => [null, ImmutableDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(ImmutableDictionary<string, int> left, ImmutableDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
 
         [Fact]
@@ -3012,7 +3014,7 @@ namespace Orleans.Serialization.UnitTests
             return result.ToImmutable();
         }
 
-        protected override ImmutableDictionary<string, int>[] TestValues => [null, ImmutableDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableDictionary<string, int>?[] TestValues => [null, ImmutableDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(ImmutableDictionary<string, int> left, ImmutableDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -3030,7 +3032,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override SortedDictionary<string, int>[] TestValues => [null, new SortedDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override SortedDictionary<string, int>?[] TestValues => [null, new SortedDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(SortedDictionary<string, int> left, SortedDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -3048,7 +3050,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override SortedDictionary<string, int>[] TestValues => [null, new SortedDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override SortedDictionary<string, int>?[] TestValues => [null, new SortedDictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(SortedDictionary<string, int> left, SortedDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -3066,7 +3068,7 @@ namespace Orleans.Serialization.UnitTests
             return result.ToImmutable();
         }
 
-        protected override ImmutableSortedDictionary<string, int>[] TestValues => [null, ImmutableSortedDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableSortedDictionary<string, int>?[] TestValues => [null, ImmutableSortedDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(ImmutableSortedDictionary<string, int> left, ImmutableSortedDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -3086,7 +3088,7 @@ namespace Orleans.Serialization.UnitTests
             return result.ToImmutable();
         }
 
-        protected override ImmutableSortedDictionary<string, int>[] TestValues => [null, ImmutableSortedDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableSortedDictionary<string, int>?[] TestValues => [null, ImmutableSortedDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(ImmutableSortedDictionary<string, int> left, ImmutableSortedDictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
@@ -3104,7 +3106,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override NameValueCollection[] TestValues => [null, new NameValueCollection(), CreateValue(), CreateValue(), CreateValue()];
+        protected override NameValueCollection?[] TestValues => [null, new NameValueCollection(), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(NameValueCollection left, NameValueCollection right) => ReferenceEquals(left, right)
             || (left.AllKeys.OrderBy(key => key).SequenceEqual(right.AllKeys.OrderBy(key => key)) && left.AllKeys.All(key => string.Equals(left[key], right[key], StringComparison.Ordinal)));
     }
@@ -3123,7 +3125,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override NameValueCollection[] TestValues => [null, new NameValueCollection(), CreateValue(), CreateValue(), CreateValue()];
+        protected override NameValueCollection?[] TestValues => [null, new NameValueCollection(), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(NameValueCollection left, NameValueCollection right) => ReferenceEquals(left, right)
             || (left.AllKeys.OrderBy(key => key).SequenceEqual(right.AllKeys.OrderBy(key => key)) && left.AllKeys.All(key => string.Equals(left[key], right[key], StringComparison.Ordinal)));
     }
@@ -3132,7 +3134,7 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override int[] MaxSegmentSizes => [32];
 
-        protected override IPAddress[] TestValues => [null, IPAddress.Any, IPAddress.IPv6Any, IPAddress.IPv6Loopback, IPAddress.IPv6None, IPAddress.Loopback, IPAddress.Parse("123.123.10.3"), CreateValue()];
+        protected override IPAddress?[] TestValues => [null, IPAddress.Any, IPAddress.IPv6Any, IPAddress.IPv6Loopback, IPAddress.IPv6None, IPAddress.Loopback, IPAddress.Parse("123.123.10.3"), CreateValue()];
 
         protected override IPAddress CreateValue()
         {
@@ -3152,7 +3154,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class IPAddressCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IPAddress, IDeepCopier<IPAddress>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override IPAddress[] TestValues => [null, IPAddress.Any, IPAddress.IPv6Any, IPAddress.IPv6Loopback, IPAddress.IPv6None, IPAddress.Loopback, IPAddress.Parse("123.123.10.3"), CreateValue()];
+        protected override IPAddress?[] TestValues => [null, IPAddress.Any, IPAddress.IPv6Any, IPAddress.IPv6Loopback, IPAddress.IPv6None, IPAddress.Loopback, IPAddress.Parse("123.123.10.3"), CreateValue()];
 
         protected override IPAddress CreateValue()
         {
@@ -3176,7 +3178,7 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override int[] MaxSegmentSizes => [32];
 
-        protected override IPEndPoint[] TestValues =>
+        protected override IPEndPoint?[] TestValues =>
            [null,
             new(IPAddress.Any, Random.Next(ushort.MaxValue)),
             new(IPAddress.IPv6Any, Random.Next(ushort.MaxValue)),
@@ -3204,7 +3206,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class IPEndPointCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IPEndPoint, IDeepCopier<IPEndPoint>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override IPEndPoint[] TestValues =>
+        protected override IPEndPoint?[] TestValues =>
            [null,
             new(IPAddress.Any, Random.Next(ushort.MaxValue)),
             new(IPAddress.IPv6Any, Random.Next(ushort.MaxValue)),
@@ -3246,7 +3248,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override HashSet<string>[] TestValues => [null, new HashSet<string>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override HashSet<string>?[] TestValues => [null, new HashSet<string>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(HashSet<string> left, HashSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
     }
@@ -3265,7 +3267,7 @@ namespace Orleans.Serialization.UnitTests
             return result;
         }
 
-        protected override HashSet<string>[] TestValues => [null, new HashSet<string>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override HashSet<string>?[] TestValues => [null, new HashSet<string>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(HashSet<string> left, HashSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
     }
@@ -3274,7 +3276,7 @@ namespace Orleans.Serialization.UnitTests
     public class TypeWithHashSetBase : HashSet<string>
     {
         public TypeWithHashSetBase() : this(true) { }
-        public TypeWithHashSetBase(bool addDefaultValue, IEqualityComparer<string> comparer = null) : base(comparer)
+        public TypeWithHashSetBase(bool addDefaultValue, IEqualityComparer<string>? comparer = null) : base(comparer)
         {
             if (addDefaultValue)
             {
@@ -3302,7 +3304,7 @@ namespace Orleans.Serialization.UnitTests
             return value;
         }
 
-        protected override TypeWithHashSetBase[] TestValues =>
+        protected override TypeWithHashSetBase?[] TestValues =>
         [
             null,
             new(),
@@ -3332,7 +3334,7 @@ namespace Orleans.Serialization.UnitTests
             return value;
         }
 
-        protected override TypeWithHashSetBase[] TestValues =>
+        protected override TypeWithHashSetBase?[] TestValues =>
         [
             null,
             new(),
@@ -3366,7 +3368,7 @@ namespace Orleans.Serialization.UnitTests
             return hashSet.ToImmutableHashSet();
         }
 
-        protected override ImmutableHashSet<string>[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableHashSet<string>?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(ImmutableHashSet<string> left, ImmutableHashSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
     }
@@ -3385,7 +3387,7 @@ namespace Orleans.Serialization.UnitTests
             return hashSet.ToImmutableHashSet();
         }
 
-        protected override ImmutableHashSet<string>[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableHashSet<string>?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(ImmutableHashSet<string> left, ImmutableHashSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
 
@@ -3406,7 +3408,7 @@ namespace Orleans.Serialization.UnitTests
             return hashSet.ToImmutableHashSet();
         }
 
-        protected override ImmutableHashSet<object>[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
+        protected override ImmutableHashSet<object>?[] TestValues => [null, [], CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(ImmutableHashSet<object> left, ImmutableHashSet<object> right) => ReferenceEquals(left, right) || left.SetEquals(right);
 
@@ -3428,7 +3430,7 @@ namespace Orleans.Serialization.UnitTests
             return result.ToFrozenDictionary();
         }
 
-        protected override FrozenDictionary<string, int>[] TestValues => [null, FrozenDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override FrozenDictionary<string, int>?[] TestValues => [null, FrozenDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(FrozenDictionary<string, int> left, FrozenDictionary<string, int> right) => ReferenceEquals(left, right) || left is not null && right is not null && left.Count == right.Count && left.All(kv => right.TryGetValue(kv.Key, out var value) && value == kv.Value);
 
         [Fact]
@@ -3461,7 +3463,7 @@ namespace Orleans.Serialization.UnitTests
             return result.ToFrozenDictionary();
         }
 
-        protected override FrozenDictionary<string, int>[] TestValues => [null, FrozenDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override FrozenDictionary<string, int>?[] TestValues => [null, FrozenDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(FrozenDictionary<string, int> left, FrozenDictionary<string, int> right) => ReferenceEquals(left, right) || left is not null && right is not null && left.Count == right.Count && left.All(kv => right.TryGetValue(kv.Key, out var value) && value == kv.Value);
     }
 
@@ -3479,7 +3481,7 @@ namespace Orleans.Serialization.UnitTests
             return hashSet.ToFrozenSet();
         }
 
-        protected override FrozenSet<string>[] TestValues => [null, FrozenSet<string>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override FrozenSet<string>?[] TestValues => [null, FrozenSet<string>.Empty, CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FrozenSet<string> left, FrozenSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
 
@@ -3509,7 +3511,7 @@ namespace Orleans.Serialization.UnitTests
             return hashSet.ToFrozenSet();
         }
 
-        protected override FrozenSet<string>[] TestValues => [null, FrozenSet<string>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override FrozenSet<string>?[] TestValues => [null, FrozenSet<string>.Empty, CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FrozenSet<string> left, FrozenSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
 
@@ -3530,7 +3532,7 @@ namespace Orleans.Serialization.UnitTests
             return hashSet.ToFrozenSet();
         }
 
-        protected override FrozenSet<object>[] TestValues => [null, FrozenSet<object>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override FrozenSet<object>?[] TestValues => [null, FrozenSet<object>.Empty, CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FrozenSet<object> left, FrozenSet<object> right) => ReferenceEquals(left, right) || left.SetEquals(right);
 
@@ -3543,7 +3545,7 @@ namespace Orleans.Serialization.UnitTests
         protected override int[] MaxSegmentSizes => [128];
         protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
 
-        protected override Uri[] TestValues => [null, CreateValue(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Uri?[] TestValues => [null, CreateValue(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(Uri left, Uri right) => ReferenceEquals(left, right) || left == right;
     }
@@ -3552,7 +3554,7 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
 
-        protected override Uri[] TestValues => [null, CreateValue(), CreateValue(), CreateValue(), CreateValue()];
+        protected override Uri?[] TestValues => [null, CreateValue(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(Uri left, Uri right) => ReferenceEquals(left, right) || left == right;
 
@@ -3561,43 +3563,43 @@ namespace Orleans.Serialization.UnitTests
 
     public class FSharpUnitTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Unit, FSharpUnitCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Unit CreateValue() => null;
-        protected override Unit[] TestValues => [null];
+        protected override Unit? CreateValue() => null;
+        protected override Unit?[] TestValues => [null];
     }
 
     public class FSharpUnitCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Unit, FSharpUnitCopier>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override bool IsImmutable => true;
-        protected override Unit CreateValue() => null;
-        protected override Unit[] TestValues => [null];
+        protected override Unit? CreateValue() => null;
+        protected override Unit?[] TestValues => [null];
     }
 
     public class FSharpOptionTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<FSharpOption<Guid>, FSharpOptionCodec<Guid>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override FSharpOption<Guid>[] TestValues => [null, FSharpOption<Guid>.None, FSharpOption<Guid>.Some(Guid.Empty), FSharpOption<Guid>.Some(Guid.NewGuid())];
+        protected override FSharpOption<Guid>?[] TestValues => [null, FSharpOption<Guid>.None, FSharpOption<Guid>.Some(Guid.Empty), FSharpOption<Guid>.Some(Guid.NewGuid())];
 
         protected override FSharpOption<Guid> CreateValue() => FSharpOption<Guid>.Some(Guid.NewGuid());
     }
 
     public class FSharpOptionCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<FSharpOption<Guid>, FSharpOptionCopier<Guid>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override FSharpOption<Guid>[] TestValues => [null, FSharpOption<Guid>.None, FSharpOption<Guid>.Some(Guid.Empty), FSharpOption<Guid>.Some(Guid.NewGuid())];
+        protected override FSharpOption<Guid>?[] TestValues => [null, FSharpOption<Guid>.None, FSharpOption<Guid>.Some(Guid.Empty), FSharpOption<Guid>.Some(Guid.NewGuid())];
 
         protected override FSharpOption<Guid> CreateValue() => FSharpOption<Guid>.Some(Guid.NewGuid());
 
         protected override bool Equals(FSharpOption<Guid> left, FSharpOption<Guid> right) => ReferenceEquals(left, right) || left.GetType() == right.GetType() && left.Value.Equals(right.Value);
     }
 
-    public class FSharpOptionTests2(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<FSharpOption<object>, FSharpOptionCodec<object>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class FSharpOptionTests2(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<FSharpOption<object?>, FSharpOptionCodec<object?>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override FSharpOption<object>[] TestValues => [null, FSharpOption<object>.Some(null), FSharpOption<object>.None, FSharpOption<object>.Some(Guid.Empty), FSharpOption<object>.Some(Guid.NewGuid())];
+        protected override FSharpOption<object?>?[] TestValues => [null, FSharpOption<object?>.Some(null), FSharpOption<object?>.None, FSharpOption<object?>.Some(Guid.Empty), FSharpOption<object?>.Some(Guid.NewGuid())];
 
-        protected override FSharpOption<object> CreateValue() => FSharpOption<object>.Some(Guid.NewGuid());
+        protected override FSharpOption<object?> CreateValue() => FSharpOption<object?>.Some(Guid.NewGuid());
     }
 
     public class FSharpRefTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<FSharpRef<Guid>, FSharpRefCodec<Guid>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override FSharpRef<Guid>[] TestValues => [null, new FSharpRef<Guid>(default), new FSharpRef<Guid>(Guid.Empty), new FSharpRef<Guid>(Guid.NewGuid())];
+        protected override FSharpRef<Guid>?[] TestValues => [null, new FSharpRef<Guid>(default), new FSharpRef<Guid>(Guid.Empty), new FSharpRef<Guid>(Guid.NewGuid())];
 
         protected override FSharpRef<Guid> CreateValue() => new(Guid.NewGuid());
 
@@ -3606,7 +3608,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class FSharpRefCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<FSharpRef<Guid>, FSharpRefCopier<Guid>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override FSharpRef<Guid>[] TestValues => [null, new FSharpRef<Guid>(default), new FSharpRef<Guid>(Guid.Empty), new FSharpRef<Guid>(Guid.NewGuid())];
+        protected override FSharpRef<Guid>?[] TestValues => [null, new FSharpRef<Guid>(default), new FSharpRef<Guid>(Guid.Empty), new FSharpRef<Guid>(Guid.NewGuid())];
 
         protected override FSharpRef<Guid> CreateValue() => new(Guid.NewGuid());
 
@@ -3720,7 +3722,7 @@ namespace Orleans.Serialization.UnitTests
             return SetModule.OfSeq(hashSet);
         }
 
-        protected override FSharpSet<string>[] TestValues => [null, SetModule.Empty<string>(), new FSharpSet<string>(Array.Empty<string>()), CreateValue(), CreateValue(), CreateValue()];
+        protected override FSharpSet<string>?[] TestValues => [null, SetModule.Empty<string>(), new FSharpSet<string>(Array.Empty<string>()), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FSharpSet<string> left, FSharpSet<string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
@@ -3739,7 +3741,7 @@ namespace Orleans.Serialization.UnitTests
             return SetModule.OfSeq(hashSet);
         }
 
-        protected override FSharpSet<string>[] TestValues => [null, SetModule.Empty<string>(), new FSharpSet<string>(Array.Empty<string>()), CreateValue(), CreateValue(), CreateValue()];
+        protected override FSharpSet<string>?[] TestValues => [null, SetModule.Empty<string>(), new FSharpSet<string>(Array.Empty<string>()), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FSharpSet<string> left, FSharpSet<string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
@@ -3760,7 +3762,7 @@ namespace Orleans.Serialization.UnitTests
             return MapModule.OfSeq(collection);
         }
 
-        protected override FSharpMap<string, string>[] TestValues => [null, MapModule.Empty<string, string>(), new FSharpMap<string, string>(Array.Empty<Tuple<string, string>>()), CreateValue(), CreateValue(), CreateValue()];
+        protected override FSharpMap<string, string>?[] TestValues => [null, MapModule.Empty<string, string>(), new FSharpMap<string, string>(Array.Empty<Tuple<string, string>>()), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FSharpMap<string, string> left, FSharpMap<string, string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
@@ -3779,7 +3781,7 @@ namespace Orleans.Serialization.UnitTests
             return MapModule.OfSeq(collection);
         }
 
-        protected override FSharpMap<string, string>[] TestValues => [null, MapModule.Empty<string, string>(), new FSharpMap<string, string>(Array.Empty<Tuple<string, string>>()), CreateValue(), CreateValue(), CreateValue()];
+        protected override FSharpMap<string, string>?[] TestValues => [null, MapModule.Empty<string, string>(), new FSharpMap<string, string>(Array.Empty<Tuple<string, string>>()), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FSharpMap<string, string> left, FSharpMap<string, string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
@@ -3798,7 +3800,7 @@ namespace Orleans.Serialization.UnitTests
             return ListModule.OfSeq(list);
         }
 
-        protected override FSharpList<string>[] TestValues => [null, ListModule.Empty<string>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override FSharpList<string>?[] TestValues => [null, ListModule.Empty<string>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FSharpList<string> left, FSharpList<string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
@@ -3817,16 +3819,16 @@ namespace Orleans.Serialization.UnitTests
             return ListModule.OfSeq(list);
         }
 
-        protected override FSharpList<string>[] TestValues => [null, ListModule.Empty<string>(), CreateValue(), CreateValue(), CreateValue()];
+        protected override FSharpList<string>?[] TestValues => [null, ListModule.Empty<string>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(FSharpList<string> left, FSharpList<string> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
     public class CultureInfoTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<CultureInfo, CultureInfoCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override CultureInfo CreateValue() => TestValues[Random.Next(TestValues.Length)];
+        protected override CultureInfo? CreateValue() => TestValues[Random.Next(TestValues.Length)];
 
-        protected override CultureInfo[] TestValues => [null, CultureInfo.CurrentCulture, CultureInfo.InvariantCulture, CultureInfo.GetCultureInfo("en-us"), CultureInfo.GetCultureInfo("mn-MN")];
+        protected override CultureInfo?[] TestValues => [null, CultureInfo.CurrentCulture, CultureInfo.InvariantCulture, CultureInfo.GetCultureInfo("en-us"), CultureInfo.GetCultureInfo("mn-MN")];
 
         protected override bool Equals(CultureInfo left, CultureInfo right) => ReferenceEquals(left, right) || left.Equals(right);
     }
@@ -3834,18 +3836,18 @@ namespace Orleans.Serialization.UnitTests
     public class CultureInfoCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<CultureInfo, IDeepCopier<CultureInfo>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override bool IsImmutable => true;
-        protected override CultureInfo CreateValue() => TestValues[Random.Next(TestValues.Length)];
+        protected override CultureInfo? CreateValue() => TestValues[Random.Next(TestValues.Length)];
 
-        protected override CultureInfo[] TestValues => [null, CultureInfo.CurrentCulture, CultureInfo.InvariantCulture, CultureInfo.GetCultureInfo("en-us"), CultureInfo.GetCultureInfo("mn-MN")];
+        protected override CultureInfo?[] TestValues => [null, CultureInfo.CurrentCulture, CultureInfo.InvariantCulture, CultureInfo.GetCultureInfo("en-us"), CultureInfo.GetCultureInfo("mn-MN")];
 
         protected override bool Equals(CultureInfo left, CultureInfo right) => ReferenceEquals(left, right) || left.Equals(right);
     }
 
     public class CompareInfoTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<CompareInfo, CompareInfoCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override CompareInfo CreateValue() => TestValues[Random.Next(TestValues.Length)];
+        protected override CompareInfo? CreateValue() => TestValues[Random.Next(TestValues.Length)];
 
-        protected override CompareInfo[] TestValues => [null, CultureInfo.CurrentCulture.CompareInfo, CultureInfo.InvariantCulture.CompareInfo, CompareInfo.GetCompareInfo("en-us"), CompareInfo.GetCompareInfo("mn-MN")];
+        protected override CompareInfo?[] TestValues => [null, CultureInfo.CurrentCulture.CompareInfo, CultureInfo.InvariantCulture.CompareInfo, CompareInfo.GetCompareInfo("en-us"), CompareInfo.GetCompareInfo("mn-MN")];
 
         protected override bool Equals(CompareInfo left, CompareInfo right) => ReferenceEquals(left, right) || left.Equals(right);
     }
@@ -3853,9 +3855,9 @@ namespace Orleans.Serialization.UnitTests
     public class CompareInfoCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<CompareInfo, IDeepCopier<CompareInfo>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override bool IsImmutable => true;
-        protected override CompareInfo CreateValue() => TestValues[Random.Next(TestValues.Length)];
+        protected override CompareInfo? CreateValue() => TestValues[Random.Next(TestValues.Length)];
 
-        protected override CompareInfo[] TestValues => [null, CultureInfo.CurrentCulture.CompareInfo, CultureInfo.InvariantCulture.CompareInfo, CompareInfo.GetCompareInfo("en-us"), CompareInfo.GetCompareInfo("mn-MN")];
+        protected override CompareInfo?[] TestValues => [null, CultureInfo.CurrentCulture.CompareInfo, CultureInfo.InvariantCulture.CompareInfo, CompareInfo.GetCompareInfo("en-us"), CompareInfo.GetCompareInfo("mn-MN")];
 
         protected override bool Equals(CompareInfo left, CompareInfo right) => ReferenceEquals(left, right) || left.Equals(right);
     }
@@ -3864,7 +3866,7 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override Response CreateValue() => Response.FromResult(Guid.NewGuid());
 
-        protected override Response[] TestValues =>
+        protected override Response?[] TestValues =>
         [
             default,
             Response.FromResult(156),
@@ -3905,7 +3907,6 @@ namespace Orleans.Serialization.UnitTests
             return Equals(left.Result, right.Result);
         }
     }
-
     public class ResponseCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Response, IDeepCopier<Response>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override bool IsImmutable => true;
@@ -3913,7 +3914,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override Response CreateValue() => Response.FromResult(Guid.NewGuid().ToString());
 
-        protected override Response[] TestValues =>
+        protected override Response?[] TestValues =>
         [
             default,
             Response.Completed,
@@ -3960,7 +3961,7 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override Response<int> CreateValue() => (Response<int>)Response.FromResult(Random.Next());
 
-        protected override Response<int>[] TestValues =>
+        protected override Response<int>?[] TestValues =>
         [
             default,
             (Response<int>)Response.FromResult(156),
@@ -4007,7 +4008,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override Response<int> CreateValue() => (Response<int>)Response.FromResult(Random.Next());
 
-        protected override Response<int>[] TestValues =>
+        protected override Response<int>?[] TestValues =>
         [
             default,
             (Response<int>)Response.FromResult(156),
@@ -4049,7 +4050,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class ExceptionCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Exception, ExceptionCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Exception[] TestValues => [null, new Exception("hi"), CreateValue()];
+        protected override Exception?[] TestValues => [null, new Exception("hi"), CreateValue()];
         protected override int[] MaxSegmentSizes => [8096];
 
         protected override Exception CreateValue()
@@ -4083,7 +4084,7 @@ namespace Orleans.Serialization.UnitTests
     public class ExceptionCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Exception, IDeepCopier<Exception>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override bool IsImmutable => true;
-        protected override Exception[] TestValues => [null, new Exception("hi"), CreateValue()];
+        protected override Exception?[] TestValues => [null, new Exception("hi"), CreateValue()];
 
         protected override Exception CreateValue()
         {
@@ -4115,7 +4116,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class AggregateExceptionCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<AggregateException, IFieldCodec<AggregateException>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override AggregateException[] TestValues => [null, new AggregateException("hi"), CreateValue()];
+        protected override AggregateException?[] TestValues => [null, new AggregateException("hi"), CreateValue()];
         protected override int[] MaxSegmentSizes => [8096];
 
         protected override AggregateException CreateValue()
@@ -4156,7 +4157,7 @@ namespace Orleans.Serialization.UnitTests
     public class AggregateExceptionCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<AggregateException, IDeepCopier<AggregateException>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override bool IsImmutable => true;
-        protected override AggregateException[] TestValues => [null, new AggregateException("hi"), CreateValue()];
+        protected override AggregateException?[] TestValues => [null, new AggregateException("hi"), CreateValue()];
 
         protected override AggregateException CreateValue()
         {
@@ -4236,7 +4237,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override GrainCancellationToken CreateValue() => CreateToken(isCanceled: false);
 
-        protected override GrainCancellationToken[] TestValues =>
+        protected override GrainCancellationToken?[] TestValues =>
         [
             null,
             CreateToken(isCanceled: false),
@@ -4294,7 +4295,7 @@ namespace Orleans.Serialization.UnitTests
         protected override SiloAddress CreateValue()
             => SiloAddress.New(IPAddress.Loopback, Random.Next(10240, 30240), Random.Next(1, 1000));
 
-        protected override SiloAddress[] TestValues =>
+        protected override SiloAddress?[] TestValues =>
         [
             null,
             SiloAddress.Zero,
@@ -4321,7 +4322,7 @@ namespace Orleans.Serialization.UnitTests
             return GrainReferenceTestHelper.CreateGrainReference(ServiceProvider, grainId, GrainReferenceTestHelper.InterfaceType);
         }
 
-        protected override IAddressable[] TestValues =>
+        protected override IAddressable?[] TestValues =>
         [
             null,
             CreateValue(),
@@ -4355,7 +4356,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override XDocument CreateValue() => CreateDocument();
 
-        protected override XDocument[] TestValues =>
+        protected override XDocument?[] TestValues =>
         [
             null,
             CreateDocument(),
@@ -4427,7 +4428,7 @@ namespace Orleans.Serialization.UnitTests
             return GrainReferenceTestHelper.CreateGrainReference(ServiceProvider, grainId, GrainReferenceTestHelper.InterfaceType);
         }
 
-        protected override GrainReference[] TestValues =>
+        protected override GrainReference?[] TestValues =>
         [
             null,
             CreateValue(),
@@ -4506,19 +4507,19 @@ namespace Orleans.Serialization.UnitTests
         public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
             => (TGrainInterface)GetGrain(grainId, GrainReferenceTestHelper.InterfaceType);
 
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
             => ThrowUnsupported<TGrainInterface>();
 
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
             => ThrowUnsupported<TGrainInterface>();
 
-        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithStringKey
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithStringKey
             => ThrowUnsupported<TGrainInterface>();
 
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidCompoundKey
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidCompoundKey
             => ThrowUnsupported<TGrainInterface>();
 
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerCompoundKey
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerCompoundKey
             => ThrowUnsupported<TGrainInterface>();
 
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
@@ -4554,3 +4555,4 @@ namespace Orleans.Serialization.UnitTests
     }
 #endif
 }
+#pragma warning restore CS8609, CS8764

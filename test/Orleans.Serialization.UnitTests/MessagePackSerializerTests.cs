@@ -62,7 +62,8 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
-        Assert.Equal(original.SubClass.Id, result.SubClass.Id);
+        // Both values are initialized above and copying preserves the nested object.
+        Assert.Equal(original.SubClass!.Id, result.SubClass!.Id);
     }
 
     [Fact]
@@ -74,7 +75,8 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
-        Assert.Equal(original.SubClass.Id, result.SubClass.Id);
+        // Both values are initialized above and copying preserves the nested object.
+        Assert.Equal(original.SubClass!.Id, result.SubClass!.Id);
     }
 
     [Fact]

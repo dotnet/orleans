@@ -93,7 +93,8 @@ namespace Orleans.Serialization.UnitTests
             var random = new Random();
             var randomData = new byte[1024 * 1024 * 10];
             random.NextBytes(randomData);
-            var writer = Writer.Create(new PooledBuffer(), null);
+            // Raw reader/writer operations in this test do not access a serializer session.
+            var writer = Writer.Create(new PooledBuffer(), null!);
             writer.Write(randomData);
             writer.Commit();
 

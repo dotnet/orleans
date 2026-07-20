@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Orleans.Serialization.Cloning;
@@ -8,6 +8,8 @@ using Orleans.Serialization.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 
+// TestKit's legacy TestValues contract cannot express intentionally nullable test values.
+#pragma warning disable CS8609
 namespace Orleans.Serialization.UnitTests
 {
     /// <summary>
@@ -43,7 +45,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override int[] MaxSegmentSizes => new[] { 840 };
 
-        protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
+        protected override MyNewtonsoftJsonClass?[] TestValues => new MyNewtonsoftJsonClass?[]
         {
             null,
             new MyNewtonsoftJsonClass(),
@@ -117,7 +119,6 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(original), Newtonsoft.Json.JsonConvert.SerializeObject(result));
         }
     }
-
     [Trait("Category", "BVT")]
     public class NewtonsoftJsonCodecCopierTests : CopierTester<MyNewtonsoftJsonClass, IDeepCopier<MyNewtonsoftJsonClass>>, IClassFixture<SerializationTesterFixture>
     {
@@ -134,7 +135,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyNewtonsoftJsonClass CreateValue() => new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
 
-        protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
+        protected override MyNewtonsoftJsonClass?[] TestValues => new MyNewtonsoftJsonClass?[]
         {
             null,
             new MyNewtonsoftJsonClass(),
@@ -166,4 +167,5 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(original), Newtonsoft.Json.JsonConvert.SerializeObject(result));
         }
     }
+    #pragma warning restore CS8609
 }
