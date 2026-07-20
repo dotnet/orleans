@@ -69,7 +69,7 @@ namespace Orleans.Hosting.Kubernetes
                 }
                 else
                 {
-                    var hostAddresses = Dns.GetHostAddresses(hostingOptions.PodName);
+                    var hostAddresses = Dns.GetHostAddresses(hostingOptions.PodName!);
                     if (hostAddresses != null)
                     {
                         podIp = IPAddressSelector.PickIPAddress(hostAddresses);

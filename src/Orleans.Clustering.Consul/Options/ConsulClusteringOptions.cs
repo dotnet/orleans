@@ -2,7 +2,6 @@ using System;
 using Consul;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -13,7 +12,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Consul KV root folder name.
         /// </summary>
-        public string KvRootFolder { get; set; }       
+        public string? KvRootFolder { get; set; }
 
         /// <summary>
         /// Factory for the used Consul-Client.
@@ -31,7 +30,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the <see cref="CreateClient"/> using the consul-address and a acl-token.
         /// </summary>
-        public void ConfigureConsulClient(Uri address, string aclClientToken = null)
+        public void ConfigureConsulClient(Uri address, string? aclClientToken = null)
         {
             if (address is null) throw new ArgumentNullException(nameof(address));            
             
@@ -47,7 +46,7 @@ namespace Orleans.Configuration
             this.CreateClient = () => new ConsulClient();
         }
 
-        internal void Validate(string name)
+        internal void Validate(string? name)
         {
             if (CreateClient is null)
             {
@@ -58,14 +57,14 @@ namespace Orleans.Configuration
 
     public class ConsulClusteringOptionsValidator<TOptions> : IConfigurationValidator where TOptions : ConsulClusteringOptions
     {
-        public ConsulClusteringOptionsValidator(TOptions options, string name = null)
+        public ConsulClusteringOptionsValidator(TOptions options, string? name = null)
         {
             Options = options;
             Name = name;
         }
 
         public TOptions Options { get; }
-        public string Name { get; }
+        public string? Name { get; }
 
         public virtual void ValidateConfiguration()
         {

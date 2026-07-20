@@ -10,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Host;
 
-#nullable disable
 namespace Orleans.Runtime.Membership
 {
     /// <summary>
@@ -23,7 +22,7 @@ namespace Orleans.Runtime.Membership
         private readonly IConsulClient _consulClient;
         private readonly ConsulClusteringOptions clusteringSiloTableOptions;
         private readonly string clusterId;
-        private readonly string kvRootFolder;
+        private readonly string? kvRootFolder;
         private readonly string versionKey;
 
         public ConsulBasedMembershipTable(
@@ -66,7 +65,7 @@ namespace Orleans.Runtime.Membership
             return ReadAll(this._consulClient, this.clusterId, this.kvRootFolder, this._logger, this.versionKey);
         }
 
-        public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string kvRootFolder, ILogger logger, string versionKey)
+        public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey)
         {
             var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
             if (deploymentKVAddresses.Response == null)
@@ -154,7 +153,7 @@ namespace Orleans.Runtime.Membership
             await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
         }
 
-        private static TableVersion GetTableVersion(string versionKey, QueryResult<KVPair[]> entries)
+        private static TableVersion GetTableVersion(string? versionKey, QueryResult<KVPair[]> entries)
         {
             TableVersion tableVersion;
             var tableVersionEntry = entries?.Response?.FirstOrDefault(kv => kv.Key.Equals(versionKey ?? string.Empty, StringComparison.OrdinalIgnoreCase));
@@ -183,7 +182,7 @@ namespace Orleans.Runtime.Membership
             return new KVTxnOp(this.versionKey, KVTxnVerb.CAS) { Index = index, Value = versionBytes };
         }
 
-        private async Task<(ConsulSiloRegistration, TableVersion)> GetConsulSiloRegistration(SiloAddress siloAddress)
+        private async Task<(ConsulSiloRegistration?, TableVersion)> GetConsulSiloRegistration(SiloAddress siloAddress)
         {
             var deploymentKey = ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder);
             var siloKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(this.clusterId, this.kvRootFolder, siloAddress);
@@ -199,10 +198,10 @@ namespace Orleans.Runtime.Membership
             return (siloRegistration, tableVersion);
         }
 
-        private static MembershipTableData AssembleMembershipTableData(TableVersion tableVersion, params ConsulSiloRegistration[] silos)
+        private static MembershipTableData AssembleMembershipTableData(TableVersion tableVersion, params ConsulSiloRegistration?[] silos)
         {
             var membershipEntries = silos
-                .Where(silo => silo != null)
+                .OfType<ConsulSiloRegistration>()
                 .Select(silo => ConsulSiloRegistrationAssembler.ToMembershipEntry(silo))
                 .ToList();
 
