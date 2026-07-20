@@ -896,7 +896,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             };
 
             return Task.FromResult<ActivityData?>(result);
@@ -930,7 +930,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             };
 
             return Task.FromResult<ActivityData?>(result);
@@ -984,7 +984,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             };
 
             return Task.FromResult<ActivityData?>(result);
@@ -992,7 +992,7 @@ namespace UnitTests.General
 
         public Task<int> GetStateValue()
         {
-            return Task.FromResult(_state.State.Value);
+            return Task.FromResult(_state.State!.Value);
         }
     }
 
@@ -1150,12 +1150,12 @@ namespace UnitTests.General
             _stateB = stateB;
         }
 
-        public ValueTask<(int A, int B)> GetState() => new((_stateA.State.Value, _stateB.State.Value));
+        public ValueTask<(int A, int B)> GetState() => new((_stateA.State!.Value, _stateB.State!.Value));
 
         public ValueTask SetState(int a, int b)
         {
-            _stateA.State.Value = a;
-            _stateB.State.Value = b;
+            _stateA.State!.Value = a;
+            _stateB.State!.Value = b;
             return default;
         }
 

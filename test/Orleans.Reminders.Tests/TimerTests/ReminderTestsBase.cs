@@ -104,8 +104,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         _ = await grain.StartReminder(DR);
         _ = await grain.StartReminder(DR);
 
-        IGrainReminder r = await grain.GetReminderObject(DR);
-        await grain.StopReminder(r);
+        IGrainReminder? r = await grain.GetReminderObject(DR);
+        await grain.StopReminder(r!);
         log.LogInformation("Removed got reminder successfully");
     }
 
@@ -193,7 +193,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
         // request a reminder that does not exist
-        IGrainReminder reminder = await g1.GetReminderObject("blarg");
+        IGrainReminder? reminder = await g1.GetReminderObject("blarg");
         Assert.Null(reminder);
     }
 

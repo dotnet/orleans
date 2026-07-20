@@ -119,7 +119,7 @@ namespace UnitTests.General
                 var result = await grain.GetActivityId();
 
                 Assert.NotNull(result);
-                Assert.NotEmpty(result.Id);
+                Assert.NotEmpty(result.Id!);
                 Assert.Null(result.TraceState);
             }
         }
@@ -171,7 +171,9 @@ namespace UnitTests.General
                 Assert.NotNull(result.Id);
                 Assert.Contains(activity.TraceId.ToHexString(), result.Id); // ensure, that trace id is persisted.
                 Assert.Equal(activity.TraceStateString, result.TraceState);
-                Assert.Equal(activity.Baggage, result.Baggage);
+                Assert.Equal(
+                    activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)),
+                    result.Baggage);
             }
         }
 
@@ -219,7 +221,9 @@ namespace UnitTests.General
 #else
                 // Pre-.NET 10: Legacy propagator supports Hierarchical format
                 Assert.StartsWith(activity.Id, result.Id);
-                Assert.Equal(activity.Baggage, result.Baggage);
+                Assert.Equal(
+                    activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)),
+                    result.Baggage);
 #endif
             }
         }

@@ -204,7 +204,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
                 this.cluster = builder.Build();
                 await this.cluster.DeployAsync();
-                silo = this.cluster.Primary;
+                silo = this.cluster.Primary!;
             }
             else
             {

@@ -598,7 +598,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             });
         }
 
@@ -663,7 +663,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             });
         }
 
@@ -673,11 +673,11 @@ namespace UnitTests.General
             return Task.CompletedTask;
         }
 
-        public Task<bool> WasDeactivated() => Task.FromResult(_state.State.WasDeactivated);
+        public Task<bool> WasDeactivated() => Task.FromResult(_state.State!.WasDeactivated);
 
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            _state.State.WasDeactivated = true;
+            _state.State!.WasDeactivated = true;
             _state.State.DeactivationReason = reason.ToString();
             await _state.WriteStateAsync();
         }
@@ -710,7 +710,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             });
         }
 
@@ -809,7 +809,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             });
         }
 
@@ -859,7 +859,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             });
         }
 
@@ -897,7 +897,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             });
         }
 
@@ -952,7 +952,7 @@ namespace UnitTests.General
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.Select(static pair => new KeyValuePair<string, string>(pair.Key, pair.Value!)).ToList(),
             });
         }
 

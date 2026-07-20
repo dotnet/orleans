@@ -46,7 +46,7 @@ namespace Tester.ClientConnectionTests
         public async Task ConnectToGwAfterStallConnectionOpened()
         {
             Socket stalledSocket;
-            var gwEndpoint = this.HostedCluster.Primary.GatewayAddress.Endpoint;
+            var gwEndpoint = this.HostedCluster.Primary!.GatewayAddress.Endpoint;
 
             // Close current client connection
             await this.Client.ServiceProvider.GetRequiredService<IHost>().StopAsync();
@@ -72,7 +72,7 @@ namespace Tester.ClientConnectionTests
         public async Task SiloJoinAfterStallConnectionOpened()
         {
             Socket stalledSocket;
-            var siloEndpoint = this.HostedCluster.Primary.SiloAddress.Endpoint;
+            var siloEndpoint = this.HostedCluster.Primary!.SiloAddress.Endpoint;
 
             // Stall connection to GW
             using (stalledSocket = new Socket(siloEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
