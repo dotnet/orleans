@@ -519,16 +519,17 @@ namespace Orleans.Runtime
         private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
             this.callbackTimer.Dispose();
+            // Once the silo is shutting down it can no longer receive responses, so any requests which
+            // are still outstanding will never complete. Fault them now so that in-flight grain calls
+            // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
+            // deactivation and host disposal during an ungraceful shutdown. This must happen before
+            // waiting for the timer task since that wait observes the shutdown cancellation token.
+            BreakOutstandingMessages();
+
             if (this.callbackTimerTask is { } task)
             {
                 await task.WaitAsync(tc);
             }
-
-            // Once the silo is shutting down it can no longer receive responses, so any requests which
-            // are still outstanding will never complete. Fault them now so that in-flight grain calls
-            // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
-            // deactivation and host disposal during an ungraceful shutdown.
-            BreakOutstandingMessages();
         }
 
         private void BreakOutstandingMessages()
