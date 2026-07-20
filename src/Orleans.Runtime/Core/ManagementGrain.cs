@@ -216,7 +216,7 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
-        public Task<object[]> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable
+        public Task<object?[]> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable
         {
             return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider<T>(providerName, command, arg),
                 $"SendControlCommandToProvider of type {typeof(T).FullName} and name {providerName} command {command}.");
@@ -304,13 +304,13 @@ namespace Orleans.Runtime.Management
             }
         }
 
-        private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)
+        private async Task<object?[]> ExecutePerSiloCall(Func<ISiloControl, Task<object?>> action, string actionToLog)
         {
             var silos = await GetHosts(true);
 
             LogDebugExecutingAction(actionToLog, new(silos));
 
-            var actionPromises = new List<Task<object>>();
+            var actionPromises = new List<Task<object?>>();
             foreach (SiloAddress siloAddress in silos.Keys.ToArray())
                 actionPromises.Add(action(GetSiloControlReference(siloAddress)));
 

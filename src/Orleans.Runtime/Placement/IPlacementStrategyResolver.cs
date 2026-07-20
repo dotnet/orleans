@@ -10,6 +10,6 @@ namespace Orleans.Runtime.Placement
         /// <summary>
         /// Gets the placement strategy associated with the provided grain type.
         /// </summary>
-        bool TryResolvePlacementStrategy(GrainType grainType, GrainProperties properties, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out PlacementStrategy result);
+        bool TryResolvePlacementStrategy(GrainType grainType, GrainProperties? properties, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out PlacementStrategy result);
     }
 }

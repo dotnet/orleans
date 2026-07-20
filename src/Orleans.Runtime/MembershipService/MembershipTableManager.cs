@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -427,7 +428,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.CurrentStatus = newStatus;
                 var entries = table.Members.ToDictionary(e => e.Item1.SiloAddress, e => e);
-                entries[myEntry.SiloAddress] = Tuple.Create(myEntry, myEtag);
+                entries[myEntry.SiloAddress] = Tuple.Create(myEntry, myEtag!);
                 var updatedTable = new MembershipTableData(entries.Values.ToList(), next);
                 this.ProcessTableUpdate(updatedTable, nameof(TryUpdateMyStatusGlobalOnce));
             }
@@ -948,7 +949,7 @@ namespace Orleans.Runtime.MembershipService
             return true;
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this.membershipUpdateTimer.CheckHealth(lastCheckTime, out reason);
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason) => this.membershipUpdateTimer.CheckHealth(lastCheckTime, out reason);
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {

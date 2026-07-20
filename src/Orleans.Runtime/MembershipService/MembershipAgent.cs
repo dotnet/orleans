@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -407,7 +408,7 @@ namespace Orleans.Runtime.MembershipService
             this.iAmAliveTimer.Dispose();
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this.iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason) => this.iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
 
         private readonly struct EnumerableToStringLogValue<T>(IEnumerable<T> enumerable)
         {

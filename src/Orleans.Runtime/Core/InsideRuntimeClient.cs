@@ -135,7 +135,7 @@ namespace Orleans.Runtime
         public void SendRequest(
             GrainReference target,
             IInvokable request,
-            IResponseCompletionSource context,
+            IResponseCompletionSource? context,
             InvokeMethodOptions options)
         {
             var cancellationToken = request.GetCancellationToken();
@@ -315,7 +315,7 @@ namespace Orleans.Runtime
                                 {
                                     var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
                                     await invoker.Invoke();
-                                    response = invoker.Response;
+                                    response = invoker.Response!;
                                 }
                                 else
                                 {

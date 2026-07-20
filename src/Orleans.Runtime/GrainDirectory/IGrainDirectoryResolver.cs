@@ -16,6 +16,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="properties">The properties.</param>
         /// <param name="grainDirectory">The grain directory.</param>
         /// <returns>true if an appropriate grain directory was found, <see langword="false"/> otherwise.</returns>
-        bool TryResolveGrainDirectory(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IGrainDirectory? grainDirectory);
+        bool TryResolveGrainDirectory(GrainType grainType, GrainProperties? properties, [NotNullWhen(true)] out IGrainDirectory? grainDirectory);
     }
 }

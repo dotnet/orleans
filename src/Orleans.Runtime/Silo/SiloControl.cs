@@ -226,7 +226,7 @@ namespace Orleans.Runtime
             return Task.FromResult(this.activationDirectory.Count);
         }
 
-        public Task<object> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable
+        public Task<object?> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable
         {
             var t = services
                     .GetKeyedServices<IControllable>(providerName);
@@ -240,7 +240,9 @@ namespace Orleans.Runtime
                 throw new ArgumentException($"Could not find a controllable service for type {typeof(IControllable).FullName} and name {providerName}.");
             }
 
-            return controllable.ExecuteCommand(command, arg);
+#pragma warning disable CS8619 // IControllable has not yet annotated its nullable command result.
+            return controllable.ExecuteCommand(command, arg!);
+#pragma warning restore CS8619
         }
 
         public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)

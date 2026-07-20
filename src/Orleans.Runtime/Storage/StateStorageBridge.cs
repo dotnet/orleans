@@ -33,7 +33,7 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 if (_grainState is { } grainState)
                 {
-                    return grainState.State;
+                    return grainState.State!;
                 }
 
                 return default!;

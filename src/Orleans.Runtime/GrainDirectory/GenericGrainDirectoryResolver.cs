@@ -16,7 +16,7 @@ namespace Orleans.Runtime.GrainDirectory
             _services = services;
         }
 
-        public bool TryResolveGrainDirectory(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IGrainDirectory? grainDirectory)
+        public bool TryResolveGrainDirectory(GrainType grainType, GrainProperties? properties, [NotNullWhen(true)] out IGrainDirectory? grainDirectory)
         {
             if (GenericGrainType.TryParse(grainType, out var constructed) && constructed.IsConstructed)
             {

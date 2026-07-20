@@ -64,7 +64,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
                     }
                     else
                     {
-                        sourceVertex = new(message.SendingGrain, message.SendingSilo, isSenderMigratable);
+                        sourceVertex = new(message.SendingGrain, message.SendingSilo!, isSenderMigratable);
                     }
 
                     EdgeVertex destinationVertex;
@@ -74,7 +74,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
                     }
                     else
                     {
-                        destinationVertex = new(message.TargetGrain, message.TargetSilo, isTargetMigratable);
+                        destinationVertex = new(message.TargetGrain, message.TargetSilo!, isTargetMigratable);
                     }
 
                     if (!sourceVertex.IsMigratable && !destinationVertex.IsMigratable)

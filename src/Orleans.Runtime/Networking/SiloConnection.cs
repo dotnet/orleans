@@ -141,7 +141,7 @@ namespace Orleans.Runtime.Messaging
 
         private void HandlePingMessage(Message msg)
         {
-            MessagingInstrumentation.OnPingReceive(msg.SendingSilo);
+            MessagingInstrumentation.OnPingReceive(msg.SendingSilo!);
 
             var objectId = RuntimeHelpers.GetHashCode(msg);
             LogTraceRespondingToPing(this.Log, msg.SendingSilo!, objectId, msg);

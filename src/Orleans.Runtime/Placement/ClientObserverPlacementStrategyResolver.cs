@@ -7,7 +7,7 @@ namespace Orleans.Runtime.Placement
     {
         private readonly ClientObserversPlacement _strategy = new ClientObserversPlacement();
 
-        public bool TryResolvePlacementStrategy(GrainType grainType, GrainProperties properties, [MaybeNullWhen(false)] out PlacementStrategy result)
+        public bool TryResolvePlacementStrategy(GrainType grainType, GrainProperties? properties, [MaybeNullWhen(false)] out PlacementStrategy result)
         {
             if (grainType.IsClient())
             {
