@@ -7,7 +7,7 @@ namespace UnitTests.Grains
     public class ConcurrentGrain : Grain, IConcurrentGrain
     {
         private readonly ILogger logger;
-        private List<IConcurrentGrain> children;
+        private List<IConcurrentGrain> children = null!;
         private int index;
         private int callNumber;
 
@@ -111,7 +111,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
         private int index;
-        private TaskCompletionSource<int> resolver;
+        private TaskCompletionSource<int> resolver = null!;
 
         public ConcurrentReentrantGrain(ILoggerFactory loggerFactory)
         {

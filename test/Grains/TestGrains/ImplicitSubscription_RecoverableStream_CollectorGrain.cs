@@ -16,7 +16,7 @@ namespace TestGrains
         
         // grain instance state
         private readonly ILogger logger;
-        private IAsyncStream<GeneratedEvent> stream;
+        private IAsyncStream<GeneratedEvent> stream = null!;
 
         public ImplicitSubscription_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
         {
@@ -40,7 +40,7 @@ namespace TestGrains
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(State.StreamNamespace, State.StreamGuid);
 
-            await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);
+            await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken!);
         }
 
         private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken sequenceToken)

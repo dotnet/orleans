@@ -7,7 +7,7 @@ namespace BenchmarkGrains.Transaction
     [GrainType("txload")]
     public class LoadGrain : Grain, ILoadGrain
     {
-        private Task<Report> runTask;
+        private Task<Report> runTask = null!;
 
         public Task Generate(int run, int transactions, int conncurrent)
         {
@@ -16,7 +16,7 @@ namespace BenchmarkGrains.Transaction
             return Task.CompletedTask;
         }
 
-        public async Task<Report> TryGetReport()
+        public async Task<Report?> TryGetReport()
         {
             if (!this.runTask.IsCompleted) return default;
             return await this.runTask;
@@ -61,7 +61,7 @@ namespace BenchmarkGrains.Transaction
             {
                 if (t.IsFaulted || t.IsCanceled)
                 {
-                    if(t.Exception.Flatten().GetBaseException() is OrleansStartTransactionFailedException)
+                    if(t.Exception!.Flatten().GetBaseException() is OrleansStartTransactionFailedException)
                     {
                         report.Throttled++;
 

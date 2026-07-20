@@ -26,7 +26,7 @@ namespace UnitTests.Grains
 
             // Whitebox testing
             var cleanup = State.Stream as IStreamControl;
-            await cleanup.Cleanup(true, false);
+            await cleanup!.Cleanup(true, false);
 
             State.IsProducer = false;
 #if USE_STORAGE
@@ -65,7 +65,7 @@ namespace UnitTests.Grains
         public virtual async Task TestBecomeConsumerSlim(Guid streamIdGuid, string providerName)
         {
             // TODO NOT SURE THIS FUNCTION MAKESE ANY SENSE
-            var streamId = StreamId.Create(null, streamIdGuid);
+            var streamId = StreamId.Create(null!, streamIdGuid);
             InitStream(streamId, providerName);
             var observer = new MyStreamObserver<int>(logger);
 
@@ -75,9 +75,9 @@ namespace UnitTests.Grains
             var id = new QualifiedStreamId(providerName, streamId);
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(id.ToString());
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference.GetGrainId(), null);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream!).InternalStreamId, myExtensionReference.GetGrainId(), null!);
 
-            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
+            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream!), observer, null!, null!, null!);
         }
     }
 }

@@ -8,8 +8,8 @@ namespace UnitTests.Grains
     {
         private int _numConsumedItems;
         private readonly ILogger _logger;
-        private IAsyncObservable<int> _consumer;
-        private StreamSubscriptionHandle<int> _subscriptionHandle;
+        private IAsyncObservable<int>? _consumer;
+        private StreamSubscriptionHandle<int>? _subscriptionHandle;
         internal const string StreamNamespace = "HaloStreamingNamespace";
 
         public ConsumerEventCountingGrain(ILoggerFactory loggerFactory)
@@ -26,7 +26,7 @@ namespace UnitTests.Grains
                 _onNext = onNext;
             }
 
-            public Task OnNextAsync(T item, StreamSequenceToken token = null)
+            public Task OnNextAsync(T item, StreamSequenceToken? token = null)
             {
                 return _onNext(item);
             }

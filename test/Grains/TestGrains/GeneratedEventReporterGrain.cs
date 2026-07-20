@@ -8,7 +8,7 @@ namespace TestGrains
     {
         private readonly ILogger logger;
 
-        private Dictionary<Tuple<string, string>, Dictionary<Guid, int>> reports;
+        private Dictionary<Tuple<string, string>, Dictionary<Guid, int>> reports = null!;
 
         public GeneratedEventReporterGrain(ILoggerFactory loggerFactory)
         {
@@ -25,7 +25,7 @@ namespace TestGrains
 
         public Task ReportResult(Guid streamGuid, string streamProvider, string streamNamespace, int count)
         {
-            Dictionary<Guid, int> counts;
+            Dictionary<Guid, int>? counts;
             Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
             if (!reports.TryGetValue(key, out counts))
             {
@@ -45,7 +45,7 @@ namespace TestGrains
 
         public Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace)
         {
-            Dictionary<Guid, int> counts;
+            Dictionary<Guid, int>? counts;
             Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
             if (!reports.TryGetValue(key, out counts))
             {

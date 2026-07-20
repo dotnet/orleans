@@ -17,7 +17,7 @@ namespace TestGrains
         [Orleans.Id(0)]
         public DateTime Timestamp { get; set; }
         [Orleans.Id(1)]
-        public string Origin { get; set; }
+        public string Origin { get; set; } = null!;
 
         public void Update(XDocument document)
         {
@@ -33,11 +33,11 @@ namespace TestGrains
         [Orleans.Id(0)]
         public Guid Guid { get; set; }
         [Orleans.Id(1)]
-        public string User { get; set; }
+        public string User { get; set; } = null!;
         [Orleans.Id(2)]
         public DateTime Timestamp { get; set; }
         [Orleans.Id(3)]
-        public string Text { get; set; }
+        public string Text { get; set; } = null!;
 
         public void Update(XDocument document)
         {
@@ -67,7 +67,7 @@ namespace TestGrains
         [Orleans.Id(0)]
         public Guid Guid { get; set; }
         [Orleans.Id(1)]
-        public string Text { get; set; }
+        public string Text { get; set; } = null!;
 
         public void Update(XDocument document)
         {

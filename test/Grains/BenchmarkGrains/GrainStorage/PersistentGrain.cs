@@ -8,7 +8,7 @@ namespace BenchmarkGrains.GrainStorage
     [Serializable]
     public class PersistentGrainState
     {
-        public byte[] Payload { get; set; }
+        public byte[] Payload { get; set; } = null!;
     }
 
     public class PersistentGrain : Grain, IPersistentGrain

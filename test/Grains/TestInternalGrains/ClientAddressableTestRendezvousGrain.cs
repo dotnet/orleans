@@ -5,7 +5,7 @@ namespace UnitTests.Grains
 
     public class ClientAddressableTestRendezvousGrain : Grain, IClientAddressableTestRendezvousGrain
     {
-        private IClientAddressableTestProducer producer;
+        private IClientAddressableTestProducer producer = null!;
 
         public Task<IClientAddressableTestProducer> GetProducer()
         {

@@ -38,7 +38,7 @@ namespace TestGrains
     {
 
         // we use another impl of this grain as the primary.
-        private ILogTestGrain storagegrain;
+        private ILogTestGrain? storagegrain;
 
         private ILogTestGrain GetStorageGrain()
         {
@@ -75,7 +75,7 @@ namespace TestGrains
         private readonly DeepCopier<MyGrainState> copier;
 
         // we use fake in-memory state as the storage
-        private MyGrainState state;
+        private MyGrainState? state;
         private int version;
 
         public LogTestGrainCustomStoragePrimaryCluster(DeepCopier<MyGrainState> copier)

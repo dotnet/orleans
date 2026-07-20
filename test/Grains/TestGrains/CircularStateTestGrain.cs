@@ -16,7 +16,7 @@ namespace TestGrains
         }
         public Task<CircularTest1> GetState()
         {
-            return Task.FromResult(State.CircularTest1);
+            return Task.FromResult(State.CircularTest1!);
         }
     }
 }

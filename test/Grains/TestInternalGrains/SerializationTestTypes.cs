@@ -50,7 +50,7 @@ namespace UnitTests.Grains
         [Id(0)]
         public int IntProperty { get; set; }
         [Id(1)]
-        public string StringProperty { get; set; }
+        public string? StringProperty { get; set; }
 
         public static int SerializeCounter { get; set; }
         public static int DeserializeCounter { get; set; }

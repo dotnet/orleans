@@ -17,8 +17,8 @@ namespace UnitTests.Grains
         private readonly IReminderTable reminderTable;
 
         private readonly IReminderRegistry unvalidatedReminderRegistry;
-        private Dictionary<string, ReminderState> allReminders;
-        private Dictionary<string, long> sequence;
+        private Dictionary<string, ReminderState> allReminders = null!;
+        private Dictionary<string, long> sequence = null!;
         private TimeSpan period;
 
         private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
@@ -26,16 +26,16 @@ namespace UnitTests.Grains
         private readonly IOptions<ReminderOptions> reminderOptions;
 
         private readonly ILogger logger;
-        private string _id; // used to distinguish during debugging between multiple activations of the same grain
+        private string _id = null!; // used to distinguish during debugging between multiple activations of the same grain
 
-        private string filePrefix;
+        private string filePrefix = null!;
 
         public ReminderTestGrain2(IServiceProvider services, IReminderTable reminderTable, ILoggerFactory loggerFactory)
         {
             this.reminderTable = reminderTable;
             this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-            this.reminderOptions = services.GetService<IOptions<ReminderOptions>>();
+            this.reminderOptions = services.GetService<IOptions<ReminderOptions>>()!;
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -145,7 +145,7 @@ namespace UnitTests.Grains
             this.logger.LogInformation("Stopping reminder {ReminderName}.", reminderName);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             //return UnregisterReminder(allReminders[reminderName]);
-            ReminderState state;
+            ReminderState? state;
             if (this.allReminders.TryGetValue(reminderName, out state))
             {
                 await this.UnregisterReminder(state.Reminder);
@@ -213,7 +213,7 @@ namespace UnitTests.Grains
             return Task.FromResult(counterValue);
         }
 
-        public Task<IGrainReminder> GetReminderObject(string reminderName)
+        public Task<IGrainReminder?> GetReminderObject(string reminderName)
         {
             return this.GetReminder(reminderName);
         }
@@ -249,8 +249,8 @@ namespace UnitTests.Grains
     public class ReminderTestCopyGrain : Grain, IReminderTestCopyGrain, IRemindable
     {
         private readonly IReminderRegistry unvalidatedReminderRegistry;
-        private Dictionary<string, IGrainReminder> allReminders;
-        private Dictionary<string, long> sequence;
+        private Dictionary<string, IGrainReminder> allReminders = null!;
+        private Dictionary<string, long> sequence = null!;
         private TimeSpan period;
 
         private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
@@ -258,7 +258,7 @@ namespace UnitTests.Grains
         private readonly ILogger logger;
         private long myId; // used to distinguish during debugging between multiple activations of the same grain
 
-        private string filePrefix;
+        private string filePrefix = null!;
 
         public ReminderTestCopyGrain(IServiceProvider services, ILoggerFactory loggerFactory)
         {
@@ -367,7 +367,7 @@ namespace UnitTests.Grains
             this.logger.LogInformation("Stopping reminder {Reminder}.", reminderName);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             //return UnregisterReminder(allReminders[reminderName]);
-            IGrainReminder reminder;
+            IGrainReminder? reminder;
             if (this.allReminders.TryGetValue(reminderName, out reminder))
             {
                 await this.UnregisterReminder(reminder);
@@ -410,7 +410,7 @@ namespace UnitTests.Grains
             return Task.FromResult(long.Parse(File.ReadAllText(GetFileName(name))));
         }
 
-        public async Task<IGrainReminder> GetReminderObject(string reminderName)
+        public async Task<IGrainReminder?> GetReminderObject(string reminderName)
         {
             return await this.GetReminder(reminderName);
         }

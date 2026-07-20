@@ -73,9 +73,8 @@ namespace TestGrains
         [Orleans.Id(0)]
         public int Seat { get; set; }
         [Orleans.Id(1)]
-        public string UserId { get; set; }
+        public string UserId { get; set; } = null!;
     }
 
 
 }
-

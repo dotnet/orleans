@@ -12,8 +12,8 @@ namespace UnitTests.Grains
         protected readonly IGrainContext _grainContext;
         private DateTime activated;
 
-        private ICollectionTestGrain other;
-        private ILogger logger;
+        private ICollectionTestGrain other = null!;
+        private ILogger logger = null!;
         private int counter;
         private static int staticCounter;
 
@@ -112,7 +112,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class ReentrantCollectionTestGrain : CollectionTestGrain, ICollectionTestGrain
     {
-        private ILogger logger;
+        private ILogger logger = null!;
         private int counter;
         private static int staticCounter;
 

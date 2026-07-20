@@ -87,7 +87,7 @@ namespace UnitTests.Grains
                 throw new ArgumentNullException(nameof(handle));
 
             // new counter for this subscription
-            Tuple<Counter,Counter> counters;
+            Tuple<Counter,Counter>? counters;
             if (!consumedMessageCounts.TryGetValue(handle, out counters))
             {
                 counters = Tuple.Create(new Counter(), new Counter());

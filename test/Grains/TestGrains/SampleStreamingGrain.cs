@@ -15,7 +15,7 @@ namespace UnitTests.Grains
             this.hostingGrain = hostingGrain;
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken token = null)
+        public Task OnNextAsync(T item, StreamSequenceToken? token = null)
         {
             hostingGrain.logger.LogInformation("OnNextAsync(item={Item}, token={Token})", item, token != null ? token.ToString() : "null");
             hostingGrain.numConsumedItems++;
@@ -37,9 +37,9 @@ namespace UnitTests.Grains
 
     public class SampleStreaming_ProducerGrain : Grain, ISampleStreaming_ProducerGrain
     {
-        private IAsyncStream<int> producer;
+        private IAsyncStream<int> producer = null!;
         private int numProducedItems;
-        private IDisposable producerTimer;
+        private IDisposable? producerTimer;
         internal ILogger logger;
         internal readonly static string RequestContextKey = "RequestContextField";
         internal readonly static string RequestContextValue = "JustAString";
@@ -74,7 +74,7 @@ namespace UnitTests.Grains
         public Task StopPeriodicProducing()
         {
             logger.LogInformation("StopPeriodicProducing");
-            producerTimer.Dispose();
+            producerTimer!.Dispose();
             producerTimer = null;
             return Task.CompletedTask;
         }
@@ -101,7 +101,7 @@ namespace UnitTests.Grains
             return producerTimer != null? Fire(): Task.CompletedTask;
         }
 
-        private async Task Fire([CallerMemberName] string caller = null)
+        private async Task Fire([CallerMemberName] string? caller = null)
         {
             RequestContext.Set(RequestContextKey, RequestContextValue);
             await producer.OnNextAsync(numProducedItems);
@@ -118,11 +118,11 @@ namespace UnitTests.Grains
 
     public class SampleStreaming_ConsumerGrain : Grain, ISampleStreaming_ConsumerGrain
     {
-        private IAsyncObservable<int> consumer;
+        private IAsyncObservable<int> consumer = null!;
         internal int numConsumedItems;
         internal ILogger logger;
-        private IAsyncObserver<int> consumerObserver;
-        private StreamSubscriptionHandle<int> consumerHandle;
+        private IAsyncObserver<int> consumerObserver = null!;
+        private StreamSubscriptionHandle<int>? consumerHandle;
 
         public SampleStreaming_ConsumerGrain(ILoggerFactory loggerFactory)
         {
@@ -170,10 +170,10 @@ namespace UnitTests.Grains
 
     public class SampleStreaming_InlineConsumerGrain : Grain, ISampleStreaming_InlineConsumerGrain
     {
-        private IAsyncObservable<int> consumer;
+        private IAsyncObservable<int> consumer = null!;
         internal int numConsumedItems;
         internal ILogger logger;
-        private StreamSubscriptionHandle<int> consumerHandle;
+        private StreamSubscriptionHandle<int>? consumerHandle;
 
         public SampleStreaming_InlineConsumerGrain(ILoggerFactory loggerFactory)
         {
@@ -212,7 +212,7 @@ namespace UnitTests.Grains
             return Task.FromResult( numConsumedItems );
         }
 
-        public Task OnNextAsync( int item, StreamSequenceToken token = null )
+        public Task OnNextAsync( int item, StreamSequenceToken? token = null )
         {
             logger.LogInformation( "OnNextAsync({Item}{Token})", item, token != null ? token.ToString() : "null" );
             numConsumedItems++;

@@ -17,14 +17,14 @@ namespace TestGrains
      
         // grain instance state
         private readonly ILogger logger;
-        private IAsyncStream<GeneratedEvent> stream;
+        private IAsyncStream<GeneratedEvent> stream = null!;
 
         private class FaultsState
         {
             public bool FaultCleared { get; set; }
         }
         private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new ConcurrentDictionary<Guid, FaultsState>();
-        private FaultsState myFaults;
+        private FaultsState? myFaults;
         private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
 
         public ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
@@ -49,7 +49,7 @@ namespace TestGrains
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(State.StreamNamespace, State.StreamGuid);
 
-            await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);
+            await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken!);
         }
 
         private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken sequenceToken)

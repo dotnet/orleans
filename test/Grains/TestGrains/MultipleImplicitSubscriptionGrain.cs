@@ -10,7 +10,7 @@ namespace UnitTests.Grains
     public class MultipleImplicitSubscriptionGrain : Grain, IMultipleImplicitSubscriptionGrain
     {
         private readonly ILogger logger;
-        private IAsyncStream<int> redStream, blueStream;
+        private IAsyncStream<int> redStream = null!, blueStream = null!;
         private int redCounter, blueCounter;
 
         public MultipleImplicitSubscriptionGrain(ILoggerFactory loggerFactory)

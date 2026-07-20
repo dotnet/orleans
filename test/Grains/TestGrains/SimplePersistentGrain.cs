@@ -79,7 +79,7 @@ namespace UnitTests.Grains
             return Task.FromResult(version);
         }
 
-        public Task<object> GetRequestContext()
+        public Task<object?> GetRequestContext()
         {
             var info = RequestContext.Get("GrainInfo");
             return Task.FromResult(info);

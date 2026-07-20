@@ -6,23 +6,23 @@ namespace UnitTests.Grains
 {
     public class RequestContextTestGrain : Grain, IRequestContextTestGrain
     {
-        public Task<string> TraceIdEcho()
+        public Task<string?> TraceIdEcho()
         {
             return Task.FromResult(RequestContext.Get("TraceId") as string);
         }
 
-        public Task<string> TraceIdDoubleEcho()
+        public Task<string?> TraceIdDoubleEcho()
         {
             var grain = GrainFactory.GetGrain<IRequestContextTestGrain>((new Random()).Next());
             return grain.TraceIdEcho();
         }
 
-        public Task<string> TraceIdDelayedEcho1()
+        public Task<string?> TraceIdDelayedEcho1()
         {
             return Task.Factory.StartNew(() => RequestContext.Get("TraceId") as string);
         }
 
-        public async Task<string> TraceIdDelayedEcho2()
+        public async Task<string?> TraceIdDelayedEcho2()
         {
             await Task.CompletedTask;
             return RequestContext.Get("TraceId") as string;
@@ -43,59 +43,59 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public Task<string> TraceIdEcho()
+        public Task<string?> TraceIdEcho()
         {
-            string traceId = RequestContext.Get("TraceId") as string;
+            string? traceId = RequestContext.Get("TraceId") as string;
             logger.LogInformation("{Method}: TraceId={TraceId}", "TraceIdEcho", traceId);
             return Task.FromResult(traceId);
         }
 
-        public Task<string> TraceIdDoubleEcho()
+        public Task<string?> TraceIdDoubleEcho()
         {
             var grain = GrainFactory.GetGrain<IRequestContextTaskGrain>((new Random()).Next());
             return grain.TraceIdEcho();
         }
 
-        public Task<string> TraceIdDelayedEcho1()
+        public Task<string?> TraceIdDelayedEcho1()
         {
             string method = "TraceIdDelayedEcho1";
             logger.LogInformation("{Method}: Entered", method);
-            string traceIdOutside = RequestContext.Get("TraceId") as string;
+            string? traceIdOutside = RequestContext.Get("TraceId") as string;
             logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
             return Task.Factory.StartNew(() =>
             {
-                string traceIdInside = RequestContext.Get("TraceId") as string;
+                string? traceIdInside = RequestContext.Get("TraceId") as string;
                 logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
         }
 
-        public Task<string> TraceIdDelayedEcho2()
+        public Task<string?> TraceIdDelayedEcho2()
         {
             string method = "TraceIdDelayedEcho2";
             logger.LogInformation("{Method}: Entered", method);
-            string traceIdOutside = RequestContext.Get("TraceId") as string;
+            string? traceIdOutside = RequestContext.Get("TraceId") as string;
             logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
             return Task.CompletedTask.ContinueWith(task =>
             {
-                string traceIdInside = RequestContext.Get("TraceId") as string;
+                string? traceIdInside = RequestContext.Get("TraceId") as string;
                 logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
         }
 
-        public async Task<string> TraceIdDelayedEchoAwait()
+        public async Task<string?> TraceIdDelayedEchoAwait()
         {
             string method = "TraceIdDelayedEchoAwait";
             logger.LogInformation("{Method}: Entered", method);
-            string traceIdOutside = RequestContext.Get("TraceId") as string;
+            string? traceIdOutside = RequestContext.Get("TraceId") as string;
             logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
-            string traceId = await Task.CompletedTask.ContinueWith(task =>
+            string? traceId = await Task.CompletedTask.ContinueWith(task =>
             {
-                string traceIdInside = RequestContext.Get("TraceId") as string;
+                string? traceIdInside = RequestContext.Get("TraceId") as string;
                 logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
@@ -103,16 +103,16 @@ namespace UnitTests.Grains
             return traceId;
         }
 
-        public Task<string> TraceIdDelayedEchoTaskRun()
+        public Task<string?> TraceIdDelayedEchoTaskRun()
         {
             string method = "TraceIdDelayedEchoTaskRun";
             logger.LogInformation("{Method}: Entered", method);
-            string traceIdOutside = RequestContext.Get("TraceId") as string;
+            string? traceIdOutside = RequestContext.Get("TraceId") as string;
             logger.LogInformation("{Method}: Outside TraceId={TraceId}", method, traceIdOutside);
 
             return Task.Run(() =>
             {
-                string traceIdInside = RequestContext.Get("TraceId") as string;
+                string? traceIdInside = RequestContext.Get("TraceId") as string;
                 logger.LogInformation("{Method}: Inside TraceId={TraceId}", method, traceIdInside);
                 return traceIdInside;
             });
@@ -125,24 +125,24 @@ namespace UnitTests.Grains
 
         public async Task<Tuple<string, string>> TestRequestContext()
         {
-            string bar1 = null;
+            string? bar1 = null;
             RequestContext.Set("jarjar", "binks");
 
             Task task = Task.Factory.StartNew(() =>
             {
-                bar1 = (string)RequestContext.Get("jarjar");
+                bar1 = (string?)RequestContext.Get("jarjar");
                 logger.LogInformation("jarjar inside Task.Factory.StartNew = {Bar}.", bar1);
             });
 
-            string bar2 = null;
+            string? bar2 = null;
             Task ac = Task.Factory.StartNew(() =>
             {
-                bar2 = (string)RequestContext.Get("jarjar");
+                bar2 = (string?)RequestContext.Get("jarjar");
                 logger.LogInformation("jarjar inside Task.StartNew  = {Bar}.", bar2);
             });
 
             await Task.WhenAll(task, ac);
-            return new Tuple<string, string>(bar1, bar2);
+            return new Tuple<string, string>(bar1!, bar2!);
         }
     }
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -14,8 +15,10 @@ namespace UnitTests.Grains
     public class SimpleGenericGrainState<T>
     {
         [Id(0)]
+        [MaybeNull]
         public T A { get; set; }
         [Id(1)]
+        [MaybeNull]
         public T B { get; set; }
     }
 
@@ -24,7 +27,7 @@ namespace UnitTests.Grains
     {
         public Task<T> GetA()
         {
-            return Task.FromResult(State.A);
+            return Task.FromResult(State.A!);
         }
 
         public Task SetA(T a)
@@ -89,8 +92,10 @@ namespace UnitTests.Grains
     public class SimpleGenericGrainUState<U>
     {
         [Id(0)]
+        [MaybeNull]
         public U A { get; set; }
         [Id(1)]
+        [MaybeNull]
         public U B { get; set; }
     }
 
@@ -99,7 +104,7 @@ namespace UnitTests.Grains
     {
         public Task<U> GetA()
         {
-            return Task.FromResult(State.A);
+            return Task.FromResult(State.A!);
         }
 
         public Task SetA(U a)
@@ -132,8 +137,10 @@ namespace UnitTests.Grains
     public class SimpleGenericGrain2State<T, U>
     {
         [Id(0)]
+        [MaybeNull]
         public T A { get; set; }
         [Id(1)]
+        [MaybeNull]
         public U B { get; set; }
     }
 
@@ -142,7 +149,7 @@ namespace UnitTests.Grains
     {
         public Task<T> GetA()
         {
-            return Task.FromResult(State.A);
+            return Task.FromResult(State.A!);
         }
 
         public Task SetA(T a)
@@ -192,7 +199,7 @@ namespace UnitTests.Grains
     public class IGrainWithListFieldsState
     {
         [Id(0)]
-        public IList<string> Items { get; set; }
+        public IList<string>? Items { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
@@ -207,13 +214,13 @@ namespace UnitTests.Grains
 
         public Task AddItem(string item)
         {
-            State.Items.Add(item);
+            State.Items!.Add(item);
             return Task.CompletedTask;
         }
 
         public Task<IList<string>> GetItems()
         {
-            return Task.FromResult((State.Items));
+            return Task.FromResult(State.Items!);
         }
     }
 
@@ -222,7 +229,7 @@ namespace UnitTests.Grains
     public class GenericGrainWithListFieldsState<T>
     {
         [Id(0)]
-        public IList<T> Items { get; set; }
+        public IList<T>? Items { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
@@ -238,13 +245,13 @@ namespace UnitTests.Grains
 
         public Task AddItem(T item)
         {
-            State.Items.Add(item);
+            State.Items!.Add(item);
             return Task.CompletedTask;
         }
 
         public Task<IList<T>> GetItems()
         {
-            return Task.FromResult(State.Items);
+            return Task.FromResult(State.Items!);
         }
     }
 
@@ -253,6 +260,7 @@ namespace UnitTests.Grains
     public class GenericReaderWriterState<T>
     {
         [Id(0)]
+        [MaybeNull]
         public T Value { get; set; }
     }
 
@@ -261,8 +269,10 @@ namespace UnitTests.Grains
     public class GenericReader2State<TOne, TTwo>
     {
         [Id(0)]
+        [MaybeNull]
         public TOne Value1 { get; set; }
         [Id(1)]
+        [MaybeNull]
         public TTwo Value2 { get; set; }
     }
 
@@ -271,8 +281,10 @@ namespace UnitTests.Grains
     public class GenericReaderWriterGrain2State<TOne, TTwo>
     {
         [Id(0)]
+        [MaybeNull]
         public TOne Value1 { get; set; }
         [Id(1)]
+        [MaybeNull]
         public TTwo Value2 { get; set; }
     }
 
@@ -281,10 +293,13 @@ namespace UnitTests.Grains
     public class GenericReader3State<TOne, TTwo, TThree>
     {
         [Id(0)]
+        [MaybeNull]
         public TOne Value1 { get; set; }
         [Id(1)]
+        [MaybeNull]
         public TTwo Value2 { get; set; }
         [Id(2)]
+        [MaybeNull]
         public TThree Value3 { get; set; }
     }
 
@@ -300,7 +315,7 @@ namespace UnitTests.Grains
 
         public Task<T> GetValue()
         {
-            return Task.FromResult(State.Value);
+            return Task.FromResult(State.Value!);
         }
     }
 
@@ -320,12 +335,12 @@ namespace UnitTests.Grains
 
         public Task<TOne> GetValue1()
         {
-            return Task.FromResult(State.Value1);
+            return Task.FromResult(State.Value1!);
         }
 
         public Task<TTwo> GetValue2()
         {
-            return Task.FromResult(State.Value2);
+            return Task.FromResult(State.Value2!);
         }
     }
 
@@ -350,28 +365,30 @@ namespace UnitTests.Grains
 
         public Task<TThree> GetValue3()
         {
-            return Task.FromResult(State.Value3);
+            return Task.FromResult(State.Value3!);
         }
 
         public Task<TOne> GetValue1()
         {
-            return Task.FromResult(State.Value1);
+            return Task.FromResult(State.Value1!);
         }
 
         public Task<TTwo> GetValue2()
         {
-            return Task.FromResult(State.Value2);
+            return Task.FromResult(State.Value2!);
         }
     }
 
     public class BasicGenericGrain<T, U> : Grain, IBasicGenericGrain<T, U>
     {
+        [MaybeNull]
         private T _a;
+        [MaybeNull]
         private U _b;
 
         public Task<T> GetA()
         {
-            return Task.FromResult(_a);
+            return Task.FromResult(_a!);
         }
 
         public Task<string> GetAxB()
@@ -522,6 +539,7 @@ namespace UnitTests.Grains
 
     public class DbGrain<T> : Grain, IDbGrain<T>
     {
+        [MaybeNull]
         private T _value;
 
         public Task SetValue(T value)
@@ -532,7 +550,7 @@ namespace UnitTests.Grains
 
         public Task<T> GetValue()
         {
-            return Task.FromResult(_value);
+            return Task.FromResult(_value!);
         }
     }
 
@@ -540,6 +558,7 @@ namespace UnitTests.Grains
     public class PingSelfGrain<T> : IGrainBase, IGenericPingSelf<T>
     {
         private readonly ILogger logger;
+        [MaybeNull]
         private T _lastValue;
         private readonly ITimerRegistry _timerRegistry;
 
@@ -584,14 +603,14 @@ namespace UnitTests.Grains
                     this.logger.LogDebug("***Timer fired for pinging {0}***", target.GetPrimaryKey());
                     return target.Ping(t);
                 },
-                null,
+                null!,
                 new() { DueTime = delay, Period = Timeout.InfiniteTimeSpan });
             return Task.CompletedTask;
         }
 
         public Task<T> GetLastValue()
         {
-            return Task.FromResult(_lastValue);
+            return Task.FromResult(_lastValue!);
         }
 
         public async Task ScheduleDelayedPingToSelfAndDeactivate(IGenericPingSelf<T> target, T t, TimeSpan delay)
@@ -616,13 +635,14 @@ namespace UnitTests.Grains
     public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
     {
         private readonly Channel<(Guid CallId, Exception Error)> _cancelledCalls = Channel.CreateUnbounded<(Guid, Exception)>();
+        [MaybeNull]
         private T lastValue;
 
         public async Task GrainCancellationTokenCallbackThrow(GrainCancellationToken ct, Guid callId)
         {
             ct.CancellationToken.Register(() =>
             {
-                _cancelledCalls.Writer.TryWrite((callId, null));
+                _cancelledCalls.Writer.TryWrite((callId, null!));
                 throw new InvalidOperationException("From cancellation token callback");
             });
 
@@ -633,7 +653,7 @@ namespace UnitTests.Grains
         {
             ct.Register(() =>
             {
-                _cancelledCalls.Writer.TryWrite((callId, null));
+                _cancelledCalls.Writer.TryWrite((callId, null!));
                 throw new InvalidOperationException("From cancellation token callback");
             });
 
@@ -642,7 +662,7 @@ namespace UnitTests.Grains
 
         public Task<T> GetLastValue()
         {
-            return Task.FromResult(lastValue);
+            return Task.FromResult(lastValue!);
         }
 
         public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId)
@@ -676,7 +696,7 @@ namespace UnitTests.Grains
                 }
                 else
                 {
-                    _cancelledCalls.Writer.TryWrite((callId, null));
+                    _cancelledCalls.Writer.TryWrite((callId, null!));
                     tcs.SetResult(true);
                 }
             });
@@ -698,7 +718,7 @@ namespace UnitTests.Grains
                 }
                 else
                 {
-                    _cancelledCalls.Writer.TryWrite((callId, null));
+                    _cancelledCalls.Writer.TryWrite((callId, null!));
                     tcs.SetResult(true);
                 }
             });
@@ -759,7 +779,7 @@ namespace UnitTests.Grains
             }
             catch (OperationCanceledException)
             {
-                _cancelledCalls.Writer.TryWrite((callId, null));
+                _cancelledCalls.Writer.TryWrite((callId, null!));
                 throw;
             }
         }
@@ -773,7 +793,7 @@ namespace UnitTests.Grains
             }
             catch (OperationCanceledException)
             {
-                _cancelledCalls.Writer.TryWrite((callId, null));
+                _cancelledCalls.Writer.TryWrite((callId, null!));
                 throw;
             }
         }
@@ -810,6 +830,7 @@ namespace UnitTests.Grains
         where B : struct
         where C : class
     {
+        [MaybeNull]
         private A collection;
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -819,11 +840,11 @@ namespace UnitTests.Grains
         }
 
         [Alias("GenericGrainWithConstraints.GetCount")]
-        public Task<int> GetCount() { return Task.FromResult(collection.Count); }
+        public Task<int> GetCount() { return Task.FromResult(collection!.Count); }
 
         public Task Add(B item)
         {
-            collection.Add(item);
+            collection!.Add(item);
             return Task.CompletedTask;
         }
 
@@ -853,7 +874,7 @@ namespace UnitTests.Grains
 
     public class GenericArrayRegisterGrain<T> : Grain, IGenericArrayRegisterGrain<T>
     {
-        private T[] _value;
+        private T[] _value = null!;
         public Task<T[]> Get() => Task.FromResult(_value);
         public Task Set(T[] value)
         {
@@ -887,7 +908,7 @@ namespace UnitTests.Grains
 
     public class Reducer2 : IReducer<int, Reducer2Action>
     {
-        public Task<int> Handle(int prevState, Reducer2Action act) => Task.FromResult(prevState + act.ToString().Length);
+        public Task<int> Handle(int prevState, Reducer2Action act) => Task.FromResult(prevState + act.ToString()!.Length);
     }
 
     public interface IUnmanagedArgGrain<T> : IGrainWithGuidKey where T : unmanaged
@@ -938,7 +959,7 @@ namespace UnitTests.Grains
             public Task<string[]> ConcreteGenArgTypeNames()
             {
                 var grainType = GetImmediateSubclass(this.GetType());
-                return Task.FromResult(grainType.GetGenericArguments().Select(t => t.FullName).ToArray());
+                return Task.FromResult(grainType.GetGenericArguments().Select(t => t.FullName!).ToArray());
             }
 
             private Type GetImmediateSubclass(Type subject)
@@ -948,7 +969,7 @@ namespace UnitTests.Grains
                     return subject;
                 }
 
-                return GetImmediateSubclass(subject.BaseType);
+                return GetImmediateSubclass(subject.BaseType!);
             }
         }
 

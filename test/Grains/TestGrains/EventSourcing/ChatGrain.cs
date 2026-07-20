@@ -36,7 +36,7 @@ namespace TestGrains
                 await RaiseConditionalEvent(new CreatedEvent()
                 {
                     Timestamp = DateTime.UtcNow,
-                    Origin = typeof(ChatGrain).FullName
+                    Origin = typeof(ChatGrain).FullName!
                 });
             }
         }
@@ -75,4 +75,3 @@ namespace TestGrains
         }
     }
 }
-

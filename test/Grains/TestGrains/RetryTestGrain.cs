@@ -76,7 +76,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
         return Task.CompletedTask;
     }
 
-    public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
+    public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string>? metadata = null)
     {
         var request = new ScheduleJobRequest
         {

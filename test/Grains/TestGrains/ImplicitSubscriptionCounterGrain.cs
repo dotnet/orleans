@@ -19,7 +19,7 @@ namespace UnitTests.Grains
             [Id(1)]
             public int ErrorCounter { get; set; }
             [Id(2)]
-            public StreamSequenceToken Token { get; set; }
+            public StreamSequenceToken? Token { get; set; }
         }
 
         public ImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory)

@@ -6,7 +6,7 @@ namespace UnitTests.Grains
 {
     internal class ProducerEventCountingGrain : BaseGrain, IProducerEventCountingGrain
     {
-        private IAsyncObserver<int> _producer;
+        private IAsyncObserver<int>? _producer;
         private int _numProducedItems;
         private readonly ILogger _logger;
 

@@ -15,14 +15,14 @@ namespace UnitTests.Grains
         // For producer and consumer
         // -- only need to store because of how we run our unit tests against multiple providers
         [Id(0)]
-        public string StreamProviderName { get; set; }
+        public string? StreamProviderName { get; set; }
 
         // For producer only.
 #if USE_GENERICS
         public IAsyncStream<T> Stream { get; set; }
 #else
         [Id(1)]
-        public IAsyncStream<int> Stream { get; set; }
+        public IAsyncStream<int>? Stream { get; set; }
 #endif
 
         [Id(2)]
@@ -64,9 +64,9 @@ namespace UnitTests.Grains
         private IAsyncObserver<T> Producer { get; set; }
         private Dictionary<StreamSubscriptionHandle<T>, MyStreamObserver<T>> Observers { get; set; }
 #else
-        private IAsyncStream<int> Stream { get { return State.Stream; } }
-        private IAsyncObserver<int> Producer { get; set; }
-        private Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; }
+        private IAsyncStream<int> Stream { get { return State.Stream!; } }
+        private IAsyncObserver<int>? Producer { get; set; }
+        private Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; } = null!;
 #endif
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 
@@ -256,12 +256,12 @@ namespace UnitTests.Grains
 #endif
         {
             _logger.LogInformation("SendItem Item={Item}", item);
-            await Producer.OnNextAsync(item);
+            await Producer!.OnNextAsync(item);
         }
 
         public Task<SiloAddress> GetLocation()
         {
-            SiloAddress siloAddress = _grainContext.Address.SiloAddress;
+            SiloAddress siloAddress = _grainContext.Address.SiloAddress!;
             _logger.LogInformation("GetLocation SiloAddress={SiloAddress}", siloAddress);
             return Task.FromResult(siloAddress);
         }

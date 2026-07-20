@@ -5,8 +5,8 @@ namespace UnitTests.Grains
 {
     public class StreamingImmutabilityTestGrain : Grain, IStreamingImmutabilityTestGrain
     {
-        private StreamImmutabilityTestObject _myObject;
-        private StreamSubscriptionHandle<StreamImmutabilityTestObject> _streamSubscriptionHandle;
+        private StreamImmutabilityTestObject? _myObject;
+        private StreamSubscriptionHandle<StreamImmutabilityTestObject>? _streamSubscriptionHandle;
 
         public async Task SubscribeToStream(Guid guid, string providerName)
         {
@@ -23,7 +23,7 @@ namespace UnitTests.Grains
         public async Task SendTestObject(string providerName)
         {
             var stream = this.GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>("Namespace", this.GetPrimaryKey());
-            await stream.OnNextAsync(_myObject);
+            await stream.OnNextAsync(_myObject!);
         }
 
         public Task SetTestObjectStringProperty(string value)
@@ -37,7 +37,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetTestObjectStringProperty()
         {
-            return Task.FromResult(_myObject.MyString);
+            return Task.FromResult(_myObject!.MyString);
         }
 
         public Task<string> GetSiloIdentifier()
@@ -57,6 +57,6 @@ namespace UnitTests.Grains
     public class StreamImmutabilityTestObject
     {
         [Id(0)]
-        public string MyString;
+        public string MyString = null!;
     }
 }

@@ -40,7 +40,7 @@
 
         public Task<SomeAbstractClass> GetState()
         {
-            return Task.FromResult(this.State.Classes.FirstOrDefault());
+            return Task.FromResult(this.State.Classes.FirstOrDefault()!);
         }
 
         [Serializable]
@@ -48,7 +48,7 @@
         public class MyState
         {
             [Id(0)]
-            public IList<SomeAbstractClass> Classes { get; set; }
+            public IList<SomeAbstractClass> Classes { get; set; } = null!;
         }
     }
 }
