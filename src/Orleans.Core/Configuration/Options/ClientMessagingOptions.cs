@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -38,11 +37,11 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the name of the network interface to use to work out an IP address for this machine.
         /// </summary>
-        public string NetworkInterfaceName { get; set; }
+        public string? NetworkInterfaceName { get; set; }
 
         /// <summary>
         /// Gets or sets the IP address used for cluster client.
         /// </summary>
-        public IPAddress LocalAddress { get; set; }
+        public IPAddress? LocalAddress { get; set; }
     }
 }

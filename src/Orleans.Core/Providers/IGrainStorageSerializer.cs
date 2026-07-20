@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Storage
 {
     /// <summary>
@@ -20,7 +19,7 @@ namespace Orleans.Storage
         /// <param name="input">The object to serialize.</param>
         /// <typeparam name="T">The input type.</typeparam>
         /// <returns>The serialized input.</returns>
-        BinaryData Serialize<T>(T input);
+        BinaryData Serialize<T>(T? input);
 
         /// <summary>
         /// Deserializes the provided data.
@@ -28,10 +27,9 @@ namespace Orleans.Storage
         /// <param name="input">The data to deserialize.</param>
         /// <typeparam name="T">The output type.</typeparam>
         /// <returns>The deserialized object.</returns>
-        T Deserialize<T>(BinaryData input);
+        T? Deserialize<T>(BinaryData input);
     }
 
-#nullable enable
     /// <summary>
     /// Optional stream-based serializer for grain state.
     /// </summary>
@@ -44,7 +42,7 @@ namespace Orleans.Storage
         /// <param name="destination">The destination stream.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <typeparam name="T">The input type.</typeparam>
-        ValueTask SerializeAsync<T>(T input, Stream destination, CancellationToken cancellationToken = default);
+        ValueTask SerializeAsync<T>(T? input, Stream destination, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Deserializes the provided data from a stream.
@@ -55,7 +53,6 @@ namespace Orleans.Storage
         /// <returns>The deserialized object.</returns>
         ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default);
     }
-#nullable restore
 
     /// <summary>
     /// Extensions for <see cref="IGrainStorageSerializer"/>.
@@ -69,7 +66,7 @@ namespace Orleans.Storage
         /// <param name="input">The data to deserialize.</param>
         /// <typeparam name="T">The output type.</typeparam>
         /// <returns>The deserialized object.</returns>
-        public static T Deserialize<T>(this IGrainStorageSerializer serializer, ReadOnlyMemory<byte> input)
+        public static T? Deserialize<T>(this IGrainStorageSerializer serializer, ReadOnlyMemory<byte> input)
             => serializer.Deserialize<T>(new BinaryData(input));
     }
 

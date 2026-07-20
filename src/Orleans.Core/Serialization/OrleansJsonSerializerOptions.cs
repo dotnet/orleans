@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 
-#nullable disable
 namespace Orleans.Serialization
 {
     public class OrleansJsonSerializerOptions
@@ -47,7 +46,7 @@ namespace Orleans.Serialization
             _serviceProvider = serviceProvider;
         }
 
-        public void PostConfigure(string name, OrleansJsonSerializerOptions options)
+        public void PostConfigure(string? name, OrleansJsonSerializerOptions options)
         {
             OrleansJsonSerializerSettings.Configure(_serviceProvider, options.JsonSerializerSettings, options.AllowAllTypes);
         }

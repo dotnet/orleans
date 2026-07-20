@@ -25,7 +25,7 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public BinaryData Serialize<T>(T value)
+        public BinaryData Serialize<T>(T? value)
         {
             var buffer = new ArrayBufferWriter<byte>();
             this.serializer.Serialize(value, buffer);
@@ -33,13 +33,13 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
+        public T? Deserialize<T>(BinaryData input)
         {
             return this.serializer.Deserialize<T>(input.ToMemory());
         }
 
         /// <inheritdoc/>
-        public ValueTask SerializeAsync<T>(T value, Stream destination, CancellationToken cancellationToken = default)
+        public ValueTask SerializeAsync<T>(T? value, Stream destination, CancellationToken cancellationToken = default)
         {
             this.serializer.Serialize(value, destination);
             return ValueTask.CompletedTask;

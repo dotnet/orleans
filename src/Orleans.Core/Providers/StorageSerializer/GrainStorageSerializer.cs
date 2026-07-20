@@ -22,10 +22,10 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public BinaryData Serialize<T>(T input) => _serializer.Serialize(input);
+        public BinaryData Serialize<T>(T? input) => _serializer.Serialize(input);
 
         /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
+        public T? Deserialize<T>(BinaryData input)
         {
             try
             {

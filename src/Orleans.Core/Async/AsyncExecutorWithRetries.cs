@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Internal
 {
     /// <summary>
@@ -42,9 +41,9 @@ namespace Orleans.Internal
         public static Task ExecuteWithRetries(
             Func<int, Task> action,
             int maxNumErrorTries,
-            Func<Exception, int, bool> retryExceptionFilter,
+            Func<Exception, int, bool>? retryExceptionFilter,
             TimeSpan maxExecutionTime,
-            IBackoffProvider onErrorBackOff)
+            IBackoffProvider? onErrorBackOff)
         {
             async Task<bool> function(int i) { await action(i); return true; }
             return ExecuteWithRetriesHelper<bool>(
@@ -83,9 +82,9 @@ namespace Orleans.Internal
         public static Task<T> ExecuteWithRetries<T>(
             Func<int, Task<T>> function,
             int maxNumErrorTries,
-            Func<Exception, int, bool> retryExceptionFilter,
+            Func<Exception, int, bool>? retryExceptionFilter,
             TimeSpan maxExecutionTime,
-            IBackoffProvider onErrorBackOff,
+            IBackoffProvider? onErrorBackOff,
             CancellationToken cancellationToken = default)
         {
             return ExecuteWithRetries<T>(
@@ -139,11 +138,11 @@ namespace Orleans.Internal
             Func<int, Task<T>> function,
             int maxNumSuccessTries,
             int maxNumErrorTries,
-            Func<T, int, bool> retryValueFilter,
-            Func<Exception, int, bool> retryExceptionFilter,
+            Func<T, int, bool>? retryValueFilter,
+            Func<Exception, int, bool>? retryExceptionFilter,
             TimeSpan maxExecutionTime = default,
-            IBackoffProvider onSuccessBackOff = null,
-            IBackoffProvider onErrorBackOff = null,
+            IBackoffProvider? onSuccessBackOff = null,
+            IBackoffProvider? onErrorBackOff = null,
             CancellationToken cancellationToken = default)
         {
             return ExecuteWithRetriesHelper<T>(
@@ -203,14 +202,14 @@ namespace Orleans.Internal
             int maxNumErrorTries,
             TimeSpan maxExecutionTime,
             DateTime startExecutionTime,
-            Func<T, int, bool> retryValueFilter = null,
-            Func<Exception, int, bool> retryExceptionFilter = null,
-            IBackoffProvider onSuccessBackOff = null,
-            IBackoffProvider onErrorBackOff = null,
+            Func<T, int, bool>? retryValueFilter = null,
+            Func<Exception, int, bool>? retryExceptionFilter = null,
+            IBackoffProvider? onSuccessBackOff = null,
+            IBackoffProvider? onErrorBackOff = null,
             CancellationToken cancellationToken = default)
         {
-            T result = default;
-            ExceptionDispatchInfo lastExceptionInfo = null;
+            T result = default!;
+            ExceptionDispatchInfo? lastExceptionInfo = null;
             bool retry;
             var callCounter = 0;
 

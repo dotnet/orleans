@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System;
 
-#nullable disable
 namespace Orleans.Placement.Repartitioning;
 
 [Alias("IActivationRepartitionerSystemTarget")]
@@ -62,7 +61,7 @@ internal readonly struct Edge(EdgeVertex source, EdgeVertex target) : IEquatable
     public static bool operator ==(Edge left, Edge right) => left.Equals(right);
     public static bool operator !=(Edge left, Edge right) => !left.Equals(right);
 
-    public override bool Equals([NotNullWhen(true)] object obj) => obj is Edge other && Equals(other);
+    public override bool Equals([NotNullWhen(true)] object? obj) => obj is Edge other && Equals(other);
     public bool Equals(Edge other) => Source == other.Source && Target == other.Target;
 
     public override int GetHashCode() => HashCode.Combine(Source, Target);
@@ -96,7 +95,7 @@ public readonly struct EdgeVertex(
     public static bool operator ==(EdgeVertex left, EdgeVertex right) => left.Equals(right);
     public static bool operator !=(EdgeVertex left, EdgeVertex right) => !left.Equals(right);
 
-    public override bool Equals([NotNullWhen(true)] object obj) => obj is EdgeVertex other && Equals(other);
+    public override bool Equals([NotNullWhen(true)] object? obj) => obj is EdgeVertex other && Equals(other);
     public bool Equals(EdgeVertex other) => Id == other.Id && Silo.Equals(other.Silo) && IsMigratable == other.IsMigratable;
 
     public override int GetHashCode() => HashCode.Combine(Id, Silo, IsMigratable);
@@ -144,7 +143,7 @@ public readonly struct CandidateConnectedVertex(GrainId id, long transferScore)
     public static bool operator ==(CandidateConnectedVertex left, CandidateConnectedVertex right) => left.Equals(right);
     public static bool operator !=(CandidateConnectedVertex left, CandidateConnectedVertex right) => !left.Equals(right);
 
-    public override bool Equals([NotNullWhen(true)] object obj) => obj is CandidateConnectedVertex other && Equals(other);
+    public override bool Equals([NotNullWhen(true)] object? obj) => obj is CandidateConnectedVertex other && Equals(other);
     public bool Equals(CandidateConnectedVertex other) => Id == other.Id && TransferScore == other.TransferScore;
 
     public override int GetHashCode() => HashCode.Combine(Id, TransferScore);

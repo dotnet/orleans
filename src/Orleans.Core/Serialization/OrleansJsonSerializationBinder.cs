@@ -3,7 +3,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using Orleans.Serialization.TypeSystem;
 
-#nullable disable
 namespace Orleans.Serialization
 {
     /// <summary>
@@ -50,7 +49,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        public override Type BindToType(string assemblyName, string typeName)
+        public override Type BindToType(string? assemblyName, string typeName)
         {
             var fullName = !string.IsNullOrWhiteSpace(assemblyName) ? typeName + ',' + assemblyName : typeName;
 

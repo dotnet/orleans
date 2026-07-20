@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Utilities;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -86,13 +85,13 @@ namespace Orleans.Runtime
         public Type[] GetArguments(TypeConverter converter) => converter.GetArguments(this.GrainType.Value);
 
         /// <inheritdoc/>
-        public override string ToString() => this.GrainType.ToString();
+        public override string? ToString() => this.GrainType.ToString();
 
         /// <inheritdoc/>
         public bool Equals(GenericGrainType other) => this.GrainType.Equals(other.GrainType);
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is GenericGrainType other && this.Equals(other);
+        public override bool Equals([NotNullWhen(true)] object? obj) => obj is GenericGrainType other && this.Equals(other);
 
         /// <inheritdoc/>
         public override int GetHashCode() => this.GrainType.GetHashCode();

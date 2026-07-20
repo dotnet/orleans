@@ -1,6 +1,5 @@
 using Orleans.Serialization;
 
-#nullable enable
 namespace Orleans.Storage
 {
     /// <summary>
@@ -19,20 +18,20 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public BinaryData Serialize<T>(T value)
+        public BinaryData Serialize<T>(T? value)
         {
             var data = _orleansJsonSerializer.Serialize(value, typeof(T));
             return new BinaryData(data);
         }
 
         /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
+        public T? Deserialize<T>(BinaryData input)
         {
-            return (T)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
+            return (T?)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
         }
 
         /// <inheritdoc/>
-        public ValueTask SerializeAsync<T>(T value, Stream destination, CancellationToken cancellationToken = default)
+        public ValueTask SerializeAsync<T>(T? value, Stream destination, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             _orleansJsonSerializer.Serialize(value, typeof(T), destination);

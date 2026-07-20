@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using System.Net;
 
-#nullable disable
 namespace Orleans.Storage
 {
     /// <summary>
@@ -69,11 +68,11 @@ namespace Orleans.Storage
 
         /// <summary>Gets the Etag value currently held in persistent storage.</summary>
         [Id(1)]
-        public string StoredEtag { get; private set; }
+        public string? StoredEtag { get; private set; }
 
         /// <summary>Gets the Etag value currently help in memory, and attempting to be updated.</summary>
         [Id(2)]
-        public string CurrentEtag { get; private set; }
+        public string? CurrentEtag { get; private set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="InconsistentStateException"/> class.
@@ -96,8 +95,8 @@ namespace Orleans.Storage
         /// </summary>
         /// <param name="message">The message.</param>
         /// <param name="innerException">The inner exception.</param>
-        public InconsistentStateException(string message, Exception innerException)
-            : base(message, innerException)
+        public InconsistentStateException(string message,         Exception? innerException)
+            : base(message, innerException!)
         {
         }
 
@@ -124,9 +123,9 @@ namespace Orleans.Storage
         /// <param name="storageException">The inner exception.</param>
         public InconsistentStateException(
           string errorMsg,
-          string storedEtag,
-          string currentEtag,
-          Exception storageException) : base(errorMsg, storageException)
+          string? storedEtag,
+          string? currentEtag,
+          Exception? storageException) : base(errorMsg, storageException!)
         {
             StoredEtag = storedEtag;
             CurrentEtag = currentEtag;
@@ -140,8 +139,8 @@ namespace Orleans.Storage
         /// <param name="currentEtag">The current ETag.</param>
         public InconsistentStateException(
           string errorMsg,
-          string storedEtag,
-          string currentEtag)
+          string? storedEtag,
+          string? currentEtag)
             : this(errorMsg, storedEtag, currentEtag, null)
         {
         }
@@ -152,7 +151,7 @@ namespace Orleans.Storage
         /// <param name="storedEtag">The stored ETag.</param>
         /// <param name="currentEtag">The current ETag.</param>
         /// <param name="storageException">The storage exception.</param>
-        public InconsistentStateException(string storedEtag, string currentEtag, Exception storageException)
+        public InconsistentStateException(string? storedEtag, string? currentEtag, Exception storageException)
             : this(storageException.Message, storedEtag, currentEtag, storageException)
         {
         }
