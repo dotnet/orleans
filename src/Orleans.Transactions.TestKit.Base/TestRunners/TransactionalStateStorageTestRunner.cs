@@ -5,7 +5,6 @@ using AwesomeAssertions;
 using AwesomeAssertions.Equivalency;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public abstract class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase
@@ -13,7 +12,7 @@ namespace Orleans.Transactions.TestKit
     {
         protected Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory;
         protected Func<int, TState> stateFactory;
-        protected Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>> assertConfig;
+        protected Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig;
 
         /// <summary>
         /// Constructor
@@ -28,7 +27,7 @@ namespace Orleans.Transactions.TestKit
         ///     are compared</param>
         protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory, 
             IGrainFactory grainFactory, Action<string> testOutput,
-            Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>> assertConfig = null)
+            Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig = null)
             :base(grainFactory, testOutput)
         {
             this.stateStorageFactory = stateStorageFactory;
@@ -166,7 +165,7 @@ namespace Orleans.Transactions.TestKit
         {
             return new ParticipantId(
                                     "tm",
-                                    null,
+                                    null!,
                                     // (GrainReference) grainFactory.GetGrain<ITransactionTestGrain>(Guid.NewGuid(), TransactionTestConstants.SingleStateTransactionalGrain),
                                     ParticipantId.Role.Resource | ParticipantId.Role.Manager);
         }

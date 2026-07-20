@@ -9,7 +9,6 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Orleans.Transactions.TestKit.Correctnesss;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public partial class TransactionRecoveryTestsRunner : TransactionTestRunnerBase
@@ -38,7 +37,7 @@ namespace Orleans.Transactions.TestKit
             public ITransactionalBitArrayGrain Grain { get; }
             public BitArrayState Expected { get; } = new BitArrayState();
             public BitArrayState Unambiguous { get; } = new BitArrayState();
-            public List<BitArrayState> Actual { get; set; }
+            public List<BitArrayState> Actual { get; set; } = null!;
             public async Task GetActual()
             {
                 try
@@ -57,7 +56,7 @@ namespace Orleans.Transactions.TestKit
             : base(testCluster.GrainFactory, testOutput)
         {
             this.testCluster = testCluster;
-            this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>();
+            this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>()!;
         }
 
         public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -109,7 +108,7 @@ namespace Orleans.Transactions.TestKit
             if (endedOnCommand) this.Log($"No transactions failed due to silo death.  Test may not be valid");
 
             this.Log($"Waiting for system to recover. Performed {index[0]} transactions on each group.");
-            var transactionGroupsRef = new[] { transactionGroups };
+            List<ExpectedGrainActivity>[]?[] transactionGroupsRef = new[] { transactionGroups };
             await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(transactionGroupsRef, getIndex, lastTry), RecoveryTimeout, RetryDelay);
             this.Log($"Recovery completed. Performed {index[0]} transactions on each group. Validating results.");
             await ValidateResults(txGrains, transactionGroups);
@@ -134,10 +133,10 @@ namespace Orleans.Transactions.TestKit
             return end[0];
         }
 
-        private async Task<bool> CheckTxResult(List<ExpectedGrainActivity>[][] transactionGroupsRef, Func<int> getIndex, bool assertIsTrue)
+        private async Task<bool> CheckTxResult(List<ExpectedGrainActivity>[]?[] transactionGroupsRef, Func<int> getIndex, bool assertIsTrue)
         {
             // only retry failed transactions
-            transactionGroupsRef[0] = await RunAllTxReportFailed(transactionGroupsRef[0], getIndex());
+            transactionGroupsRef[0] = await RunAllTxReportFailed(transactionGroupsRef[0]!, getIndex());
             bool succeed = transactionGroupsRef[0] == null;
             this.Log($"All transactions succeed after interruption : {succeed}");
             if (assertIsTrue)
@@ -154,7 +153,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         // Runs all transactions and returns failed;
-        private async Task<List<ExpectedGrainActivity>[]> RunAllTxReportFailed(List<ExpectedGrainActivity>[] transactionGroups, int index)
+        private async Task<List<ExpectedGrainActivity>[]?> RunAllTxReportFailed(List<ExpectedGrainActivity>[] transactionGroups, int index)
         {
             List<Task> tasks = transactionGroups
                 .Select(p => SetBit(p, index))
@@ -221,10 +220,10 @@ namespace Orleans.Transactions.TestKit
             foreach (List<ExpectedGrainActivity> transactionGroup in transactionGroups)
             {
                 if (transactionGroup.Count == 0) continue;
-                BitArrayState first = transactionGroup[0].Actual.FirstOrDefault();
+                BitArrayState first = transactionGroup[0].Actual.FirstOrDefault()!;
                 foreach (ExpectedGrainActivity activity in transactionGroup.Skip(1))
                 {
-                    BitArrayState actual = activity.Actual.FirstOrDefault();
+                    BitArrayState actual = activity.Actual.FirstOrDefault()!;
                     BitArrayState difference = first ^ actual;
                     if (difference.Value.Any(v => v != 0))
                     {
@@ -246,7 +245,7 @@ namespace Orleans.Transactions.TestKit
                 BitArrayState unambiguous = activity.Unambiguous;
                 BitArrayState unambuguousExpected = expected & unambiguous;
                 List<BitArrayState> actual = activity.Actual;
-                BitArrayState first = actual.FirstOrDefault();
+                BitArrayState? first = actual.FirstOrDefault();
                 if (first == null)
                 {
                     this.Log($"No activity for {i} ({activity.GrainId})");

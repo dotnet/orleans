@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit
 {
 
@@ -13,7 +12,7 @@ namespace Orleans.Transactions.TestKit
         Task Set(int newValue);
 
         [Transaction(TransactionOption.CreateOrJoin)]
-        Task Add(int numberToAdd, FaultInjectionControl faultInjectionControl = null);
+        Task Add(int numberToAdd, FaultInjectionControl? faultInjectionControl = null);
 
         [Transaction(TransactionOption.CreateOrJoin)]
         Task<int> Get();
@@ -25,7 +24,7 @@ namespace Orleans.Transactions.TestKit
     {
         private readonly IFaultInjectionTransactionalState<GrainData> data;
         private readonly ILoggerFactory loggerFactory;
-        private ILogger logger;
+        private ILogger logger = null!;
 
         public SingleStateFaultInjectionTransactionalGrain(
             [FaultInjectionTransactionalState("data", TransactionTestConstants.TransactionStore)]
@@ -53,7 +52,7 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
-        public Task Add(int numberToAdd, FaultInjectionControl faultInjectionControl = null)
+        public Task Add(int numberToAdd, FaultInjectionControl? faultInjectionControl = null)
         {
             //reset in case control from last tx isn't cleared for some reason
             this.data.FaultInjectionControl.Reset();

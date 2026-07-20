@@ -5,7 +5,6 @@ using Orleans.Transactions.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState>
@@ -24,7 +23,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         ///     are compared</param>
         public TransactionalStateStorageTestRunnerxUnit(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory,
             Func<int, TState> stateFactory, IGrainFactory grainFactory, ITestOutputHelper testOutput,
-            Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>> assertConfig = null)
+            Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig = null)
             : base(stateStorageFactory, stateFactory, grainFactory, testOutput.WriteLine, assertConfig)
         {
         }

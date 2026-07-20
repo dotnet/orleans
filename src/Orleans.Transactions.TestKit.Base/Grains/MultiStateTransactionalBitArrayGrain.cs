@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit.Correctnesss
 {
     [Serializable]
@@ -32,7 +31,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return true;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
@@ -111,7 +110,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             set => this.value[index] = value;
         }
 
-        public static bool operator ==(BitArrayState left, BitArrayState right)
+        public static bool operator ==(BitArrayState? left, BitArrayState? right)
         {
             if (ReferenceEquals(left, right)) return true;
             if (ReferenceEquals(left, null)) return false;
@@ -119,7 +118,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return left.Equals(right);
         }
 
-        public static bool operator !=(BitArrayState left, BitArrayState right)
+        public static bool operator !=(BitArrayState? left, BitArrayState? right)
         {
             return !(left == right);
         }
@@ -205,7 +204,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
     {
         protected ITransactionalState<BitArrayState>[] dataArray;
         private readonly ILoggerFactory loggerFactory;
-        protected ILogger logger;
+        protected ILogger logger = null!;
 
         public MultiStateTransactionalBitArrayGrain(
             ITransactionalState<BitArrayState>[] dataArray,

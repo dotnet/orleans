@@ -6,13 +6,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit.Consistency
 {
     public class ConsistencyTestHarness
     {
         private readonly ConsistencyTestOptions options;
-        private Action<string> output;
+        private Action<string> output = null!;
 
         private readonly Dictionary<int,       // Grain
                           SortedDictionary<int, // SeqNo
