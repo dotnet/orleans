@@ -755,7 +755,7 @@ public class GeneratedSerializerTests : IDisposable
             var initialHeader = reader.ReadFieldHeader();
             Assert.True(reader.Position > previousPos);
 
-            result = codec.ReadValue(ref reader, initialHeader);
+            result = codec.ReadValue(ref reader, initialHeader)!;
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
         }
@@ -766,7 +766,7 @@ public class GeneratedSerializerTests : IDisposable
     private T Copy<T>(T original)
     {
         var copier = _serviceProvider.GetRequiredService<DeepCopier<T>>();
-        return copier.Copy(original);
+        return copier.Copy(original)!;
     }
 
     private object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream)
@@ -791,7 +791,7 @@ public class GeneratedSerializerTests : IDisposable
 
             var reader = Reader.Create(readResult.Buffer, readerSession);
 
-            result = serializer.Deserialize(ref reader);
+            result = serializer.Deserialize(ref reader)!;
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
         }

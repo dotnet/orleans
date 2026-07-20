@@ -160,7 +160,7 @@ public class PooledBufferStreamTests
     public void Return_NullStream_ThrowsException()
     {
         // Arrange & Act & Assert
-        Assert.Throws<ArgumentNullException>(() => PooledBufferStream.Return(null));
+        Assert.Throws<ArgumentNullException>(() => PooledBufferStream.Return(null!));
     }
 
     /// <summary>
@@ -678,7 +678,7 @@ public class PooledBufferStreamTests
         using var stream = new PooledBufferStream();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => stream.Read(null, 0, 5));
+        Assert.Throws<ArgumentNullException>(() => stream.Read(null!, 0, 5));
     }
 
     /// <summary>

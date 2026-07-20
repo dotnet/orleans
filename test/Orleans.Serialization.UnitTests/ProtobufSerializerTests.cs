@@ -61,7 +61,7 @@ public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IField
     {
         var original = new MyProtobufClass { IntProperty = 30, StringProperty = "hi", SubClass = new MyProtobufClass.Types.SubClass { Id = Guid.NewGuid().ToByteString() } };
         var copier = ServiceProvider.GetRequiredService<DeepCopier<MyProtobufClass>>();
-        var result = copier.Copy(original);
+        var result = copier.Copy(original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
@@ -72,7 +72,7 @@ public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IField
     {
         var original = new MyProtobufClass { IntProperty = 30, StringProperty = "hi", SubClass = new MyProtobufClass.Types.SubClass { Id = Guid.NewGuid().ToByteString() } };
         var copier = ServiceProvider.GetRequiredService<DeepCopier>();
-        var result = (MyProtobufClass)copier.Copy((object)original);
+        var result = (MyProtobufClass)copier.Copy((object)original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
@@ -82,7 +82,7 @@ public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IField
     public void ProtobufSerializerRoundTripThroughCodec()
     {
         var original = new MyProtobufClass { IntProperty = 30, StringProperty = "hi", SubClass = new MyProtobufClass.Types.SubClass { Id = Guid.NewGuid().ToByteString() } };
-        var result = RoundTripThroughCodec(original);
+        var result = RoundTripThroughCodec(original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
@@ -142,7 +142,7 @@ public class ProtobufRepeatedFieldCodecTests : FieldCodecTester<RepeatedField<in
         return result;
     }
 
-    protected override bool Equals(RepeatedField<int> left, RepeatedField<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override bool Equals(RepeatedField<int>? left, RepeatedField<int>? right) => object.ReferenceEquals(left, right) || left!.SequenceEqual(right!);
     protected override RepeatedField<int>[] TestValues => new[] { new RepeatedField<int>(), CreateValue(), CreateValue(), CreateValue() };
 }
 
@@ -166,7 +166,7 @@ public class ProtobufRepeatedFieldCopierTests : CopierTester<RepeatedField<int>,
         return result;
     }
 
-    protected override bool Equals(RepeatedField<int> left, RepeatedField<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override bool Equals(RepeatedField<int>? left, RepeatedField<int>? right) => object.ReferenceEquals(left, right) || left!.SequenceEqual(right!);
     protected override RepeatedField<int>[] TestValues => new[] { new RepeatedField<int>(), CreateValue(), CreateValue(), CreateValue() };
 }
 
@@ -189,7 +189,7 @@ public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFie
     }
 
     protected override MapField<string, int>[] TestValues => new[] { new MapField<string, int>(), CreateValue(), CreateValue(), CreateValue() };
-    protected override bool Equals(MapField<string, int> left, MapField<string, int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override bool Equals(MapField<string, int>? left, MapField<string, int>? right) => object.ReferenceEquals(left, right) || left!.SequenceEqual(right!);
 }
 
 [Trait("Category", "BVT")]
@@ -211,7 +211,7 @@ public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldC
     }
 
     protected override MapField<string, int>[] TestValues => new[] { new MapField<string, int>(), CreateValue(), CreateValue(), CreateValue() };
-    protected override bool Equals(MapField<string, int> left, MapField<string, int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override bool Equals(MapField<string, int>? left, MapField<string, int>? right) => object.ReferenceEquals(left, right) || left!.SequenceEqual(right!);
 }
 
 [Trait("Category", "BVT")]
@@ -223,7 +223,7 @@ public class ByteStringCodecTests : FieldCodecTester<ByteString, ByteStringCodec
 
     protected override ByteString CreateValue() => Guid.NewGuid().ToByteString();
 
-    protected override bool Equals(ByteString left, ByteString right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override bool Equals(ByteString? left, ByteString? right) => ReferenceEquals(left, right) || left!.SequenceEqual(right!);
 
     protected override ByteString[] TestValues => new[]
     {
@@ -242,7 +242,7 @@ public class ByteStringCopierTests : CopierTester<ByteString, ByteStringCopier>,
 
     protected override ByteString CreateValue() => Guid.NewGuid().ToByteString();
 
-    protected override bool Equals(ByteString left, ByteString right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override bool Equals(ByteString? left, ByteString? right) => ReferenceEquals(left, right) || left!.SequenceEqual(right!);
 
     protected override ByteString[] TestValues => new[]
     {

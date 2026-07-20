@@ -288,7 +288,7 @@ namespace Orleans.Serialization.UnitTests
         {
             // AddSerializer guarantees that the closed copier is registered.
             var deepCopier = _serviceProvider.GetService<DeepCopier<T>>()!;
-            return deepCopier.Copy(original);
+            return deepCopier.Copy(original)!;
         }
 
         [Id(1000)]

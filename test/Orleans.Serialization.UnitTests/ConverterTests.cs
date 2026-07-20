@@ -5,8 +5,6 @@ using Orleans.Serialization.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 
-// TestKit's legacy TestValues contract cannot express intentionally nullable test values.
-#pragma warning disable CS8609
 namespace Orleans.Serialization.UnitTests;
 
 /// <summary>
@@ -29,8 +27,8 @@ public class ConverterCodecTests : FieldCodecTester<MyForeignLibraryType, IField
     }
 
     protected override MyForeignLibraryType CreateValue() => new(12, "hi", DateTimeOffset.Now);
-    protected override bool Equals(MyForeignLibraryType left, MyForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
-    protected override MyForeignLibraryType?[] TestValues => new MyForeignLibraryType?[] { null, CreateValue() };
+    protected override bool Equals(MyForeignLibraryType? left, MyForeignLibraryType? right) => ReferenceEquals(left, right) || left!.Equals(right);
+    protected override MyForeignLibraryType[] TestValues => new MyForeignLibraryType[] { null!, CreateValue() };
 }
 
 public class ConverterCopierTests : CopierTester<MyForeignLibraryType, IDeepCopier<MyForeignLibraryType>>, IClassFixture<SerializationTesterFixture>
@@ -40,8 +38,8 @@ public class ConverterCopierTests : CopierTester<MyForeignLibraryType, IDeepCopi
     }
 
     protected override MyForeignLibraryType CreateValue() => new(12, "hi", DateTimeOffset.Now);
-    protected override bool Equals(MyForeignLibraryType left, MyForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
-    protected override MyForeignLibraryType?[] TestValues => new MyForeignLibraryType?[] { null, CreateValue() };
+    protected override bool Equals(MyForeignLibraryType? left, MyForeignLibraryType? right) => ReferenceEquals(left, right) || left!.Equals(right);
+    protected override MyForeignLibraryType[] TestValues => new MyForeignLibraryType[] { null!, CreateValue() };
 }
 
 public class WrappedConverterCodecTests : FieldCodecTester<WrapsMyForeignLibraryType, IFieldCodec<WrapsMyForeignLibraryType>>, IClassFixture<SerializationTesterFixture>
@@ -51,8 +49,8 @@ public class WrappedConverterCodecTests : FieldCodecTester<WrapsMyForeignLibrary
     }
 
     protected override WrapsMyForeignLibraryType CreateValue() => new() { IntValue = 12, ForeignValue = new MyForeignLibraryType(12, "hi", DateTimeOffset.Now), OtherIntValue = 7468249 };
-    protected override bool Equals(WrapsMyForeignLibraryType left, WrapsMyForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
-    protected override WrapsMyForeignLibraryType?[] TestValues => new WrapsMyForeignLibraryType?[] { default, CreateValue() };
+    protected override bool Equals(WrapsMyForeignLibraryType? left, WrapsMyForeignLibraryType? right) => ReferenceEquals(left, right) || left!.Equals(right);
+    protected override WrapsMyForeignLibraryType[] TestValues => new WrapsMyForeignLibraryType[] { default!, CreateValue() };
 }
 
 public class WrappedConverterCopierTests : CopierTester<WrapsMyForeignLibraryType, IDeepCopier<WrapsMyForeignLibraryType>>, IClassFixture<SerializationTesterFixture>
@@ -62,8 +60,8 @@ public class WrappedConverterCopierTests : CopierTester<WrapsMyForeignLibraryTyp
     }
 
     protected override WrapsMyForeignLibraryType CreateValue() => new() { IntValue = 12, ForeignValue = new MyForeignLibraryType(12, "hi", DateTimeOffset.Now), OtherIntValue = 7468249 };
-    protected override bool Equals(WrapsMyForeignLibraryType left, WrapsMyForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
-    protected override WrapsMyForeignLibraryType?[] TestValues => new WrapsMyForeignLibraryType?[] { default, CreateValue() };
+    protected override bool Equals(WrapsMyForeignLibraryType? left, WrapsMyForeignLibraryType? right) => ReferenceEquals(left, right) || left!.Equals(right);
+    protected override WrapsMyForeignLibraryType[] TestValues => new WrapsMyForeignLibraryType[] { default!, CreateValue() };
 }
 
 public class StructConverterCodecTests : ValueTypeFieldCodecTester<MyForeignLibraryValueType, IFieldCodec<MyForeignLibraryValueType>>, IClassFixture<SerializationTesterFixture>
@@ -117,8 +115,8 @@ public class DerivedConverterCodecTests : FieldCodecTester<DerivedFromMyForeignL
     }
 
     protected override DerivedFromMyForeignLibraryType CreateValue() => new(658, 12, "hi", DateTimeOffset.Now);
-    protected override bool Equals(DerivedFromMyForeignLibraryType left, DerivedFromMyForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
-    protected override DerivedFromMyForeignLibraryType?[] TestValues => new DerivedFromMyForeignLibraryType?[] { null, CreateValue() };
+    protected override bool Equals(DerivedFromMyForeignLibraryType? left, DerivedFromMyForeignLibraryType? right) => ReferenceEquals(left, right) || left!.Equals(right);
+    protected override DerivedFromMyForeignLibraryType[] TestValues => new DerivedFromMyForeignLibraryType[] { null!, CreateValue() };
 }
 
 public class DerivedConverterCopierTests : CopierTester<DerivedFromMyForeignLibraryType, IDeepCopier<DerivedFromMyForeignLibraryType>>, IClassFixture<SerializationTesterFixture>
@@ -128,8 +126,8 @@ public class DerivedConverterCopierTests : CopierTester<DerivedFromMyForeignLibr
     }
 
     protected override DerivedFromMyForeignLibraryType CreateValue() => new(658, 12, "hi", DateTimeOffset.Now);
-    protected override bool Equals(DerivedFromMyForeignLibraryType left, DerivedFromMyForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
-    protected override DerivedFromMyForeignLibraryType?[] TestValues => new DerivedFromMyForeignLibraryType?[] { null, CreateValue() };
+    protected override bool Equals(DerivedFromMyForeignLibraryType? left, DerivedFromMyForeignLibraryType? right) => ReferenceEquals(left, right) || left!.Equals(right);
+    protected override DerivedFromMyForeignLibraryType[] TestValues => new DerivedFromMyForeignLibraryType[] { null!, CreateValue() };
 }
 
 
@@ -140,7 +138,6 @@ public class CombinedConverterCopierTests : CopierTester<MyFirstForeignLibraryTy
     }
 
     protected override MyFirstForeignLibraryType CreateValue() => new() { Num = 12, String = "hi", DateTimeOffset = DateTimeOffset.Now };
-    protected override bool Equals(MyFirstForeignLibraryType left, MyFirstForeignLibraryType right) => left.Equals(right);
+    protected override bool Equals(MyFirstForeignLibraryType? left, MyFirstForeignLibraryType? right) => left!.Equals(right);
     protected override MyFirstForeignLibraryType[] TestValues => new MyFirstForeignLibraryType[] { CreateValue() };
 }
-#pragma warning restore CS8609

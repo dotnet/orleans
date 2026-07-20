@@ -99,32 +99,32 @@ namespace Orleans.Serialization.UnitTests
             writer.Commit();
 
             var slice = writer.Output.Slice();
-            var sliceReader = Reader.Create(slice, null);
+            var sliceReader = Reader.Create(slice, null!);
             var sliceArray = sliceReader.ReadBytes((uint)randomData.Length);
             Assert.True(randomData.AsSpan().SequenceEqual(sliceArray));
 
             var slice3 = writer.Output.Slice(100, 1024);
-            var reader3 = Reader.Create(slice3, null);
+            var reader3 = Reader.Create(slice3, null!);
             var result3 = reader3.ReadBytes((uint)slice3.Length);
             Assert.True(randomData.AsSpan(100, 1024).SequenceEqual(result3));
 
             var slice2 = writer.Output.Slice(100);
-            var reader2 = Reader.Create(slice2, null);
+            var reader2 = Reader.Create(slice2, null!);
             var result2 = reader2.ReadBytes((uint)slice2.Length);
             Assert.True(randomData.AsSpan(100).SequenceEqual(result2));
 
             var slice4 = writer.Output.Slice(3000, 1500);
-            var reader4 = Reader.Create(slice4, null);
+            var reader4 = Reader.Create(slice4, null!);
             var result4 = reader4.ReadBytes((uint)slice4.Length);
             Assert.True(randomData.AsSpan(3000, 1500).SequenceEqual(result4));
 
             var slice5 = writer.Output.Slice(4500, 125);
-            var reader5 = Reader.Create(slice5, null);
+            var reader5 = Reader.Create(slice5, null!);
             var result5 = reader5.ReadBytes((uint)slice5.Length);
             Assert.True(randomData.AsSpan(4500, 125).SequenceEqual(result5));
 
             var ros = writer.Output.AsReadOnlySequence();
-            var rosReader = Reader.Create(ros, null);
+            var rosReader = Reader.Create(ros, null!);
             var rosArray = rosReader.ReadBytes((uint)randomData.Length);
             Assert.True(randomData.AsSpan().SequenceEqual(rosArray));
 

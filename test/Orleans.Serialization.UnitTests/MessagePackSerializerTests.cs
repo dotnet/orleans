@@ -58,7 +58,7 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
     {
         var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new() { Id = Guid.NewGuid() } };
         var copier = ServiceProvider.GetRequiredService<DeepCopier<MyMessagePackClass>>();
-        var result = copier.Copy(original);
+        var result = copier.Copy(original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
@@ -71,7 +71,7 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
     {
         var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new() { Id = Guid.NewGuid() } };
         var copier = ServiceProvider.GetRequiredService<DeepCopier>();
-        var result = (MyMessagePackClass)copier.Copy((object)original);
+        var result = (MyMessagePackClass)copier.Copy((object)original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
@@ -83,7 +83,7 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
     public void MessagePackSerializerRoundTripThroughCodec()
     {
         var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new() { Id = Guid.NewGuid() } };
-        var result = RoundTripThroughCodec(original);
+        var result = RoundTripThroughCodec(original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);

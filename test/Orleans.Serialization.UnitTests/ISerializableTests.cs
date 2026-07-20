@@ -86,7 +86,7 @@ namespace Orleans.Serialization.UnitTests
                 //Assert.True(Equals(original, deserialized), $"Deserialized value \"{deserialized}\" must equal original value \"{original}\"");
                 Assert.Equal(writer.Position, reader.Position);
                 Assert.Equal(writerSession.ReferencedObjects.CurrentReferenceId, readerSession.ReferencedObjects.CurrentReferenceId);
-                return deserialized;
+                return deserialized!;
             }
         }
 
@@ -276,7 +276,7 @@ namespace Orleans.Serialization.UnitTests
             using var formatterSession = _sessionPool.GetSession();
             var formatted = BitStreamFormatter.Format(serialized, formatterSession);
 
-            object deserialized = serializer.Deserialize<Exception>(serialized);
+            object deserialized = serializer.Deserialize<Exception>(serialized)!;
 
             // Type is wrong after round trip of unserializable exception
             var result = Assert.IsAssignableFrom<UnavailableExceptionFallbackException>(deserialized);
@@ -305,7 +305,7 @@ namespace Orleans.Serialization.UnitTests
                     BaseField = new SimpleISerializableObject() { Payload = "payload" }
                 };
             }));
-            deserialized = serializer.Deserialize<Exception>(serializer.SerializeToArray(source));
+            deserialized = serializer.Deserialize<Exception>(serializer.SerializeToArray(source))!;
 
             // Type is wrong after round trip of unserializable exception
             result = Assert.IsAssignableFrom<UnavailableExceptionFallbackException>(deserialized);

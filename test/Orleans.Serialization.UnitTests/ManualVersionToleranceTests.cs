@@ -163,7 +163,7 @@ namespace Orleans.Serialization.UnitTests
             _log.WriteLine("Header:");
             _log.WriteLine(initialHeader.ToString());
 
-            var actual = _serializer.ReadValue(ref reader, initialHeader);
+            var actual = _serializer.ReadValue(ref reader, initialHeader)!;
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
 
@@ -274,7 +274,7 @@ namespace Orleans.Serialization.UnitTests
                 Assert.IsNotType<ConcreteTypeSerializer<ObjectWithNewField, ObjectWithNewFieldTypeSerializer>>(objectWithNewFieldSerializer);
 
                 // using Generated Deserializer, which is capable of deserializing NewField 
-                var value = objectWithNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                var value = objectWithNewFieldSerializer.ReadValue(ref reader, initialHeader)!;
                 return (value, reader.Position, reader.Session.ReferencedObjects.CurrentReferenceId);
             }
 
@@ -340,7 +340,7 @@ namespace Orleans.Serialization.UnitTests
                 Assert.IsNotType<ConcreteTypeSerializer<ObjectWithoutNewField, ObjectWithoutNewFieldTypeSerializer>>(objectWithoutNewFieldSerializer);
 
                 // using Generated Deserializer, which is not able to deserialize the new field that was serialized
-                var value = objectWithoutNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                var value = objectWithoutNewFieldSerializer.ReadValue(ref reader, initialHeader)!;
                 return (value, reader.Position, reader.Session.ReferencedObjects.CurrentReferenceId);
             }
 

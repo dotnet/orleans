@@ -231,7 +231,7 @@ public class NumericsWideningAndNarrowingTests
     {
         // Round-trip the value, converting it along the way.
         var payload = _serializer.SerializeToArray(leftValue);
-        var result = _serializer.Deserialize<TRight>(payload);
+        var result = _serializer.Deserialize<TRight>(payload)!;
 
         var asRight = TRight.CreateTruncating(leftValue);
         Assert.Equal(asRight, result);
@@ -247,7 +247,7 @@ public class NumericsWideningAndNarrowingTests
     {
         // Wrap the value and round-trip the wrapped value, converting it along the way.
         var payload = _serializer.SerializeToArray(new ValueHolder<TLeft> { Value = leftValue });
-        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload).Value;
+        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload)!.Value;
 
         var asRight = TRight.CreateTruncating(leftValue);
         Assert.Equal(asRight, result);

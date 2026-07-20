@@ -9,7 +9,6 @@ using Xunit;
 using Xunit.Abstractions;
 
 // TestKit's legacy TestValues contract cannot express intentionally nullable test values.
-#pragma warning disable CS8609
 namespace Orleans.Serialization.UnitTests
 {
     /// <summary>
@@ -45,9 +44,9 @@ namespace Orleans.Serialization.UnitTests
 
         protected override int[] MaxSegmentSizes => new[] { 840 };
 
-        protected override MyNewtonsoftJsonClass?[] TestValues => new MyNewtonsoftJsonClass?[]
+        protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
         {
-            null,
+            null!,
             new MyNewtonsoftJsonClass(),
             new MyNewtonsoftJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
             new MyNewtonsoftJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 4097) },
@@ -58,7 +57,7 @@ namespace Orleans.Serialization.UnitTests
         {
             var original = new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
             var copier = ServiceProvider.GetRequiredService<DeepCopier<MyNewtonsoftJsonClass>>();
-            var result = copier.Copy(original);
+            var result = copier.Copy(original)!;
 
             Assert.Equal(original.IntProperty, result.IntProperty);
             Assert.Equal(original.SubTypeProperty, result.SubTypeProperty);
@@ -69,7 +68,7 @@ namespace Orleans.Serialization.UnitTests
         {
             var original = new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
             var copier = ServiceProvider.GetRequiredService<DeepCopier>();
-            var result = (MyNewtonsoftJsonClass)copier.Copy((object)original);
+            var result = (MyNewtonsoftJsonClass)copier.Copy((object)original)!;
 
             Assert.Equal(original.IntProperty, result.IntProperty);
             Assert.Equal(original.SubTypeProperty, result.SubTypeProperty);
@@ -79,7 +78,7 @@ namespace Orleans.Serialization.UnitTests
         public void NewtonsoftJsonRoundTripThroughCodec()
         {
             var original = new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
-            var result = RoundTripThroughCodec(original);
+            var result = RoundTripThroughCodec(original)!;
 
             Assert.Equal(original.IntProperty, result.IntProperty);
             Assert.Equal(original.SubTypeProperty, result.SubTypeProperty);
@@ -135,9 +134,9 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyNewtonsoftJsonClass CreateValue() => new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
 
-        protected override MyNewtonsoftJsonClass?[] TestValues => new MyNewtonsoftJsonClass?[]
+        protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
         {
-            null,
+            null!,
             new MyNewtonsoftJsonClass(),
             new MyNewtonsoftJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
             new MyNewtonsoftJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 4097) },
@@ -167,5 +166,4 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(original), Newtonsoft.Json.JsonConvert.SerializeObject(result));
         }
     }
-    #pragma warning restore CS8609
 }
