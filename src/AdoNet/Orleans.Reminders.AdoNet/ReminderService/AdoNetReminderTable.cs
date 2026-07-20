@@ -30,7 +30,7 @@ namespace Orleans.Runtime.ReminderService
             return this.orleansQueries.ReadReminderRowsAsync(this.serviceId, grainId);
         }
 
-        public Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
+        public Task<ReminderTableData?> ReadRows(uint beginHash, uint endHash)
         {
             return this.orleansQueries.ReadReminderRowsAsync(this.serviceId, beginHash, endHash);
         }
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.ReminderService
             return this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName);
         }   
         
-        public Task<string> UpsertRow(ReminderEntry entry)
+        public Task<string?> UpsertRow(ReminderEntry entry)
         {
             if (entry.StartAt.Kind is DateTimeKind.Unspecified)
             {

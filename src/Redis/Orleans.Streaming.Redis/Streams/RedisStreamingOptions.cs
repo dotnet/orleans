@@ -51,5 +51,5 @@ public sealed class RedisStreamingOptions
 
 internal sealed class RedactRedisConfigurationOptionsAttribute : RedactAttribute
 {
-    public override string Redact(object value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
+    public override string Redact(object? value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
 }

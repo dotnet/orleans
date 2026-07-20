@@ -75,7 +75,8 @@ internal sealed class RedisStreamBatchContainer : IBatchContainer
         }
 
         var payload = (byte[]?)payloadEntry.Value ?? throw new RedisStreamingException($"Redis stream entry '{entry.Id}' contains an empty '{fieldName}' payload field.");
-        var message = serializer.Deserialize(payload);
+        // A non-empty payload field contains a serialized stream batch container.
+        var message = serializer.Deserialize(payload)!;
         var (sequenceNumber, redisSequenceNumber) = ParseEntryId(entry.Id);
         message._sequenceToken = new RedisStreamSequenceToken(entry.Id.ToString(), sequenceNumber, redisSequenceNumber, 0);
         message.Entry = entry;

@@ -92,7 +92,7 @@ namespace Orleans.Reminders.Redis
             }
         }
 
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public async Task<ReminderTableData?> ReadRows(uint begin, uint end)
         {
             try
             {
@@ -147,7 +147,7 @@ namespace Orleans.Reminders.Redis
             }
         }
 
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string?> UpsertRow(ReminderEntry entry)
         {
             const string UpsertScript =
                 """
@@ -283,6 +283,6 @@ namespace Orleans.Reminders.Redis
             Level = LogLevel.Debug,
             Message = "UpsertRow entry = {Entry}, ETag = {ETag}"
         )]
-        private partial void LogDebugUpsertRow(ReminderEntryLogValue entry, string eTag);
+        private partial void LogDebugUpsertRow(ReminderEntryLogValue entry, string? eTag);
     }
 }

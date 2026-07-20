@@ -78,7 +78,8 @@ internal class AdoNetBatchContainer : IBatchContainer
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(message);
 
-        var container = serializer.Deserialize(message.Payload);
+        // A stored stream message always contains a serialized batch container.
+        var container = serializer.Deserialize(message.Payload)!;
         container.SequenceToken = new(message.MessageId);
         container.Dequeued = message.Dequeued;
 

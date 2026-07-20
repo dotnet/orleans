@@ -99,7 +99,8 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainId grainId)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, GetReminderEntry, command =>
+            // Collection queries only yield rows containing reminder data; the selector is nullable for single-row outer joins.
+            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, record => GetReminderEntry(record)!, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -111,11 +112,12 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="beginHash">The begin hash.</param>
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
+        internal Task<ReminderTableData?> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
         {
             var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
-            return ReadAsync(query, GetReminderEntry, command =>
+            // Collection queries only yield rows containing reminder data; the selector is nullable for single-row outer joins.
+            return ReadAsync<ReminderEntry, ReminderTableData?>(query, record => GetReminderEntry(record)!, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -174,10 +176,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-        internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,
+        internal Task<string?> UpsertReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName, DateTime startTime, TimeSpan period)
         {
-            return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
+            return ReadAsync<int, string?>(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,

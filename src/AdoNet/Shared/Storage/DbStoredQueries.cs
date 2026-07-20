@@ -214,10 +214,11 @@ namespace Orleans.Tests.SqlUtils
                 MembershipEntry? entry = null;
                 if (startTime.HasValue)
                 {
+                    // Legacy membership schemas can omit SiloName, but MembershipEntry retains the value as-is for compatibility.
                     entry = new MembershipEntry
                     {
                         SiloAddress = GetSiloAddress(record, nameof(Columns.Port)),
-                        SiloName = TryGetSiloName(record),
+                        SiloName = TryGetSiloName(record)!,
                         HostName = record.GetValue<string>(nameof(Columns.HostName)),
                         Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), record.GetInt32(nameof(Columns.Status)).ToString()),
                         ProxyPort = record.GetInt32(nameof(Columns.ProxyPort)),
