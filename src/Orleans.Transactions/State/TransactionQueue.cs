@@ -11,7 +11,6 @@ using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
 
-#nullable disable
 namespace Orleans.Transactions.State
 {
     internal partial class TransactionQueue<TState>
@@ -28,7 +27,7 @@ namespace Orleans.Transactions.State
         private CommitQueue<TState> commitQueue;
         private Task readyTask;
 
-        protected StorageBatch<TState> storageBatch;
+        protected StorageBatch<TState> storageBatch = null!;
 
         private int failCounter;
 
@@ -44,7 +43,7 @@ namespace Orleans.Transactions.State
             public TransactionalStatus Status;
         }
 
-        private TState stableState;
+        private TState stableState = null!;
         private long stableSequenceNumber;
         public ReadWriteLock<TState> RWLock { get; }
         public CausalClock Clock { get; }
@@ -93,7 +92,7 @@ namespace Orleans.Transactions.State
                     case CommitRole.LocalCommit:
                         {
                             // process prepared messages received ahead of time
-                            if (unprocessedPreparedMessages.TryGetValue(record.Timestamp, out PreparedMessages info))
+                            if (unprocessedPreparedMessages.TryGetValue(record.Timestamp, out PreparedMessages? info))
                             {
                                 if (info.Status == TransactionalStatus.Ok)
                                 {
@@ -194,7 +193,7 @@ namespace Orleans.Transactions.State
             else
             {
                 // this message has arrived ahead of the commit request - we need to remember it
-                if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out PreparedMessages info))
+                if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out PreparedMessages? info))
                 {
                     this.unprocessedPreparedMessages[timeStamp] = info = new PreparedMessages(status);
                 }
@@ -236,7 +235,7 @@ namespace Orleans.Transactions.State
             this.RWLock.Notify();
         }
 
-        public async Task NotifyOfAbort(TransactionRecord<TState> entry, TransactionalStatus status, Exception exception)
+        public async Task NotifyOfAbort(TransactionRecord<TState> entry, TransactionalStatus status, Exception? exception)
         {
             switch (entry.Role)
             {
@@ -535,7 +534,7 @@ namespace Orleans.Transactions.State
                     }
 
                     // store the current storage batch, if it is not empty
-                    StorageBatch<TState> batchBeingSentToStorage = null;
+                    StorageBatch<TState>? batchBeingSentToStorage = null;
                     if (this.storageBatch.BatchSize > 0)
                     {
                         // get the next batch in place so it can be filled while we store the old one
@@ -615,12 +614,12 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private async Task AbortAndRestore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
+        private async Task AbortAndRestore(TransactionalStatus status, Exception? exception, bool storageOutcomeInDoubt)
         {
             var task = this.readyTask = AbortAndRestoreCore(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt);
             await task;
 
-            async Task AbortAndRestoreCore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
+            async Task AbortAndRestoreCore(TransactionalStatus status, Exception? exception, bool storageOutcomeInDoubt)
             {
                 List<Task> pending = [RWLock.AbortExecutingTransactions(exception)];
                 this.RWLock.AbortQueuedTransactions();
@@ -652,7 +651,7 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception exception)
+        private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception? exception)
         {
             switch (entry.Role)
             {

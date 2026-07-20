@@ -28,7 +28,7 @@ namespace Orleans.Transactions
         /// <returns>null if the transaction committed successfully, or an exception otherwise.
         /// If the exception is OrleansTransactionInDoubtException, it means the outcome of the Commit cannot be determined; otherwise,
         /// the transaction is guaranteed to not have taken effect.</returns>
-        Task<(TransactionalStatus Status, Exception exception)> Resolve(TransactionInfo transactionInfo);
+        Task<(TransactionalStatus Status, Exception? exception)> Resolve(TransactionInfo transactionInfo);
 
         /// <summary>
         /// Abort a transaction.

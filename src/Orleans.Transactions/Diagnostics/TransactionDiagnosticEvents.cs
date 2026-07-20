@@ -20,16 +20,16 @@ internal static class TransactionDiagnosticEvents
 
     internal sealed class StorageWriteCompleted(
         ParticipantId resource,
-        string eTag,
+        string? eTag,
         int batchSize,
         int commitCount) : TransactionDiagnosticEvent(resource)
     {
-        public readonly string ETag = eTag;
+        public readonly string? ETag = eTag;
         public readonly int BatchSize = batchSize;
         public readonly int CommitCount = commitCount;
     }
 
-    internal static void EmitStorageWriteCompleted(ParticipantId resource, string eTag, int batchSize, int commitCount)
+    internal static void EmitStorageWriteCompleted(ParticipantId resource, string? eTag, int batchSize, int commitCount)
     {
         if (!Listener.IsEnabled(nameof(StorageWriteCompleted)))
         {
@@ -39,7 +39,7 @@ internal static class TransactionDiagnosticEvents
         Emit(resource, eTag, batchSize, commitCount);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Emit(ParticipantId resource, string eTag, int batchSize, int commitCount)
+        static void Emit(ParticipantId resource, string? eTag, int batchSize, int commitCount)
         {
             // Observer exceptions intentionally propagate so tests can inject post-write faults.
             Listener.Write(nameof(StorageWriteCompleted), new StorageWriteCompleted(resource, eTag, batchSize, commitCount));

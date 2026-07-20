@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 
 using Orleans.Serialization;
 
-#nullable disable
 namespace Orleans.Transactions;
 
 internal class TransactionClient : ITransactionClient
@@ -92,7 +91,7 @@ internal class TransactionClient : ITransactionClient
         }
     }
 
-    private static async Task RunDelegateWithDisallowedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private static async Task RunDelegateWithDisallowedTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         if (ambientTransactionInfo is not null)
         {
@@ -104,7 +103,7 @@ internal class TransactionClient : ITransactionClient
         _ = await transactionDelegate();
     }
 
-    private static async Task RunDelegateWithSupportedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private static async Task RunDelegateWithSupportedTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         if (ambientTransactionInfo is null)
         {
@@ -118,7 +117,7 @@ internal class TransactionClient : ITransactionClient
         }
     }
 
-    private static async Task RunDelegateWithSupressedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private static async Task RunDelegateWithSupressedTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         // Clear transaction context
         TransactionContext.Clear();
@@ -135,7 +134,7 @@ internal class TransactionClient : ITransactionClient
         }
     }
 
-    private async Task RunDelegateWithTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate, bool useExclusiveLock)
+    private async Task RunDelegateWithTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate, bool useExclusiveLock)
     {
         TransactionInfo transactionInfo;
 
@@ -190,7 +189,7 @@ internal class TransactionClient : ITransactionClient
     private async Task FinalizeTransaction(TransactionInfo transactionInfo)
     {
         // Prepare for exception, if any
-        OrleansTransactionException transactionException;
+        OrleansTransactionException? transactionException;
 
         // Check if transaction is pending for abort
         transactionException = transactionInfo.MustAbort(_serializer);

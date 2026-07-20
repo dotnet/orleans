@@ -11,7 +11,6 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 using Orleans.Transactions.TOC;
 
-#nullable disable
 namespace Orleans.Transactions
 {
     public partial class TransactionCommitter<TService> : ITransactionCommitter<TService>, ILifecycleParticipant<IGrainLifecycle>
@@ -24,7 +23,7 @@ namespace Orleans.Transactions
         private readonly ActivationLifetime activationLifetime;
         private readonly ILogger logger;
         private ParticipantId participantId;
-        private TransactionQueue<OperationState> queue;
+        private TransactionQueue<OperationState> queue = null!;
 
         private bool detectReentrancy;
 
@@ -66,7 +65,7 @@ namespace Orleans.Transactions
                 () =>
                 {
                     // check if we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState> record))
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState>? record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -122,7 +121,7 @@ namespace Orleans.Transactions
             this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);
+            ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName)!;
 
             // setup transaction processing pipe
             void deactivate() => grainRuntime.DeactivateOnIdle(context);
@@ -144,7 +143,7 @@ namespace Orleans.Transactions
         public sealed class OperationState
         {
             [Id(0)]
-            public ITransactionCommitOperation<TService> Operation { get; set; }
+            public ITransactionCommitOperation<TService> Operation { get; set; } = null!;
         }
 
         [LoggerMessage(

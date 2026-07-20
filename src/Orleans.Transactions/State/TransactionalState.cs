@@ -11,7 +11,6 @@ using Orleans.Transactions.State;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
 
-#nullable disable
 namespace Orleans.Transactions
 {
     /// <summary>
@@ -28,7 +27,7 @@ namespace Orleans.Transactions
         private readonly ILogger logger;
         private readonly ActivationLifetime activationLifetime;
         private ParticipantId participantId;
-        private TransactionQueue<TState> queue;
+        private TransactionQueue<TState> queue = null!;
 
         public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo().Id;
 
@@ -71,7 +70,7 @@ namespace Orleans.Transactions
                 () =>
                 {
                     // check if our record is gone because we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState>? record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -90,7 +89,7 @@ namespace Orleans.Transactions
                     info.RecordRead(this.participantId, record.Timestamp);
 
                     // perform the read
-                    TResult result = default;
+                    TResult result = default!;
                     try
                     {
                         detectReentrancy = true;
@@ -131,7 +130,7 @@ namespace Orleans.Transactions
                 () =>
                 {
                     // check if we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState>? record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -195,7 +194,7 @@ namespace Orleans.Transactions
             this.participantId = new ParticipantId(this.config.StateName, this.context.GrainReference, this.config.SupportedRoles);
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
+            ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName)!;
 
             // setup transaction processing pipe
             void deactivate() => grainRuntime.DeactivateOnIdle(context);
@@ -213,7 +212,7 @@ namespace Orleans.Transactions
         private TResult CopyResult<TResult>(TResult result)
         {
             ITransactionDataCopier<TResult> resultCopier;
-            if (!this.copiers.TryGetValue(typeof(TResult), out object cp))
+            if (!this.copiers.TryGetValue(typeof(TResult), out object? cp))
             {
                 resultCopier = this.context.ActivationServices.GetRequiredService<ITransactionDataCopier<TResult>>();
                 this.copiers.Add(typeof(TResult), resultCopier);
@@ -246,7 +245,7 @@ namespace Orleans.Transactions
             Level = LogLevel.Trace,
             Message = "EndRead {Info} {Result} {State}"
         )]
-        private partial void LogTraceEndRead(TransactionInfo info, object result, TState state);
+        private partial void LogTraceEndRead(TransactionInfo info, object? result, TState state);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

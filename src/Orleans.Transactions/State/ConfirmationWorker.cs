@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.State
 {
     internal partial class ConfirmationWorker<TState>
@@ -152,7 +151,7 @@ namespace Orleans.Transactions.State
             private readonly DateTime timestamp;
             private readonly Func<Task> call;
             private readonly ILogger logger;
-            private Task pending;
+            private Task? pending;
             private bool complete;
 
             public Confirmation(ParticipantId paricipant, Guid transactionId, DateTime timestamp, Func<Task> call, ILogger logger)

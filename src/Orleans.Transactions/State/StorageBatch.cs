@@ -54,7 +54,7 @@ namespace Orleans.Transactions
 
         public TransactionalStateMetaData MetaData { get; private set; }
 
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         public int BatchSize => total;
 
@@ -65,7 +65,7 @@ namespace Orleans.Transactions
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
         }
 
-        public StorageBatch(TransactionalStateMetaData metaData, string etag, long confirmUpTo, long cancelAbove)
+        public StorageBatch(TransactionalStateMetaData metaData, string? etag, long confirmUpTo, long cancelAbove)
         {
             this.MetaData = metaData ?? throw new ArgumentNullException(nameof(metaData));
             this.ETag = etag;
@@ -87,7 +87,7 @@ namespace Orleans.Transactions
         {
         }
 
-        public async Task<string> Store(ITransactionalStateStorage<TState> storage)
+        public async Task<string?> Store(ITransactionalStateStorage<TState> storage)
         {
             List<PendingTransactionState<TState>> list = this.prepares.Values.ToList();
             return await storage.Store(ETag, this.MetaData, list,

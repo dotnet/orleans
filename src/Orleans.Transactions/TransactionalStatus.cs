@@ -47,7 +47,7 @@ namespace Orleans.Transactions
             }
         }
 
-        public static OrleansTransactionException ConvertToUserException(this TransactionalStatus status, string transactionId, Exception exception)
+        public static OrleansTransactionException ConvertToUserException(this TransactionalStatus status, string transactionId, Exception? exception)
         {
             switch (status)
             {
