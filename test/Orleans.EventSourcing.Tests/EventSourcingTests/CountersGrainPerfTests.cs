@@ -99,7 +99,7 @@ namespace Tester.EventSourcingTests
 
     public class SimplePriorityOrderer : ITestCaseOrderer
     {
-        private readonly string attrname = typeof(RunThisFirstAttribute).AssemblyQualifiedName;
+        private readonly string attrname = typeof(RunThisFirstAttribute).AssemblyQualifiedName!;
 
         private bool HasRunThisFirstAttribute(ITestCase testcase)
         {
