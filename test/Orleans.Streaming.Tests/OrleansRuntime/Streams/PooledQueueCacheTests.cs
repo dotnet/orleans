@@ -688,7 +688,7 @@ namespace UnitTests.OrleansRuntime.Streams
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)
         {
             int sequenceNumber = startOfCache;
-            IBatchContainer batch;
+            IBatchContainer? batch;
 
             var stream1 = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
             var stream2 = StreamId.Create(TestStreamNamespace, Guid.NewGuid());

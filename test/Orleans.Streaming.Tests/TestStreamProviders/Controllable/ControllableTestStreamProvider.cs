@@ -18,8 +18,8 @@ namespace Tester.TestStreamProviders.Controllable
     {
         public string Name { get; private set; }
 
-        public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
-            Dictionary<string, object> requestContext)
+        public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token,
+            Dictionary<string, object>? requestContext)
         {
             return Task.CompletedTask;
         }

@@ -189,7 +189,7 @@ namespace UnitTests.StreamingTests
                 id = Guid.NewGuid();
             }
 
-            public Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
+            public Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData)
             {
                 return Task.CompletedTask;
             }

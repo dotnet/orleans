@@ -460,6 +460,7 @@ public class SubscriptionMultiplicityTestRunner
         var streamId = StreamId.Create(streamNamespace, streamGuid);
 
         var provider = this.testCluster.Client.ServiceProvider.GetKeyedService<IStreamProvider>(streamProviderName);
+        Assert.NotNull(provider);
         var stream = provider.GetStream<int>(streamNamespace, streamGuid);
         StreamSubscriptionHandle<int> handle = null!;
         await WaitForSubscriptionRegisteredAsync(

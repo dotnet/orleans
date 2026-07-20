@@ -34,7 +34,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
     public async Task Programmatic_Subscribe_CanUseNullNamespace()
     {
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
-        var streamId = new FullStreamIdentity(Guid.NewGuid(), null, StreamProviderName);
+        var streamId = new FullStreamIdentity(Guid.NewGuid(), null!, StreamProviderName);
         await subscriptionManager.AddSubscription<IPassive_ConsumerGrain>(streamId,
             Guid.NewGuid());
         var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
@@ -126,6 +126,8 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var expectedSubscriptionIds = expectedSubscriptions.Select(sub => sub.SubscriptionId).ToSet();
         var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
         var subscriptionIds = subscriptions.Select(sub => sub.SubscriptionId).ToSet();
+        Assert.NotNull(expectedSubscriptionIds);
+        Assert.NotNull(subscriptionIds);
         Assert.True(expectedSubscriptionIds.SetEquals(subscriptionIds));
 
          //remove one subscription
@@ -134,6 +136,8 @@ public abstract class ProgrammaticSubscribeTestsRunner
         subscriptions = await subscriptionManager.GetSubscriptions(streamId);
         expectedSubscriptionIds = expectedSubscriptions.Select(sub => sub.SubscriptionId).ToSet();
         subscriptionIds = subscriptions.Select(sub => sub.SubscriptionId).ToSet();
+        Assert.NotNull(expectedSubscriptionIds);
+        Assert.NotNull(subscriptionIds);
         Assert.True(expectedSubscriptionIds.SetEquals(subscriptionIds));
 
         // clean up tests

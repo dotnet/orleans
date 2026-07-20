@@ -20,11 +20,11 @@ public class CustomStreamFilter : IStreamFilter
         this.logger = logger;
     }
 
-    public bool ShouldDeliver(StreamId streamId, object item, string filterData)
+    public bool ShouldDeliver(StreamId streamId, object item, string? filterData)
     {
         try
         {
-            var result = ShouldDeliverImpl(streamId, item, filterData);
+            var result = ShouldDeliverImpl(streamId, item, filterData!);
             logger.LogInformation("Filter -> StreamId {StreamId}, Item: {Item}, FilterData: {FilterData} -> Result: {Result}", streamId, item, filterData, result);
 
             return result;

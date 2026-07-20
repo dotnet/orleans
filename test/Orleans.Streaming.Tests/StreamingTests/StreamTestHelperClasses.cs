@@ -43,13 +43,13 @@ namespace UnitTests.StreamingTests
         public Task BecomeConsumer(Guid streamId, string providerToUse)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), null);
+            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), null!);
         }
         
         public Task BecomeConsumer(Guid streamId, string providerToUse, string? streamNamespace)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace!);
         }
 
         public Task StopBeingConsumer()
@@ -92,7 +92,7 @@ namespace UnitTests.StreamingTests
 
         public Task BecomeProducer(Guid streamId, string providerToUse, string? streamNamespace)
         {
-            this.producer.BecomeProducer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            this.producer.BecomeProducer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace!);
             return Task.CompletedTask;
         }
 
@@ -122,7 +122,7 @@ namespace UnitTests.StreamingTests
                             {
                                 try
                                 {
-                                    await timerCallback(null);
+                                    await timerCallback(null!);
                                 }
                                 catch
                                 {
@@ -297,7 +297,7 @@ namespace UnitTests.StreamingTests
             List<Task> tasks = new List<Task>();
             foreach (var target in _targets)
             {
-                Task t = target.BecomeConsumer(streamId, providerToUse, null);
+                Task t = target.BecomeConsumer(streamId, providerToUse, null!);
                 // Consider: remove this await, let the calls go in parallel. 
                 // Have to do it for now to prevent multithreaded scheduler bug from happening.
                 // await t;
@@ -478,7 +478,7 @@ namespace UnitTests.StreamingTests
 
             return Task.WhenAll(_targets.Select(
                 target => 
-                    target.BecomeProducer(streamId, providerToUse, streamNamespace)).ToArray());
+                    target.BecomeProducer(streamId, providerToUse, streamNamespace!)).ToArray());
         }
 
         public async Task ProduceSequentialSeries(int count)

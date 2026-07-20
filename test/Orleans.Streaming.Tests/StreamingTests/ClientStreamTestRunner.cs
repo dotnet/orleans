@@ -79,7 +79,7 @@ namespace Tester.StreamingTests
         }
 
         private Task<StreamSubscriptionHandle<int>> SubscribeToStream(string streamProviderName, Guid streamGuid, string streamNamespace,
-            Func<int, StreamSequenceToken, Task> onNextAsync)
+            Func<int, StreamSequenceToken?, Task> onNextAsync)
         {
             IStreamProvider streamProvider = this.testHost.Client.GetStreamProvider(streamProviderName);
             IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamNamespace, streamGuid);

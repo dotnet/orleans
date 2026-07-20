@@ -37,7 +37,7 @@ namespace Tester.StreamingTests
         /// </summary>
         protected class CustomStreamFilter : IStreamFilter
         {
-            public bool ShouldDeliver(StreamId streamId, object item, string filterData)
+            public bool ShouldDeliver(StreamId streamId, object item, string? filterData)
             {
                 var data = item as byte[];
                 return data == default || data[0] == 1;

@@ -47,7 +47,7 @@ namespace UnitTests.StreamingTests
         internal static IStreamPubSub GetStreamPubSub(IInternalClusterClient client)
         {
             var runtime = client.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
-            return runtime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit);
+            return runtime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit)!;
         }
 
         internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamIdGuid, string streamProviderName, string streamNamespace)

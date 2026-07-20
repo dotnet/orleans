@@ -33,7 +33,7 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             // Use Arg.Any<int>() to match regardless of the maxCacheAddCount value.
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(
+                .Returns(Task.FromResult<IList<IBatchContainer>?>(
                 [
                     new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
                 ]));
@@ -73,7 +73,7 @@ namespace UnitTests.StreamingTests
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(
+                .Returns(Task.FromResult<IList<IBatchContainer>?>(
                 [
                     new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
                 ]));
@@ -188,7 +188,7 @@ namespace UnitTests.StreamingTests
                 queueId,
                 new StreamPullingAgentOptions(),
                 queueAdapter,
-                queueAdapterCache,
+                queueAdapterCache!,
                 new NoOpStreamDeliveryFailureHandler(),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
@@ -213,7 +213,7 @@ namespace UnitTests.StreamingTests
                 return false;
             }
 
-            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
+            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
             {
                 return Substitute.For<IQueueCacheCursor>();
             }
@@ -253,7 +253,7 @@ namespace UnitTests.StreamingTests
                 return false;
             }
 
-            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
+            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
             {
                 return new ScriptedQueueCursor(messages, streamId, token);
             }
@@ -273,7 +273,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private sealed class ScriptedQueueCursor(List<IBatchContainer> messages, StreamId streamId, StreamSequenceToken token) : IQueueCacheCursor
+        private sealed class ScriptedQueueCursor(List<IBatchContainer> messages, StreamId streamId, StreamSequenceToken? token) : IQueueCacheCursor
         {
             private int index = -1;
             private IBatchContainer? current;
@@ -340,7 +340,7 @@ namespace UnitTests.StreamingTests
                 return false;
             }
 
-            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
+            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
                 => new Cursor(cache, cache.GetCursor(streamId, token));
 
             public bool IsUnderPressure() => false;
@@ -405,10 +405,10 @@ namespace UnitTests.StreamingTests
             public TaskCompletionSource<bool> Delivered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
 
-            public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
                 => throw new NotSupportedException();
 
-            public Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
                 => throw new NotSupportedException();
 
             public async Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken)
@@ -432,27 +432,27 @@ namespace UnitTests.StreamingTests
         {
             public TaskCompletionSource<bool> Delivered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
             {
                 throw new NotSupportedException();
             }
 
-            public Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken handshakeToken)
+            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken)
             {
                 Delivered.TrySetResult(true);
-                return Task.FromResult(rewindToken);
+                return Task.FromResult<StreamHandshakeToken?>(rewindToken);
             }
 
             public Task CompleteStream(GuidId subscriptionId) => Task.CompletedTask;
 
             public Task ErrorInStream(GuidId subscriptionId, Exception exc) => Task.CompletedTask;
 
-            public Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId) => Task.FromResult(rewindToken);
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId) => Task.FromResult<StreamHandshakeToken?>(rewindToken);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -475,7 +475,7 @@ namespace UnitTests.StreamingTests
 
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId, newToken)]));
+                .Returns(Task.FromResult<IList<IBatchContainer>?>([new TestBatchContainer(streamId, newToken)]));
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache);
@@ -522,13 +522,14 @@ namespace UnitTests.StreamingTests
             var previousToken = new EventSequenceTokenV2(1);
             var attemptedToken = new EventSequenceTokenV2(2);
             var rewindToken = StreamHandshakeToken.CreateDeliveyToken(previousToken);
+            Assert.NotNull(rewindToken);
             var consumer = new RewindConsumer(rewindToken);
 
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(
-                    Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId, attemptedToken)]),
-                    Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+                    Task.FromResult<IList<IBatchContainer>?>([new TestBatchContainer(streamId, attemptedToken)]),
+                    Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new ScriptedQueueCache();
@@ -644,7 +645,7 @@ namespace UnitTests.StreamingTests
         public async Task Shutdown_WaitsForInFlightPumpWork()
         {
             var queueReadStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var queueReadReleased = new TaskCompletionSource<IList<IBatchContainer>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var queueReadReleased = new TaskCompletionSource<IList<IBatchContainer>?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
@@ -694,7 +695,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var agent = CreateAgent(pubSub: null, queueId, receiver);
@@ -719,7 +720,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
@@ -739,7 +740,7 @@ namespace UnitTests.StreamingTests
             var newestConsumer = streamData.AddConsumer(
                 GuidId.GetGuidId(Guid.NewGuid()),
                 streamId,
-                streamConsumer: null,
+                streamConsumer: null!,
                 filterData: null,
                 now: DateTime.UtcNow);
             newestConsumer.IsRegistered = true;
@@ -748,7 +749,7 @@ namespace UnitTests.StreamingTests
             var earliestConsumer = streamData.AddConsumer(
                 GuidId.GetGuidId(Guid.NewGuid()),
                 streamId,
-                streamConsumer: null,
+                streamConsumer: null!,
                 filterData: null,
                 now: DateTime.UtcNow);
             earliestConsumer.IsRegistered = true;
@@ -769,7 +770,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
@@ -789,7 +790,7 @@ namespace UnitTests.StreamingTests
             var newestConsumer = streamData.AddConsumer(
                 GuidId.GetGuidId(Guid.NewGuid()),
                 streamId,
-                streamConsumer: null,
+                streamConsumer: null!,
                 filterData: null,
                 now: DateTime.UtcNow);
             newestConsumer.IsRegistered = true;
@@ -798,7 +799,7 @@ namespace UnitTests.StreamingTests
             var earliestConsumer = streamData.AddConsumer(
                 GuidId.GetGuidId(Guid.NewGuid()),
                 streamId,
-                streamConsumer: null,
+                streamConsumer: null!,
                 filterData: null,
                 now: DateTime.UtcNow);
             earliestConsumer.IsRegistered = true;
@@ -823,10 +824,10 @@ namespace UnitTests.StreamingTests
             var receiverShutdownStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(
-                    Task.FromResult<IList<IBatchContainer>>([
+                    Task.FromResult<IList<IBatchContainer>?>([
                         new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
                     ]),
-                    Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+                    Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(_ =>
             {
                 receiverShutdownStarted.SetResult(true);
@@ -873,7 +874,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
@@ -893,7 +894,7 @@ namespace UnitTests.StreamingTests
             var registeredConsumer = streamData.AddConsumer(
                 GuidId.GetGuidId(Guid.NewGuid()),
                 streamId,
-                streamConsumer: null,
+                streamConsumer: null!,
                 filterData: null,
                 now: DateTime.UtcNow);
             registeredConsumer.IsRegistered = true;
@@ -902,7 +903,7 @@ namespace UnitTests.StreamingTests
             var unregisteredConsumer = streamData.AddConsumer(
                 GuidId.GetGuidId(Guid.NewGuid()),
                 streamId,
-                streamConsumer: null,
+                streamConsumer: null!,
                 filterData: null,
                 now: DateTime.UtcNow);
             unregisteredConsumer.PendingStartToken = new EventSequenceTokenV2(50);
