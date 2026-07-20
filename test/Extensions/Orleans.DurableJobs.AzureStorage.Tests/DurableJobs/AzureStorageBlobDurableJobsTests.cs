@@ -139,7 +139,7 @@ internal static class AzureBlobDurableJobsTestConfiguration
         }
         else
         {
-            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString!);
         }
 
         return options;

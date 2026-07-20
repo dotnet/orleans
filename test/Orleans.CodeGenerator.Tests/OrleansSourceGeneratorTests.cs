@@ -1,3 +1,5 @@
+extern alias CodeGenerator;
+
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -5,8 +7,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.CodeGenerator.Diagnostics;
 using Orleans.Serialization;
+using DiagnosticRuleId = CodeGenerator::Orleans.CodeGenerator.Diagnostics.DiagnosticRuleId;
+using OrleansSerializationSourceGenerator = CodeGenerator::Orleans.CodeGenerator.OrleansSerializationSourceGenerator;
 
 namespace Orleans.CodeGenerator.Tests;
 
