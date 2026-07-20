@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Threading;
@@ -13,7 +14,6 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
@@ -252,8 +252,7 @@ namespace Orleans.Runtime.MembershipService
             var newProbedSilos = ImmutableDictionary.CreateBuilder<SiloAddress, SiloHealthMonitor>();
             foreach (var silo in silosToWatch.Union(additionalSilos))
             {
-                SiloHealthMonitor monitor;
-                if (!monitoredSilos.TryGetValue(silo, out monitor))
+                if (!monitoredSilos.TryGetValue(silo, out var monitor))
                 {
                     monitor = this.createMonitor(silo);
                     monitor.Start();
@@ -334,7 +333,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason)
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason)
         {
             var ok = true;
             reason = default;

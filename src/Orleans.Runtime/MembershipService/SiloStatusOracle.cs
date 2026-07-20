@@ -1,8 +1,8 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal partial class SiloStatusOracle : ISiloStatusOracle
@@ -16,7 +16,7 @@ namespace Orleans.Runtime.MembershipService
 #else
         private readonly object cacheUpdateLock = new();
 #endif
-        private MembershipTableSnapshot cachedSnapshot;
+        private MembershipTableSnapshot? cachedSnapshot;
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
         private SiloAddress[] _activeSilos = [];
@@ -119,7 +119,7 @@ namespace Orleans.Runtime.MembershipService
             return !status.IsTerminating();
         }
 
-        public bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
+        public bool TryGetSiloName(SiloAddress siloAddress, [NotNullWhen(true)] out string? siloName)
         {
             var snapshot = this.membershipManager.CurrentSnapshot.Entries;
             if (snapshot.TryGetValue(siloAddress, out var entry))

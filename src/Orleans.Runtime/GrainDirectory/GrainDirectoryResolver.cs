@@ -1,22 +1,22 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime.Hosting;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GrainDirectoryResolver
     {
         private readonly Dictionary<string, IGrainDirectory> directoryPerName = new Dictionary<string, IGrainDirectory>();
-        private readonly ConcurrentDictionary<GrainType, IGrainDirectory> directoryPerType = new();
+        private readonly ConcurrentDictionary<GrainType, IGrainDirectory?> directoryPerType = new();
         private readonly GrainPropertiesResolver grainPropertiesResolver;
         private readonly IGrainDirectoryResolver[] resolvers;
-        private readonly Func<GrainType, IGrainDirectory> getGrainDirectoryInternal;
+        private readonly Func<GrainType, IGrainDirectory?> getGrainDirectoryInternal;
 
         public GrainDirectoryResolver(
             IServiceProvider serviceProvider,
@@ -40,13 +40,13 @@ namespace Orleans.Runtime.GrainDirectory
 
         public IReadOnlyCollection<IGrainDirectory> Directories => this.directoryPerName.Values;
 
-        public IGrainDirectory DefaultGrainDirectory { get; }
+        public IGrainDirectory? DefaultGrainDirectory { get; }
 
-        public IGrainDirectory Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
+        public IGrainDirectory? Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
 
         public bool IsUsingDefaultDirectory(GrainType grainType) => Resolve(grainType) == null;
 
-        private IGrainDirectory GetGrainDirectoryPerType(GrainType grainType)
+        private IGrainDirectory? GetGrainDirectoryPerType(GrainType grainType)
         {
             if (this.TryGetNonDefaultGrainDirectory(grainType, out var result))
             {
@@ -56,7 +56,7 @@ namespace Orleans.Runtime.GrainDirectory
             return this.DefaultGrainDirectory;
         }
 
-        internal bool TryGetNonDefaultGrainDirectory(GrainType grainType, out IGrainDirectory directory)
+        internal bool TryGetNonDefaultGrainDirectory(GrainType grainType, [NotNullWhen(true)] out IGrainDirectory? directory)
         {
             this.grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
 

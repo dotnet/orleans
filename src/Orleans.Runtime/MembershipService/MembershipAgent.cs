@@ -9,7 +9,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
@@ -54,11 +53,11 @@ namespace Orleans.Runtime.MembershipService
 
         internal interface ITestAccessor
         {
-            Action OnUpdateIAmAlive { get; set; }
+            Action? OnUpdateIAmAlive { get; set; }
             Func<DateTime> GetDateTime { get; set; }
         }
 
-        Action ITestAccessor.OnUpdateIAmAlive { get; set; }
+        Action? ITestAccessor.OnUpdateIAmAlive { get; set; }
         Func<DateTime> ITestAccessor.GetDateTime { get => this.getUtcDateTime; set => this.getUtcDateTime = value ?? throw new ArgumentNullException(nameof(value)); }
 
         private async Task UpdateIAmAlive()

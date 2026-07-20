@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -21,8 +21,8 @@ namespace Orleans.Runtime.GrainDirectory
 #else
         private readonly object _initLock = new();
 #endif
-        private BatchedDeregistrationWorker _forceWorker;
-        private BatchedDeregistrationWorker _neaWorker;
+        private BatchedDeregistrationWorker _forceWorker = null!;
+        private BatchedDeregistrationWorker _neaWorker = null!;
 
         public DhtGrainLocator(
             ILocalGrainDirectory localGrainDirectory,
@@ -32,9 +32,9 @@ namespace Orleans.Runtime.GrainDirectory
             _grainContext = grainContext;
         }
 
-        public async ValueTask<GrainAddress> Lookup(GrainId grainId) => (await _localGrainDirectory.LookupAsync(grainId)).Address;
+        public async ValueTask<GrainAddress?> Lookup(GrainId grainId) => (await _localGrainDirectory.LookupAsync(grainId)).Address;
 
-        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress) => (await _localGrainDirectory.RegisterAsync(address, currentRegistration: previousAddress)).Address;
+        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => (await _localGrainDirectory.RegisterAsync(address, currentRegistration: previousAddress)).Address;
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
@@ -79,7 +79,7 @@ namespace Orleans.Runtime.GrainDirectory
         public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => _localGrainDirectory.AddOrUpdateCacheEntry(grainId, siloAddress);
         public void InvalidateCache(GrainId grainId) => _localGrainDirectory.InvalidateCacheEntry(grainId);
         public void InvalidateCache(GrainAddress address) => _localGrainDirectory.InvalidateCacheEntry(address);
-        public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => _localGrainDirectory.TryLocalLookup(grainId, out address);
+        public bool TryLookupInCache(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => _localGrainDirectory.TryLocalLookup(grainId, out address);
 
         private class BatchedDeregistrationWorker
         {

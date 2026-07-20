@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Runtime.ConsistentRing
 {
     /// <summary>
@@ -18,7 +17,7 @@ namespace Orleans.Runtime.ConsistentRing
     {
         private readonly List<IRingRangeListener> statusListeners = new();
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap = new();
-        private (uint Hash, SiloAddress SiloAddress)[] sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
+        private (uint Hash, SiloAddress SiloAddress)[] sortedBucketsList = null!; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
         private readonly ILogger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
@@ -251,7 +250,7 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        public SiloAddress GetPrimaryTargetSilo(uint key)
+        public SiloAddress? GetPrimaryTargetSilo(uint key)
         {
             return CalculateTargetSilo(key);
         }
@@ -264,7 +263,7 @@ namespace Orleans.Runtime.ConsistentRing
         /// <param name="hash"></param>
         /// <param name="excludeThisSiloIfStopping"></param>
         /// <returns></returns>
-        private SiloAddress CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
+        private SiloAddress? CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
         {
             // put a private reference to point to sortedBucketsList,
             // so if someone is changing the sortedBucketsList reference, we won't get it changed in the middle of our operation.
@@ -283,7 +282,7 @@ namespace Orleans.Runtime.ConsistentRing
             // use clockwise ... current code in membershipOracle.CalculateTargetSilo() does counter-clockwise ...
             // if you want to stick to counter-clockwise, change the responsibility definition in 'In()' method & responsibility defs in OrleansReminderMemory
             // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-            (uint Hash, SiloAddress SiloAddress) s = default;
+            (uint Hash, SiloAddress? SiloAddress) s = default;
             foreach (var tuple in snapshotBucketsList)
             {
                 if (tuple.Hash >= hash && // <= hash for counter-clockwise responsibilities
@@ -300,7 +299,7 @@ namespace Orleans.Runtime.ConsistentRing
                 // if you go back to their counter-clockwise policy, then change the 'In()' method in OrleansReminderMemory
                 s = snapshotBucketsList[0]; // vs [membershipRingList.Count - 1]; for counter-clockwise policy
                 // Make sure it's not us...
-                if (s.SiloAddress.Equals(myAddress) && excludeMySelf)
+                if (s.SiloAddress!.Equals(myAddress) && excludeMySelf)
                 {
                     // vs [membershipRingList.Count - 2]; for counter-clockwise policy
                     s = snapshotBucketsList.Length > 1 ? snapshotBucketsList[1] : default;
@@ -347,7 +346,7 @@ namespace Orleans.Runtime.ConsistentRing
             Level = LogLevel.Warning,
             Message = "Error notifying listener '{ListenerType}' of ring range {AdjustmentKind} from '{OldRange}' to '{NewRange}'."
         )]
-        private static partial void LogWarningErrorNotifyingListener(ILogger logger, Exception exception, string listenerType, string adjustmentKind, IRingRange oldRange, IRingRange newRange);
+        private static partial void LogWarningErrorNotifyingListener(ILogger logger, Exception exception, string? listenerType, string adjustmentKind, IRingRange oldRange, IRingRange newRange);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.CRP_Added_Silo,
@@ -367,7 +366,6 @@ namespace Orleans.Runtime.ConsistentRing
             Level = LogLevel.Trace,
             Message = "Calculated ring partition owner silo {Owner} for key {Key}: {Key} --> {OwnerHash}"
         )]
-        private static partial void LogTraceCalculatedRingPartitionOwner(ILogger logger, SiloAddress owner, uint key, uint ownerHash);
+        private static partial void LogTraceCalculatedRingPartitionOwner(ILogger logger, SiloAddress? owner, uint key, uint ownerHash);
     }
 }
-

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Caching;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>, IGrainDirectoryCache, IAsyncDisposable
@@ -15,7 +15,7 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
         int maxCacheSize,
         TimeSpan maxCacheTTL,
         TimeProvider timeProvider,
-        DirectoryInstruments directoryInstruments = null)
+        DirectoryInstruments? directoryInstruments = null)
         : base(
             capacity: maxCacheSize,
             comparer: null,
@@ -33,7 +33,7 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
 
     public bool Remove(GrainAddress grainAddress) => TryRemove(grainAddress.GrainId, ActivationAddressesMatch, grainAddress);
 
-    public bool LookUp(GrainId key, out GrainAddress result, out int version)
+    public bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version)
     {
         if (TryGet(key, out var entry))
         {

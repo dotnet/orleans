@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -21,7 +21,7 @@ namespace Orleans.Runtime.GrainDirectory
         public static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
             => CreateGrainDirectoryCache(services, options, out _);
 
-        internal static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments directoryInstruments = null)
+        internal static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments? directoryInstruments = null)
         {
             if (options.CacheSize <= 0)
             {
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
             => CreateCustomGrainDirectoryCache(services, options, out _);
 
-        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments directoryInstruments = null)
+        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments? directoryInstruments = null)
         {
             var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
             if (grainDirectoryCache is not null)
@@ -77,7 +77,7 @@ namespace Orleans.Runtime.GrainDirectory
             return default;
         }
 
-        private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, DirectoryInstruments directoryInstruments)
+        private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider? services, GrainDirectoryOptions options, DirectoryInstruments? directoryInstruments)
         {
             var timeProvider = services?.GetKeyedService<TimeProvider>(TimeProviderNames.GrainDirectory) ?? TimeProvider.System;
             directoryInstruments ??= services?.GetService<DirectoryInstruments>();
@@ -99,7 +99,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public bool LookUp(GrainId key, out GrainAddress result, out int version)
+        public bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version)
         {
             result = default;
             version = default;

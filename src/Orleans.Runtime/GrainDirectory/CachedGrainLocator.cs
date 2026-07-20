@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -8,7 +9,6 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -24,7 +24,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
         private readonly IClusterMembershipService clusterMembershipService;
 
-        private Task listenToClusterChangeTask;
+        private Task? listenToClusterChangeTask;
 
         internal interface ITestAccessor
         {
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeCache, _directoryInstruments);
         }
 
-        public async ValueTask<GrainAddress> Lookup(GrainId grainId)
+        public async ValueTask<GrainAddress?> Lookup(GrainId grainId)
         {
             var grainType = grainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.GrainDirectory
             return entry;
         }
 
-        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
+        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
             var grainType = address.GrainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -117,7 +117,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // Cache update
-            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
+            this.cache.AddOrUpdate(result!, (int)result!.MembershipVersion.Value);
 
             return result;
 
@@ -161,7 +161,7 @@ namespace Orleans.Runtime.GrainDirectory
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
 
-        private IGrainDirectory GetGrainDirectory(GrainType grainType) => this.grainDirectoryResolver.Resolve(grainType);
+        private IGrainDirectory GetGrainDirectory(GrainType grainType) => this.grainDirectoryResolver.Resolve(grainType)!;
 
         private async Task ListenToClusterChange()
         {
@@ -197,7 +197,7 @@ namespace Orleans.Runtime.GrainDirectory
         private bool IsKnownDeadSilo(GrainAddress grainAddress)
             => IsKnownDeadSilo(grainAddress.SiloAddress, grainAddress.MembershipVersion);
 
-        private bool IsKnownDeadSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
+        private bool IsKnownDeadSilo(SiloAddress? siloAddress, MembershipVersion membershipVersion)
         {
             var current = this.clusterMembershipService.CurrentSnapshot;
             return siloAddress is null || current.GetSiloStatus(siloAddress, membershipVersion) == SiloStatus.Dead;
@@ -212,7 +212,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
         public void InvalidateCache(GrainAddress address) => cache.Remove(address);
-        public bool TryLookupInCache(GrainId grainId, out GrainAddress address)
+        public bool TryLookupInCache(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
         {
             var grainType = grainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())

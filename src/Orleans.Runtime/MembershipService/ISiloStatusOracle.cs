@@ -1,6 +1,6 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -53,7 +53,7 @@ namespace Orleans.Runtime
         /// <param name="siloAddress">A silo whose name we are interested in.</param>
         /// <param name="siloName">A silo name.</param>
         /// <returns>TTrue if could return the requested name, false otherwise.</returns>
-        bool TryGetSiloName(SiloAddress siloAddress, out string siloName);
+        bool TryGetSiloName(SiloAddress siloAddress, [NotNullWhen(true)] out string? siloName);
 
         /// <summary>
         /// Gets a value indicating whether the current silo is valid for creating new activations on or for directory lookups.

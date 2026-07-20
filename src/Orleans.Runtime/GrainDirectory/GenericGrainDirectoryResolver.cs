@@ -1,22 +1,22 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GenericGrainDirectoryResolver : IGrainDirectoryResolver
     {
         private readonly IServiceProvider _services;
-        private GrainDirectoryResolver _resolver;
+        private GrainDirectoryResolver? _resolver;
 
         public GenericGrainDirectoryResolver(IServiceProvider services)
         {
             _services = services;
         }
 
-        public bool TryResolveGrainDirectory(GrainType grainType, GrainProperties properties, out IGrainDirectory grainDirectory)
+        public bool TryResolveGrainDirectory(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IGrainDirectory? grainDirectory)
         {
             if (GenericGrainType.TryParse(grainType, out var constructed) && constructed.IsConstructed)
             {
