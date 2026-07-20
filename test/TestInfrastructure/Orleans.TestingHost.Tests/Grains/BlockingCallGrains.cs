@@ -57,13 +57,23 @@ namespace Orleans.TestingHost.Tests.Grains
     /// <summary>
     /// A stateless worker (placed local to its caller) which makes an outbound call and awaits the
     /// response. When its silo is killed while this call is in-flight, the grain context disposal
-    /// awaits deactivation of this worker, which cannot complete until the response arrives - which it
-    /// never will. That reproduces the shutdown deadlock unless outstanding callbacks are faulted.
+    /// awaits deactivation of this worker. If the first call faults during shutdown, the worker retries
+    /// to verify that no new callback can be registered after the shutdown callback sweep.
     /// </summary>
     [StatelessWorker(1)]
     public class LocalWorkerGrain : Grain, ILocalWorkerGrain
     {
-        public Task CallRemote(IRemoteBlockerGrain remote) => remote.BlockUntilReleased();
+        public async Task CallRemote(IRemoteBlockerGrain remote)
+        {
+            try
+            {
+                await remote.BlockUntilReleased();
+            }
+            catch (SiloUnavailableException)
+            {
+                await remote.BlockUntilReleased();
+            }
+        }
     }
 
     /// <summary>

@@ -94,8 +94,8 @@ namespace Orleans.TestingHost.Tests
             // Regression test for the deadlock that surfaced in CI: killing a silo whose stateless
             // workers are awaiting outbound calls (whose responses can never arrive once the silo stops)
             // must not hang while disposing the silo host. A stateless worker's grain context disposal
-            // awaits each worker's deactivation, which cannot complete until the outbound calls do; the
-            // runtime faults outstanding callbacks during shutdown so that deactivation can complete.
+            // awaits each worker's deactivation. Faulting those calls resumes the workers, which retry
+            // and would register new callbacks after the shutdown sweep unless registration is closed.
             var builder = new InProcessTestClusterBuilder(2);
             builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
             await using var cluster = builder.Build();
