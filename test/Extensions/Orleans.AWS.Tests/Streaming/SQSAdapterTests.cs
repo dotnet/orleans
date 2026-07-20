@@ -106,7 +106,7 @@ namespace AWSUtils.Tests.Streaming
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = receiver.GetQueueMessagesAsync(SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK).Result.ToArray();
+                        var messages = receiver.GetQueueMessagesAsync(SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK).Result!.ToArray();
                         if (!messages.Any())
                         {
                             continue;
@@ -161,9 +161,10 @@ namespace AWSUtils.Tests.Streaming
                     StreamSequenceToken lastToken = firstInCache;
                     while (cursor.MoveNext())
                     {
-                        Exception ex;
+                        Exception? ex;
                         messageCount++;
-                        IBatchContainer batch = cursor.GetCurrent(out ex);
+                        IBatchContainer? batch = cursor.GetCurrent(out ex);
+                        Assert.NotNull(batch);
                         output.WriteLine("Token: {0}", batch.SequenceToken);
                         Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;

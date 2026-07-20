@@ -39,6 +39,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression);
             var originalEtag = toPersist.ETag;
             var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response) );
+            Assert.NotNull(persisted);
             Assert.Equal(toPersist.StringData, persisted.StringData);
             Assert.True(persisted.ETag == 0);
             Assert.Equal(originalEtag, persisted.ETag);
@@ -65,6 +66,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             toPersist.StringData = "Replaced";            
             await manager.UpsertEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), GetValues(toPersist));
             var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
+            Assert.NotNull(persisted);
             Assert.Equal("Replaced", persisted.StringData);
             Assert.True(persisted.ETag == 0); //Yes, ETag didn't changed cause we didn't 
 
@@ -75,6 +77,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             var expValues = new Dictionary<string, AttributeValue> { { ":OldETag", new AttributeValue { N = persistedEtag.ToString() } } };
             await manager.UpsertEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(persisted), GetValues(persisted), expression, expValues);
             persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
+            Assert.NotNull(persisted);
             Assert.Equal("Updated", persisted.StringData);
             Assert.NotEqual(persistedEtag, persisted.ETag); //Now ETag changed cause we did it
 

@@ -35,9 +35,9 @@ namespace AWSUtils.Tests.RemindersTest
                 Options.Create(options));
         }
 
-        protected override Task<string?> GetConnectionString()
+        protected override Task<string> GetConnectionString()
         {
-            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null);
+            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null!);
         }
 
         [SkippableFact]

@@ -46,9 +46,9 @@ namespace AWSUtils.Tests.MembershipTests
             return new DynamoDBGatewayListProvider(this.loggerFactory.CreateLogger<DynamoDBGatewayListProvider>(), Options.Create(options), this._clusterOptions, this._gatewayOptions);
         }
 
-        protected override Task<string?> GetConnectionString()
+        protected override Task<string> GetConnectionString()
         {
-            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null);
+            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null!);
         }
 
         [SkippableFact, TestCategory("Functional")]
