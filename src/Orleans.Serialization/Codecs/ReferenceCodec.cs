@@ -205,7 +205,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="session">The session.</param>
         /// <param name="value">The value.</param>
         /// <param name="referenceId">The reference identifier.</param>
-        public static void RecordObject(SerializerSession session, object value, uint referenceId) => session.ReferencedObjects.RecordReferenceField(value, referenceId);
+        public static void RecordObject(SerializerSession session, object? value, uint referenceId) => session.ReferencedObjects.RecordReferenceField(value, referenceId);
 
         /// <summary>
         /// Records and returns a placeholder reference id for objects which cannot be immediately deserialized.

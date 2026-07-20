@@ -262,7 +262,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RecordReferenceField(object value) => RecordReferenceField(value, ++_currentReferenceId);
+        public void RecordReferenceField(object? value) => RecordReferenceField(value, ++_currentReferenceId);
 
         /// <summary>
         /// Records a reference field with the specified identifier.
@@ -270,7 +270,7 @@ namespace Orleans.Serialization.Session
         /// <param name="value">The value.</param>
         /// <param name="referenceId">The reference identifier.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RecordReferenceField(object value, uint referenceId)
+        public void RecordReferenceField(object? value, uint referenceId)
         {
             if (value is null)
             {

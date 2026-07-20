@@ -64,6 +64,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <param name="surrogate">The surrogate.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract TField ConvertFromSurrogate(ref TSurrogate surrogate);
 
         /// <summary>
