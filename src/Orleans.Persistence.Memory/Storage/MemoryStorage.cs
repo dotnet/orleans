@@ -115,7 +115,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag);
+                await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag!);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
                 grainState.State = CreateInstance<T>();
@@ -176,7 +176,7 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T grainState)
+        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T? grainState)
         {
             // Convert to binary format
             return this.storageSerializer.Serialize<T>(grainState);

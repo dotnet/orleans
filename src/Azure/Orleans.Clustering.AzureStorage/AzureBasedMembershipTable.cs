@@ -189,7 +189,7 @@ namespace Orleans.Runtime.MembershipService
                         }
                     }
                 }
-                var data = new MembershipTableData(memEntries, tableVersion);
+                var data = new MembershipTableData(memEntries, tableVersion!);
                 return data;
             }
             catch (Exception exc)
@@ -203,7 +203,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var parse = new MembershipEntry
             {
-                HostName = tableEntry.HostName,
+                HostName = tableEntry.HostName!,
                 Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), tableEntry.Status!)
             };
 

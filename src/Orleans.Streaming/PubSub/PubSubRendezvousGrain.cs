@@ -128,7 +128,7 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
-            return State.Consumers.Where(c => !c.IsFaulted).ToSet();
+            return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
         }
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)

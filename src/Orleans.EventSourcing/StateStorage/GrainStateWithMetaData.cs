@@ -1,5 +1,6 @@
 using Orleans.EventSourcing.Common;
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.EventSourcing.StateStorage
 {
@@ -27,7 +28,8 @@ namespace Orleans.EventSourcing.StateStorage
         [Id(2)]
         public bool RecordExists { get; set; }
 
-        public GrainStateWithMetaData<TView> State { get => StateAndMetaData; set => StateAndMetaData = value; }
+        [AllowNull]
+        public GrainStateWithMetaData<TView> State { get => StateAndMetaData; set => StateAndMetaData = value!; }
 
         /// <summary>
         /// Initialize a new instance of GrainStateWithMetaDataAndETag class with an initialView

@@ -1,6 +1,7 @@
 using Orleans.EventSourcing.Common;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.EventSourcing.LogStorage
 {
@@ -28,7 +29,8 @@ namespace Orleans.EventSourcing.LogStorage
         [Id(2)]
         public bool RecordExists { get; set; }
 
-        public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value; }
+        [AllowNull]
+        public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value!; }
 
         /// <summary>
         /// Initializes a new instance of GrainStateWithMetaDataAndETag class
