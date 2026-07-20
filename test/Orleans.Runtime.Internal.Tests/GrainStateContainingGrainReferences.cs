@@ -7,7 +7,7 @@ namespace TesterInternal
     public class GrainStateContainingGrainReferences
     {
         [Orleans.Id(0)]
-        public IAddressable Grain { get; set; }
+        public IAddressable? Grain { get; set; }
         [Orleans.Id(1)]
         public List<IAddressable> GrainList { get; set; }
         [Orleans.Id(2)]

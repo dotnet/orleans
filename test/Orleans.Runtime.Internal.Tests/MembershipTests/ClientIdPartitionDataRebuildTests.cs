@@ -38,7 +38,7 @@ namespace UnitTests.MembershipTests
 
         private readonly ITestOutputHelper output;
 
-        private TestCluster hostedCluster;
+        private TestCluster hostedCluster = null!;
 
         public ClientIdPartitionDataRebuildTests(ITestOutputHelper output)
         {
@@ -111,7 +111,7 @@ namespace UnitTests.MembershipTests
             Assert.False(clientId.IsDefault);
 
             // Ensure grain is activated on Silo3
-            T grain = null;
+            T? grain = null;
             for (var i = 0; i < 100; i++)
             {
                 grain = this.hostedCluster.GrainFactory.GetGrain<T>(i);
@@ -169,7 +169,7 @@ namespace UnitTests.MembershipTests
             finally
             {
                 hostedCluster?.Dispose();
-                hostedCluster = null;
+                hostedCluster = null!;
             }
         }
     }

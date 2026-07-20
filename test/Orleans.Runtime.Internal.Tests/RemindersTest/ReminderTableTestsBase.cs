@@ -57,7 +57,7 @@ namespace UnitTests.RemindersTest
         protected abstract Task<string> GetConnectionString();
         protected IReminderTable RemindersTable => remindersTable;
 
-        protected virtual string GetAdoInvariant()
+        protected virtual string? GetAdoInvariant()
         {
             return null;
         }

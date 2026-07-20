@@ -164,7 +164,7 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_Activate_Error()
         {
             const string providerName = ErrorInjectorProviderName;
-            string grainType = typeof(PersistenceProviderErrorGrain).FullName;
+            string grainType = typeof(PersistenceProviderErrorGrain).FullName!;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
 
@@ -208,14 +208,14 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(1, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(1, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             await grain.DoWrite(2);
             providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(2, providerState.LastStoredGrainState!.Field1); // Store-Field1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -240,7 +240,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
-            Assert.Equal(42, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(42, providerState.LastStoredGrainState!.Field1); // Store-Field1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -327,14 +327,14 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(1, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(1, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             await grain.DoWrite(2);
             providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(2, providerState.LastStoredGrainState!.Field1); // Store-Field1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -367,7 +367,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(initialReadCount, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(initialWriteCount + 1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(2, providerState.LastStoredGrainState!.Field1); // Store-Field1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -447,14 +447,14 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(1, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(1, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             await grain.DoWrite(2);
             providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(2, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             try
             {
@@ -479,7 +479,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(2, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             try
             {
@@ -504,7 +504,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(3, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            Assert.Equal(4, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(4, providerState.LastStoredGrainState!.Field1); // Store-Field1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -529,14 +529,14 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
-            Assert.Equal(42, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(42, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             await grain.DoWrite(43);
             providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
-            Assert.Equal(43, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(43, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             try
             {
@@ -561,7 +561,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
-            Assert.Equal(43, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(43, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             try
             {
@@ -586,7 +586,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(3, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
-            Assert.Equal(43, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(43, providerState.LastStoredGrainState!.Field1); // Store-Field1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -665,7 +665,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 62;
             await grain.DoWrite(expectedVal);
             var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             const int attemptedVal3 = 63;
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
@@ -673,13 +673,13 @@ namespace UnitTests.StorageTests
 
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 #if REREAD_STATE_AFTER_WRITE_FAILED
             Assert.Equal(expectedVal, val); // Last value written successfully
 #else
@@ -700,7 +700,7 @@ namespace UnitTests.StorageTests
             var originalActivationId = await grain.GetActivationId();
             await grain.DoWrite(expectedVal);
             var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             const int attemptedVal3 = 63;
             await SetErrorInjection(providerName, new ErrorInjectionBehavior
@@ -712,14 +712,14 @@ namespace UnitTests.StorageTests
 
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
             Assert.NotEqual(originalActivationId, await grain.GetActivationId());
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             // The value should not have changed.
             Assert.Equal(expectedVal, val);
@@ -767,7 +767,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 82;
             await grain.DoWrite(expectedVal);
             var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             const int attemptedVal4 = 83;
             await SetErrorInjection(providerName, ErrorInjectionPoint.AfterWrite);
@@ -776,7 +776,7 @@ namespace UnitTests.StorageTests
             // Stored value has changed
             expectedVal = attemptedVal4;
             providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
@@ -799,7 +799,7 @@ namespace UnitTests.StorageTests
             expectedVal = 73;
             await grain.DoWrite(expectedVal);
             var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
             await CheckStorageProviderErrors(grain.DoRead);
@@ -827,7 +827,7 @@ namespace UnitTests.StorageTests
             expectedVal = 93;
             await grain.DoWrite(expectedVal);
             var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             expectedVal = 94;
             SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
@@ -925,7 +925,7 @@ namespace UnitTests.StorageTests
             val = await grain.GetValue();
             // Stored value unchanged
             var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
-            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 #if REREAD_STATE_AFTER_WRITE_FAILED
             Assert.Equal(expectedVal, val); // After failed write: Last value written successfully
 #else
@@ -1219,7 +1219,7 @@ namespace UnitTests.StorageTests
             await ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory);
         }
 
-        private async Task CheckStorageProviderErrors(Func<Task> taskFunc, Type expectedException = null)
+        private async Task CheckStorageProviderErrors(Func<Task> taskFunc, Type? expectedException = null)
         {
             StackTrace at = new StackTrace();
             TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(15);
@@ -1292,8 +1292,8 @@ namespace UnitTests.StorageTests
 
         private class ProviderState
         {
-            public MockStorageProvider.StateForTest ProviderStateForTest { get; set; }
-            public PersistenceTestGrainState LastStoredGrainState { get; set; }
+            public MockStorageProvider.StateForTest ProviderStateForTest { get; set; } = null!;
+            public PersistenceTestGrainState? LastStoredGrainState { get; set; }
         }
 
         private void ResetMockStorageProvidersHistory()

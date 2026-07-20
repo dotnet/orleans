@@ -21,14 +21,14 @@ namespace UnitTests.ActivationsLifeCycleTests
     public class DeactivateOnIdleTests : OrleansTestingBase, IDisposable
     {
         private readonly ITestOutputHelper output;
-        private TestCluster testCluster;
+        private TestCluster testCluster = null!;
 
         public DeactivateOnIdleTests(ITestOutputHelper output)
         {
             this.output = output;
         }
 
-        private void Initialize(TestClusterBuilder builder = null)
+        private void Initialize(TestClusterBuilder? builder = null)
         {
             if (builder == null)
             {
@@ -48,7 +48,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             finally
             {
                 testCluster?.Dispose();
-                testCluster = null;
+                testCluster = null!;
             }
         }
 
@@ -205,7 +205,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
-                var maxForwardCount = int.Parse(cfg["MaxForwardCount"]);
+                var maxForwardCount = int.Parse(cfg["MaxForwardCount"]!);
                 hostBuilder.ConfigureServices(services =>
                 {
                     services.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = maxForwardCount);

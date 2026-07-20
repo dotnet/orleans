@@ -4,7 +4,7 @@ namespace UnitTests
 {
     public class ConnectionStringFixture
     {
-        private Lazy<Task<string>> connectionStringLazy;
+        private Lazy<Task<string>>? connectionStringLazy;
 
         public void InitializeConnectionStringAccessor(Func<Task<string>> connectionStringAccessor)
         {

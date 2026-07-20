@@ -28,13 +28,13 @@ namespace Samples.StorageProviders
         /// <summary>
         /// Storage provider name
         /// </summary>
-        public string Name { get; protected set; }
+        public string? Name { get; protected set; }
 
         /// <summary>
         /// Data manager instance
         /// </summary>
         /// <remarks>The data manager is responsible for reading and writing JSON strings.</remarks>
-        protected IJSONStateDataManager DataManager { get; set; }
+        protected IJSONStateDataManager? DataManager { get; set; }
 
         /// <summary>
         /// Constructor
@@ -126,7 +126,7 @@ namespace Samples.StorageProviders
         protected static void ConvertFromStorageFormat<T>(IGrainState<T> grainState, string entityData)
         {
             var data = JsonConvert.DeserializeObject<T>(entityData);
-            grainState.State = data;
+            grainState.State = data!;
         }
     }
 

@@ -80,10 +80,10 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
 #pragma warning restore 1574
         public static string GetGrainType<TGrainKey, TGrain>()
         {
-            Func<Type, Type, Type> func;
+            Func<Type, Type, Type>? func;
             if(GrainTypeSwitch.TryGetValue(typeof(TGrainKey), out func))
             {
-                return (func(typeof(TGrainKey), typeof(TGrain))).AssemblyQualifiedName;
+                return (func(typeof(TGrainKey), typeof(TGrain))).AssemblyQualifiedName!;
             }
 
             throw new ArgumentException(typeof(TGrainKey).Name);

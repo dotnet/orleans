@@ -8,7 +8,7 @@ namespace UnitTests.General
 {
     public class CallChainReentrancyTestHelper
     {
-        public BaseTestClusterFixture Fixture { get; set; }
+        public BaseTestClusterFixture Fixture { get; set; } = null!;
         public int NumIterations { get; set; }
 
         // 2 silos, loop across all cases (to force all grains to be local and remote):

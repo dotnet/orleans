@@ -115,7 +115,7 @@ namespace UnitTests.StorageTests
             Assert.True(storedData.Count == 0, $"Should get no data from Re-Read but got: {StorageProviderUtils.PrintData(storedData)}");
 
             sw.Restart();
-            const string oldEtag = null;
+            const string? oldEtag = null;
             eTag = store.WriteRow(keys, storedData, oldEtag);
             output.WriteLine("Write for Keys={0} Etag={1} Data={2} returned New Etag={3} after {4}",
                 StorageProviderUtils.PrintKeys(keys), oldEtag, StorageProviderUtils.PrintData(storedData),
@@ -209,7 +209,7 @@ namespace UnitTests.StorageTests
         private static Dictionary<string, object> AsDictionary(object state)
         {
             return state.GetType().GetProperties()
-                .Select(v => new KeyValuePair<string, object>(v.Name, v.GetValue(state)))
+                .Select(v => new KeyValuePair<string, object>(v.Name, v.GetValue(state)!))
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
         }
     }
@@ -222,7 +222,7 @@ namespace UnitTests.StorageTests
                 keyTuple => string.Format("Key:{0}={1}", keyTuple.Item1, keyTuple.Item2 ?? "null"));
         }
 
-        public static string PrintData(object data)
+        public static string? PrintData(object? data)
         {
             if (data == null)
             {
@@ -234,8 +234,8 @@ namespace UnitTests.StorageTests
 
         public static string PrintOneWrite(
             IEnumerable<Tuple<string, string>> keys,
-            object data,
-            string eTag)
+            object? data,
+            string? eTag)
         {
             var sb = new StringBuilder();
             sb.Append("Keys=").Append(PrintKeys(keys));

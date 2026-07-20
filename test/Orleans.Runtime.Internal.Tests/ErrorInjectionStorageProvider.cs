@@ -158,7 +158,7 @@ namespace UnitTests.StorageTests
                 }
                 else
                 {
-                    throw ((Exception)Activator.CreateInstance(ErrorInjection.ExceptionType));
+                    throw ((Exception)Activator.CreateInstance(ErrorInjection.ExceptionType)!);
                 }
             }
         }

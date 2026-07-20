@@ -27,9 +27,9 @@ namespace UnitTests.ActivationsLifeCycleTests
         private static readonly TimeSpan FORCED_COLLECTION_AGE_LIMIT = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan FORCED_COLLECTION_WAIT_TIME = FORCED_COLLECTION_AGE_LIMIT + TimeSpan.FromMilliseconds(250);
 
-        private TestCluster testCluster;
+        private TestCluster testCluster = null!;
 
-        private ILogger logger;
+        private ILogger logger = null!;
 
         private async Task Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
@@ -47,8 +47,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             public void Configure(IHostBuilder hostBuilder)
             {
                 var config = hostBuilder.GetConfiguration();
-                var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]);
-                var quantum = TimeSpan.Parse(config["CollectionQuantum"]);
+                var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]!);
+                var quantum = TimeSpan.Parse(config["CollectionQuantum"]!);
                 hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
@@ -59,9 +59,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                         options.CollectionQuantum = quantum;
                         options.ClassSpecificCollectionAge = new Dictionary<string, TimeSpan>
                         {
-                            [typeof(IdleActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
-                            [typeof(BusyActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
-                            [typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName] = COLLECTION_SPECIFIC_AGE_LIMIT,
+                            [typeof(IdleActivationGcTestGrain2).FullName!] = DEFAULT_IDLE_TIMEOUT,
+                            [typeof(BusyActivationGcTestGrain2).FullName!] = DEFAULT_IDLE_TIMEOUT,
+                            [typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName!] = COLLECTION_SPECIFIC_AGE_LIMIT,
                         };
                     });
                 });
@@ -87,7 +87,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             finally
             {
                 await testCluster.DisposeAsync();
-                testCluster = null;
+                testCluster = null!;
             }
         }
 
@@ -560,7 +560,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             private readonly object _lock = new();
             private readonly List<ActivationCollectionEvents.CollectionCompleted> _completedEvents = [];
             private readonly List<Waiter> _waiters = [];
-            private IDisposable _subscription;
+            private IDisposable _subscription = null!;
 
             public static ActivationCollectionObserver Create()
             {
