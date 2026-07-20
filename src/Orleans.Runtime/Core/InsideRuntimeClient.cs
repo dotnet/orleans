@@ -234,6 +234,11 @@ namespace Orleans.Runtime
 
         public void SniffIncomingMessage(Message message)
         {
+            if (Volatile.Read(ref _isStopping) != 0)
+            {
+                return;
+            }
+
             try
             {
                 if (message.CacheInvalidationHeader is { } cacheUpdates)
@@ -405,6 +410,12 @@ namespace Orleans.Runtime
         {
             OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
 
+            if (Volatile.Read(ref _isStopping) != 0)
+            {
+                ProcessResponseCallback(message, hostShutdown: message.Result is Message.ResponseTypes.Status);
+                return;
+            }
+
             var result = message.Result;
             if (result != Message.ResponseTypes.Rejection && result != Message.ResponseTypes.Status)
             {
@@ -455,13 +466,20 @@ namespace Orleans.Runtime
             }
         }
 
-        private void ProcessResponseCallback(Message message)
+        private void ProcessResponseCallback(Message message, bool hostShutdown = false)
         {
             if (callbacks.TryRemove((message.TargetGrain, message.Id), out var callbackData))
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
+                if (hostShutdown)
+                {
+                    callbackData.OnHostShutdown();
+                }
+                else
+                {
+                    callbackData.DoCallback(message);
+                }
             }
             else
             {
