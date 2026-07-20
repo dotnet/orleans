@@ -7,7 +7,6 @@ using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Utilities;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -25,7 +24,7 @@ namespace Orleans
 #endif
         private readonly ConcurrentDictionary<GrainInterfaceType, GrainType> _genericMapping = new ConcurrentDictionary<GrainInterfaceType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
-        private Cache _cache;
+        private Cache? _cache;
 
         /// <summary>
         /// Creates a new instance of the <see cref="GrainInterfaceTypeToGrainTypeResolver"/> class.
@@ -184,7 +183,7 @@ namespace Orleans
             lock (_lockObj)
             {
                 var manifest = _clusterManifestProvider.Current;
-                cache = _cache;
+                cache = _cache!;
                 if (cache is not null && cache.Version == manifest.Version)
                 {
                     return cache;
@@ -214,7 +213,7 @@ namespace Orleans
                     {
                         if (!property.Key.StartsWith(WellKnownGrainTypeProperties.ImplementedInterfacePrefix, StringComparison.Ordinal)) continue;
                         var implemented = GrainInterfaceType.Create(property.Value);
-                        string interfaceTypeName;
+                        string? interfaceTypeName;
                         if (manifest.Interfaces.TryGetValue(implemented, out var interfaceProperties))
                         {
                             interfaceProperties.Properties.TryGetValue(WellKnownGrainInterfaceProperties.TypeName, out interfaceTypeName);
@@ -228,7 +227,7 @@ namespace Orleans
                         result.TryGetValue(implemented, out var entry);
 
                         var implementations = entry.Implementations ?? new List<(string Prefix, GrainType GrainType)>();
-                        if (!implementations.Contains((fullTypeName, id))) implementations.Add((fullTypeName, id));
+                        if (!implementations.Contains((fullTypeName!, id))) implementations.Add((fullTypeName!, id));
 
                         GrainType primaryImplementation;
                         if (!entry.PrimaryImplementation.IsDefault)

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal static class Constants
@@ -60,8 +59,7 @@ namespace Orleans.Runtime
             {GrainDirectoryType, "GrainDirectory"},
         }.ToFrozenDictionary();
 
-        public static string SystemTargetName(GrainType id) => SingletonSystemTargetNames.TryGetValue(id, out var name) ? name : id.ToString();
+        public static string SystemTargetName(GrainType id) => SingletonSystemTargetNames.TryGetValue(id, out var name) ? name : id.ToString()!;
         public static bool IsSingletonSystemTarget(GrainType id) => SingletonSystemTargetNames.ContainsKey(id);
     }
 }
-

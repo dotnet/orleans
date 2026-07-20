@@ -295,7 +295,7 @@ namespace Orleans
                         {
                             var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
                             await invoker.Invoke();
-                            response = invoker.Response;
+                            response = invoker.Response!;
                         }
                         else
                         {

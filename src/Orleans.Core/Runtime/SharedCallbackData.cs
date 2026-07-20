@@ -17,7 +17,7 @@ internal sealed class SharedCallbackData
         TimeSpan responseTimeout,
         bool cancelOnTimeout,
         bool waitForCancellationAcknowledgement,
-        IGrainCallCancellationManager cancellationManager)
+        IGrainCallCancellationManager? cancellationManager)
     {
         Unregister = unregister;
         Logger = logger;
@@ -37,7 +37,7 @@ internal sealed class SharedCallbackData
         }
     }
 
-    public IGrainCallCancellationManager CancellationManager { get; internal set; }
+    public IGrainCallCancellationManager? CancellationManager { get; internal set; }
 
     public bool CancelRequestOnTimeout { get; }
 

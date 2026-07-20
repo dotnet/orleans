@@ -44,7 +44,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">New response timeout value</param>
         void SetResponseTimeout(TimeSpan timeout);
 
-        void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options);
+        void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options);
 
         void SendResponse(Message request, Response response);
 
