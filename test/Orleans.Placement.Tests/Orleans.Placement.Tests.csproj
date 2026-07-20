@@ -3,6 +3,7 @@
     <RootNamespace>UnitTests</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

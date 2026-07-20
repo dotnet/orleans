@@ -12,7 +12,7 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
 {
     public class Fixture : IAsyncLifetime
     {
-        public InProcessTestCluster Cluster { get; private set; }
+        public InProcessTestCluster Cluster { get; private set; } = null!;
         public async Task DisposeAsync()
         {
             if (Cluster is { } cluster)
