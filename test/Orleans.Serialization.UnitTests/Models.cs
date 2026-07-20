@@ -6,7 +6,6 @@ using System.Linq.Expressions;
 using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using MemoryPack;
 using MessagePack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -965,40 +964,4 @@ namespace Orleans.Serialization.UnitTests
         public string StringProperty { get; init; }
     }
 
-    [MemoryPackable]
-    public partial record MyMemoryPackClass
-    {
-        public int IntProperty { get; init; }
-
-        public string StringProperty { get; init; }
-
-        public MyMemoryPackSubClass SubClass { get; init; }
-
-        public IMyMemoryPackUnion Union { get; init; }
-    }
-
-    [MemoryPackable]
-    public partial record MyMemoryPackSubClass
-    {
-        public Guid Id { get; init; }
-    }
-
-    [MemoryPackable]
-    [MemoryPackUnion(0, typeof(MyMemoryPackUnionVariant1))]
-    [MemoryPackUnion(1, typeof(MyMemoryPackUnionVariant2))]
-    public partial interface IMyMemoryPackUnion
-    {
-    }
-
-    [MemoryPackable]
-    public partial record MyMemoryPackUnionVariant1 : IMyMemoryPackUnion
-    {
-        public int IntProperty { get; init; }
-    }
-
-    [MemoryPackable]
-    public partial record MyMemoryPackUnionVariant2 : IMyMemoryPackUnion
-    {
-        public string StringProperty { get; init; }
-    }
 }
