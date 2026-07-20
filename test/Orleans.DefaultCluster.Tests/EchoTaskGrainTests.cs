@@ -213,7 +213,7 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("CreateGrain took {Elapsed}", clock.Elapsed);
 
             clock.Restart();
-            string received = await grain.EchoAsync(expectedEcho);
+            string? received = await grain.EchoAsync(expectedEcho);
             this.Logger.LogInformation("EchoGrain.Echo took {Elapsed}", clock.Elapsed);
 
             Assert.Equal(expectedEcho, received);
@@ -301,7 +301,7 @@ namespace DefaultCluster.Tests.General
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
 
-            SiloAddress silo1 = HostedCluster.Primary.SiloAddress;
+            SiloAddress silo1 = HostedCluster.Primary!.SiloAddress;
             SiloAddress silo2 = HostedCluster.SecondarySilos[0].SiloAddress;
 
             what = "EchoGrain.PingRemoteSilo[1]";

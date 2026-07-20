@@ -252,7 +252,7 @@ namespace DefaultCluster.Tests.General
 
             // Wait for membership to stabilize and for cluster manifests to be propagated.
             // We do this by repeatedly trying to activate a grain on the target silo.
-            var primaryGrainFactory = ((InProcessSiloHandle)Fixture.HostedCluster.Primary).ServiceProvider.GetRequiredService<IGrainFactory>();
+            var primaryGrainFactory = ((InProcessSiloHandle)Fixture.HostedCluster.Primary!).ServiceProvider.GetRequiredService<IGrainFactory>();
             SiloAddress? grainOnOtherSiloAddr;
             do
             {

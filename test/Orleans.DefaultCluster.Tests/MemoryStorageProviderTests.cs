@@ -43,7 +43,7 @@ namespace DefaultCluster.Tests.StorageTests
             var grainWithState = this.GrainFactory.GetGrain<INullStateGrain>(0);
             Assert.NotNull(await grainWithState.GetState());
 
-            await grainWithState.SetStateAndDeactivate(null);
+            await grainWithState.SetStateAndDeactivate(null!);
             await grainWithState.SetStateAndDeactivate(new NullableState { Name = "Thrall" });
         }
 
@@ -162,7 +162,7 @@ namespace DefaultCluster.Tests.StorageTests
             }
 
             [Id(0)]
-            public object State { get; set; } = null!;
+            public object? State { get; set; }
 
             [Id(1)]
             public string? ETag { get; set; }

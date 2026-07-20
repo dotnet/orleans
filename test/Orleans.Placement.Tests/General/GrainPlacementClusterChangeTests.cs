@@ -28,7 +28,7 @@ namespace UnitTests.General
             IPEndPoint targetSilo;
             if (value == "Primary")
             {
-                targetSilo = HostedCluster.Primary.SiloAddress.Endpoint;
+                targetSilo = HostedCluster.Primary!.SiloAddress.Endpoint;
             }
             else
             {

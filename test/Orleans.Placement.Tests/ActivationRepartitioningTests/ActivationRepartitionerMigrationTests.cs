@@ -15,7 +15,7 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
 {
     private readonly Fixture _fixture = fixture;
 
-    private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary;
+    private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
 
     [Fact]
     public async Task FinalizeProtocol_DoesNotAwaitDeactivated_ForNonActivationDataContext()

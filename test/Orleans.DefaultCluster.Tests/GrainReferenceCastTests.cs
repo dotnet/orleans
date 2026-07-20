@@ -449,7 +449,7 @@ namespace DefaultCluster.Tests
             isNullStr = grain.StringSet("a").ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
             Assert.False(await isNullStr, "Value should not be null after SetString(a)");
 
-            isNullStr = grain.StringSet(null).ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
+            isNullStr = grain.StringSet(null!).ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
             Assert.True(await isNullStr, "Value should be null after SetString(null)");
 
             IGeneratorTestGrain cast = grain.AsReference<IGeneratorTestGrain>();
