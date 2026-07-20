@@ -29,8 +29,8 @@ namespace Orleans.Serialization.TestKit
 
         public interface IBufferTestSerializer
         {
-            IOutputBuffer Serialize(TValue input);
-            void Deserialize(ReadOnlySequence<byte> buffer, out TValue output);
+            IOutputBuffer Serialize([AllowNull] TValue input);
+            void Deserialize(ReadOnlySequence<byte> buffer, [MaybeNull] out TValue output);
         }
 
         [ExcludeFromCodeCoverage]
@@ -47,7 +47,7 @@ namespace Orleans.Serialization.TestKit
 
             protected abstract TBufferWriter CreateBufferWriter();
 
-            public IOutputBuffer Serialize(TValue input)
+            public IOutputBuffer Serialize([AllowNull] TValue input)
             {
                 using var session = _sessionPool.GetSession();
                 var writer = Writer.Create(CreateBufferWriter(), session);
@@ -55,7 +55,7 @@ namespace Orleans.Serialization.TestKit
                 return writer.Output;
             }
 
-            public void Deserialize(ReadOnlySequence<byte> buffer, out TValue output)
+            public void Deserialize(ReadOnlySequence<byte> buffer, [MaybeNull] out TValue output)
             {
                 using var session = _sessionPool.GetSession();
                 var reader = Reader.Create(buffer, session);

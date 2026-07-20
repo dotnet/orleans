@@ -8,7 +8,6 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
 
-#nullable disable
 namespace Orleans.Serialization.TestKit
 {
     /// <summary>
@@ -92,12 +91,12 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Compares two values and returns <see langword="true"/> if they are equal, or <see langword="false"/> if they are not equal.
         /// </summary>
-        protected virtual bool Equals(TValue left, TValue right) => EqualityComparer<TValue>.Default.Equals(left, right);
+        protected virtual bool Equals(TValue? left, TValue? right) => EqualityComparer<TValue>.Default.Equals(left!, right!);
 
         /// <summary>
         /// Gets a value provider delegate.
         /// </summary>
-        protected virtual Action<Action<TValue>> ValueProvider { get; }
+        protected virtual Action<Action<TValue>>? ValueProvider { get; }
 
         /// <summary>
         /// Checks if copied values are equal.
@@ -140,7 +139,7 @@ namespace Orleans.Serialization.TestKit
             var value = CreateValue();
             var array = new TValue[] { value, value };
             var arrayCopier = ServiceProvider.GetRequiredService<DeepCopier<TValue[]>>();
-            var arrayCopy = arrayCopier.Copy(array);
+            var arrayCopy = arrayCopier.Copy(array)!;
             Assert.Same(arrayCopy[0], arrayCopy[1]);
 
             if (IsImmutable)
@@ -163,7 +162,7 @@ namespace Orleans.Serialization.TestKit
 
             var original = (Guid.NewGuid().ToString(), CreateValue(), CreateValue(), Guid.NewGuid().ToString());
 
-            var copy = copier.Copy(original);
+            var copy = copier.Copy(original)!;
 
             var isEqual = Equals(original.Item1, copy.Item1);
             Assert.True(
@@ -189,22 +188,22 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyUntypedTupleViaSerializer()
         {
-            var copier = ServiceProvider.GetRequiredService<DeepCopier<(string, object, object, string)>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<(string, object?, object?, string)>>();
             var value = ((IEnumerable<TValue>)TestValues).Reverse().Concat(new[] { CreateValue(), CreateValue() }).Take(2).ToArray();
 
-            var original = (Guid.NewGuid().ToString(), (object)value[0], (object)value[1], Guid.NewGuid().ToString());
+            var original = (Guid.NewGuid().ToString(), (object?)value[0], (object?)value[1], Guid.NewGuid().ToString());
 
-            var copy = copier.Copy(original);
+            var copy = copier.Copy(original)!;
 
             var isEqual = Equals(original.Item1, copy.Item1);
             Assert.True(
                 isEqual,
                 isEqual ? string.Empty : $"Copied value for item 1, \"{copy.Item1}\", must equal original value, \"{original.Item1}\"");
-            isEqual = Equals((TValue)original.Item2, (TValue)copy.Item2);
+            isEqual = Equals((TValue?)original.Item2, (TValue?)copy.Item2);
             Assert.True(
                 isEqual,
                 isEqual ? string.Empty : $"Copied value for item 2, \"{copy.Item2}\", must equal original value, \"{original.Item2}\"");
-            isEqual = Equals((TValue)original.Item3, (TValue)copy.Item3);
+            isEqual = Equals((TValue?)original.Item3, (TValue?)copy.Item3);
             Assert.True(
                 isEqual,
                 isEqual ? string.Empty : $"Copied value for item 3, \"{copy.Item3}\", must equal original value, \"{original.Item3}\"");
@@ -229,7 +228,7 @@ namespace Orleans.Serialization.TestKit
                 original.Add(CreateValue());
             }
 
-            var copy = copier.Copy(original);
+            var copy = copier.Copy(original)!;
 
             Assert.Equal(original.Count, copy.Count);
             for (var i = 0; i < original.Count; ++i)
@@ -247,9 +246,9 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyCollectionViaUntypedSerializer()
         {
-            var copier = ServiceProvider.GetRequiredService<DeepCopier<List<object>>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<List<object?>>>();
 
-            var original = new List<object>();
+            var original = new List<object?>();
             foreach (var value in TestValues)
             {
                 original.Add(value);
@@ -260,12 +259,12 @@ namespace Orleans.Serialization.TestKit
                 original.Add(CreateValue());
             }
 
-            var copy = copier.Copy(original);
+            var copy = copier.Copy(original)!;
 
             Assert.Equal(original.Count, copy.Count);
             for (var i = 0; i < original.Count; ++i)
             {
-                var isEqual = Equals((TValue)original[i], (TValue)copy[i]);
+                var isEqual = Equals((TValue?)original[i], (TValue?)copy[i]);
                 Assert.True(
                     isEqual,
                     isEqual ? string.Empty : $"Copied value at index {i}, \"{copy}\", must equal original value, \"{original}\"");
