@@ -22,7 +22,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
         /// storage should be accessed directly from all clusters.
         /// </summary>
-        public string PrimaryCluster => options.PrimaryCluster;
+        public string? PrimaryCluster => options.PrimaryCluster;
 
         /// <inheritdoc/>
         public bool UsesStorageProvider => false;
@@ -33,7 +33,7 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         /// <inheritdoc/>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class
         {
@@ -43,7 +43,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
     public static class LogConsistencyProviderFactory
     {
-        public static ILogViewAdaptorFactory Create(IServiceProvider services, string name)
+        public static ILogViewAdaptorFactory Create(IServiceProvider services, string? name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();
             return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsMonitor.Get(name));

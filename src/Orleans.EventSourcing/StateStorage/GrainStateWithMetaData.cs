@@ -1,7 +1,6 @@
 using Orleans.EventSourcing.Common;
 using System;
 
-#nullable disable
 namespace Orleans.EventSourcing.StateStorage
 {
     /// <summary>
@@ -23,7 +22,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// Gets and Sets Etag
         /// </summary>
         [Id(1)]
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         [Id(2)]
         public bool RecordExists { get; set; }

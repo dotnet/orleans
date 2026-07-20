@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.EventSourcing
 {
     /// <summary>
@@ -16,7 +15,7 @@ namespace Orleans.EventSourcing
         void DisableStatsCollection();
 
         /// <summary>Gets the collected statistics for this log-consistent grain.</summary>
-        LogConsistencyStatistics GetStats();
+        LogConsistencyStatistics? GetStats();
 
     }
 
@@ -28,10 +27,10 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// A map from event names to event counts
         /// </summary>
-        public Dictionary<string, long> EventCounters;
+        public Dictionary<string, long> EventCounters = null!;
         /// <summary>
         /// A list of all measured stabilization latencies
         /// </summary>
-        public List<int> StabilizationLatenciesInMsecs;
+        public List<int> StabilizationLatenciesInMsecs = null!;
     }
 }

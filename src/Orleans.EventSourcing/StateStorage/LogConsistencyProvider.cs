@@ -22,11 +22,11 @@ namespace Orleans.EventSourcing.StateStorage
         }
 
         /// <inheritdoc/>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services) 
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class
         {
-            return new LogViewAdaptor<TView,TEntry>(hostGrain, initialState, grainStorage, grainTypeName, services);
+            return new LogViewAdaptor<TView,TEntry>(hostGrain, initialState, grainStorage!, grainTypeName, services);
         }
     }
 }
