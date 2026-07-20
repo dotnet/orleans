@@ -23,7 +23,7 @@ namespace AWSUtils.Tests.Streaming
         private readonly string StorageConnectionString = AWSTestConstants.SqsConnectionString;
 
         private readonly ITestOutputHelper output;
-        private ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner = null!;
 
         public SQSClientStreamTests(ITestOutputHelper output)
         {

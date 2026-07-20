@@ -196,7 +196,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
-            GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 
@@ -221,7 +221,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            IGrainStorage store, GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 
@@ -253,7 +253,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            IGrainStorage store, GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 

@@ -2,7 +2,7 @@
 {
     public class DynamoDBStorageTestsFixture
     {
-        internal UnitTestDynamoDBStorage DataManager { get; set; }
+        internal UnitTestDynamoDBStorage DataManager { get; set; } = null!;
 
         public DynamoDBStorageTestsFixture()
         {

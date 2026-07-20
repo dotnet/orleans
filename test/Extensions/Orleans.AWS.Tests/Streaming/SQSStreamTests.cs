@@ -18,7 +18,7 @@ namespace AWSUtils.Tests.Streaming
     {
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSProvider";
 
-        private SingleStreamTestRunner runner;
+        private SingleStreamTestRunner runner = null!;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
