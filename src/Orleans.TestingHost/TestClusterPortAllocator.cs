@@ -8,7 +8,6 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
 
-#nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>
@@ -178,7 +177,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             AppDomain.CurrentDomain.DomainUnload += this.OnAppDomainUnload;
         }
 
-        private void OnAppDomainUnload(object sender, EventArgs e) => Shutdown();
+        private void OnAppDomainUnload(object? sender, EventArgs e) => Shutdown();
 
         private void Shutdown()
         {

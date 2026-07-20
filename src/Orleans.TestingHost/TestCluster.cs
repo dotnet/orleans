@@ -23,7 +23,6 @@ using Orleans.Statistics;
 using Orleans.Runtime.TestHooks;
 using Orleans.Messaging;
 
-#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
@@ -49,7 +48,7 @@ namespace Orleans.TestingHost
         /// Primary silo handle, if applicable.
         /// </summary>
         /// <remarks>This handle is valid only when using Grain-based membership.</remarks>
-        public SiloHandle Primary { get; private set; }
+        public SiloHandle? Primary { get; private set; }
 
         /// <summary>
         /// List of handles to the secondary silos.
@@ -98,12 +97,12 @@ namespace Orleans.TestingHost
         /// <summary>
         /// The internal client interface.
         /// </summary>
-        internal IHost ClientHost { get; private set; }
+        internal IHost? ClientHost { get; private set; }
 
         /// <summary>
         /// The internal client interface.
         /// </summary>
-        internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+        internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>()!;
 
         /// <summary>
         /// The client.
@@ -154,7 +153,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="silo">The silo process to the the service provider for.</param>
         /// <remarks>If <paramref name="silo"/> is <see langword="null"/> one of the existing silos will be picked randomly.</remarks>
-        public IServiceProvider GetSiloServiceProvider(SiloAddress silo = null)
+        public IServiceProvider GetSiloServiceProvider(SiloAddress? silo = null)
         {
             if (silo != null)
             {
@@ -176,7 +175,6 @@ namespace Orleans.TestingHost
         /// <param name="grainId">The ID of the grain to find.</param>
         /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
         /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
-        #nullable enable
         public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
         {
             foreach (var silo in Silos)
@@ -192,7 +190,6 @@ namespace Orleans.TestingHost
             grainContext = null;
             return false;
         }
-#nullable restore
 
         /// <summary>
         /// Gets a <see cref="Task"/> that completes when the current activation of the specified grain
@@ -251,7 +248,6 @@ namespace Orleans.TestingHost
         /// await cluster.MigrateAsync(grain.GetGrainId(), targetSilo);
         /// </code>
         /// </example>
-#nullable enable
         public async Task MigrateAsync(GrainId grainId, SiloAddress? targetSilo = null)
         {
             var deactivated = WaitForDeactivationAsync(grainId);
@@ -263,7 +259,6 @@ namespace Orleans.TestingHost
             await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
             await deactivated;
         }
-#nullable restore
 
         /// <inheritdoc cref="WaitForDeactivationAsync(GrainId)"/>
         /// <param name="grain">The grain to observe.</param>
@@ -276,9 +271,7 @@ namespace Orleans.TestingHost
         /// <inheritdoc cref="MigrateAsync(GrainId, SiloAddress?)"/>
         /// <param name="grain">The grain to migrate.</param>
         /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
-#nullable enable
         public Task MigrateAsync(IAddressable grain, SiloAddress? targetSilo = null) => MigrateAsync(grain.GetGrainId(), targetSilo);
-#nullable restore
 
         /// <summary>
         /// Deploys the cluster using the specified configuration and starts the client in-process.
@@ -957,13 +950,13 @@ namespace Orleans.TestingHost
             return this.log.ToString();
         }
 
-        private void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
+        private void ReportUnobservedException(object? sender, UnhandledExceptionEventArgs eventArgs)
         {
             Exception exception = (Exception)eventArgs.ExceptionObject;
             this.WriteLog("Unobserved exception: {0}", exception);
         }
 
-        private void WriteLog(string format, params object[] args)
+        private void WriteLog(string format, params object?[] args)
         {
             log.AppendFormat(format + Environment.NewLine, args);
         }
@@ -1014,7 +1007,7 @@ namespace Orleans.TestingHost
             DisposeAsync().AsTask().Wait();
         }
 
-        private static async Task DisposeAsync(IDisposable value)
+        private static async Task DisposeAsync(IDisposable? value)
         {
             if (value is IAsyncDisposable asyncDisposable)
             {

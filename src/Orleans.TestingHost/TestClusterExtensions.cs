@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 
-#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
@@ -34,7 +33,7 @@ namespace Orleans.TestingHost
         /// <param name="hostBuilder">The host builder.</param>
         /// <param name="key">The key.</param>
         /// <returns>The configuration value.</returns>
-        public static string GetConfigurationValue(this IHostBuilder hostBuilder, string key)
+        public static string? GetConfigurationValue(this IHostBuilder hostBuilder, string key)
         {
             return hostBuilder.GetConfiguration()[key];
         }

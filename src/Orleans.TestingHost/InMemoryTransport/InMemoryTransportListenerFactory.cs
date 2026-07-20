@@ -12,7 +12,6 @@ using Orleans.Hosting;
 using Orleans.Networking.Shared;
 using Orleans.Runtime.Messaging;
 
-#nullable disable
 namespace Orleans.TestingHost.InMemoryTransport;
 
 internal static class InMemoryTransportExtensions
@@ -39,9 +38,9 @@ internal static class InMemoryTransportExtensions
         return clientBuilder;
     }
 
-    private static Func<IServiceProvider, object, IConnectionFactory> CreateInMemoryConnectionFactory(InMemoryTransportConnectionHub hub)
+    private static Func<IServiceProvider, object?, IConnectionFactory> CreateInMemoryConnectionFactory(InMemoryTransportConnectionHub hub)
     {
-        return (IServiceProvider sp, object key) =>
+        return (IServiceProvider sp, object? key) =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var sharedMemoryPool = sp.GetRequiredService<SharedMemoryPool>();
@@ -49,9 +48,9 @@ internal static class InMemoryTransportExtensions
         };
     }
 
-    private static Func<IServiceProvider, object, IConnectionListenerFactory> CreateInMemoryConnectionListenerFactory(InMemoryTransportConnectionHub hub)
+    private static Func<IServiceProvider, object?, IConnectionListenerFactory> CreateInMemoryConnectionListenerFactory(InMemoryTransportConnectionHub hub)
     {
-        return (IServiceProvider sp, object key) =>
+        return (IServiceProvider sp, object? key) =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var sharedMemoryPool = sp.GetRequiredService<SharedMemoryPool>();
@@ -77,7 +76,7 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
 
     public CancellationToken OnDisposed => _disposedCts.Token;
 
-    public EndPoint EndPoint { get; set; }
+    public EndPoint EndPoint { get; set; } = null!;
 
     public async Task ConnectAsync(InMemoryTransportConnection connection)
     {
@@ -94,7 +93,7 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
         throw new ConnectionFailedException($"Unable to connect to {EndPoint} because its listener has terminated.");
     }
 
-    public async ValueTask<ConnectionContext> AcceptAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
     {
         if (await _acceptQueue.Reader.WaitToReadAsync(cancellationToken))
         {
@@ -158,7 +157,7 @@ internal class InMemoryTransportConnectionHub
         });
     }
 
-    public InMemoryTransportListener GetConnectionListenerFactory(EndPoint endPoint)
+    public InMemoryTransportListener? GetConnectionListenerFactory(EndPoint endPoint)
     {
         _listeners.TryGetValue(endPoint, out var listener);
         return listener;
@@ -197,4 +196,3 @@ internal class InMemoryTransportConnectionFactory : IConnectionFactory
         return connectionContext;
     }
 }
-

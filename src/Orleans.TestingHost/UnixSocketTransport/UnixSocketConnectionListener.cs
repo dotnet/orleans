@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Networking.Shared;
 
-#nullable disable
 namespace Orleans.TestingHost.UnixSocketTransport;
 
 internal class UnixSocketConnectionListener : IConnectionListener
@@ -18,7 +17,7 @@ internal class UnixSocketConnectionListener : IConnectionListener
     private readonly SocketsTrace _trace;
     private readonly SocketSchedulers _schedulers;
     private readonly MemoryPool<byte> _memoryPool;
-    private Socket _listenSocket;
+    private Socket _listenSocket = null!;
 
     public UnixSocketConnectionListener(UnixDomainSocketEndPoint unixEndpoint, EndPoint endpoint, UnixSocketConnectionOptions socketConnectionOptions, SocketsTrace trace, SocketSchedulers schedulers)
     {
@@ -39,7 +38,7 @@ internal class UnixSocketConnectionListener : IConnectionListener
         _listenSocket.Listen(512);
     }
 
-    public async ValueTask<ConnectionContext> AcceptAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
     {
         while (true)
         {

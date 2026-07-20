@@ -8,7 +8,6 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 
-#nullable disable
 namespace Orleans.Hosting
 {
     /// <summary>
@@ -45,14 +44,14 @@ namespace Orleans.Hosting
         public static IServiceCollection AddFaultInjectionMemoryStorage(
             this IServiceCollection services,
             string name,
-            Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null,
-            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null)
+            Action<OptionsBuilder<MemoryGrainStorageOptions>>? configureOptions = null,
+            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>>? configureFaultInjectionOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
             configureFaultInjectionOptions?.Invoke(services.AddOptions<FaultInjectionGrainStorageOptions>(name));
             services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
             services.ConfigureNamedOptionForLogging<FaultInjectionGrainStorageOptions>(name);
-            services.AddKeyedSingleton<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, n as string, MemoryGrainStorageFactory.Create))
+            services.AddKeyedSingleton<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, (n as string)!, MemoryGrainStorageFactory.Create))
                 .AddKeyedSingleton<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<IGrainStorage>(n));
             return services;
         }

@@ -27,7 +27,6 @@ using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
 
-#nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>
@@ -69,17 +68,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IHost ClientHost { get; private set; }
+    internal IHost? ClientHost { get; private set; }
 
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>()!;
 
     /// <summary>
     /// The client.
     /// </summary>
-    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>()!;
 
     /// <summary>
     /// The port allocator.
@@ -104,7 +103,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="silo">The silo process to the the service provider for.</param>
     /// <remarks>If <paramref name="silo"/> is <see langword="null"/> one of the existing silos will be picked randomly.</remarks>
-    public IServiceProvider GetSiloServiceProvider(SiloAddress silo = null)
+    public IServiceProvider GetSiloServiceProvider(SiloAddress? silo = null)
     {
         if (silo != null)
         {
@@ -126,7 +125,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="grainId">The ID of the grain to find.</param>
     /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
     /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
-    #nullable enable
     public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
     {
         foreach (var silo in Silos)
@@ -142,7 +140,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         grainContext = null;
         return false;
     }
-#nullable restore
 
     /// <summary>
     /// Gets a <see cref="Task"/> that completes when the current activation of the specified grain
@@ -185,7 +182,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         if (TryGetGrainContext(grainId, out var grainContext))
         {
-            grainContext!.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
+            grainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
             await grainContext.Deactivated;
         }
     }
@@ -203,7 +200,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// await cluster.MigrateAsync(grain.GetGrainId(), targetSilo);
     /// </code>
     /// </example>
-#nullable enable
     public async Task MigrateAsync(GrainId grainId, SiloAddress? targetSilo = null)
     {
         var deactivated = WaitForDeactivationAsync(grainId);
@@ -215,7 +211,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
         await deactivated;
     }
-#nullable restore
 
     /// <inheritdoc cref="WaitForDeactivationAsync(GrainId)"/>
     /// <param name="grain">The grain to observe.</param>
@@ -228,9 +223,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <inheritdoc cref="MigrateAsync(GrainId, SiloAddress?)"/>
     /// <param name="grain">The grain to migrate.</param>
     /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
-#nullable enable
     public Task MigrateAsync(IAddressable grain, SiloAddress? targetSilo = null) => MigrateAsync(grain.GetGrainId(), targetSilo);
-#nullable restore
 
     /// <summary>
     /// Deploys the cluster using the specified configuration and starts the client in-process.
@@ -893,13 +886,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         return _log.ToString();
     }
 
-    private void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
+    private void ReportUnobservedException(object? sender, UnhandledExceptionEventArgs eventArgs)
     {
         Exception exception = (Exception)eventArgs.ExceptionObject;
         WriteLog("Unobserved exception: {0}", exception);
     }
 
-    private void WriteLog(string format, params object[] args)
+    private void WriteLog(string format, params object?[] args)
     {
         _log.AppendFormat(format + Environment.NewLine, args);
     }
@@ -954,7 +947,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         _disposed = true;
     }
 
-    private static async Task DisposeAsync(IDisposable value)
+    private static async Task DisposeAsync(IDisposable? value)
     {
         if (value is IAsyncDisposable asyncDisposable)
         {
