@@ -196,7 +196,7 @@ namespace Orleans.Serialization.Invocation
         public PooledResponseCodec(ICodecProvider codecProvider)
             => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<TResult>>(this, codecProvider);
 
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Response<TResult> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Response<TResult> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -211,6 +211,7 @@ namespace Orleans.Serialization.Invocation
             writer.WriteEndObject();
         }
 
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Response<TResult> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
@@ -231,7 +232,7 @@ namespace Orleans.Serialization.Invocation
 
         public override void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, object value)
         {
-            writer.WriteStartObject(0, null, _resultType);
+            writer.WriteStartObject(0, null!, _resultType);
             var holder = (Response<TResult>)value;
             if (holder.TypedResult is not null)
                 _codec.WriteField(ref writer, 0, _resultType, holder.TypedResult);

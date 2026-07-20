@@ -9,7 +9,6 @@ using System.Reflection;
 using System.Runtime.Loader;
 #endif
 
-#nullable disable
 namespace Orleans.Serialization.Internal
 {
     public static class ReferencedAssemblyProvider
@@ -72,11 +71,11 @@ namespace Orleans.Serialization.Internal
             }
         }
 
-        public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, Assembly assembly = null)
+        public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, Assembly? assembly = null)
         {
             assembly ??= typeof(ReferencedAssemblyProvider).Assembly;
             var assemblies = new HashSet<Assembly>();
-            var context = AssemblyLoadContext.GetLoadContext(assembly);
+            var context = AssemblyLoadContext.GetLoadContext(assembly)!;
             foreach (var asm in context.Assemblies)
             {
                 // Skip assemblies which have not had code generation executed against them and already-seen assemblies.
@@ -90,10 +89,10 @@ namespace Orleans.Serialization.Internal
         }
 #endif
 
-        public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly assembly = null)
+        public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly? assembly = null)
         {
             assembly ??= Assembly.GetEntryAssembly();
-            DependencyContext dependencyContext;
+            DependencyContext? dependencyContext;
             if (assembly is null || assembly.IsDynamic)
             {
                 dependencyContext = DependencyContext.Default;

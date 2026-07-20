@@ -5,7 +5,6 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -54,7 +53,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(1)]
-        public IEqualityComparer<T> KeyComparer;
+        public IEqualityComparer<T>? KeyComparer;
     }
 
     /// <summary>
@@ -64,7 +63,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class FrozenSetCopier<T> : IDeepCopier<FrozenSet<T>>, IOptionalDeepCopier, IDerivedTypeCopier
     {
-        private readonly IDeepCopier<T> _copier;
+        private readonly IDeepCopier<T>? _copier;
 
         public FrozenSetCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
@@ -74,7 +73,7 @@ namespace Orleans.Serialization.Codecs
         public FrozenSet<T> DeepCopy(FrozenSet<T> input, CopyContext context)
         {
             if (context.TryGetCopy<FrozenSet<T>>(input, out var result))
-                return result;
+                return result!;
 
             if (input.Count == 0 || _copier is null)
                 return input;

@@ -15,7 +15,6 @@ using static Orleans.Serialization.Buffers.PooledBuffer;
 using Orleans.Serialization.Utilities;
 #endif
 
-#nullable disable
 namespace Orleans.Serialization.Buffers
 {
     /// <summary>
@@ -91,7 +90,7 @@ namespace Orleans.Serialization.Buffers
     internal sealed class StreamReaderInput : ReaderInput
     {
         [ThreadStatic]
-        private static byte[] Scratch;
+        private static byte[]? Scratch;
 
         private readonly Stream _stream;
         private readonly ArrayPool<byte> _memoryPool;
@@ -345,7 +344,7 @@ namespace Orleans.Serialization.Buffers
         {
             if (IsSpanInput)
             {
-                _input = default;
+                _input = default!;
                 _currentSpan = input;
                 _bufferPos = 0;
                 _bufferSize = _currentSpan.Length;

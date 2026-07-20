@@ -1,6 +1,5 @@
 using System;
 
-#nullable disable
 namespace Orleans.Serialization.Serializers;
 
 /// <summary>
@@ -40,9 +39,9 @@ public interface ICopierSelector
 /// </summary>
 public sealed class DelegateCodecSelector : ICodecSelector
 {
-    public string CodecName { get; init; }
+    public string CodecName { get; init; } = null!;
 
-    public Func<Type, bool> IsSupportedTypeDelegate { get; init; }
+    public Func<Type, bool> IsSupportedTypeDelegate { get; init; } = null!;
 
     public bool IsSupportedType(Type type) => IsSupportedTypeDelegate(type);
 }
@@ -52,9 +51,9 @@ public sealed class DelegateCodecSelector : ICodecSelector
 /// </summary>
 public sealed class DelegateCopierSelector : ICopierSelector
 {
-    public string CopierName { get; init; }
+    public string CopierName { get; init; } = null!;
 
-    public Func<Type, bool> IsSupportedTypeDelegate { get; init; }
+    public Func<Type, bool> IsSupportedTypeDelegate { get; init; } = null!;
 
     public bool IsSupportedType(Type type) => IsSupportedTypeDelegate(type);
 }

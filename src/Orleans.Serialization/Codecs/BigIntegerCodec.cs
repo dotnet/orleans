@@ -15,7 +15,7 @@ public sealed class BigIntegerCodec : IFieldCodec<BigInteger>
 {
     /// <inheritdoc/>
     void IFieldCodec<BigInteger>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
-        Type expectedType, BigInteger value)
+        [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] BigInteger value)
     {
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(BigInteger), WireType.LengthPrefixed);
@@ -58,6 +58,7 @@ public sealed class BigIntegerCodec : IFieldCodec<BigInteger>
     }
 
     /// <inheritdoc/>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     BigInteger IFieldCodec<BigInteger>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
     /// <summary>
@@ -68,6 +69,7 @@ public sealed class BigIntegerCodec : IFieldCodec<BigInteger>
     /// <param name="field">The field.</param>
     /// <returns>The value.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public static BigInteger ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         ReferenceCodec.MarkValueField(reader.Session);

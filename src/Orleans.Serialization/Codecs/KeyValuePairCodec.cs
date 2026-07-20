@@ -6,7 +6,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -36,8 +35,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
-            Type expectedType,
-            KeyValuePair<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] KeyValuePair<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
@@ -49,6 +48,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public KeyValuePair<TKey, TValue> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();
@@ -79,7 +79,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            return new KeyValuePair<TKey, TValue>(key, value);
+            return new KeyValuePair<TKey, TValue>(key!, value!);
         }
     }
 
@@ -91,8 +91,8 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class KeyValuePairCopier<TKey, TValue> : IDeepCopier<KeyValuePair<TKey, TValue>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<TKey> _keyCopier;
-        private readonly IDeepCopier<TValue> _valueCopier;
+        private readonly IDeepCopier<TKey>? _keyCopier;
+        private readonly IDeepCopier<TValue>? _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="KeyValuePairCopier{TKey, TValue}"/> class.
@@ -107,7 +107,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _keyCopier is null && _valueCopier is null;
 
-        object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((KeyValuePair<TKey, TValue>)input, context);
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((KeyValuePair<TKey, TValue>)input!, context);
 
         /// <inheritdoc/>
         public KeyValuePair<TKey, TValue> DeepCopy(KeyValuePair<TKey, TValue> input, CopyContext context)

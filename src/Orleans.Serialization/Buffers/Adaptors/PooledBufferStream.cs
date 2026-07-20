@@ -6,7 +6,6 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
-#nullable disable
     /// <summary>
     /// A <see cref="IBufferWriter{T}"/> implementation which boxes another buffer writer.
     /// </summary>
@@ -123,8 +122,8 @@ namespace Orleans.Serialization.Buffers.Adaptors
             }
 
             var runningIndex = 0L;
-            var firstSegment = default(BufferSegment);
-            var previousSegment = default(BufferSegment);
+            BufferSegment? firstSegment = null;
+            BufferSegment? previousSegment = null;
             var remaining = _length;
             foreach (var buffer in _segments)
             {
@@ -142,7 +141,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
                 previousSegment = segment;
             }
 
-            return new ReadOnlySequence<byte>(firstSegment, 0, previousSegment, previousSegment.Memory.Length);
+            return new ReadOnlySequence<byte>(firstSegment!, 0, previousSegment!, previousSegment!.Memory.Length);
         }
 
         /// <summary>
@@ -150,11 +149,12 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// </summary>
         public void ReturnReadOnlySequence(in ReadOnlySequence<byte> sequence)
         {
-            if (sequence.Start.GetObject() is not BufferSegment segment)
+            if (sequence.Start.GetObject() is not BufferSegment initialSegment)
             {
                 return;
             }
 
+            BufferSegment? segment = initialSegment;
             while (segment is not null)
             {
                 var next = segment.Next as BufferSegment;

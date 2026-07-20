@@ -10,7 +10,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Serialization.Buffers;
 
-#nullable disable
 namespace Orleans.Serialization.TypeSystem
 {
     /// <summary>
@@ -68,7 +67,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
         /// <returns>The type if it was successfully read, <see langword="null" /> otherwise.</returns>
-        public unsafe Type TryRead<TInput>(ref Reader<TInput> reader)
+        public unsafe Type? TryRead<TInput>(ref Reader<TInput> reader)
         {
             var version = reader.ReadByte();
             if (version != Version1)
@@ -110,8 +109,10 @@ namespace Orleans.Serialization.TypeSystem
                 typeNameString = Encoding.UTF8.GetString(typeNameBytes, typeName.Length);
             }
 
-            if (_typeConverter.TryParse(typeNameString, out var type))
+            Type? type = null;
+            if (_typeConverter.TryParse(typeNameString, out var parsedType))
             {
+                type = parsedType;
                 var key = new TypeKey(hashCode, typeName.ToArray());
                 while (!_typeKeyCache.TryAdd(candidateHashCode++, (key, type)))
                 {
@@ -156,7 +157,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="type">The type.</param>
         /// <param name="typeString">The type name as a string.</param>
         /// <returns><see langword="true" /> if a type was successfully read, <see langword="false" /> otherwise.</returns>
-        public unsafe bool TryReadForAnalysis<TInput>(ref Reader<TInput> reader, [NotNullWhen(true)] out Type type, out string typeString)
+        public unsafe bool TryReadForAnalysis<TInput>(ref Reader<TInput> reader, [NotNullWhen(true)] out Type? type, out string typeString)
         {
             var version = reader.ReadByte();
             var hashCode = reader.ReadInt32();
@@ -218,7 +219,7 @@ namespace Orleans.Serialization.TypeSystem
                 return ReferenceEquals(a, b) || a.AsSpan().SequenceEqual(b);
             }
 
-            public override bool Equals(object obj) => obj is TypeKey key && Equals(key);
+            public override bool Equals(object? obj) => obj is TypeKey key && Equals(key);
 
             public override int GetHashCode() => HashCode;
 

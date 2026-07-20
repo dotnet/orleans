@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.Serialization;
 
-#nullable disable
 namespace Orleans.Serialization
 {
     internal static class ExceptionHelper
@@ -244,14 +243,14 @@ namespace Orleans.Serialization
         /// </summary>
         /// <value>The type of the target reference.</value>
         [Id(1)]
-        public Type TargetReferenceType { get; }
+        public Type? TargetReferenceType { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ReferenceNotFoundException"/> class.
         /// </summary>
         /// <param name="targetType">Type of the target.</param>
         /// <param name="targetId">The target identifier.</param>
-        public ReferenceNotFoundException(Type targetType, uint targetId) : base(
+        public ReferenceNotFoundException(Type? targetType, uint targetId) : base(
             $"Reference with id {targetId} and type {targetType} not found.")
         {
             TargetReference = targetId;
@@ -269,7 +268,7 @@ namespace Orleans.Serialization
         private ReferenceNotFoundException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
             TargetReference = info.GetUInt32(nameof(TargetReference));
-            TargetReferenceType = (Type)info.GetValue(nameof(TargetReferenceType), typeof(Type));
+            TargetReferenceType = (Type)info.GetValue(nameof(TargetReferenceType), typeof(Type))!;
         }
 
         /// <inheritdoc/>
@@ -343,13 +342,13 @@ namespace Orleans.Serialization
         /// </summary>
         /// <value>The type of the target reference.</value>
         [Id(0)]
-        public Type TargetReferenceType { get; }
+        public Type? TargetReferenceType { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ReferenceFieldNotSupportedException"/> class.
         /// </summary>
         /// <param name="targetType">Type of the target.</param>
-        public ReferenceFieldNotSupportedException(Type targetType) : base(
+        public ReferenceFieldNotSupportedException(Type? targetType) : base(
             $"Reference with type {targetType} not allowed here.")
         {
             TargetReferenceType = targetType;
@@ -365,7 +364,7 @@ namespace Orleans.Serialization
 #endif
         private ReferenceFieldNotSupportedException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            TargetReferenceType = (Type)info.GetValue(nameof(TargetReferenceType), typeof(Type));
+            TargetReferenceType = (Type)info.GetValue(nameof(TargetReferenceType), typeof(Type))!;
         }
 
         /// <inheritdoc/>
@@ -452,7 +451,7 @@ namespace Orleans.Serialization
 #endif
         private IllegalTypeException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            TypeName = info.GetString(nameof(TypeName));
+            TypeName = info.GetString(nameof(TypeName))!;
         }
 
         /// <summary>

@@ -43,7 +43,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Dictionary<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Dictionary<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -54,7 +54,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Comparer is var comparer && comparer != EqualityComparer<TKey>.Default)
             {
-                _comparerCodec.WriteField(ref writer, 0, null, comparer);
+                _comparerCodec.WriteField(ref writer, 0, null!, comparer);
             }
 
             if (value.Count > 0)
@@ -73,6 +73,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Dictionary<TKey, TValue> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -122,7 +123,7 @@ namespace Orleans.Serialization.Codecs
                         }
                         else
                         {
-                            result!.Add(key!, _valueCodec.ReadValue(ref reader, header));
+                            result!.Add(key!, _valueCodec.ReadValue(ref reader, header)!);
                             valueExpected = false;
                         }
                         break;
@@ -253,7 +254,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (value.Comparer is var comparer && comparer != EqualityComparer<TKey>.Default)
             {
-                _comparerCodec.WriteField(ref writer, 0, null, comparer);
+                _comparerCodec.WriteField(ref writer, 0, null!, comparer);
             }
 
             if (value.Count > 0)
@@ -325,7 +326,7 @@ namespace Orleans.Serialization.Codecs
                         }
                         else
                         {
-                            value.Add(key!, _valueCodec.ReadValue(ref reader, header));
+                            value.Add(key!, _valueCodec.ReadValue(ref reader, header)!);
                             valueExpected = false;
                         }
                         break;

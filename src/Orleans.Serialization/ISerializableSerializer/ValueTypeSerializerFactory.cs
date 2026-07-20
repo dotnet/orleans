@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Security;
 
-#nullable disable
 namespace Orleans.Serialization
 {
     internal class ValueTypeSerializerFactory
@@ -22,7 +21,7 @@ namespace Orleans.Serialization
 
         private readonly MethodInfo _createTypedSerializerMethodInfo = typeof(ValueTypeSerializerFactory).GetMethod(
             nameof(CreateTypedSerializer),
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
 
         [SecurityCritical]
         public ValueTypeSerializerFactory(
@@ -39,7 +38,7 @@ namespace Orleans.Serialization
             _entrySerializer = entrySerializer;
             _streamingContext = streamingContext;
             _formatterConverter = formatterConverter;
-            _createSerializerDelegate = type => (ValueTypeSerializer)_createTypedSerializerMethodInfo.MakeGenericMethod(type).Invoke(this, null);
+            _createSerializerDelegate = type => (ValueTypeSerializer)_createTypedSerializerMethodInfo.MakeGenericMethod(type).Invoke(this, null)!;
         }
 
         [SecurityCritical]

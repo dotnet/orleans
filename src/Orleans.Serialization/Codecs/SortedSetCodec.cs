@@ -3,7 +3,6 @@ using Orleans.Serialization.Serializers;
 using System;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -51,7 +50,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The comparer.</value>
         [Id(1)]
-        public IComparer<T> Comparer;
+        public IComparer<T>? Comparer;
     }
 
     /// <summary>
@@ -78,12 +77,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<SortedSet<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new SortedSet<T>(input.Comparer);

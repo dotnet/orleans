@@ -9,7 +9,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -23,9 +22,10 @@ namespace Orleans.Serialization.Codecs
         [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_array")]
         extern static ref int[] GetSetArray(BitArray bitArray);
 #else
-        private static int[] GetSetArray(BitArray bitArray) => typeof(BitArray).GetField("m_array", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(bitArray) as int[];
+        private static int[] GetSetArray(BitArray bitArray) => (typeof(BitArray).GetField("m_array", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(bitArray) as int[])!;
 #endif
 
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         BitArray IFieldCodec<BitArray>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -35,6 +35,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static BitArray ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -53,10 +54,10 @@ namespace Orleans.Serialization.Codecs
 #endif
 
             ReferenceCodec.RecordObject(reader.Session, result);
-            return result;
+            return result!;
         }
 
-        void IFieldCodec<BitArray>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, BitArray value)
+        void IFieldCodec<BitArray>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] BitArray value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -105,7 +106,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<BitArray>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             result = new(input);
@@ -120,6 +121,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ByteArrayCodec : IFieldCodec<byte[]>
     {
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         byte[] IFieldCodec<byte[]>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -129,6 +131,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static byte[] ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -143,7 +146,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        void IFieldCodec<byte[]>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte[] value)
+        void IFieldCodec<byte[]>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] byte[] value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -195,7 +198,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<byte[]>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             result = new byte[input.Length];
@@ -212,6 +215,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class ReadOnlyMemoryOfByteCodec : IFieldCodec<ReadOnlyMemory<byte>>
     {
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         ReadOnlyMemory<byte> IFieldCodec<ReadOnlyMemory<byte>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -221,6 +225,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static byte[] ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -236,7 +241,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<ReadOnlyMemory<byte>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ReadOnlyMemory<byte> value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<ReadOnlyMemory<byte>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ReadOnlyMemory<byte> value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
         /// Writes a field without type info (expected type is statically known).
@@ -249,7 +254,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, ReadOnlyMemory<byte> value) where TBufferWriter : IBufferWriter<byte>
             => WriteField(ref writer, fieldIdDelta, typeof(ReadOnlyMemory<byte>), value);
 
-        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ReadOnlyMemory<byte> value) where TBufferWriter : IBufferWriter<byte>
+        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ReadOnlyMemory<byte> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -321,6 +326,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class MemoryOfByteCodec : IFieldCodec<Memory<byte>>
     {
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         Memory<byte> IFieldCodec<Memory<byte>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -330,6 +336,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static Memory<byte> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -345,7 +352,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<Memory<byte>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Memory<byte> value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<Memory<byte>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Memory<byte> value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
         /// Writes a field without type info (expected type is statically known).
@@ -358,7 +365,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Memory<byte> value) where TBufferWriter : IBufferWriter<byte>
             => WriteField(ref writer, fieldIdDelta, typeof(Memory<byte>), value);
 
-        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Memory<byte> value) where TBufferWriter : IBufferWriter<byte>
+        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Memory<byte> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -403,7 +410,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class PooledBufferCodec : IFieldCodec<PooledBuffer>
     {
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
@@ -417,6 +424,7 @@ namespace Orleans.Serialization.Codecs
             value.Reset();
         }
 
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public PooledBuffer ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);

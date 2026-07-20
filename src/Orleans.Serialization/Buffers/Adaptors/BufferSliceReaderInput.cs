@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using static Orleans.Serialization.Buffers.PooledBuffer;
 
-#nullable disable
 namespace Orleans.Serialization.Buffers.Adaptors;
 
 /// <summary>
@@ -14,7 +13,7 @@ public struct BufferSliceReaderInput
     private static readonly SequenceSegment InitialSegmentSentinel = new();
     private static readonly SequenceSegment FinalSegmentSentinel = new();
     private readonly BufferSlice _slice;
-    private SequenceSegment _segment;
+    private SequenceSegment? _segment;
     private int _position;
 
     /// <summary>
@@ -121,7 +120,7 @@ public struct BufferSliceReaderInput
 public struct ArcBufferReaderInput(in ArcBuffer slice)
 {
     private readonly ArcBuffer _slice = slice;
-    private ArcBufferPage _page = slice.First;
+    private ArcBufferPage? _page = slice.First;
     private int _position;
 
     internal readonly ArcBufferPage First => _slice.First;

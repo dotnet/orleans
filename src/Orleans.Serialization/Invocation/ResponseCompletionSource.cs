@@ -1,9 +1,9 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
-#nullable disable
 namespace Orleans.Serialization.Invocation
 {
     /// <summary>
@@ -31,7 +31,7 @@ namespace Orleans.Serialization.Invocation
         public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
 
         /// <inheritdoc/>
-        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
+        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
 
         /// <summary>
         /// Resets this instance.
@@ -136,7 +136,7 @@ namespace Orleans.Serialization.Invocation
         public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
 
         /// <inheritdoc/>
-        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
+        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
 
         /// <summary>
         /// Resets this instance.
@@ -157,7 +157,7 @@ namespace Orleans.Serialization.Invocation
         /// Completes this instance with a result.
         /// </summary>
         /// <param name="result">The result.</param>
-        public void SetResult(TResult result) => _core.SetResult(result);
+        public void SetResult([AllowNull] TResult result) => _core.SetResult(result!);
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

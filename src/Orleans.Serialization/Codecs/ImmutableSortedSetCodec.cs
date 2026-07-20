@@ -4,7 +4,6 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -53,7 +52,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(1)]
-        public IComparer<T> KeyComparer;
+        public IComparer<T>? KeyComparer;
     }
 
     /// <summary>
@@ -63,7 +62,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableSortedSetCopier<T> : IDeepCopier<ImmutableSortedSet<T>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T> _copier;
+        private readonly IDeepCopier<T>? _copier;
 
         public ImmutableSortedSetCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
@@ -73,7 +72,7 @@ namespace Orleans.Serialization.Codecs
         public ImmutableSortedSet<T> DeepCopy(ImmutableSortedSet<T> input, CopyContext context)
         {
             if (context.TryGetCopy<ImmutableSortedSet<T>>(input, out var result))
-                return result;
+                return result!;
 
             if (input.IsEmpty || _copier is null)
                 return input;
@@ -84,7 +83,7 @@ namespace Orleans.Serialization.Codecs
 
             var items = new List<T>(input.Count);
             foreach (var item in input)
-                items.Add(_copier.DeepCopy(item, context));
+                items.Add(_copier!.DeepCopy(item, context));
 
             var res = ImmutableSortedSet.CreateRange(input.KeyComparer, items);
             context.RecordCopy(input, res);

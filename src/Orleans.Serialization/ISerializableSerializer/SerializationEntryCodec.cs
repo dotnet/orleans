@@ -12,8 +12,8 @@ namespace Orleans.Serialization
         [SecurityCritical]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
-            Type expectedType,
-            SerializationEntrySurrogate value) where TBufferWriter : IBufferWriter<byte>
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] SerializationEntrySurrogate value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(SerializationEntrySurrogate), WireType.TagDelimited);
@@ -28,6 +28,7 @@ namespace Orleans.Serialization
         }
 
         [SecurityCritical]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public SerializationEntrySurrogate ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();

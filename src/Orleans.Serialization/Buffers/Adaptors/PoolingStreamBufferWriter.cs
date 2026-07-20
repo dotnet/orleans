@@ -1,6 +1,5 @@
 using System.Buffers;
 
-#nullable disable
 namespace Orleans.Serialization.Buffers.Adaptors
 {
     /// <summary>
@@ -44,7 +43,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         {
             if (_buffer is { } buf)
             {
-                _buffer = null;
+                _buffer = null!;
                 ArrayPool<byte>.Shared.Return(buf);
             }
         }

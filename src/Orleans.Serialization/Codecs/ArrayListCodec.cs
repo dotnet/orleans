@@ -4,7 +4,6 @@ using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Codecs
 {
-#nullable disable
     /// <summary>
     /// Serializer for <see cref="ArrayList"/>.
     /// </summary>
@@ -37,7 +36,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public object[] Values;
+        public object?[] Values;
     }
 
     /// <summary>
@@ -51,12 +50,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<ArrayList>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() != typeof(ArrayList))
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new ArrayList(input.Count);

@@ -3,7 +3,6 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -35,10 +34,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public override void ConvertToSurrogate(NameValueCollection value, ref NameValueCollectionSurrogate surrogate)
         {
-            var result = new Dictionary<string, string>(value.Count);
+            var result = new Dictionary<string, string?>(value.Count);
             for (var i = 0; i < value.Count; i++)
             {
-                result.Add(value.GetKey(i), value.Get(i));
+                result.Add(value.GetKey(i)!, value.Get(i));
             }
 
             surrogate.Values = result;
@@ -56,7 +55,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public Dictionary<string, string> Values;
+        public Dictionary<string, string?> Values;
     }
 
     /// <summary>
@@ -70,12 +69,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<NameValueCollection>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() != typeof(NameValueCollection))
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new NameValueCollection(input.Count);
