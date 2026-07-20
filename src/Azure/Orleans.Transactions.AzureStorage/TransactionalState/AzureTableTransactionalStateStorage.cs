@@ -90,7 +90,7 @@ namespace Orleans.Transactions.AzureStorage
                             SequenceId = kvp.Key,
                             State = kvp.Value.GetState<TState>(this.jsonSettings),
                             TimeStamp = kvp.Value.TransactionTimestamp,
-                            TransactionId = kvp.Value.TransactionId,
+                            TransactionId = kvp.Value.TransactionId!, // Persisted transaction rows always include an identifier.
                             TransactionManager = tm
                         });
                     }
@@ -115,7 +115,7 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
-        public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+        public async Task<string?> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             var keyETag = key.ETag.ToString();
             if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) && keyETag != expectedETag)

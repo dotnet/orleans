@@ -90,7 +90,7 @@ public class GrainStorageBenchmark : IDisposable
         {
             hostBuilder.AddAdoNetGrainStorageAsDefault(options =>
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString!; // The benchmark requires the configured ADO.NET test connection.
             });
         }
     }

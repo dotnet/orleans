@@ -156,7 +156,7 @@ namespace UnitTests.Grains
 
         public async Task DoWrite(int val, bool recover)
         {
-            var original = this.copier.Copy(State);
+            var original = this.copier.Copy(State)!; // Grain state is non-null after activation.
             try
             {
                 State.Field1 = val;
@@ -167,13 +167,13 @@ namespace UnitTests.Grains
                 if (!recover) throw;
 
                 this.logger.LogWarning(exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
-                State = (PersistenceTestGrainState)original;
+                State = original;
             }
         }
 
         public async Task<int> DoRead(bool recover)
         {
-            var original = this.copier.Copy(State);
+            var original = this.copier.Copy(State)!; // Grain state is non-null after activation.
             try
             {
                 await ReadStateAsync();
@@ -183,7 +183,7 @@ namespace UnitTests.Grains
                 if (!recover) throw;
 
                 this.logger.LogWarning(exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
-                State = (PersistenceTestGrainState)original;
+                State = original;
             }
             return State.Field1;
         }

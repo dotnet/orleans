@@ -480,7 +480,7 @@ public class NumericsWideningAndNarrowingTests
     {
         // Wrap the value and round-trip the wrapped value, converting it along the way.
         var payload = _serializer.SerializeToArray(new ValueHolder<TLeft> { Value = leftValue });
-        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload).Value;
+        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload)!.Value; // The payload was serialized from a ValueHolder above.
 
         var asRight = right.CreateTruncating(leftValue);
         Assert.Equal(asRight, result);

@@ -203,6 +203,7 @@ namespace Orleans.Connections.Security
                 }
 
                 ThrowArgumentException(asyncResult);
+                return default!; // Unreachable because ThrowArgumentException always throws.
             }
 
             /// <summary>Gets the task represented by the IAsyncResult.</summary>

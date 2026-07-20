@@ -121,7 +121,7 @@ namespace TestGrains
                 state = new MyGrainState();
                 version = 0;
             }
-            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, this.copier.Copy(state)));
+            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, this.copier.Copy(state!)!)); // State is initialized in the branch above.
         }
 
         public Task ClearStoredState()

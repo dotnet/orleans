@@ -30,15 +30,15 @@ namespace Orleans.Transactions
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
             await this.StateStorage.ReadStateAsync();
-            var state = stateStorage.State;
-            return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, state.CommittedState, state.CommittedSequenceId, state.Metadata, state.PendingStates);
+            var state = stateStorage!.State!; // ReadStateAsync initializes the transactional state record.
+            return new TransactionalStorageLoadResponse<TState>(stateStorage!.Etag, state.CommittedState, state.CommittedSequenceId, state.Metadata, state.PendingStates); // StateStorage access above initializes the field.
         }
 
         public async Task<string?> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            var state = stateStorage.State;
+            var state = stateStorage!.State!; // StateStorage access above initializes the field and ReadStateAsync has populated its state.
             state.Metadata = metadata;
 
             var pendinglist = state.PendingStates;

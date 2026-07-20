@@ -462,7 +462,7 @@ namespace UnitTests.Grains
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
             => GetGrainService(callingGrainId).UnregisterReminder(reminder);
 
-        public Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
+        public Task<IGrainReminder?> GetReminder(GrainId callingGrainId, string reminderName)
         {
             return GetGrainService(callingGrainId).GetReminder(callingGrainId, reminderName);
         }

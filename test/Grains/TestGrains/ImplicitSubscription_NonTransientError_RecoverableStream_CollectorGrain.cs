@@ -47,15 +47,15 @@ namespace TestGrains
             }
 
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
-            stream = streamProvider.GetStream<GeneratedEvent>(State.StreamNamespace, State.StreamGuid);
+            stream = streamProvider.GetStream<GeneratedEvent>(State.StreamNamespace!, State.StreamGuid); // The namespace is initialized above before the stream is retrieved.
 
             await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken!);
         }
 
-        private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken sequenceToken)
+        private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken? sequenceToken)
         {
             // Ignore duplicates
-            if (State.IsDuplicate(sequenceToken))
+            if (State.IsDuplicate(sequenceToken!)) // Generated streams always provide sequence tokens.
             {
                 logger.LogInformation("Received duplicate event. StreamGuid: {StreamGuid}, SequenceToken: {SequenceToken}", State.StreamGuid, sequenceToken);
                 return;
@@ -65,7 +65,7 @@ namespace TestGrains
 
             // We will only update the start token if this is the first event we're processed
             // In that case, we'll want to save the start token in case something goes wrong.
-            if (State.TryUpdateStartToken(sequenceToken))
+            if (State.TryUpdateStartToken(sequenceToken!)) // Generated streams always provide sequence tokens.
             {
                 await WriteStateAsync();
             }

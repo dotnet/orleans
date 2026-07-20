@@ -55,7 +55,7 @@ namespace UnitTests.Grains
 
             await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
 
-            async Task OnNext(byte[] value, StreamSequenceToken token)
+            async Task OnNext(byte[] value, StreamSequenceToken? token)
             {
                 this.logger.LogInformation("Received: [{Value} {Token}]", value, token);
                 this.State.EventCounter++;

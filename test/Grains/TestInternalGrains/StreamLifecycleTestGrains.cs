@@ -445,6 +445,6 @@ namespace UnitTests.Grains
 
     internal class ClosedTypeStreamSubscriptionHandle : StreamSubscriptionHandleImpl<StreamSubscriptionHandleArg>
     {
-        public ClosedTypeStreamSubscriptionHandle() : base(null, null) { /* not a subject to the creation */ }
+        public ClosedTypeStreamSubscriptionHandle() : base(null!, null!) { /* This test-only type is never instantiated through the normal creation path. */ }
     }
 }

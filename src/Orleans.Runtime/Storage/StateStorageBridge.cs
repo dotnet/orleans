@@ -26,7 +26,6 @@ namespace Orleans.Core
         private GrainState<TState>? _grainState;
 
         /// <inheritdoc/>
-        [MaybeNull, AllowNull]
         public TState State
         {
             get
@@ -34,10 +33,10 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 if (_grainState is { } grainState)
                 {
-                    return grainState.State;
+                    return grainState.State!; // ReadStateAsync initializes state before consumers access it.
                 }
 
-                return default;
+                return default!; // Access before ReadStateAsync is outside the storage lifecycle contract.
             }
 
             set

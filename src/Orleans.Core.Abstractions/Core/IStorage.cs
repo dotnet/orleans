@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -102,7 +101,6 @@ namespace Orleans.Core
         /// <summary>
         /// Gets or sets the state.
         /// </summary>
-        [MaybeNull, AllowNull]
         TState State { get; set; }
     }
 }

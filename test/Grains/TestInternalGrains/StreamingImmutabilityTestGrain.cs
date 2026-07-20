@@ -45,7 +45,7 @@ namespace UnitTests.Grains
             return Task.FromResult(this.Runtime.SiloIdentity);
         }
 
-        private Task OnNextAsync(StreamImmutabilityTestObject myObject, StreamSequenceToken streamSequenceToken)
+        private Task OnNextAsync(StreamImmutabilityTestObject myObject, StreamSequenceToken? streamSequenceToken)
         {
             _myObject = myObject;
             return Task.CompletedTask;

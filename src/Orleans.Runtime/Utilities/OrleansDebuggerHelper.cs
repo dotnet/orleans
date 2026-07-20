@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Utilities
         /// <returns>
         /// The grain instance corresponding to the provided <paramref name="grainReference"/> if it is activated on current silo, or <see langword="null"/> otherwise.
         /// </returns>
-        public static object? GetGrainInstance(object grainReference)
+        public static object? GetGrainInstance(object? grainReference)
         {
             switch (grainReference)
             {

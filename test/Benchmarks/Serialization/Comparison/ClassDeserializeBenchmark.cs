@@ -108,7 +108,7 @@ public class ClassDeserializeBenchmark
     {
         Session.Reset();
         var instance = Serializer.Deserialize(Input, Session);
-        return SumResult(instance);
+        return SumResult(instance!); // The benchmark input is a serialized IntClass.
     }
 
     [Benchmark]

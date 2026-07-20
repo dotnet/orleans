@@ -58,7 +58,7 @@ namespace Orleans.Clustering.Redis
 
     internal class RedactRedisConfigurationOptions : RedactAttribute
     {
-        public override string Redact(object value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
+        public override string Redact(object? value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
     }
 
     /// <summary>
