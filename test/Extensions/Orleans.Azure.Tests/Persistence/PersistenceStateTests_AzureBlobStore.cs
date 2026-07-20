@@ -76,7 +76,7 @@ public class PersistenceStateTests_AzureBlobStore_CustomContainerFactory : Base_
 
         private class TestBlobContainerFactory : IBlobContainerFactory
         {
-            private BlobServiceClient _blobServiceClient;
+            private BlobServiceClient? _blobServiceClient;
             private const string NamePrefix = "test-container";
 
             public BlobContainerClient GetBlobContainerClient(GrainId grainId)

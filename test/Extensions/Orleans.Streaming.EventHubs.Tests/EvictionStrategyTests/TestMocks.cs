@@ -11,15 +11,15 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     {
         public EventHubQueueCacheForTesting(IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger)
-            :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null, null, null)
+            :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null!, null!, null!)
             { }
 
         public int ItemCount => this.cache.ItemCount;
     }
     public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {
-        public EHEvictionStrategyForTesting(ILogger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
-            :base(logger, timePurage, cacheMonitor, monitorWriteInterval)
+        public EHEvictionStrategyForTesting(ILogger logger, ICacheMonitor? cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate? timePurage = null)
+            :base(logger, timePurage!, cacheMonitor!, monitorWriteInterval)
         { }
 
         public Queue<FixedSizeBuffer> InUseBuffers => this.inUseBuffers;
@@ -44,7 +44,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     internal class CachePressureInjectionMonitor : ICachePressureMonitor
     {
         public bool isUnderPressure { get; set; }
-        public ICacheMonitor CacheMonitor { set; private get; }
+        public ICacheMonitor CacheMonitor { set; private get; } = null!;
         public CachePressureInjectionMonitor()
         {
             this.isUnderPressure = false;

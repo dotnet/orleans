@@ -33,7 +33,7 @@ namespace UnitTests.Streaming.Reliability
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const int QueueCount = 8;
         private Guid _streamId;
-        private string _streamProviderName;
+        private string _streamProviderName = null!;
         private int _numExpectedSilos;
         private IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
 #if DELETE_AFTER_TEST

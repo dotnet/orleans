@@ -18,7 +18,7 @@ namespace Tester.AzureUtils.Streaming
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 #pragma warning disable 618
-        private readonly string adapterType = typeof(PersistentStreamProvider).FullName;
+        private readonly string adapterType = typeof(PersistentStreamProvider).FullName!;
 #pragma warning restore 618
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);

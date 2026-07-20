@@ -289,7 +289,7 @@ namespace Tester.AzureUtils.Persistence
         [Fact, TestCategory("Functional")]
         public void LoadClassByName()
         {
-            string className = typeof(MockStorageProvider).FullName;
+            string className = typeof(MockStorageProvider).FullName!;
             Type classType = new CachedTypeResolver().ResolveType(className);
             Assert.NotNull(classType); // Type
             Assert.True(typeof(IGrainStorage).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
@@ -303,7 +303,7 @@ namespace Tester.AzureUtils.Persistence
             }
 
             var options = new AzureTableStorageOptions();
-            var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
+            var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>()!;
             if (typeNameHandling != null)
             {
                 jsonOptions.Value.JsonSerializerSettings.TypeNameHandling = typeNameHandling.Value;
@@ -330,7 +330,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
-            GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId;
 
@@ -355,7 +355,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            IGrainStorage store, GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId;
 
@@ -387,7 +387,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            IGrainStorage store, GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId;
 
@@ -434,7 +434,7 @@ namespace Tester.AzureUtils.Persistence
         public class TestStoreGrainStateWithCustomJsonProperties
         {
             [JsonProperty("s")]
-            public string String { get; set; }
+            public string? String { get; set; }
 
             internal static GrainState<TestStoreGrainStateWithCustomJsonProperties> NewRandomState(int? aPropertyLength = null)
             {

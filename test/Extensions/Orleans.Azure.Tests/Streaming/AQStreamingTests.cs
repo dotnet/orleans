@@ -24,7 +24,7 @@ namespace Tester.AzureUtils.Streaming
 
         public sealed class Fixture : IAsyncLifetime
         {
-            private readonly ExceptionDispatchInfo _preconditionsException;
+            private readonly ExceptionDispatchInfo? _preconditionsException;
 
             public Fixture()
             {
@@ -41,7 +41,7 @@ namespace Tester.AzureUtils.Streaming
 
                 builder.ConfigureHost(cb =>
                 {
-                    Dictionary<string, string> queueConfig = [];
+                    Dictionary<string, string?> queueConfig = [];
                     void ConfigureStreaming(string option, string value)
                     {
                         var prefix = $"Orleans:Streaming:{AzureQueueStreamProviderName}:";
@@ -100,8 +100,8 @@ namespace Tester.AzureUtils.Streaming
                 Cluster = builder.Build();
             }
 
-            public InProcessTestCluster Cluster { get; }
-            public SingleStreamTestRunner Runner { get; private set; }
+            public InProcessTestCluster? Cluster { get; }
+            public SingleStreamTestRunner Runner { get; private set; } = null!;
 
             public async Task DisposeAsync()
             {
@@ -128,7 +128,7 @@ namespace Tester.AzureUtils.Streaming
             public async Task InitializeAsync()
             {
                 _preconditionsException?.Throw();
-                await Cluster.DeployAsync();
+                await Cluster!.DeployAsync();
                 Runner = new SingleStreamTestRunner(Cluster.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
             }
         }
@@ -235,16 +235,16 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
+            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster!.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
+            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster!.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                fixture.Cluster.StartAdditionalSilo);
+                fixture.Cluster!.StartAdditionalSilo);
         }
 
         //[SkippableFact, TestCategory("BVT")]

@@ -89,14 +89,14 @@ namespace UnitTests.HaloTests.Streaming
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
         private Guid _streamId;
-        private string _streamProvider;
+        private string _streamProvider = null!;
         private readonly ILoggerFactory loggerFactory;
         public HaloStreamSubscribeTests(Fixture fixture)
         {
             this.fixture = fixture;
             HostedCluster = fixture.HostedCluster;
             fixture.EnsurePreconditionsMet();
-            this.loggerFactory = fixture.HostedCluster.ServiceProvider.GetService<ILoggerFactory>();
+            this.loggerFactory = fixture.HostedCluster.ServiceProvider.GetService<ILoggerFactory>()!;
         }
 
         [SkippableFact, TestCategory("Functional")]

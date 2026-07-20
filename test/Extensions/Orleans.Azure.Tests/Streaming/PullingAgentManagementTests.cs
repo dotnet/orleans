@@ -45,7 +45,7 @@ namespace UnitTests.StreamingTests
 
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 #pragma warning disable 618
-        private readonly string adapterType = typeof(PersistentStreamProvider).FullName;
+        private readonly string adapterType = typeof(PersistentStreamProvider).FullName!;
 #pragma warning restore 618
 
         public PullingAgentManagementTests(Fixture fixture)

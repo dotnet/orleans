@@ -17,7 +17,7 @@ namespace Tester.AzureUtils
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
-        private string queueName;
+        private string queueName = null!;
 
         public AzureQueueDataManagerTests()
         {

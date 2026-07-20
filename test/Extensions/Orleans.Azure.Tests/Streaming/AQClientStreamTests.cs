@@ -22,7 +22,7 @@ namespace Tester.AzureUtils.Streaming
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
         private readonly ITestOutputHelper output;
-        private ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner = null!;
 
         public AQClientStreamTests(ITestOutputHelper output)
         {

@@ -33,7 +33,7 @@ namespace Tester.AzureUtils
         private readonly string clusterId;
         private int generation;
         private SiloAddress siloAddress;
-        private SiloInstanceTableEntry myEntry;
+        private SiloInstanceTableEntry myEntry = null!;
         private OrleansSiloInstanceManager manager;
         private readonly ITestOutputHelper output;
 
@@ -67,7 +67,7 @@ namespace Tester.AzureUtils
                 manager.DeleteTableEntries(this.clusterId).WaitAsync(timeout).Wait();
 
                 output.WriteLine("TestCleanup -  Finished");
-                manager = null;
+                manager = null!;
             }
         }
 

@@ -56,8 +56,8 @@ namespace ServiceBus.Tests.TestStreamProviders
                 IEventHubDataAdapter dataAdapter, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
                 OrleansInstruments instruments,
-                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
-                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor>? cacheMonitorFactory = null,
+                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor>? blockPoolMonitorFactory = null)
                 : base(cacheOptions, evictionOptions, statisticOptions, dataAdapter, sharedDimensions, instruments, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.name = name;

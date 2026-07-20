@@ -10,10 +10,10 @@ namespace Tester.AzureUtils
 {
     public class UnitTestAzureTableData : ITableEntity
     {
-        public byte[] Data { get; set; }
-        public string StringData { get; set; }
-        public string PartitionKey { get; set; }
-        public string RowKey { get; set; }
+        public byte[]? Data { get; set; }
+        public string? StringData { get; set; }
+        public string PartitionKey { get; set; } = null!;
+        public string RowKey { get; set; } = null!;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
@@ -22,7 +22,7 @@ namespace Tester.AzureUtils
 
         }
 
-        public UnitTestAzureTableData(string data, string partitionKey, string rowKey)
+        public UnitTestAzureTableData(string? data, string partitionKey, string rowKey)
         {
             StringData = data;
             PartitionKey = partitionKey;

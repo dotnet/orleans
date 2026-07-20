@@ -96,21 +96,21 @@ namespace ServiceBus.Tests.MonitorTests
                 (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null);
             foreach (var callCounter in receiverMonitorCounters)
             {
-                AssertReceiverMonitorCallCounters(callCounter as EventHubReceiverMonitorCounters);
+                AssertReceiverMonitorCallCounters((callCounter as EventHubReceiverMonitorCounters)!);
             }
 
             var cacheMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null);
             foreach (var callCounter in cacheMonitorCounters)
             {
-                AssertCacheMonitorCallCounters(callCounter as CacheMonitorCounters);
+                AssertCacheMonitorCallCounters((callCounter as CacheMonitorCounters)!);
             }
 
             var objectPoolMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
              (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null);
             foreach (var callCounter in objectPoolMonitorCounters)
             {
-                AssertObjectPoolMonitorCallCounters(callCounter as ObjectPoolMonitorCounters);
+                AssertObjectPoolMonitorCallCounters((callCounter as ObjectPoolMonitorCounters)!);
             }
         }
 
