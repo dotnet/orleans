@@ -533,7 +533,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 LogErrorUnregisteringShard(_logger, ex, shard.Id);
             }
         }
-        catch (OperationCanceledException ex) when (_cts.IsCancellationRequested && ex.CancellationToken == _cts.Token)
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
         {
             // Cancellation initiated by Stop is expected.
         }
