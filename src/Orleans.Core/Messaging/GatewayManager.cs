@@ -163,7 +163,6 @@ namespace Orleans.Messaging
         /// </summary>
         /// <returns></returns>
         public SiloAddress? GetLiveGateway()
-        #nullable disable
         {
             List<SiloAddress> live = GetLiveGateways();
             int count = live.Count;
@@ -262,7 +261,7 @@ namespace Orleans.Messaging
 
                 // the listProvider.GetGateways() is not under lock.
                 var allGateways = await gatewayListProvider.GetGateways();
-                var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()).ToList();
+                var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()!).ToList();
 
                 await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
             }
@@ -399,7 +398,7 @@ namespace Orleans.Messaging
             Level = LogLevel.Warning,
             Message = "Could not find any gateway in '{GatewayListProviderName}'. Orleans client cannot initialize until at least one gateway becomes available."
         )]
-        private static partial void LogNoGatewayDuringInitialization(ILogger logger, string gatewayListProviderName);
+        private static partial void LogNoGatewayDuringInitialization(ILogger logger, string? gatewayListProviderName);
 
         private readonly struct UrisLogValue(IList<Uri> uris)
         {

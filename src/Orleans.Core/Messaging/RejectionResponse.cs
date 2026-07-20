@@ -1,18 +1,17 @@
 using System;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     [Id(102), GenerateSerializer, Immutable]
     internal sealed class RejectionResponse
     {
         [Id(0)]
-        public string RejectionInfo { get; init; }
+        public string RejectionInfo { get; init; } = null!;
 
         [Id(1)]
         public Message.RejectionTypes RejectionType { get; init; }
 
         [Id(2)]
-        public Exception Exception { get; init; }
+        public Exception? Exception { get; init; }
     }
 }
