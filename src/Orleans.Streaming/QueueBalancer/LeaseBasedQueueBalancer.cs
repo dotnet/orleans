@@ -105,18 +105,24 @@ public partial class LeaseBasedQueueBalancer(
         // Stop processing membership updates.
         await base.Shutdown();
 
-        // Stop acquiring and renewing leases.
-        await Task.WhenAll(_leaseMaintenanceTimerTask, _leaseAcquisitionTimerTask);
-
-        // Drain queued operations and release all owned leases.
-        await _executor.AddNext(async () =>
+        try
         {
-            _responsibility = 0;
-            await ReleaseLeasesToMeetResponsibility(isShuttingDown: true);
-        });
+            // Stop acquiring and renewing leases.
+            await Task.WhenAll(_leaseMaintenanceTimerTask, _leaseAcquisitionTimerTask);
 
-        _leaseMaintenanceTimer.Dispose();
-        _leaseAcquisitionTimer.Dispose();
+            // Drain queued operations and release all owned leases.
+            await _executor.AddNext(async () =>
+            {
+                _responsibility = 0;
+                await ReleaseLeasesToMeetResponsibility(isShuttingDown: true);
+            });
+        }
+        finally
+        {
+            // Ensure the timers are always disposed, even if draining queued operations or releasing leases fails.
+            _leaseMaintenanceTimer.Dispose();
+            _leaseAcquisitionTimer.Dispose();
+        }
     }
 
     /// <inheritdoc/>
