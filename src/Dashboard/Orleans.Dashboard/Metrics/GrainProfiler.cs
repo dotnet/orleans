@@ -13,7 +13,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Dashboard.Core;
 
-#nullable disable
 namespace Orleans.Dashboard.Metrics;
 
 internal sealed partial class GrainProfiler(
@@ -23,10 +22,10 @@ internal sealed partial class GrainProfiler(
     IOptions<GrainProfilerOptions> options) : IGrainProfiler, ILifecycleParticipant<ISiloLifecycle>
 {
     private ConcurrentDictionary<string, SiloGrainTraceEntry> _grainTrace = new();
-    private Timer _timer;
-    private string _siloAddress;
+    private Timer _timer = null!;
+    private string? _siloAddress;
     private bool _isEnabled;
-    private IDashboardGrain _dashboardGrain;
+    private IDashboardGrain? _dashboardGrain;
 
     public bool IsEnabled => options.Value.TraceAlways || _isEnabled;
 
@@ -48,7 +47,7 @@ internal sealed partial class GrainProfiler(
         return Task.CompletedTask;
     }
 
-    public void Track(double elapsedMs, Type grainType, [CallerMemberName] string methodName = null, bool failed = false)
+    public void Track(double elapsedMs, Type grainType, [CallerMemberName] string? methodName = null, bool failed = false)
     {
         ArgumentNullException.ThrowIfNull(grainType);
 
@@ -91,7 +90,7 @@ internal sealed partial class GrainProfiler(
         });
     }
 
-    private void ProcessStats(object state)
+    private void ProcessStats(object? state)
     {
         if (!IsEnabled)
         {
@@ -108,7 +107,7 @@ internal sealed partial class GrainProfiler(
 
             foreach (var item in items)
             {
-                item.Grain = TypeFormatter.Parse(item.Grain);
+                item.Grain = TypeFormatter.Parse(item.Grain!);
             }
 
             try

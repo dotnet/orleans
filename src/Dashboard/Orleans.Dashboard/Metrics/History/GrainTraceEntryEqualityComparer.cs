@@ -2,7 +2,6 @@ using Orleans.Dashboard.Model;
 using System;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Dashboard.Metrics.History;
 
 internal sealed class GrainTraceEqualityComparer : IEqualityComparer<GrainTraceEntry>
@@ -18,7 +17,7 @@ internal sealed class GrainTraceEqualityComparer : IEqualityComparer<GrainTraceE
         _withSiloAddress = withSiloAddress;
     }
 
-    public bool Equals(GrainTraceEntry x, GrainTraceEntry y)
+    public bool Equals(GrainTraceEntry? x, GrainTraceEntry? y)
     {
         if (ReferenceEquals(x, y))
         {

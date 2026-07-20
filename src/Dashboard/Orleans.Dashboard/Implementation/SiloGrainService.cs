@@ -10,22 +10,21 @@ using Orleans.Dashboard.Metrics;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Core;
 
-#nullable disable
 namespace Orleans.Dashboard.Implementation;
 
 internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
 {
     private const int DefaultTimerIntervalMs = 1000; // 1 second
-    private readonly Queue<SiloRuntimeStatistics> _statistics;
+    private readonly Queue<SiloRuntimeStatistics?> _statistics;
     private readonly Dictionary<string, StatCounter> _counters = [];
     private readonly DashboardOptions _options;
     private readonly IGrainProfiler _profiler;
     private readonly IGrainFactory _grainFactory;
     private readonly ISiloLifecycleSubject _siloLifecycle;
     private readonly ILogger<SiloGrainService> _logger;
-    private IDisposable _timer;
-    private string _versionOrleans;
-    private string _versionHost;
+    private IDisposable? _timer;
+    private string? _versionOrleans;
+    private string? _versionHost;
 
     public SiloGrainService(
         GrainId grainId,
@@ -40,7 +39,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         _options = options.Value;
         _grainFactory = grainFactory;
         _siloLifecycle = siloLifecycle;
-        _statistics = new Queue<SiloRuntimeStatistics>(_options.HistoryLength + 1);
+        _statistics = new Queue<SiloRuntimeStatistics?>(_options.HistoryLength + 1);
         _logger = loggerFactory.CreateLogger<SiloGrainService>();
     }
 
@@ -56,7 +55,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         );
         try
         {
-            _timer = RegisterTimer(x => CollectStatistics((bool) x), true, updateInterval, updateInterval);
+            _timer = RegisterTimer(x => CollectStatistics((bool)x!), true, updateInterval, updateInterval);
 
             await CollectStatistics(false);
         }
@@ -103,9 +102,9 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         return Task.CompletedTask;
     }
 
-    public Task<Immutable<Dictionary<string, string>>> GetExtendedProperties()
+    public Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties()
     {
-        var results = new Dictionary<string, string>
+        var results = new Dictionary<string, string?>
         {
             ["hostVersion"] = _versionHost,
             ["orleansVersion"] = _versionOrleans
@@ -127,7 +126,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         return Task.CompletedTask;
     }
 
-    public Task<Immutable<SiloRuntimeStatistics[]>> GetRuntimeStatistics()
+    public Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics()
     {
         return Task.FromResult(_statistics.ToArray().AsImmutable());
     }

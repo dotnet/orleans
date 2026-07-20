@@ -36,7 +36,7 @@ internal sealed class TraceHistory(int capacity = 100) : ITraceHistory
 
         var periodStart = time.ToPeriodNumber();
 
-        var aggregations = new GrainTraceEntry[capacity];
+        var aggregations = new GrainTraceEntry?[capacity];
 
         foreach (var traceList in traces)
         {
@@ -88,7 +88,7 @@ internal sealed class TraceHistory(int capacity = 100) : ITraceHistory
 
         foreach (var trace in grainTrace)
         {
-            var key = new HistoryKey(siloAddress, trace.Grain, trace.Method);
+            var key = new HistoryKey(siloAddress, trace.Grain!, trace.Method!);
 
             if (!_history.TryGetValue(key, out var historyBuffer))
             {
@@ -142,7 +142,7 @@ internal sealed class TraceHistory(int capacity = 100) : ITraceHistory
         });
     }
 
-    public IEnumerable<GrainMethodAggregate> AggregateByGrainMethod(string[] exclusions)
+    public IEnumerable<GrainMethodAggregate> AggregateByGrainMethod(string[]? exclusions)
     {
         var time = GetRetirementWindow(DateTime.UtcNow);
         var periodStart = time.ToPeriodNumber();

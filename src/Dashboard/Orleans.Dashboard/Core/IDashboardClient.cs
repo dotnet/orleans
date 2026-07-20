@@ -5,20 +5,19 @@ using Orleans.Runtime;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
 
-#nullable disable
 namespace Orleans.Dashboard.Core;
 
 internal interface IDashboardClient
 {
-    Task<Immutable<DashboardCounters>> DashboardCounters(string[] exclusions = null);
+    Task<Immutable<DashboardCounters>> DashboardCounters(string[]? exclusions = null);
 
     Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats();
 
     Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize);
 
-    Task<Immutable<SiloRuntimeStatistics[]>> HistoricalStats(string siloAddress);
+    Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(string siloAddress);
 
-    Task<Immutable<Dictionary<string, string>>> SiloProperties(string siloAddress);
+    Task<Immutable<Dictionary<string, string?>>> SiloProperties(string siloAddress);
 
     Task<Immutable<Dictionary<string, string>>> SiloMetadata(string siloAddress);
 
@@ -28,11 +27,11 @@ internal interface IDashboardClient
 
     Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GrainStats(string grainName);
 
-    Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[] exclusions = null);
+    Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[]? exclusions = null);
 
-    Task<Immutable<string>> GetGrainState(string id, string grainType);
+    Task<Immutable<string>> GetGrainState(string? id, string? grainType);
 
-    Task<Immutable<string[]>> GetGrainTypes(string[] exclusions = null);
+    Task<Immutable<string?[]>> GetGrainTypes(string[]? exclusions = null);
 
     Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages();
 }
