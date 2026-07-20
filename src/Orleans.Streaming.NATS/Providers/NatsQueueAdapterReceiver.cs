@@ -98,7 +98,8 @@ internal sealed partial class NatsQueueAdapterReceiver : IQueueAdapterReceiver
             for (var i = 0; i < messageCount; i++)
             {
                 var natsMessage = messages[i];
-                var container = this._serializer.Deserialize<NatsBatchContainer>(natsMessage.Payload);
+                // NATS stream messages handled by this receiver always contain a serialized batch container.
+                var container = this._serializer.Deserialize<NatsBatchContainer>(natsMessage.Payload)!;
                 container.SequenceToken = new EventSequenceTokenV2((long)natsMessage.Sequence);
                 container.ReplyTo = natsMessage.ReplyTo;
 
