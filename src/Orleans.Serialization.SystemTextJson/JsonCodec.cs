@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -14,7 +15,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>
@@ -50,7 +50,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     }
 
     /// <inheritdoc/>
-    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] object? value)
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -92,7 +92,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     }
 
     /// <inheritdoc/>
-    object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.IsReference)
         {
@@ -102,8 +102,8 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        object result = null;
-        Type type = null;
+        object? result = null;
+        Type? type = null;
         uint fieldId = 0;
         while (true)
         {
@@ -136,13 +136,13 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
                         reader.ReadBytes(ref tempBuffer, (int)length);
                         var sequence = tempBuffer.AsReadOnlySequence();
                         var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
-                        if (typeof(JsonNode).IsAssignableFrom(type))
+                        if (typeof(JsonNode).IsAssignableFrom(type!))
                         {
                             result = JsonNode.Parse(ref jsonReader);
                         }
                         else
                         {
-                            result = JsonSerializer.Deserialize(ref jsonReader, type, _options.SerializerOptions);
+                            result = JsonSerializer.Deserialize(ref jsonReader, type!, _options.SerializerOptions);
                         }
                     }
                     finally
@@ -157,7 +157,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
             }
         }
 
-        ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+        ReferenceCodec.RecordObject(reader.Session, result!, placeholderReferenceId);
         return result;
     }
 
@@ -208,9 +208,9 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     }
 
     /// <inheritdoc/>
-    object IDeepCopier.DeepCopy(object input, CopyContext context)
+    object? IDeepCopier.DeepCopy(object? input, CopyContext context)
     {
-        if (context.TryGetCopy(input, out object result))
+        if (context.TryGetCopy(input!, out object? result))
         {
             return result;
         }
@@ -226,19 +226,19 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         try
         {
             var jsonWriter = new Utf8JsonWriter(bufferWriter, _options.WriterOptions);
-            JsonSerializer.Serialize(jsonWriter, input, _options.SerializerOptions);
+            JsonSerializer.Serialize(jsonWriter, input!, _options.SerializerOptions);
             jsonWriter.Flush();
 
             var sequence = bufferWriter.Value.AsReadOnlySequence();
             var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
-            result = JsonSerializer.Deserialize(ref jsonReader, input.GetType(), _options.SerializerOptions);
+            result = JsonSerializer.Deserialize(ref jsonReader, input!.GetType(), _options.SerializerOptions);
         }
         finally
         {
             bufferWriter.Value.Dispose();
         }
 
-        context.RecordCopy(input, result);
+        context.RecordCopy(input!, result!);
         return result;
     }
 
