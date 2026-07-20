@@ -154,8 +154,9 @@ public class AtMostOneOrleansConstructorAnalyzerTest : DiagnosticAnalyzerTestBas
             .Select(x => MetadataReference.CreateFromFile(x.Location))
             .ToList();
 
-        var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location);
-        metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath!, "mscorlib.dll")));
+        // System.Private.CoreLib is loaded from a file-backed assembly.
+        var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "mscorlib.dll")));
         metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.dll")));
         metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")));
         metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")));

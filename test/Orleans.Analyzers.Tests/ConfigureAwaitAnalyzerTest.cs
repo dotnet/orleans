@@ -43,7 +43,7 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
         Assert.Empty(diagnostics);
     }
 
-    private async Task VerifyCodeFix(string originalCode, string expectedFixedCode, string[] extraUsings = null)
+    private async Task VerifyCodeFix(string originalCode, string expectedFixedCode, string[]? extraUsings = null)
     {
         extraUsings ??= Array.Empty<string>();
 
@@ -67,7 +67,8 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
         // Create project and get diagnostics
         var project = CreateProject(fullOriginalCode);
         var document = project.Documents.First();
-        var compilation = await project.GetCompilationAsync();
+        // C# projects always support compilations.
+        var compilation = (await project.GetCompilationAsync())!;
 
         var analyzer = new ConfigureAwaitAnalyzer();
         var compilationWithAnalyzers = compilation
@@ -92,7 +93,8 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
 
         var operations = await actions.First().GetOperationsAsync(CancellationToken.None);
         var changedSolution = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
-        var changedDocument = changedSolution.GetDocument(document.Id);
+        // Applying the code fix preserves the original document.
+        var changedDocument = changedSolution.GetDocument(document.Id)!;
         var changedText = await changedDocument.GetTextAsync();
 
         Assert.Equal(fullExpectedCode, changedText.ToString());
@@ -123,7 +125,8 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
             .Cast<MetadataReference>()
             .ToList();
 
-        var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location);
+        // System.Private.CoreLib is loaded from a file-backed assembly.
+        var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
         metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "mscorlib.dll")));
         metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.dll")));
         metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")));
@@ -135,7 +138,8 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
             .AddMetadataReferences(projectId, metadataReferences)
             .AddDocument(documentId, fileName, SourceText.From(source));
 
-        return solution.GetProject(projectId)
+        // The project was added to this solution above.
+        return solution.GetProject(projectId)!
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 

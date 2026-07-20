@@ -85,7 +85,8 @@ namespace Analyzers.Tests
 
         protected async Task<Diagnostic[]> GetDiagnosticsFullSourceAsync(string source)
         {
-            var compilation = await CreateProject(source).GetCompilationAsync();
+            // C# projects always support compilations.
+            var compilation = (await CreateProject(source).GetCompilationAsync())!;
             var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
 
             Assert.Empty(errors);
@@ -127,7 +128,8 @@ namespace Analyzers.Tests
                 .Cast<MetadataReference>()
                 .ToList();
 
-            var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location);
+            // System.Private.CoreLib is loaded from a file-backed assembly.
+            var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
             metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "mscorlib.dll")));
             metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.dll")));
             metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")));
@@ -139,7 +141,8 @@ namespace Analyzers.Tests
                 .AddMetadataReferences(projectId, metadataReferences)
                 .AddDocument(documentId, fileName, SourceText.From(source));
 
-            return solution.GetProject(projectId)
+            // The project was added to this solution above.
+            return solution.GetProject(projectId)!
                 .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         }
     }
