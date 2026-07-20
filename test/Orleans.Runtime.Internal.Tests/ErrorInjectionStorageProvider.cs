@@ -173,7 +173,7 @@ namespace UnitTests.StorageTests
             switch ((Commands)command)
             {
                 case Commands.SetErrorInjection:
-                    SetErrorInjection((ErrorInjectionBehavior)arg);
+                    SetErrorInjection((ErrorInjectionBehavior)arg!);
                     return Task.FromResult<object?>(true);
                 default:
                     return base.ExecuteCommand(command, arg);

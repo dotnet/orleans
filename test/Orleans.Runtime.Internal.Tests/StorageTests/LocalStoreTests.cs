@@ -65,6 +65,7 @@ namespace UnitTests.StorageTests
 
             GrainReference reference = (GrainReference)fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
+            Assert.NotNull(state.State);
             Stopwatch sw = new Stopwatch();
             sw.Start();
             var keys = GetKeys(name, reference);
@@ -89,6 +90,7 @@ namespace UnitTests.StorageTests
 
             GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var data = TestStoreGrainState.NewRandomState();
+            Assert.NotNull(data.State);
 
             output.WriteLine("Using store = {0}", store.GetType().FullName);
             Stopwatch sw = new Stopwatch();
@@ -141,6 +143,7 @@ namespace UnitTests.StorageTests
             }.ToList();
             var grainState = TestStoreGrainState.NewRandomState();
             var state = grainState.State;
+            Assert.NotNull(state);
             state.A = name;
             store.WriteRow(keys, AsDictionary(state), grainState.ETag);
 
@@ -152,6 +155,7 @@ namespace UnitTests.StorageTests
             }.ToList();
             grainState = TestStoreGrainState.NewRandomState();
             state = grainState.State;
+            Assert.NotNull(state);
             state.A = name;
             store.WriteRow(keys, AsDictionary(state), grainState.ETag);
 
@@ -176,6 +180,7 @@ namespace UnitTests.StorageTests
             GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var grainState = TestStoreGrainState.NewRandomState();
             var state = grainState.State;
+            Assert.NotNull(state);
             Stopwatch sw = new Stopwatch();
             sw.Start();
             IList<Tuple<string, string>> keys = new[]
@@ -206,10 +211,10 @@ namespace UnitTests.StorageTests
             return keys.ToList();
         }
 
-        private static Dictionary<string, object> AsDictionary(object state)
+        private static Dictionary<string, object?> AsDictionary(object state)
         {
             return state.GetType().GetProperties()
-                .Select(v => new KeyValuePair<string, object>(v.Name, v.GetValue(state)!))
+                .Select(v => new KeyValuePair<string, object?>(v.Name, v.GetValue(state)))
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
         }
     }

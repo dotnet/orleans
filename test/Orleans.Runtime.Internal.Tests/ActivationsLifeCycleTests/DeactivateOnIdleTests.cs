@@ -271,7 +271,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                     RequestContext.Remove(IPlacementDirector.PlacementHintKey);
                 }
 
-                if (this.testCluster.Primary.SiloAddress.ToString().Equals(siloHostingActivation))
+                if (this.testCluster.Primary!.SiloAddress.ToString().Equals(siloHostingActivation))
                 {
                     continue;
                 }
@@ -286,7 +286,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private async Task<DirectoryMembershipSnapshot> WaitForDirectoryView(SiloAddress targetSilo)
         {
-            var directoryMembership = ((InProcessSiloHandle)this.testCluster.Primary).ServiceProvider.GetRequiredService<DirectoryMembershipService>();
+            var directoryMembership = ((InProcessSiloHandle)this.testCluster.Primary!).ServiceProvider.GetRequiredService<DirectoryMembershipService>();
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try
             {

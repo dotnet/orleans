@@ -287,7 +287,7 @@ namespace UnitTests.MembershipTests
                         siloEntry,
                         etagBefore,
                         tableVersion?.ToString() ?? "null");
-                    ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
+                    ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!);
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
                     tableData = await membershipTable.ReadAll();
                 }
@@ -300,7 +300,7 @@ namespace UnitTests.MembershipTests
                     etagBefore,
                     tableVersion?.ToString() ?? "null");
 
-                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
+                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!);
 
                 Assert.True(ok, $"UpdateRow failed - Table Data = {tableData}");
 
@@ -309,13 +309,14 @@ namespace UnitTests.MembershipTests
                     siloEntry,
                     etagBefore,
                     tableVersion?.ToString() ?? "null");
-                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
+                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!);
                 Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
                 tableData = await membershipTable.ReadAll();
 
                 var tuple = tableData.TryGet(siloEntry.SiloAddress);
 
+                Assert.NotNull(tuple);
                 Assert.Equal(tuple.Item1.ToFullString(), siloEntry.ToFullString());
 
                 var etagAfter = tuple.Item2;
@@ -328,7 +329,7 @@ namespace UnitTests.MembershipTests
                         etagAfter,
                         tableVersion?.ToString() ?? "null");
 
-                    ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion);
+                    ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion!);
 
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
                 }

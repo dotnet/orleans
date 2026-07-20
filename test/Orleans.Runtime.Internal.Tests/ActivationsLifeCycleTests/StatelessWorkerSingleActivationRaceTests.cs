@@ -48,7 +48,7 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
 
     private readonly Fixture _fixture = fixture;
 
-    private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary;
+    private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
 
     /// <summary>
     /// Deterministically verifies that once the last worker of a stateless worker context is

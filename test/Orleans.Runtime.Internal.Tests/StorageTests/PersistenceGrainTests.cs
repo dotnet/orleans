@@ -120,7 +120,7 @@ namespace UnitTests.StorageTests
 
             //request InitCount on providers on all silos in this cluster
             IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = await mgmtGrain.SendControlCommandToProvider<MockStorageProvider>(
+            object?[] replies = await mgmtGrain.SendControlCommandToProvider<MockStorageProvider>(
                MockStorageProviderName1, (int)MockStorageProvider.Commands.InitCount, null);
 
             Assert.Contains(1, replies); // StorageProvider #Init
@@ -1063,7 +1063,7 @@ namespace UnitTests.StorageTests
                 initialState.GrainDict.Add(g.GetPrimaryKey().ToString(), g);
             }
 
-            var copy = (GrainStateContainingGrainReferences)this.HostedCluster.DeepCopy(initialState);
+            var copy = (GrainStateContainingGrainReferences)this.HostedCluster.DeepCopy(initialState)!;
             Assert.NotSame(initialState.GrainDict, copy.GrainDict); // Dictionary
             Assert.NotSame(initialState.GrainList, copy.GrainList); // List
         }
@@ -1271,14 +1271,14 @@ namespace UnitTests.StorageTests
         {
             ProviderState providerState = new ProviderState();
             IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = mgmtGrain.SendControlCommandToProvider<T>(
+            object?[] replies = mgmtGrain.SendControlCommandToProvider<T>(
                providerName, (int)MockStorageProvider.Commands.GetProvideState, null).Result;
-            object[] replies2 = mgmtGrain.SendControlCommandToProvider<T>(
+            object?[] replies2 = mgmtGrain.SendControlCommandToProvider<T>(
                               providerName, (int)MockStorageProvider.Commands.GetLastState, null).Result;
             for(int i = 0; i < replies.Length; i++)
             {
-                MockStorageProvider.StateForTest state = (MockStorageProvider.StateForTest)replies[i];
-                PersistenceTestGrainState grainState = (PersistenceTestGrainState)replies2[i];
+                MockStorageProvider.StateForTest state = (MockStorageProvider.StateForTest)replies[i]!;
+                PersistenceTestGrainState grainState = (PersistenceTestGrainState)replies2[i]!;
                 if (state.ReadCount > 0)
                 {
                     providerState.ProviderStateForTest = state;

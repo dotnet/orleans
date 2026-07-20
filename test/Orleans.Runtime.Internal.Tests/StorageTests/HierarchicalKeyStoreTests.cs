@@ -52,7 +52,7 @@ namespace UnitTests.StorageTests
                 Tuple.Create(KeyName1, key1.ToString(CultureInfo.InvariantCulture))
             }.ToList();
 
-            var data = new Dictionary<string, object>();
+            var data = new Dictionary<string, object?>();
             data.Add(ValueName1, testName);
 
             var store = new HierarchicalKeyStore(1);
@@ -81,7 +81,7 @@ namespace UnitTests.StorageTests
                 Tuple.Create(KeyName2, key2.ToString(CultureInfo.InvariantCulture))
             }.ToList();
 
-            var data = new Dictionary<string, object>();
+            var data = new Dictionary<string, object?>();
             data.Add(ValueName1, testName);
 
             var store = new HierarchicalKeyStore(2);
@@ -112,7 +112,7 @@ namespace UnitTests.StorageTests
                 Tuple.Create(KeyName3, key3.ToString(CultureInfo.InvariantCulture))
             }.ToList();
 
-            var data = new Dictionary<string, object>();
+            var data = new Dictionary<string, object?>();
             data[ValueName1] = testName + 1;
             data[ValueName2] = testName + 2;
             data[ValueName3] = testName + 3;
@@ -139,7 +139,7 @@ namespace UnitTests.StorageTests
 
             List<Tuple<string, string>> keys = MakeKeys(key1, key2);
 
-            var data = new Dictionary<string, object>();
+            var data = new Dictionary<string, object?>();
             data[ValueName1] = testName;
 
             var store = new HierarchicalKeyStore(keys.Count);
@@ -176,7 +176,7 @@ namespace UnitTests.StorageTests
             List<Tuple<string, string>> keys1 = MakeKeys(key1, key2);
             List<Tuple<string, string>> keys2 = MakeKeys(key3, key4);
 
-            var data = new Dictionary<string, object>();
+            var data = new Dictionary<string, object?>();
             data[ValueName1] = testName;
 
             var store = new HierarchicalKeyStore(keys1.Count);
@@ -217,7 +217,7 @@ namespace UnitTests.StorageTests
 
             List<Tuple<string, string>> keys = MakeKeys(key1, key2);
 
-            var data = new Dictionary<string, object>();
+            var data = new Dictionary<string, object?>();
             data[ValueName1] = testName + 1;
             data[ValueName2] = testName + 2;
             data[ValueName3] = testName + 3;
