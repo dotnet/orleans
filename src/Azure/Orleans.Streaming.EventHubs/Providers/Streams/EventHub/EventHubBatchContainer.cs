@@ -42,7 +42,8 @@ namespace Orleans.Streaming.EventHubs
         [NonSerialized]
         private Body? payload;
 
-        private Body GetPayload() => payload ?? (payload = this.Serializer.Deserialize<Body>(eventHubMessage.Payload));
+        // Event hub messages handled by this container always contain a serialized body.
+        private Body GetPayload() => payload ?? (payload = this.Serializer.Deserialize<Body>(eventHubMessage.Payload)!);
 
         [Serializable]
         [GenerateSerializer]

@@ -429,7 +429,8 @@ namespace Orleans.Clustering.DynamoDB
         {
             var parse = new MembershipEntry
             {
-                HostName = tableEntry.HostName,
+                // Persisted silo membership records always include a host name.
+                HostName = tableEntry.HostName!,
                 Status = (SiloStatus)tableEntry.Status
             };
 

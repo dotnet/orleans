@@ -145,7 +145,8 @@ namespace Orleans.Runtime.ReminderService
                 Period = remEntry.Period.ToString(),
 
                 GrainRefConsistentHash = consistentHash.ToString("X8"),
-                ETag = new ETag(remEntry.ETag),
+                // The Azure SDK accepts the default reminder ETag even though its string constructor is non-nullable.
+                ETag = new ETag(remEntry.ETag!),
             };
         }
 
@@ -174,7 +175,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public async Task<ReminderTableData?> ReadRows(uint begin, uint end)
         {
             try
             {

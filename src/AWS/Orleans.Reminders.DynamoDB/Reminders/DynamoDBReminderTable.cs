@@ -164,7 +164,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="begin"></param>
         /// <param name="end"></param>
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public async Task<ReminderTableData?> ReadRows(uint begin, uint end)
         {
             Dictionary<string, AttributeValue>? expressionValues = null;
 
@@ -303,7 +303,7 @@ namespace Orleans.Reminders.DynamoDB
         /// </summary>
         /// <param name="entry"> The entry to put </param>
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string?> UpsertRow(ReminderEntry entry)
         {
             var reminderId = ConstructReminderId(this.serviceId, entry.GrainId, entry.ReminderName);
 
@@ -381,7 +381,7 @@ namespace Orleans.Reminders.DynamoDB
             Level = LogLevel.Debug,
             Message = "UpsertRow entry = {Entry}, etag = {ETag}"
         )]
-        private static partial void LogDebugUpsertRow(ILogger logger, ReminderEntry entry, string eTag);
+        private static partial void LogDebugUpsertRow(ILogger logger, ReminderEntry entry, string? eTag);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.ReminderServiceBase,

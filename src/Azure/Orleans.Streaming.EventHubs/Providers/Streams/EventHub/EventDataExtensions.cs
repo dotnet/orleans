@@ -51,7 +51,8 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes, Serialization.Serializer serializer)
         {
-            return serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            // Serialized EventData properties always contain a property list.
+            return serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan())!.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
     }
 }

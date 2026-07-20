@@ -106,7 +106,7 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+    public async Task<ReminderTableData?> ReadRows(uint begin, uint end)
     {
         try
         {
@@ -149,7 +149,7 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+    public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
     {
         try
         {
@@ -170,7 +170,7 @@ internal partial class CosmosReminderTable : IReminderTable
             },
             (this, id, pk)).ConfigureAwait(false);
 
-            return response != null ? FromEntity(response)! : default!;
+            return response != null ? FromEntity(response) : default;
         }
         catch (Exception exc)
         {
@@ -180,7 +180,7 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string?> UpsertRow(ReminderEntry entry)
     {
         try
         {

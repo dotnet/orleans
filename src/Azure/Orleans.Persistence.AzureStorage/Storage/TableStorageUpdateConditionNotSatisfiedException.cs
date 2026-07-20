@@ -21,7 +21,7 @@ namespace Orleans.Storage
             string grainId,
             string tableName,
             string storedEtag,
-            string currentEtag,
+            string? currentEtag,
             Exception storageException)
             : base(errorMsg, storedEtag, currentEtag, storageException)
         {
@@ -38,7 +38,7 @@ namespace Orleans.Storage
             string grainId,
             string tableName,
             string storedEtag,
-            string currentEtag,
+            string? currentEtag,
             Exception storageException)
             : this(CreateDefaultMessage(grainType, grainId, tableName, storedEtag, currentEtag), grainType, grainId, tableName, storedEtag, currentEtag, storageException)
         {
@@ -90,7 +90,7 @@ namespace Orleans.Storage
             string grainId,
             string tableName,
             string storedEtag,
-            string currentEtag)
+            string? currentEtag)
         {
             return string.Format(DefaultMessageFormat, grainType, grainId, tableName, storedEtag, currentEtag);
         }

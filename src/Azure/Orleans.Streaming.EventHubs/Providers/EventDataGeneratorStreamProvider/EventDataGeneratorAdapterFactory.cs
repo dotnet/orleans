@@ -167,7 +167,8 @@ namespace Orleans.Streaming.EventHubs.Testing
                     this.RandomlyPlaceStreamToQueue((arg as StreamRandomPlacementArg)!);
                     break;
                 case (int)Commands.Stop_Producing_On_Stream:
-                    this.StopProducingOnStream((StreamId) arg);
+                    // This command is always issued with a StreamId argument.
+                    this.StopProducingOnStream((StreamId)arg!);
                     break;
                 default: break;
 

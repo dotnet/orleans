@@ -160,7 +160,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
             TableVersion? version = null;
             if (clusterVersion is not null)
             {
-                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag);
+                // Cosmos populates ETag on resources returned from reads.
+                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag!);
             }
             else
             {
@@ -169,10 +170,12 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
             var memEntries = new List<Tuple<MembershipEntry, string>>
             {
-                Tuple.Create(ParseEntity(silo.Resource), silo.Resource.ETag)
+                // Cosmos populates ETag on resources returned from reads.
+                Tuple.Create(ParseEntity(silo.Resource), silo.Resource.ETag!)
             };
 
-            return new MembershipTableData(memEntries, version);
+            // A cluster version record is created during provider initialization.
+            return new MembershipTableData(memEntries, version!);
         }
         catch (Exception exc)
         {
@@ -197,7 +200,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
             TableVersion? version = null;
             if (clusterVersion is not null)
             {
-                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag);
+                // Cosmos populates ETag on resources returned from reads.
+                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag!);
             }
             else
             {
@@ -210,7 +214,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 try
                 {
                     var membershipEntry = ParseEntity(entity);
-                    memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, entity.ETag));
+                    // Cosmos populates ETag on resources returned from reads.
+                    memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, entity.ETag!));
                 }
                 catch (Exception exc)
                 {
@@ -220,7 +225,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 }
             }
 
-            return new MembershipTableData(memEntries, version);
+            // A cluster version record is created during provider initialization.
+            return new MembershipTableData(memEntries, version!);
         }
         catch (Exception exc)
         {

@@ -319,7 +319,7 @@ namespace Orleans.Storage
             return loadedState;
         }
 
-        private static async Task<TResult> DoOptimisticUpdate<TState, TResult>(Func<TState, Task<TResult>> updateOperation, TState state, BlobClient blob, string currentETag)
+        private static async Task<TResult> DoOptimisticUpdate<TState, TResult>(Func<TState, Task<TResult>> updateOperation, TState state, BlobClient blob, string? currentETag)
         {
             try
             {
