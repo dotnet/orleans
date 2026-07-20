@@ -64,7 +64,7 @@ namespace UnitTests.MembershipTests
             return ActivatorUtilities.CreateInstance<ZooKeeperGatewayListProvider>(this.Services, Options.Create(options), this._clusterOptions);
         }
 
-        protected override async Task<string> GetConnectionString()
+        protected override async Task<string?> GetConnectionString()
         {
             bool isReachable = await ZookeeperTestUtils.EnsureZooKeeperAsync();
             return isReachable ? TestDefaultConfiguration.ZooKeeperConnectionString : null;

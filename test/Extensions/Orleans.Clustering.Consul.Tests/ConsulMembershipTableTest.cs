@@ -72,7 +72,7 @@ namespace Consul.Tests
             return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this._gatewayOptions, this._clusterOptions);
         }
 
-        protected override async Task<string> GetConnectionString()
+        protected override async Task<string?> GetConnectionString()
         {
             return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.ConsulConnectionString : null;
         }
