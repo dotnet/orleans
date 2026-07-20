@@ -25,8 +25,8 @@ public class AdaptivePingBenchmark : IDisposable
     }
 
     private readonly List<IHost> _hosts = new();
-    private readonly IHost _clientHost;
-    private readonly IClusterClient _client;
+    private readonly IHost? _clientHost;
+    private readonly IClusterClient? _client;
     private readonly BenchmarkMode _mode;
     private readonly int _numSilos;
     private readonly CancellationTokenSource _cts = new();
@@ -136,7 +136,7 @@ public class AdaptivePingBenchmark : IDisposable
     private IGrainFactory GetGrainFactory()
     {
         return _mode == BenchmarkMode.ExternalClient
-            ? _client
+            ? _client!
             : _hosts[0].Services.GetRequiredService<IGrainFactory>();
     }
 

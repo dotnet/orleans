@@ -17,7 +17,7 @@ public sealed class ConcurrentLoadGenerator<TState>
         public readonly double RequestsPerSecond => this.Completed / this.ElapsedSeconds;
     }
 
-    private Channel<WorkBlock> _completedBlocks;
+    private Channel<WorkBlock> _completedBlocks = null!;
     private readonly Func<TState, ValueTask> _issueRequest;
     private readonly Func<int, TState> _getStateForWorker;
     private readonly bool _logIntermediateResults;

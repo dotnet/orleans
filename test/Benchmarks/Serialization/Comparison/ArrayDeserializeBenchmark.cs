@@ -53,7 +53,7 @@ public class ArrayDeserializeBenchmark
     public MyVector3[] ProtobufNetDeserialize() => ProtoBuf.Serializer.Deserialize<MyVector3[]>(_protobufPayload.AsSpan());
 
     [Benchmark]
-    public MyVector3[] SystemTextJsonDeserialize() => JsonSerializer.Deserialize<MyVector3[]>(_stjPayload);
+    public MyVector3[] SystemTextJsonDeserialize() => JsonSerializer.Deserialize<MyVector3[]>(_stjPayload)!;
 
     [Benchmark]
     public MyVector3[] OrleansDeserialize() => _orleansSerializer.Deserialize(_orleansPayload);

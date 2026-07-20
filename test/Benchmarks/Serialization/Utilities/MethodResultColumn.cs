@@ -7,20 +7,20 @@ namespace Benchmarks.Serialization.Utilities;
 
 public class MethodResultColumn : IColumn
 {
-    private readonly Func<object, string> _formatter;
+    private readonly Func<object?, string> _formatter;
 
-    public MethodResultColumn(string columnName, Func<object, string> formatter, string legend = null)
+    public MethodResultColumn(string columnName, Func<object?, string> formatter, string? legend = null)
     {
         ColumnName = columnName;
         _formatter = formatter;
-        Legend = legend;
+        Legend = legend!;
     }
 
     public string GetValue(Summary summary, BenchmarkCase benchmarkCase) => GetValue(summary, benchmarkCase, null);
 
-    public string GetValue(Summary summary, BenchmarkCase benchmarkCase, SummaryStyle style) => _formatter(CallMethod(benchmarkCase));
+    public string GetValue(Summary summary, BenchmarkCase benchmarkCase, SummaryStyle? style) => _formatter(CallMethod(benchmarkCase));
 
-    private static object CallMethod(BenchmarkCase benchmarkCase)
+    private static object? CallMethod(BenchmarkCase benchmarkCase)
     {
         try
         {
@@ -34,7 +34,7 @@ public class MethodResultColumn : IColumn
 
             return result;
 
-            static void TryInvoke(object target, MethodInfo method)
+            static void TryInvoke(object? target, MethodInfo? method)
             {
                 try
                 {

@@ -10,7 +10,7 @@ namespace Benchmarks.MapReduce;
 /// </summary>
 public class MapReduceBenchmark : IDisposable
 {
-    private static TestCluster _host;
+    private static TestCluster _host = null!;
     private readonly int _intermediateStagesCount = 15;
     private readonly int _pipelineParallelization = 4;
     private readonly int _repeats = 50000;
@@ -70,7 +70,7 @@ public class MapReduceBenchmark : IDisposable
         var collector = _host.GrainFactory.GetGrain<IBufferGrain<Dictionary<string, int>>>(Guid.NewGuid());
         using (var e = intermediateGrains.GetEnumerator())
         {
-            ITransformGrain<Dictionary<string, int>, Dictionary<string, int>> previous = null;
+            ITransformGrain<Dictionary<string, int>, Dictionary<string, int>> previous = null!;
             if (e.MoveNext())
             {
                 initializationTasks.Add(reducer.LinkTo(e.Current));

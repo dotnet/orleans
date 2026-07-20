@@ -32,7 +32,7 @@ internal static class JournalReplayContextFactory
     {
         public string FormatKey { get; } = journalFormatKey;
 
-        public string MimeType => null;
+        public string? MimeType => null;
 
         public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
 

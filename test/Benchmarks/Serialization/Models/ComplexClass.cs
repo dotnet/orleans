@@ -8,20 +8,20 @@ public class ComplexClass : SimpleClass
     public int Int { get; set; }
 
     [Id(1)]
-    public string String { get; set; }
+    public string? String { get; set; }
 
     [Id(2)]
-    public ComplexClass Self { get; set; }
+    public ComplexClass? Self { get; set; }
 
     [Id(3)]
-    public object AlsoSelf { get; set; }
+    public object? AlsoSelf { get; set; }
 
     [Id(4)]
-    public SimpleClass BaseSelf { get; set; }
+    public SimpleClass? BaseSelf { get; set; }
 
     [Id(5)]
-    public int[] Array { get; set; }
+    public int[]? Array { get; set; }
 
     [Id(6)]
-    public int[,] MultiDimensionalArray { get; set; }
+    public int[,]? MultiDimensionalArray { get; set; }
 }

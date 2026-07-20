@@ -23,9 +23,9 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
     private readonly int _maxStableRounds;
     private readonly double _minimumRelativeImprovement;
 
-    private Channel<WorkBlock> _completedBlocks;
+    private Channel<WorkBlock> _completedBlocks = null!;
     private volatile int _currentConcurrency;
-    private CancellationTokenSource _cts;
+    private CancellationTokenSource _cts = null!;
 
     // Hill climbing state
     private double _bestThroughput;

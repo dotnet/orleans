@@ -18,12 +18,12 @@ public class DurableCommandReaderBenchmarks
     private static readonly JournalStreamId ListJournalStreamId = new(8);
     private static readonly int[] SnapshotItems = Enumerable.Range(0, SnapshotItemCount).ToArray();
 
-    private IJournalFormat _journalFormat;
-    private IDurableListCommandCodec<int> _codec;
-    private EncodedJournalData _smallOperations;
-    private EncodedJournalData _snapshotOperation;
-    private ArcBufferWriter _readBuffer;
-    private ListReplayConsumer _consumer;
+    private IJournalFormat _journalFormat = null!;
+    private IDurableListCommandCodec<int> _codec = null!;
+    private EncodedJournalData _smallOperations = null!;
+    private EncodedJournalData _snapshotOperation = null!;
+    private ArcBufferWriter _readBuffer = null!;
+    private ListReplayConsumer _consumer = null!;
     private JournalReplayContext _replayContext;
 
     [Params(CodecFamily.OrleansBinary)]
