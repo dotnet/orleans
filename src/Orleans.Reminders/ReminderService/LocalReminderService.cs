@@ -323,8 +323,8 @@ namespace Orleans.Runtime.ReminderService
             return entry?.ToIGrainReminder();
         }
 
-        async Task<IGrainReminder> IReminderService.GetReminder(GrainId grainId, string reminderName)
-            => (await GetReminder(grainId, reminderName))!;
+        async Task<IGrainReminder?> IReminderService.GetReminder(GrainId grainId, string reminderName)
+            => await GetReminder(grainId, reminderName);
 
         public async Task<List<IGrainReminder>> GetReminders(GrainId grainId)
         {
