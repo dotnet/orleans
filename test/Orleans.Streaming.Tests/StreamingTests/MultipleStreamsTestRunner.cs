@@ -31,7 +31,7 @@ namespace UnitTests.Streaming
             logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
         }
 
-        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
+        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<SiloHandle>? startSiloFunc = null, Action<SiloHandle>? stopSiloFunc = null)
         {
             Heading("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
             List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();
@@ -47,7 +47,7 @@ namespace UnitTests.Streaming
             await Task.WhenAll(tasks);
             tasks.Clear();
 
-            SiloHandle silo = null;
+            SiloHandle? silo = null;
             if (startSiloFunc != null)
             {
                 silo = startSiloFunc();
@@ -62,7 +62,7 @@ namespace UnitTests.Streaming
 
             if (stopSiloFunc != null)
             {
-                logger.LogInformation("\n\n\nAbout to stop silo {SiloAddress} \n\n", silo.SiloAddress);
+                logger.LogInformation("\n\n\nAbout to stop silo {SiloAddress} \n\n", silo!.SiloAddress);
 
                 stopSiloFunc(silo);
 

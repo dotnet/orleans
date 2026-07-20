@@ -43,7 +43,7 @@ namespace UnitTests.StreamingTests
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
             // clean call, to make sure everything is happy and pubsub has state.
-            await pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null);
+            await pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null!);
             int consumers = await pubSubGrain.ConsumerCount(streamId);
             Assert.Equal(1, consumers);
 
@@ -52,10 +52,10 @@ namespace UnitTests.StreamingTests
 
             // expect exception when registering a new consumer
             await Assert.ThrowsAsync<OrleansException>(
-                    () => pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null));
+                    () => pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null!));
 
             // pubsub grain should recover and still function
-            await pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null);
+            await pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null!);
             consumers = await pubSubGrain.ConsumerCount(streamId);
             Assert.Equal(2, consumers);
         }
@@ -71,8 +71,8 @@ namespace UnitTests.StreamingTests
             // Add two consumers so when we remove the first it does a storage write, not a storage clear.
             GuidId subscriptionId1 = GuidId.GetGuidId(Guid.NewGuid());
             GuidId subscriptionId2 = GuidId.GetGuidId(Guid.NewGuid());
-            await pubSubGrain.RegisterConsumer(subscriptionId1, streamId, default, null);
-            await pubSubGrain.RegisterConsumer(subscriptionId2, streamId, default, null);
+            await pubSubGrain.RegisterConsumer(subscriptionId1, streamId, default, null!);
+            await pubSubGrain.RegisterConsumer(subscriptionId2, streamId, default, null!);
             int consumers = await pubSubGrain.ConsumerCount(streamId);
             Assert.Equal(2, consumers);
 
@@ -199,7 +199,7 @@ namespace UnitTests.StreamingTests
                 return Task.CompletedTask;
             }
 
-            public override bool Equals(object obj)
+            public override bool Equals(object? obj)
             {
                 if (ReferenceEquals(null, obj)) return false;
                 if (ReferenceEquals(this, obj)) return true;

@@ -79,13 +79,13 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
     }
 
     private async Task RunFaultedTransfer(
-        BankTransferFault commitFault,
+        BankTransferFault? commitFault,
         long initialFrom,
         long initialTo,
         long expectedFrom,
         long expectedTo,
         string because,
-        Func<IBankTransferFaultInjectionAccountGrain, IBankTransferFaultInjectionAccountGrain, IReadOnlyList<StorageWriteCompletedFaultScope>> createDiagnosticFaults = null,
+        Func<IBankTransferFaultInjectionAccountGrain, IBankTransferFaultInjectionAccountGrain, IReadOnlyList<StorageWriteCompletedFaultScope>>? createDiagnosticFaults = null,
         bool useDepositAsManager = false)
     {
         BankTransferTrace.Clear();
@@ -97,7 +97,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         await from.SetBalance(initialFrom);
         await to.SetBalance(initialTo);
 
-        IReadOnlyList<StorageWriteCompletedFaultScope> diagnosticFaults = null;
+        IReadOnlyList<StorageWriteCompletedFaultScope>? diagnosticFaults = null;
         OrleansTransactionException exception;
         try
         {

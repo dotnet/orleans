@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests
     /// </summary>
     public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
-        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName!;
         private const int TotalQueueCount = 4;
         private readonly Fixture fixture;
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;

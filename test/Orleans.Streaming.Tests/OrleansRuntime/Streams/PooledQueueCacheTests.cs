@@ -31,10 +31,10 @@ namespace UnitTests.OrleansRuntime.Streams
             public StreamId StreamId { get; set; }
 
             [Id(1)]
-            public StreamSequenceToken SequenceToken { get; set; }
+            public StreamSequenceToken SequenceToken { get; set; } = null!;
 
             [Id(2)]
-            public byte[] Data { get; set; }
+            public byte[] Data { get; set; } = null!;
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
             {
@@ -75,7 +75,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
             private readonly IEvictionStrategy evictionStrategy;
-            private FixedSizeBuffer currentBuffer;
+            private FixedSizeBuffer currentBuffer = null!;
 
 
             public CachedMessageConverter(IObjectPool<FixedSizeBuffer> bufferPool, IEvictionStrategy evictionStrategy)

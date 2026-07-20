@@ -21,7 +21,7 @@ namespace UnitTests.Streaming
     {
         public class Fixture : BaseTestClusterFixture
         {
-            public string ServiceId { get; set; }
+            public string ServiceId { get; set; } = null!;
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {

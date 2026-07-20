@@ -42,7 +42,7 @@ namespace Tester.StreamingTests
             await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
         }
 
-        public async Task StreamConsumerOnDroppedClientTest(string streamProviderName, string streamNamespace, ITestOutputHelper output, Func<Task<int>> getDeliveryFailureCount = null, bool waitForRetryTimeouts = false)
+        public async Task StreamConsumerOnDroppedClientTest(string streamProviderName, string streamNamespace, ITestOutputHelper? output, Func<Task<int>>? getDeliveryFailureCount = null, bool waitForRetryTimeouts = false)
         {
             var hasDeliveryFailureCounter = getDeliveryFailureCount is not null;
             getDeliveryFailureCount ??= DefaultDeliveryFailureCount;

@@ -44,7 +44,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        private readonly ITestOutputHelper output = null;
+        private readonly ITestOutputHelper? output = null;
         private readonly ClientStreamTestRunner runner;
 
         private readonly Fixture fixture;

@@ -151,10 +151,10 @@ public interface IBankTransferFaultInjectionAccountGrain : IGrainWithGuidKey
     Task<long> GetBalance();
 
     [Transaction(TransactionOption.Join)]
-    Task<long> WithdrawReturnBalance(long units, BankTransferFault fault = null);
+    Task<long> WithdrawReturnBalance(long units, BankTransferFault? fault = null);
 
     [Transaction(TransactionOption.Join)]
-    Task<long> DepositReturnBalance(long units, BankTransferFault fault = null);
+    Task<long> DepositReturnBalance(long units, BankTransferFault? fault = null);
 }
 
 public interface IBankTransferFaultInjectionTellerGrain : IGrainWithIntegerKey
@@ -170,15 +170,15 @@ public interface IBankTransferFaultInjectionTellerGrain : IGrainWithIntegerKey
         IBankTransferFaultInjectionAccountGrain from,
         IBankTransferFaultInjectionAccountGrain to,
         long units,
-        BankTransferFault fromFault = null,
-        BankTransferFault toFault = null);
+        BankTransferFault? fromFault = null,
+        BankTransferFault? toFault = null);
 
     [Transaction(TransactionOption.Create)]
     Task<BankTransferResult> TransferReturnBalancesWithDepositAsManager(
         IBankTransferFaultInjectionAccountGrain from,
         IBankTransferFaultInjectionAccountGrain to,
         long units,
-        BankTransferFault toFault = null);
+        BankTransferFault? toFault = null);
 }
 
 public sealed class BankTransferFaultInjectionAccountGrain(
@@ -205,7 +205,7 @@ public sealed class BankTransferFaultInjectionAccountGrain(
         });
     }
 
-    public Task<long> WithdrawReturnBalance(long units, BankTransferFault fault = null)
+    public Task<long> WithdrawReturnBalance(long units, BankTransferFault? fault = null)
     {
         ApplyFault(fault);
         return balance.PerformUpdate(state =>
@@ -216,7 +216,7 @@ public sealed class BankTransferFaultInjectionAccountGrain(
         });
     }
 
-    public Task<long> DepositReturnBalance(long units, BankTransferFault fault = null)
+    public Task<long> DepositReturnBalance(long units, BankTransferFault? fault = null)
     {
         ApplyFault(fault);
         return balance.PerformUpdate(state =>
@@ -229,7 +229,7 @@ public sealed class BankTransferFaultInjectionAccountGrain(
 
     private void ClearFault() => balance.FaultInjectionControl.Reset();
 
-    private void ApplyFault(BankTransferFault fault)
+    private void ApplyFault(BankTransferFault? fault)
     {
         ClearFault();
         if (fault is null)
@@ -288,8 +288,8 @@ public sealed class BankTransferFaultInjectionTellerGrain : Grain, IBankTransfer
         IBankTransferFaultInjectionAccountGrain from,
         IBankTransferFaultInjectionAccountGrain to,
         long units,
-        BankTransferFault fromFault = null,
-        BankTransferFault toFault = null)
+        BankTransferFault? fromFault = null,
+        BankTransferFault? toFault = null)
     {
         BankTransferTrace.Record(this, "fault-teller-transfer-start");
         var balances = await Task.WhenAll(
@@ -305,7 +305,7 @@ public sealed class BankTransferFaultInjectionTellerGrain : Grain, IBankTransfer
         IBankTransferFaultInjectionAccountGrain from,
         IBankTransferFaultInjectionAccountGrain to,
         long units,
-        BankTransferFault toFault = null)
+        BankTransferFault? toFault = null)
     {
         BankTransferTrace.Record(this, "fault-teller-deposit-manager-transfer-start");
         var toBalance = await to.DepositReturnBalance(units, toFault);

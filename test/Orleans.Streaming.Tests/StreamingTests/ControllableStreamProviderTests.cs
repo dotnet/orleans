@@ -17,7 +17,7 @@ namespace UnitTests.StreamingTests
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = "ControllableTestStreamProvider";
-            public readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+            public readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName!;
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {

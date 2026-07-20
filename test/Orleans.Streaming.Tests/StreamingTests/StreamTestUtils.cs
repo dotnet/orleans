@@ -14,20 +14,20 @@ namespace UnitTests.StreamingTests
 
         internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, ILogger logger, TestCluster siloHost)
         {
-            SiloAddress primSilo = siloHost.Primary?.SiloAddress;
-            SiloAddress secSilo = siloHost.SecondarySilos.FirstOrDefault()?.SiloAddress;
+            SiloAddress? primSilo = siloHost.Primary?.SiloAddress;
+            SiloAddress? secSilo = siloHost.SecondarySilos.FirstOrDefault()?.SiloAddress;
             LogStartTest(testName, streamId, streamProviderName, logger, primSilo, secSilo);
         }
 
         internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, ILogger logger, InProcessTestCluster siloHost)
         {
             var silos = siloHost.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
-            SiloAddress primSilo = silos.FirstOrDefault();
-            SiloAddress secSilo = silos.Skip(1).FirstOrDefault();
+            SiloAddress? primSilo = silos.FirstOrDefault();
+            SiloAddress? secSilo = silos.Skip(1).FirstOrDefault();
             LogStartTest(testName, streamId, streamProviderName, logger, primSilo, secSilo);
         }
 
-        private static void LogStartTest(string testName, Guid streamId, string streamProviderName, ILogger logger, SiloAddress primSilo, SiloAddress secSilo)
+        private static void LogStartTest(string testName, Guid streamId, string streamProviderName, ILogger logger, SiloAddress? primSilo, SiloAddress? secSilo)
         {
             logger.LogInformation(
                 "\n\n**START********************** {TestName} ********************************* \n\n"

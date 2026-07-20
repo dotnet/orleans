@@ -147,7 +147,7 @@ namespace UnitTests.StreamingTests
             Assert.Empty(pubSub.ReceivedCalls());
         }
 
-        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub pubSub, QueueId queueId, IQueueAdapterReceiver receiver = null, IQueueAdapterCache queueAdapterCache = null)
+        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub? pubSub, QueueId queueId, IQueueAdapterReceiver? receiver = null, IQueueAdapterCache? queueAdapterCache = null)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -199,7 +199,7 @@ namespace UnitTests.StreamingTests
         private sealed class RecordingQueueCache : IQueueCache
         {
             public int DeliveryProgressCallCount { get; private set; }
-            public List<StreamSequenceToken> DeliveryProgressTokens { get; } = new();
+            public List<StreamSequenceToken?> DeliveryProgressTokens { get; } = new();
 
             public int GetMaxAddCount() => 1000;
 
@@ -209,7 +209,7 @@ namespace UnitTests.StreamingTests
 
             public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
             {
-                purgedItems = null;
+                purgedItems = null!;
                 return false;
             }
 
@@ -220,7 +220,7 @@ namespace UnitTests.StreamingTests
 
             public bool IsUnderPressure() => false;
 
-            public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
+            public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
             {
                 DeliveryProgressCallCount++;
                 DeliveryProgressTokens.Add(earliestSubscriptionToken);
@@ -238,7 +238,7 @@ namespace UnitTests.StreamingTests
             private readonly List<IBatchContainer> messages = new();
 
             public int DeliveryProgressCallCount { get; private set; }
-            public List<StreamSequenceToken> DeliveryProgressTokens { get; } = new();
+            public List<StreamSequenceToken?> DeliveryProgressTokens { get; } = new();
 
             public int GetMaxAddCount() => 1000;
 
@@ -249,7 +249,7 @@ namespace UnitTests.StreamingTests
 
             public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
             {
-                purgedItems = null;
+                purgedItems = null!;
                 return false;
             }
 
@@ -260,7 +260,7 @@ namespace UnitTests.StreamingTests
 
             public bool IsUnderPressure() => false;
 
-            public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
+            public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
             {
                 DeliveryProgressCallCount++;
                 DeliveryProgressTokens.Add(earliestSubscriptionToken);
@@ -276,7 +276,7 @@ namespace UnitTests.StreamingTests
         private sealed class ScriptedQueueCursor(List<IBatchContainer> messages, StreamId streamId, StreamSequenceToken token) : IQueueCacheCursor
         {
             private int index = -1;
-            private IBatchContainer current;
+            private IBatchContainer? current;
 
             public void Dispose()
             {
@@ -284,8 +284,8 @@ namespace UnitTests.StreamingTests
 
             public IBatchContainer GetCurrent(out Exception exception)
             {
-                exception = null;
-                return current;
+                exception = null!;
+                return current!;
             }
 
             public bool MoveNext()
@@ -336,7 +336,7 @@ namespace UnitTests.StreamingTests
 
             public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
             {
-                purgedItems = null;
+                purgedItems = null!;
                 return false;
             }
 
@@ -345,7 +345,7 @@ namespace UnitTests.StreamingTests
 
             public bool IsUnderPressure() => false;
 
-            public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
+            public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
             {
             }
 
@@ -368,7 +368,7 @@ namespace UnitTests.StreamingTests
 
             private sealed class Cursor(PooledQueueCache cache, object cursor) : IQueueCacheCursor
             {
-                private IBatchContainer current;
+                private IBatchContainer? current;
 
                 public void Dispose()
                 {
@@ -376,8 +376,8 @@ namespace UnitTests.StreamingTests
 
                 public IBatchContainer GetCurrent(out Exception exception)
                 {
-                    exception = null;
-                    return current;
+                    exception = null!;
+                    return current!;
                 }
 
                 public bool MoveNext() => cache.TryGetNextMessage(cursor, out current);
@@ -416,14 +416,14 @@ namespace UnitTests.StreamingTests
                 DeliveredTokens.Add(item.SequenceToken);
                 Delivered.TrySetResult(true);
                 await releaseDelivery.Task;
-                return null;
+                return null!;
             }
 
             public Task CompleteStream(GuidId subscriptionId) => Task.CompletedTask;
 
             public Task ErrorInStream(GuidId subscriptionId, Exception exc) => Task.CompletedTask;
 
-            public Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId) => Task.FromResult<StreamHandshakeToken>(null);
+            public Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId) => Task.FromResult<StreamHandshakeToken>(null!);
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }
