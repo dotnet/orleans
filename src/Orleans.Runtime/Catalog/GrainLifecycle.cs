@@ -4,13 +4,12 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal class GrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {
         private static readonly ImmutableDictionary<int, string> StageNames = GetStageNames(typeof(GrainLifecycleStage));
-        private List<IGrainMigrationParticipant> _migrationParticipants;
+        private List<IGrainMigrationParticipant>? _migrationParticipants;
 
         public IEnumerable<IGrainMigrationParticipant> GetMigrationParticipants() => _migrationParticipants ?? (IEnumerable<IGrainMigrationParticipant>)[];
 

@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
 
         public SiloConnection(
-            SiloAddress remoteSiloAddress,
+            SiloAddress? remoteSiloAddress,
             ConnectionContext connection,
             ConnectionDelegate middleware,
             MessageCenter messageCenter,
@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Messaging
             this.RemoteSiloAddress = remoteSiloAddress;
         }
 
-        public SiloAddress RemoteSiloAddress { get; private set; }
+        public SiloAddress? RemoteSiloAddress { get; private set; }
 
         public SiloAddress LocalSiloAddress { get; }
 

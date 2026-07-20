@@ -20,7 +20,6 @@ using Orleans.Serialization.Invocation;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -39,18 +38,18 @@ namespace Orleans.Runtime
         private readonly PeriodicTimer callbackTimer;
         private int _isStopping;
 
-        private GrainLocator grainLocator;
-        private MessageCenter messageCenter;
-        private List<IIncomingGrainCallFilter> grainCallFilters;
+        private GrainLocator? grainLocator;
+        private MessageCenter? messageCenter;
+        private List<IIncomingGrainCallFilter>? grainCallFilters;
         private readonly DeepCopier _deepCopier;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
-        private IGrainCallCancellationManager _cancellationManager;
-        private HostedClient hostedClient;
+        private IGrainCallCancellationManager _cancellationManager = null!;
+        private HostedClient? hostedClient;
 
         private HostedClient HostedClient => this.hostedClient;
         private readonly MessageFactory messageFactory;
-        private IGrainReferenceRuntime grainReferenceRuntime;
-        private Task callbackTimerTask;
+        private IGrainReferenceRuntime? grainReferenceRuntime;
+        private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
 
@@ -94,7 +93,7 @@ namespace Orleans.Runtime
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null);
+                cancellationManager: null!);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
@@ -102,7 +101,7 @@ namespace Orleans.Runtime
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null);
+                cancellationManager: null!);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -150,7 +149,7 @@ namespace Orleans.Runtime
             if (message.SendingSilo == null)
                 message.SendingSilo = MySilo;
 
-            IGrainContext sendingActivation = RuntimeContext.Current;
+            IGrainContext? sendingActivation = RuntimeContext.Current;
 
             if (sendingActivation == null)
             {
@@ -424,7 +423,7 @@ namespace Orleans.Runtime
 
             if (result is Message.ResponseTypes.Rejection)
             {
-                if (!message.TargetSilo.Matches(this.MySilo))
+                if (!message.TargetSilo!.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
                     LogTraceNoCallbackForRejection(this.logger, message);
@@ -433,7 +432,7 @@ namespace Orleans.Runtime
                 }
 
                 LogHandleMessage(this.logger, message);
-                var rejection = (RejectionResponse)message.BodyObject;
+                var rejection = (RejectionResponse)message.BodyObject!;
                 switch (rejection.RejectionType)
                 {
                     case Message.RejectionTypes.Overloaded:
@@ -481,12 +480,12 @@ namespace Orleans.Runtime
 
         private void ProcessStatusResponse(Message message)
         {
-            var status = (StatusResponse)message.BodyObject;
+            var status = (StatusResponse)message.BodyObject!;
             callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
             var request = callback?.Message;
             if (request is not null)
             {
-                callback.OnStatusUpdate(status);
+                callback!.OnStatusUpdate(status);
                 if (status.Diagnostics is { Count: > 0 })
                 {
                     LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);

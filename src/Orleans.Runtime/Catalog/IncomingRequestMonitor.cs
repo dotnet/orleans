@@ -6,7 +6,6 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Messaging;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -21,7 +20,7 @@ namespace Orleans.Runtime
         private readonly MessageFactory _messageFactory;
         private readonly IOptionsMonitor<SiloMessagingOptions> _messagingOptions;
         private bool _enabled = true;
-        private Task _runTask;
+        private Task? _runTask;
 
         public IncomingRequestMonitor(
             ActivationWorkingSet activationWorkingSet,

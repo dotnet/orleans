@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +15,6 @@ using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class Gateway : IConnectedClientCollection
@@ -163,7 +163,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (connection == null) return;
 
-            ClientState clientState;
+            ClientState? clientState;
             lock (clients)
             {
                 if (!clientConnections.Remove(connection, out clientState)) return;
@@ -175,7 +175,7 @@ namespace Orleans.Runtime.Messaging
             LogInformationGatewayClientClosedSocket(logger, connection.RemoteEndPoint?.ToString() ?? "null", clientState.Id);
         }
 
-        internal SiloAddress TryToReroute(Message msg)
+        internal SiloAddress? TryToReroute(Message msg)
         {
             // ** Special routing rule for system target here **
             // When a client make a request/response to/from a SystemTarget, the TargetSilo can be set to either
@@ -187,7 +187,7 @@ namespace Orleans.Runtime.Messaging
             // it to this address...
             // EXCEPT if the value is equal to the current GatewayAddress: in this case we will return
             // null and the local dispatcher will forward the Message to a local SystemTarget activation
-            if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo))
+            if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo!))
             {
                 return msg.TargetSilo;
             }
@@ -232,7 +232,7 @@ namespace Orleans.Runtime.Messaging
         internal void DropDisconnectedClients()
         {
             var trackDroppedClients = GatewayEvents.IsClientDroppedEnabled();
-            List<(GrainId ClientId, TimeSpan DisconnectedDuration)> droppedClients = null;
+            List<(GrainId ClientId, TimeSpan DisconnectedDuration)>? droppedClients = null;
             foreach (var kv in clients)
             {
                 if (kv.Value.ReadyToDrop())
@@ -295,7 +295,7 @@ namespace Orleans.Runtime.Messaging
             // it will use this Gateway to re-route the REPLY from Y back to X.
             if (msg.SendingGrain.IsClient())
             {
-                clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
+                clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo!);
             }
 
             msg.TargetSilo = null;
@@ -315,7 +315,7 @@ namespace Orleans.Runtime.Messaging
                 RunContinuationsAsynchronously = true
             };
 
-            private GatewayInboundConnection _connection;
+            private GatewayInboundConnection? _connection;
             private int _dropped;
             private CoarseStopwatch _disconnectedSince;
 
@@ -334,7 +334,7 @@ namespace Orleans.Runtime.Messaging
 
             private bool IsDropped => Volatile.Read(ref _dropped) == 1;
 
-            public GatewayInboundConnection Connection => _connection;
+            public GatewayInboundConnection? Connection => _connection;
 
             public TimeSpan DisconnectedSince => _disconnectedSince.Elapsed;
 
@@ -433,7 +433,7 @@ namespace Orleans.Runtime.Messaging
 
             private void RejectDroppedClientMessages()
             {
-                ClientNotAvailableException exception = null;
+                ClientNotAvailableException? exception = null;
                 while (_pendingToSend.TryDequeue(out var message))
                 {
                     exception ??= new ClientNotAvailableException(Id.GrainId);
@@ -483,7 +483,7 @@ namespace Orleans.Runtime.Messaging
                 clientRoutes[client] = new(gateway, DateTime.UtcNow);
             }
 
-            internal bool TryFindClientRoute(GrainId client, out SiloAddress gateway)
+            internal bool TryFindClientRoute(GrainId client, [NotNullWhen(true)] out SiloAddress? gateway)
             {
                 if (clientRoutes.TryGetValue(client, out var tuple))
                 {

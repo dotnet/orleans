@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -29,7 +28,7 @@ namespace Orleans.Runtime
         private readonly List<IActivationWorkingSetObserver> _observers;
 
         private int _activeCount;
-        private Task _runTask;
+        private Task? _runTask;
 
         public ActivationWorkingSet(
             IAsyncTimerFactory asyncTimerFactory,

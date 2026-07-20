@@ -11,18 +11,17 @@ using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal abstract partial class ConnectionListener
     {
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
-        protected readonly ConcurrentDictionary<Connection, object> connections = new(ReferenceEqualsComparer.Default);
+        protected readonly ConcurrentDictionary<Connection, object?> connections = new(ReferenceEqualsComparer.Default);
         private readonly ConnectionCommon connectionShared;
-        private Task acceptLoopTask;
-        private IConnectionListener listener;
-        private ConnectionDelegate connectionDelegate;
+        private Task? acceptLoopTask;
+        private IConnectionListener? listener;
+        private ConnectionDelegate? connectionDelegate;
 
         protected ConnectionListener(
             IConnectionListenerFactory listenerFactory,
@@ -36,7 +35,7 @@ namespace Orleans.Runtime.Messaging
             this.connectionShared = connectionShared;
         }
 
-        public abstract EndPoint Endpoint { get; }
+        public abstract EndPoint? Endpoint { get; }
 
         protected IServiceProvider ServiceProvider => this.connectionShared.ServiceProvider;
 
@@ -77,7 +76,7 @@ namespace Orleans.Runtime.Messaging
 
         protected async Task BindAsync()
         {
-            this.listener = await this.listenerFactory.BindAsync(this.Endpoint);
+            this.listener = await this.listenerFactory.BindAsync(this.Endpoint!);
         }
 
         protected void Start()
@@ -93,7 +92,7 @@ namespace Orleans.Runtime.Messaging
             {
                 while (true)
                 {
-                    var context = await this.listener.AcceptAsync();
+                    var context = await this.listener!.AcceptAsync();
                     if (context == null) break;
 
                     var connection = this.CreateConnection(context);
@@ -102,7 +101,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                ConnectionEvents.EmitAcceptFailed(this.Endpoint, exception);
+                ConnectionEvents.EmitAcceptFailed(this.Endpoint!, exception);
                 LogCriticalExceptionInAcceptAsync(this.Logger, exception);
             }
         }
@@ -111,7 +110,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                await listener.UnbindAsync(cancellationToken);
+                await listener!.UnbindAsync(cancellationToken);
 
                 if (acceptLoopTask is not null)
                 {
@@ -130,7 +129,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 await this.connectionManager.Closed;
-                await this.listener.DisposeAsync();
+                await this.listener!.DisposeAsync();
             }
             catch (Exception exception)
             {
@@ -144,7 +143,7 @@ namespace Orleans.Runtime.Messaging
 
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                var (t, connection) = ((ConnectionListener, Connection))state;
+                var (t, connection) = ((ConnectionListener, Connection))state!;
                 t.RunConnectionAsync(connection).Ignore();
             }, (this, connection));
         }
@@ -169,7 +168,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private IDisposable BeginConnectionScope(Connection connection)
+        private IDisposable? BeginConnectionScope(Connection connection)
         {
             if (this.Logger.IsEnabled(LogLevel.Critical))
             {
