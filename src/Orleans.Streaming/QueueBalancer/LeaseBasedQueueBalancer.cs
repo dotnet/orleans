@@ -102,20 +102,21 @@ public partial class LeaseBasedQueueBalancer(
     {
         if (Cancellation.IsCancellationRequested) return;
 
+        // Stop processing membership updates.
+        await base.Shutdown();
+
         // Stop acquiring and renewing leases.
-        _leaseMaintenanceTimer.Dispose();
-        _leaseAcquisitionTimer.Dispose();
         await Task.WhenAll(_leaseMaintenanceTimerTask, _leaseAcquisitionTimerTask);
 
-        // Release all owned leases.
-        var shutdownTask = _executor.AddNext(async () =>
+        // Drain queued operations and release all owned leases.
+        await _executor.AddNext(async () =>
         {
             _responsibility = 0;
-            await ReleaseLeasesToMeetResponsibility();
+            await ReleaseLeasesToMeetResponsibility(isShuttingDown: true);
         });
 
-        // Signal shutdown.
-        await base.Shutdown();
+        _leaseMaintenanceTimer.Dispose();
+        _leaseAcquisitionTimer.Dispose();
     }
 
     /// <inheritdoc/>
@@ -132,7 +133,7 @@ public partial class LeaseBasedQueueBalancer(
     private async Task PeriodicallyMaintainLeases()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-        while (await _leaseMaintenanceTimer.WaitForNextTickAsync())
+        while (await WaitForNextTick(_leaseMaintenanceTimer))
         {
             try
             {
@@ -169,7 +170,7 @@ public partial class LeaseBasedQueueBalancer(
     private async Task PeriodicallyAcquireLeasesToMeetResponsibility()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-        while (await _leaseAcquisitionTimer.WaitForNextTickAsync())
+        while (await WaitForNextTick(_leaseAcquisitionTimer))
         {
             // Set the period for the next round.
             // It may be mutated by another method, but not concurrently.
@@ -212,9 +213,9 @@ public partial class LeaseBasedQueueBalancer(
         }
     }
 
-    private async Task ReleaseLeasesToMeetResponsibility()
+    private async Task ReleaseLeasesToMeetResponsibility(bool isShuttingDown = false)
     {
-        if (Cancellation.IsCancellationRequested) return;
+        if (Cancellation.IsCancellationRequested && !isShuttingDown) return;
         LogTraceReleaseLeasesToMeetResponsibility(Logger, _myQueues.Count, _responsibility);
 
         var queueCountToRelease = _myQueues.Count - _responsibility;
@@ -396,6 +397,18 @@ public partial class LeaseBasedQueueBalancer(
         }
 
         return Task.CompletedTask;
+    }
+
+    private async ValueTask<bool> WaitForNextTick(PeriodicTimer timer)
+    {
+        try
+        {
+            return await timer.WaitForNextTickAsync(Cancellation);
+        }
+        catch (OperationCanceledException) when (Cancellation.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     /// <inheritdoc/>
