@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 
-#nullable disable
 namespace Orleans.Streams
 {
     internal partial class StreamConsumer<T> : IInternalAsyncObservable<T>
@@ -19,8 +18,8 @@ namespace Orleans.Streams
         private readonly IStreamProviderRuntime     providerRuntime;
         [NonSerialized]
         private readonly IStreamPubSub              pubSub;
-        private StreamConsumerExtension             myExtension;
-        private IStreamConsumerExtension            myGrainReference;
+        private StreamConsumerExtension?             myExtension;
+        private IStreamConsumerExtension?            myGrainReference;
         [NonSerialized]
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
@@ -57,8 +56,8 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncObserver<T> observer,
-            StreamSequenceToken token,
-            string filterData = null)
+            StreamSequenceToken? token,
+            string? filterData = null)
         {
             return SubscribeAsyncImpl(observer, null, token, filterData);
         }
@@ -68,16 +67,16 @@ namespace Orleans.Streams
             return SubscribeAsyncImpl(null, batchObserver, null);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken token)
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken? token)
         {
             return SubscribeAsyncImpl(null, batchObserver, token);
         }
 
         private async Task<StreamSubscriptionHandle<T>> SubscribeAsyncImpl(
-            IAsyncObserver<T> observer,
-            IAsyncBatchObserver<T> batchObserver,
-            StreamSequenceToken token,
-            string filterData = null)
+            IAsyncObserver<T>? observer,
+            IAsyncBatchObserver<T>? batchObserver,
+            StreamSequenceToken? token,
+            string? filterData = null)
         {
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
@@ -93,7 +92,7 @@ namespace Orleans.Streams
 
             LogDebugSubscribeRendezvous(pubSub, myGrainReference, token);
 
-            GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.InternalStreamId, myGrainReference.GetGrainId());
+            GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.InternalStreamId, myGrainReference!.GetGrainId());
 
             // Optimistic Concurrency:
             // In general, we should first register the subsription with the pubsub (pubSub.RegisterConsumer)
@@ -107,16 +106,16 @@ namespace Orleans.Streams
             // and undo it in the case of failure.
             // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
             // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
-            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, batchObserver, token, filterData);
+            var subriptionHandle = myExtension!.SetObserver(subscriptionId, stream, observer, batchObserver, token, filterData);
             try
             {
-                await pubSub.RegisterConsumer(subscriptionId, stream.InternalStreamId, myGrainReference.GetGrainId(), filterData);
+                await pubSub.RegisterConsumer(subscriptionId, stream.InternalStreamId, myGrainReference!.GetGrainId(), filterData);
                 return subriptionHandle;
             }
             catch (Exception)
             {
                 // Undo the previous call myExtension.SetObserver.
-                myExtension.RemoveObserver(subscriptionId);
+                myExtension!.RemoveObserver(subscriptionId);
                 throw;
             }
         }
@@ -124,7 +123,7 @@ namespace Orleans.Streams
         public Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
-            StreamSequenceToken token = null)
+            StreamSequenceToken? token = null)
         {
             return ResumeAsyncImpl(handle, observer, null, token);
         }
@@ -132,16 +131,16 @@ namespace Orleans.Streams
         public Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncBatchObserver<T> batchObserver,
-            StreamSequenceToken token = null)
+            StreamSequenceToken? token = null)
         {
             return ResumeAsyncImpl(handle, null, batchObserver, token);
         }
 
         private async Task<StreamSubscriptionHandle<T>> ResumeAsyncImpl(
             StreamSubscriptionHandle<T> handle,
-            IAsyncObserver<T> observer,
-            IAsyncBatchObserver<T> batchObserver,
-            StreamSequenceToken token = null)
+            IAsyncObserver<T>? observer,
+            IAsyncBatchObserver<T>? batchObserver,
+            StreamSequenceToken? token = null)
         {
             using var _ = RequestContext.SuppressCallChainReentrancy();
 
@@ -155,7 +154,7 @@ namespace Orleans.Streams
 
             LogDebugResumeRendezvous(pubSub, myGrainReference, token);
 
-            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
+            StreamSubscriptionHandle<T> newHandle = myExtension!.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
 
             // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.
             oldHandleImpl.Invalidate();
@@ -173,10 +172,10 @@ namespace Orleans.Streams
 
             LogDebugUnsubscribe(handle);
 
-            myExtension.RemoveObserver(handleImpl.SubscriptionId);
+            myExtension!.RemoveObserver(handleImpl.SubscriptionId);
             // UnregisterConsumer from pubsub even if does not have this handle locally, to allow UnsubscribeAsync retries.
 
-            LogDebugUnsubscribeRendezvous(pubSub, myGrainReference);
+            LogDebugUnsubscribeRendezvous(pubSub, myGrainReference!);
 
             await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.InternalStreamId);
 
@@ -189,7 +188,7 @@ namespace Orleans.Streams
 
             await BindExtensionLazy();
 
-            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.InternalStreamId, myGrainReference.GetGrainId());
+            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.InternalStreamId, myGrainReference!.GetGrainId());
             return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
@@ -228,9 +227,12 @@ namespace Orleans.Streams
 
         internal Task<int> DiagGetConsumerObserversCount()
         {
-            return Task.FromResult(myExtension.DiagCountStreamObservers<T>(stream.InternalStreamId));
+            return Task.FromResult(myExtension!.DiagCountStreamObservers<T>(stream.InternalStreamId));
         }
 
+        // Sets myExtension and myGrainReference as a side effect. The lazy-binding pattern below guarantees
+        // both are non-null once this method returns, but the compiler cannot prove this across the await
+        // boundary, so callers use the null-forgiving operator (!) after awaiting this method.
         private async Task BindExtensionLazy()
         {
             if (myExtension == null)
@@ -265,25 +267,25 @@ namespace Orleans.Streams
             Level = LogLevel.Debug,
             Message = "Subscribe Token={Token}"
         )]
-        private partial void LogDebugSubscribeToken(StreamSequenceToken token);
+        private partial void LogDebugSubscribeToken(StreamSequenceToken? token);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Subscribe - Connecting to Rendezvous {PubSub} My GrainRef={GrainReference} Token={Token}"
         )]
-        private partial void LogDebugSubscribeRendezvous(IStreamPubSub pubSub, IStreamConsumerExtension grainReference, StreamSequenceToken token);
+        private partial void LogDebugSubscribeRendezvous(IStreamPubSub pubSub, IStreamConsumerExtension? grainReference, StreamSequenceToken? token);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Resume Token={Token}"
         )]
-        private partial void LogDebugResumeToken(StreamSequenceToken token);
+        private partial void LogDebugResumeToken(StreamSequenceToken? token);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Resume - Connecting to Rendezvous {PubSub} My GrainRef={GrainReference} Token={Token}"
         )]
-        private partial void LogDebugResumeRendezvous(IStreamPubSub pubSub, IStreamConsumerExtension grainReference, StreamSequenceToken token);
+        private partial void LogDebugResumeRendezvous(IStreamPubSub pubSub, IStreamConsumerExtension? grainReference, StreamSequenceToken? token);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

@@ -2,7 +2,6 @@
 using System;
 using System.Runtime.InteropServices;
 
-#nullable disable
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
@@ -20,7 +19,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="str"></param>
         /// <returns></returns>
-        public static int CalculateAppendSize(string str) => str is null ? sizeof(int) : str.Length * sizeof(char) + sizeof(int);
+        public static int CalculateAppendSize(string? str) => str is null ? sizeof(int) : str.Length * sizeof(char) + sizeof(int);
 
         /// <summary>
         /// Appends a <see cref="ReadOnlyMemory{T}"/> of bytes to the end of the segment
@@ -52,7 +51,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="writerOffset"></param>
         /// <param name="str"></param>
         /// <param name="segment"></param>
-        public static void Append(ArraySegment<byte> segment, ref int writerOffset, string str)
+        public static void Append(ArraySegment<byte> segment, ref int writerOffset, string? str)
         {
             if (segment.Array == null)
             {
@@ -91,7 +90,7 @@ namespace Orleans.Providers.Streams.Common
         /// Reads the next item in the segment as a string.
         /// </summary>
         /// <returns></returns>
-        public static string ReadNextString(ArraySegment<byte> segment, ref int readerOffset)
+        public static string? ReadNextString(ArraySegment<byte> segment, ref int readerOffset)
         {
             if (segment.Array == null)
             {

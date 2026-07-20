@@ -7,7 +7,6 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>
@@ -20,7 +19,7 @@ namespace Orleans.Providers.Streams.Generator
         private readonly IEvictionStrategy evictionStrategy;
         private readonly PooledQueueCache cache;
 
-        private FixedSizeBuffer currentBuffer;
+        private FixedSizeBuffer? currentBuffer;
 
         /// <summary>
         /// Pooled cache for generator stream provider.
@@ -30,7 +29,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="serializer">The serializer.</param>
         /// <param name="cacheMonitor">The cache monitor.</param>
         /// <param name="monitorWriteInterval">The monitor write interval. Only triggered for active caches</param>
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, ILogger logger, Serialization.Serializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, ILogger logger, Serialization.Serializer serializer, ICacheMonitor? cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             this.bufferPool = bufferPool;
             this.serializer = serializer;
@@ -112,9 +111,9 @@ namespace Orleans.Providers.Streams.Generator
         {
             private readonly PooledQueueCache cache;
             private readonly object cursor;
-            private IBatchContainer current;
+            private IBatchContainer? current;
 
-            public Cursor(PooledQueueCache cache, StreamId streamId, StreamSequenceToken token)
+            public Cursor(PooledQueueCache cache, StreamId streamId, StreamSequenceToken? token)
             {
                 this.cache = cache;
                 cursor = cache.GetCursor(streamId, token);
@@ -124,7 +123,7 @@ namespace Orleans.Providers.Streams.Generator
             {
             }
 
-            public IBatchContainer GetCurrent(out Exception exception)
+            public IBatchContainer? GetCurrent(out Exception? exception)
             {
                 exception = null;
                 return current;
@@ -132,7 +131,7 @@ namespace Orleans.Providers.Streams.Generator
 
             public bool MoveNext()
             {
-                IBatchContainer next;
+                IBatchContainer? next;
                 if (!cache.TryGetNextMessage(cursor, out next))
                 {
                     return false;
@@ -168,13 +167,13 @@ namespace Orleans.Providers.Streams.Generator
         /// <inheritdoc />
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
-            purgedItems = null;
+            purgedItems = null!; // Return value is always false, per [MaybeNullWhen(false)] on the interface.
             this.evictionStrategy.PerformPurge(DateTime.UtcNow);
             return false;
         }
 
         /// <inheritdoc />
-        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
             return new Cursor(cache, streamId, token);
         }

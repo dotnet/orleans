@@ -22,7 +22,7 @@ namespace Orleans.Streams
         /// The maximum number of message batches to retrieve.
         /// </param>
         /// <returns>The message batches.</returns>
-        Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
+        Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount);
 
         /// <summary>
         /// Notifies the adapter receiver that the messages were delivered to all consumers,

@@ -1,6 +1,5 @@
 using System;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -10,7 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public abstract class StreamSequenceToken : IEquatable<StreamSequenceToken>, IComparable<StreamSequenceToken>
+    public abstract class StreamSequenceToken : IEquatable<StreamSequenceToken?>, IComparable<StreamSequenceToken?>
     {
         /// <summary>
         /// Gets the number of event batches in stream prior to this event batch
@@ -23,10 +22,10 @@ namespace Orleans.Streams
         public abstract int EventIndex { get; protected set; }
 
         /// <inheritdoc/>
-        public abstract bool Equals(StreamSequenceToken other);
+        public abstract bool Equals(StreamSequenceToken? other);
 
         /// <inheritdoc/>
-        public abstract int CompareTo(StreamSequenceToken other);
+        public abstract int CompareTo(StreamSequenceToken? other);
     }
 
     /// <summary>

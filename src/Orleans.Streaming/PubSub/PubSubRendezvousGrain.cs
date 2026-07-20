@@ -167,7 +167,7 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             QualifiedStreamId streamId,
             GrainId streamConsumer,
-            string filterData)
+            string? filterData)
         {
             _streamInstruments.PubSubConsumersAdded.Add(1);
             var pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));

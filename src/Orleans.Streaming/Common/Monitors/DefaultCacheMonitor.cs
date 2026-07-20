@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Threading;
 
-#nullable disable
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
@@ -13,7 +12,7 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class DefaultCacheMonitor : ICacheMonitor
     {
-        private readonly KeyValuePair<string, object>[] _dimensions;
+        private readonly KeyValuePair<string, object?>[] _dimensions;
         private readonly ObservableCounter<long> _queueCacheSizeCounter;
         private readonly ObservableCounter<long> _queueCacheMessagesAddedCounter;
         private readonly ObservableCounter<long> _queueCacheMessagesPurgedCounter;
@@ -47,7 +46,10 @@ namespace Orleans.Providers.Streams.Common
 
         private DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)
         {
-            _dimensions = dimensions;
+            // The tag values are never actually null here; the cast only widens the nullability annotation of the array element
+            // type to satisfy the (nullable-annotated) System.Diagnostics.Metrics APIs below, which is safe since the underlying
+            // CLR array type is identical regardless of the element's nullable annotation.
+            _dimensions = (KeyValuePair<string, object?>[])(object)dimensions;
             _queueCacheSizeCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_SIZE, () => new(_totalCacheSize, _dimensions), unit: "bytes");
             _queueCacheMessageCountCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_LENGTH, () => new(_messageCount, _dimensions), unit: "messages");
             _queueCacheMessagesAddedCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MESSAGES_ADDED, () => new(_messagesAdded, _dimensions));
@@ -126,14 +128,14 @@ namespace Orleans.Providers.Streams.Common
 
         private sealed class PressureMonitorStatistics
         {
-            public PressureMonitorStatistics(string type, KeyValuePair<string, object>[] dimensions)
+            public PressureMonitorStatistics(string type, KeyValuePair<string, object?>[] dimensions)
             {
-                Dimensions = new KeyValuePair<string, object>[dimensions.Length + 1];
+                Dimensions = new KeyValuePair<string, object?>[dimensions.Length + 1];
                 dimensions.CopyTo(Dimensions, 0);
-                Dimensions[^1] = new KeyValuePair<string, object>("PressureMonitorType", type);
+                Dimensions[^1] = new KeyValuePair<string, object?>("PressureMonitorType", type);
             }
 
-            public KeyValuePair<string, object>[] Dimensions { get; }
+            public KeyValuePair<string, object?>[] Dimensions { get; }
             public double PressureContributionCount { get; set; }
             public double CurrentPressure { get; set; }
             public int UnderPressure { get; set; }

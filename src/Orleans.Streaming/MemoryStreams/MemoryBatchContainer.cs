@@ -6,7 +6,6 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Providers
 {
     [Serializable]
@@ -28,7 +27,7 @@ namespace Orleans.Providers
         public long SequenceNumber => realToken.SequenceNumber;
 
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
-        [NonSerialized] private MemoryMessageBody payload;
+        [NonSerialized] private MemoryMessageBody? payload;
          
         private MemoryMessageBody Payload()
         {

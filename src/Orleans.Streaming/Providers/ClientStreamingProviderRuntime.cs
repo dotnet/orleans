@@ -5,7 +5,6 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Providers
 {
     internal class ClientStreamingProviderRuntime : IStreamProviderRuntime, ILifecycleParticipant<IClusterClientLifecycle>
@@ -13,7 +12,7 @@ namespace Orleans.Providers
         private readonly IStreamPubSub grainBasedPubSub;
         private readonly IStreamPubSub implicitPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
-        private StreamDirectory streamDirectory;
+        private StreamDirectory? streamDirectory;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitSubscriberTable;
         private readonly ClientGrainContext clientContext;
@@ -30,7 +29,7 @@ namespace Orleans.Providers
             this.ServiceProvider = serviceProvider;
             this.implicitSubscriberTable = implicitSubscriberTable;
             this.clientContext = clientContext;
-            this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
+            this.runtimeClient = serviceProvider.GetService<IRuntimeClient>()!; // Registered by DefaultClientServices.
             grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.grainFactory, this.implicitSubscriberTable);
             implicitPubSub = tmp;
@@ -44,7 +43,7 @@ namespace Orleans.Providers
 
         public StreamDirectory GetStreamDirectory()
         {
-            return streamDirectory;
+            return streamDirectory!; // Reset only clears this during client shutdown.
         }
 
         public async Task Reset(bool cleanup = true)
@@ -83,7 +82,7 @@ namespace Orleans.Providers
                 case StreamPubSubType.ImplicitOnly:
                     return implicitPubSub;
                 default:
-                    return null;
+                    return null!; // Only reachable for undefined enum values.
             }
         }
 

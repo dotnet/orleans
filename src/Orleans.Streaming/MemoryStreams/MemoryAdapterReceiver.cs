@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Providers
 {
     internal partial class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver
@@ -34,11 +33,11 @@ namespace Orleans.Providers
             return Task.CompletedTask;
         }
 
-        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
         {
             var watch = Stopwatch.StartNew();
             List<IBatchContainer> batches;
-            Task<List<MemoryMessageData>> task = null;
+            Task<List<MemoryMessageData>> task = null!; // Preserves the existing null-in-finally behavior if Dequeue throws synchronously.
             try
             {
                 task = queueGrain.Dequeue(maxCount);

@@ -9,7 +9,6 @@ using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -26,7 +25,7 @@ namespace Orleans.Streams
         private readonly DeploymentBasedQueueBalancerOptions options;
         private readonly TimeProvider _timeProvider;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
-        private List<QueueId> allQueues;
+        private List<QueueId> allQueues = null!; // Initialized in Initialize.
         private bool isStarting;
         
         public DeploymentBasedQueueBalancer(
@@ -91,8 +90,7 @@ namespace Orleans.Streams
                 ? balancer.IdealDistribution
                 : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
 
-            List<QueueId> myQueues;
-            if (distribution.TryGetValue(siloStatusOracle.SiloName, out myQueues))
+            if (distribution.TryGetValue(siloStatusOracle.SiloName, out var myQueues))
             {
                 if (!useIdealDistribution)
                 {
@@ -145,8 +143,7 @@ namespace Orleans.Streams
                 string siloName;
                 if (siloStatusOracle.TryGetSiloName(silo.Key, out siloName))
                 {
-                    List<QueueId> queues;
-                    if (idealDistribution.TryGetValue(siloName, out queues))
+                    if (idealDistribution.TryGetValue(siloName, out var queues))
                     {
                         queuesOfImmatureSilos.UnionWith(queues);
                     }

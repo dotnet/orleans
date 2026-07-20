@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -20,7 +19,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="streamGuid">The stream unique identifier.</param>
         /// <param name="streamNamespace">The stream namespace.</param>
-        public StreamIdentity(Guid streamGuid, string streamNamespace)
+        public StreamIdentity(Guid streamGuid, string? streamNamespace)
         {
             Guid = streamGuid;
             Namespace = streamNamespace;
@@ -36,10 +35,10 @@ namespace Orleans.Streams
         /// Gets the stream namespace.
         /// </summary>
         [Id(1)]
-        public string Namespace { get; }
+        public string? Namespace { get; }
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is StreamIdentity identity && this.Guid.Equals(identity.Guid) && this.Namespace == identity.Namespace;
+        public override bool Equals(object? obj) => obj is StreamIdentity identity && this.Guid.Equals(identity.Guid) && this.Namespace == identity.Namespace;
 
         /// <inheritdoc />
         public override int GetHashCode() => HashCode.Combine(Guid, Namespace);

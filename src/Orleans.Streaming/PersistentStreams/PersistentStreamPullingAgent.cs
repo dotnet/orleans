@@ -14,7 +14,6 @@ using Orleans.Runtime.Scheduler;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
 
-#nullable disable
 namespace Orleans.Streams
 {
     internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent, PersistentStreamPullingAgent.ITestAccessor
@@ -32,24 +31,24 @@ namespace Orleans.Streams
         private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IQueueAdapter queueAdapter;
         private readonly IStreamFailureHandler streamFailureHandler;
-        private readonly StreamInstruments _streamInstruments;
+        private readonly StreamInstruments? _streamInstruments;
         private readonly TimeProvider _timeProvider;
         internal readonly QueueId QueueId;
 
         private int numMessages;
-        private IQueueCache queueCache;
-        private IQueueAdapterReceiver receiver;
+        private IQueueCache? queueCache;
+        private IQueueAdapterReceiver? receiver;
         private DateTime lastTimeCleanedPubSubCache;
-        private IGrainTimer timer;
+        private IGrainTimer? timer;
 
-        private Task receiverInitTask;
+        private Task? receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
         private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
         internal interface ITestAccessor
         {
-            Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount);
+            Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
@@ -70,7 +69,7 @@ namespace Orleans.Streams
             IBackoffProvider queueReaderBackoffProvider,
             TimeProvider timeProvider,
             SystemTargetShared shared,
-            StreamInstruments streamInstruments = null)
+            StreamInstruments? streamInstruments = null)
             : base(id, shared)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
@@ -95,7 +94,7 @@ namespace Orleans.Streams
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
-        Task<bool> ITestAccessor.ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount)
+        Task<bool> ITestAccessor.ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount)
             => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount, CancellationToken.None)).Unwrap();
 
         Task ITestAccessor.RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
@@ -182,7 +181,7 @@ namespace Orleans.Streams
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterGrainTimer(RunQueuePump, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
-            _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
+            _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object?>("name", StatisticUniquePostfix)));
 
             LogInfoTakingQueue(new(QueueId));
             return Task.CompletedTask;
@@ -197,7 +196,7 @@ namespace Orleans.Streams
             timer = null;
             asyncTimer?.Dispose();
 
-            Task localReceiverInitTask = receiverInitTask;
+            Task? localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
             {
                 await localReceiverInitTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -214,7 +213,7 @@ namespace Orleans.Streams
 
             try
             {
-                IQueueAdapterReceiver localReceiver = this.receiver;
+                IQueueAdapterReceiver? localReceiver = this.receiver;
                 this.receiver = null;
                 if (localReceiver != null)
                 {
@@ -235,7 +234,7 @@ namespace Orleans.Streams
             // to stop retrying, so these tasks will complete quickly.
             var inFlightRegistrations = pubSubCache.Values
                 .Select(v => v.RegistrationTask)
-                .Where(t => t is not null)
+                .OfType<Task>()
                 .ToList();
             if (inFlightRegistrations.Count > 0)
             {
@@ -267,7 +266,7 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             QualifiedStreamId streamId,
             GrainId streamConsumer,
-            string filterData)
+            string? filterData)
         {
             LogDebugAddSubscriber(streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
@@ -283,20 +282,18 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             QualifiedStreamId streamId,
             GrainId streamConsumer,
-            string filterData,
-            StreamSequenceToken cacheToken)
+            string? filterData,
+            StreamSequenceToken? cacheToken)
         {
             if (IsShutdown) return;
 
-            StreamConsumerCollection streamDataCollection;
-            if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
+            if (!pubSubCache.TryGetValue(streamId, out var streamDataCollection))
             {
                 // If stream is not in pubsub cache, then we've received no events on this stream, and will aquire the subscriptions from pubsub when we do.
                 return;
             }
 
-            StreamConsumerData data;
-            if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
+            if (!streamDataCollection.TryGetConsumer(subscriptionId, out var data))
             {
                 var consumerReference = this.RuntimeClient.InternalGrainFactory
                     .GetGrain(streamConsumer)
@@ -319,15 +316,15 @@ namespace Orleans.Streams
 
         private async Task<bool> DoHandshakeWithConsumer(
             StreamConsumerData consumerData,
-            StreamSequenceToken cacheToken)
+            StreamSequenceToken? cacheToken)
         {
             if (IsShutdown) return false;
 
-            StreamHandshakeToken requestedHandshakeToken = null;
+            StreamHandshakeToken? requestedHandshakeToken = null;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
-                Exception exceptionOccured = null;
+                Exception? exceptionOccured = null;
                 try
                 {
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
@@ -391,8 +388,7 @@ namespace Orleans.Streams
         {
             if (IsShutdown) return;
 
-            StreamConsumerCollection streamData;
-            if (!pubSubCache.TryGetValue(streamId, out streamData)) return;
+            if (!pubSubCache.TryGetValue(streamId, out var streamData)) return;
 
             // remove consumer
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
@@ -427,7 +423,7 @@ namespace Orleans.Streams
         {
             try
             {
-                Task localReceiverInitTask = receiverInitTask;
+                Task? localReceiverInitTask = receiverInitTask;
                 if (localReceiverInitTask != null)
                 {
                     await localReceiverInitTask;
@@ -479,7 +475,7 @@ namespace Orleans.Streams
         /// <param name="rcvr"></param>
         /// <param name="maxCacheAddCount"></param>
         /// <returns></returns>
-        private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver rcvr, int maxCacheAddCount, CancellationToken cancellationToken)
+        private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? rcvr, int maxCacheAddCount, CancellationToken cancellationToken)
         {
             if (rcvr == null || IsShutdown || cancellationToken.IsCancellationRequested)
             {
@@ -501,8 +497,7 @@ namespace Orleans.Streams
 
             if (queueCache != null)
             {
-                IList<IBatchContainer> purgedItems;
-                if (queueCache.TryPurgeFromCache(out purgedItems))
+                if (queueCache.TryPurgeFromCache(out var purgedItems))
                 {
                     try
                     {
@@ -528,7 +523,7 @@ namespace Orleans.Streams
             }
 
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
-            IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
+            IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
 
             if (IsShutdown || cancellationToken.IsCancellationRequested)
             {
@@ -555,8 +550,7 @@ namespace Orleans.Streams
 
                 var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                 StreamSequenceToken startToken = group.First().SequenceToken;
-                StreamConsumerCollection streamData;
-                if (pubSubCache.TryGetValue(streamId, out streamData))
+                if (pubSubCache.TryGetValue(streamId, out var streamData))
                 {
                     streamData.RefreshActivity(now);
                     StartInactiveCursors(streamData, startToken);
@@ -599,7 +593,7 @@ namespace Orleans.Streams
             }
         }
 
-        private bool TryGetDeliveryProgress(out StreamSequenceToken earliest)
+        private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest)
         {
             earliest = null;
 
@@ -783,7 +777,7 @@ namespace Orleans.Streams
                 while (!IsShutdown && consumerData.Cursor != null)
                 {
                     ConsumerBatch nextBatch = default;
-                    Exception exceptionOccured = null;
+                    Exception? exceptionOccured = null;
                     try
                     {
                         nextBatch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
@@ -800,7 +794,7 @@ namespace Orleans.Streams
                     {
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
+                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, null); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
                     }
 
                     if (exceptionOccured is null)
@@ -825,7 +819,7 @@ namespace Orleans.Streams
                         if (nextBatch.Batch != null)
                         {
                             var batch = nextBatch.Batch;
-                            StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                            StreamHandshakeToken? newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
@@ -837,7 +831,7 @@ namespace Orleans.Streams
                             {
                                 consumerData.LastProcessedToken = newToken.Token;
                                 consumerData.LastToken = newToken;
-                                IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
+                                IQueueCacheCursor newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
                                 // The handshake token points to an already processed event, we need to advance the cursor to
                                 // the next event.
                                 newCursor.MoveNext();
@@ -881,18 +875,18 @@ namespace Orleans.Streams
 
         private readonly struct ConsumerBatch
         {
-            public ConsumerBatch(IBatchContainer batch, StreamSequenceToken progressToken)
+            public ConsumerBatch(IBatchContainer? batch, StreamSequenceToken? progressToken)
             {
                 Batch = batch;
                 ProgressToken = progressToken;
             }
 
-            public IBatchContainer Batch { get; }
-            public StreamSequenceToken ProgressToken { get; }
+            public IBatchContainer? Batch { get; }
+            public StreamSequenceToken? ProgressToken { get; }
             public bool HasProgress => ProgressToken is not null;
         }
 
-        private ConsumerBatch GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string filterData)
+        private ConsumerBatch GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string? filterData)
         {
             if (this.options.BatchContainerBatchSize <= 1)
             {
@@ -901,7 +895,7 @@ namespace Orleans.Streams
                     return default;
                 }
 
-                var batchContainer = cursor.GetCurrent(out _);
+                var batchContainer = cursor.GetCurrent(out _)!; // MoveNext returned true, so GetCurrent is guaranteed non-null here.
                 return ShouldDeliverBatch(streamId, batchContainer, filterData)
                     ? new ConsumerBatch(batchContainer, batchContainer.SequenceToken)
                     : new ConsumerBatch(null, batchContainer.SequenceToken);
@@ -910,7 +904,7 @@ namespace Orleans.Streams
             {
                 int i = 0;
                 var batchContainers = new List<IBatchContainer>();
-                StreamSequenceToken progressToken = null;
+                StreamSequenceToken? progressToken = null;
 
                 while (i < this.options.BatchContainerBatchSize)
                 {
@@ -919,7 +913,7 @@ namespace Orleans.Streams
                         break;
                     }
 
-                    var batchContainer = cursor.GetCurrent(out _);
+                    var batchContainer = cursor.GetCurrent(out _)!; // MoveNext returned true, so GetCurrent is guaranteed non-null here.
                     progressToken = batchContainer.SequenceToken;
 
                     if (!ShouldDeliverBatch(streamId, batchContainer, filterData))
@@ -942,11 +936,11 @@ namespace Orleans.Streams
             return default;
         }
 
-        private async Task<StreamHandshakeToken> DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        private async Task<StreamHandshakeToken?> DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
             try
             {
-                StreamHandshakeToken newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
+                StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
                 consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
                 StreamingEvents.EmitMessageDelivered(streamProviderName, consumerData, batch, Silo);
 
@@ -962,7 +956,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Add call context for batch delivery call, then clear context immediately, without giving up turn.
         /// </summary>
-        private static Task<StreamHandshakeToken> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        private static Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
             bool isRequestContextSet = batch.ImportRequestContext();
             try
@@ -980,7 +974,7 @@ namespace Orleans.Streams
         }
 
 
-        private static async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
+        private static async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer? batch)
         {
             Task errorDeliveryTask;
             bool isRequestContextSet = batch != null && batch.ImportRequestContext();
@@ -998,7 +992,7 @@ namespace Orleans.Streams
             await errorDeliveryTask;
         }
 
-        private async Task<bool> ErrorProtocol(StreamConsumerData consumerData, Exception exceptionOccured, bool isDeliveryError, IBatchContainer batch, StreamSequenceToken token)
+        private async Task<bool> ErrorProtocol(StreamConsumerData consumerData, Exception exceptionOccured, bool isDeliveryError, IBatchContainer? batch, StreamSequenceToken? token)
         {
             // for loss of client, we just remove the subscription
             if (exceptionOccured is ClientNotAvailableException)
@@ -1067,7 +1061,7 @@ namespace Orleans.Streams
                 return new HashSet<PubSubSubscriptionState>();
             }
 
-            ISet<PubSubSubscriptionState> subscribers = null;
+            ISet<PubSubSubscriptionState> subscribers = null!; // Always assigned by the retry lambda before ExecuteWithRetries returns successfully (it retries until success or throws).
             await AsyncExecutorWithRetries.ExecuteWithRetries(
                 async i => { subscribers = await PubsubRegisterProducer(pubSub, streamId, GrainId, logger); },
                 AsyncExecutorWithRetries.INFINITE_RETRIES,
@@ -1078,7 +1072,7 @@ namespace Orleans.Streams
             return subscribers;
         }
 
-        private bool ShouldDeliverBatch(StreamId streamId, IBatchContainer batchContainer, string filterData)
+        private bool ShouldDeliverBatch(StreamId streamId, IBatchContainer batchContainer, string? filterData)
         {
             if (this.streamFilter is NoOpStreamFilter)
                 return true;
@@ -1284,6 +1278,6 @@ namespace Orleans.Streams
             EventId = (int)ErrorCode.PersistentStreamPullingAgent_13,
             Message = "Ignoring exception while trying to evaluate subscription filter '{Filter}' with data '{FilterData}' on stream {StreamId}"
         )]
-        private partial void LogWarningFilterEvaluation(string filter, string filterData, StreamId streamId, Exception exception);
+        private partial void LogWarningFilterEvaluation(string filter, string? filterData, StreamId streamId, Exception exception);
     }
 }

@@ -103,7 +103,7 @@ namespace Orleans.Streams
             return GetProducerInterface().OnNextAsync(item, token);
         }
 
-        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
+        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken? token)
         {
             return GetProducerInterface().OnNextBatchAsync(batch, token);
         }
@@ -123,7 +123,7 @@ namespace Orleans.Streams
         internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
-            StreamSequenceToken token)
+            StreamSequenceToken? token)
         {
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
         }
@@ -131,7 +131,7 @@ namespace Orleans.Streams
         internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncBatchObserver<T> observer,
-            StreamSequenceToken token)
+            StreamSequenceToken? token)
         {
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
         }

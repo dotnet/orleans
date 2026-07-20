@@ -25,7 +25,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
                                                                            Func<Task> onCompletedAsync)
         {
@@ -46,7 +46,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync)
         {
             return obs.SubscribeAsync(onNextAsync, onErrorAsync, DefaultOnCompleted);
@@ -65,7 +65,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Task> onCompletedAsync)
         {
             return obs.SubscribeAsync(onNextAsync, DefaultOnError, onCompletedAsync);
@@ -83,7 +83,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync)
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync)
         {
             return obs.SubscribeAsync(onNextAsync, DefaultOnError, DefaultOnCompleted);
         }
@@ -107,7 +107,7 @@ namespace Orleans.Streams
         /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
         /// Usually this is because it is not a static method. </exception>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
                                                                            Func<Task> onCompletedAsync,
                                                                            StreamSequenceToken token)
@@ -133,7 +133,7 @@ namespace Orleans.Streams
         /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
         /// Usually this is because it is not a static method. </exception>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
                                                                            StreamSequenceToken token)
         {
@@ -157,7 +157,7 @@ namespace Orleans.Streams
         /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
         /// Usually this is because it is not a static method. </exception>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Task> onCompletedAsync,
                                                                            StreamSequenceToken token)
         {
@@ -180,7 +180,7 @@ namespace Orleans.Streams
         /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
         /// Usually this is because it is not a static method. </exception>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncObservable<T> obs,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            StreamSequenceToken token)
         {
             return obs.SubscribeAsync(onNextAsync, DefaultOnError, DefaultOnCompleted, token);

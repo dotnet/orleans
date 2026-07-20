@@ -11,7 +11,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
-#nullable disable
 namespace Orleans.Streams;
 
 /// <summary>
@@ -50,7 +49,7 @@ public partial class LeaseBasedQueueBalancer(
     private readonly PeriodicTimer _leaseAcquisitionTimer = new(Timeout.InfiniteTimeSpan, timeProvider);
     private Task _leaseMaintenanceTimerTask = Task.CompletedTask;
     private Task _leaseAcquisitionTimerTask = Task.CompletedTask;
-    private RoundRobinSelector<QueueId> _queueSelector;
+    private RoundRobinSelector<QueueId> _queueSelector = null!; // Initialized in Initialize.
     private int _allQueuesCount;
     private int _responsibility;
     private int _leaseOrder;

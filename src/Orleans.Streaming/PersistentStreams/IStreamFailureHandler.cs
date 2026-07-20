@@ -22,7 +22,7 @@ namespace Orleans.Streams
         /// <param name="streamIdentity">The stream identity.</param>
         /// <param name="sequenceToken">The sequence token.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
-        Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken);
+        Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken? sequenceToken);
 
         /// <summary>
         /// Should be called when establishing a subscription failed.
@@ -32,6 +32,6 @@ namespace Orleans.Streams
         /// <param name="streamIdentity">The stream identity.</param>
         /// <param name="sequenceToken">The sequence token.</param>
         /// <returns>A <see cref="Task" /> representing the operation.</returns>
-        Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken);
+        Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken? sequenceToken);
     }
 }

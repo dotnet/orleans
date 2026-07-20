@@ -5,7 +5,6 @@ using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -26,7 +25,7 @@ namespace Orleans
         /// <remarks>
         /// This value is the name used to resolve the <see cref="IStreamIdMapper"/> registered in the dependency injection container.
         /// </remarks>
-        public string StreamIdMapper { get; init; }
+        public string? StreamIdMapper { get; init; }
 
         /// <summary>
         /// Used to subscribe to all stream namespaces.
@@ -41,7 +40,7 @@ namespace Orleans
         /// </summary>
         /// <param name="streamNamespace">The stream namespace to subscribe.</param>
         /// <param name="streamIdMapper">The name of the stream identity mapper.</param>
-        public ImplicitStreamSubscriptionAttribute(string streamNamespace, string streamIdMapper = null)
+        public ImplicitStreamSubscriptionAttribute(string streamNamespace, string? streamIdMapper = null)
         {
             Predicate = new ExactMatchStreamNamespacePredicate(streamNamespace.Trim());
             StreamIdMapper = streamIdMapper;
@@ -53,9 +52,9 @@ namespace Orleans
         /// </summary>
         /// <param name="predicateType">The stream namespace predicate type.</param>
         /// <param name="streamIdMapper">The name of the stream identity mapper.</param>
-        public ImplicitStreamSubscriptionAttribute(Type predicateType, string streamIdMapper = null)
+        public ImplicitStreamSubscriptionAttribute(Type predicateType, string? streamIdMapper = null)
         {
-            Predicate = (IStreamNamespacePredicate) Activator.CreateInstance(predicateType);
+            Predicate = (IStreamNamespacePredicate)Activator.CreateInstance(predicateType)!; // CreateInstance returns a predicate instance or throws.
             StreamIdMapper = streamIdMapper;
         }
 
@@ -65,7 +64,7 @@ namespace Orleans
         /// </summary>
         /// <param name="predicate">The stream namespace predicate.</param>
         /// <param name="streamIdMapper">The name of the stream identity mapper.</param>
-        public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate, string streamIdMapper = null)
+        public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate, string? streamIdMapper = null)
         {
             Predicate = predicate;
             StreamIdMapper = streamIdMapper;
@@ -74,7 +73,7 @@ namespace Orleans
         /// <inheritdoc />
         public IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
         {
-            var binding = new Dictionary<string, string>
+            var binding = new Dictionary<string, string?>
             {
                 [WellKnownGrainTypeProperties.BindingTypeKey] = WellKnownGrainTypeProperties.StreamBindingTypeValue,
                 [WellKnownGrainTypeProperties.StreamBindingPatternKey] = this.Predicate.PredicatePattern,
@@ -100,7 +99,7 @@ namespace Orleans
                 binding[WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey] = "true";
             }
 
-            yield return binding;
+            yield return (Dictionary<string, string>)(object)binding; // Nullable annotations are erased at runtime and bindings may carry a null mapper name.
         }
     }
 

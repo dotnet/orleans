@@ -2,7 +2,6 @@
 using System;
 using System.Threading;
 
-#nullable disable
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
@@ -33,7 +32,7 @@ namespace Orleans.Providers.Streams.Common
     public abstract class PooledResource<T> : IDisposable
         where T : PooledResource<T>, IDisposable
     {
-        private IObjectPool<T> pool;
+        private IObjectPool<T>? pool;
 
         /// <summary>
         /// Gets the pool to return this resource to upon disposal.
@@ -55,7 +54,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public void Dispose()
         {
-            IObjectPool<T> localPool = Interlocked.Exchange(ref pool, null);
+            IObjectPool<T>? localPool = Interlocked.Exchange(ref pool, null);
             if (localPool != null)
             {
                 OnResetState();

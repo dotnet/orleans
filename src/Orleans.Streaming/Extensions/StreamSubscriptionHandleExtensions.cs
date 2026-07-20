@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -29,10 +28,10 @@ namespace Orleans.Streams
         /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
                                                                            Func<Task> onCompletedAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           StreamSequenceToken? token = null)
         {
             var genericObserver = new GenericAsyncObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
             return handle.ResumeAsync(genericObserver, token);
@@ -53,9 +52,9 @@ namespace Orleans.Streams
         /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           StreamSequenceToken? token = null)
         {
             return handle.ResumeAsync(onNextAsync, onErrorAsync, DefaultOnCompleted, token);
         }
@@ -75,9 +74,9 @@ namespace Orleans.Streams
         /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
                                                                            Func<Task> onCompletedAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           StreamSequenceToken? token = null)
         {
             return handle.ResumeAsync(onNextAsync, DefaultOnError, onCompletedAsync, token);
         }
@@ -95,8 +94,8 @@ namespace Orleans.Streams
         /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
-                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           Func<T, StreamSequenceToken?, Task> onNextAsync,
+                                                                           StreamSequenceToken? token = null)
         {
             return handle.ResumeAsync(onNextAsync, DefaultOnError, DefaultOnCompleted, token);
         }
@@ -120,7 +119,7 @@ namespace Orleans.Streams
                                                                            Func<IList<SequentialItem<T>>, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
                                                                            Func<Task> onCompletedAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           StreamSequenceToken? token = null)
         {
             var genericObserver = new GenericAsyncBatchObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
             return handle.ResumeAsync(genericObserver, token);
@@ -143,7 +142,7 @@ namespace Orleans.Streams
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
                                                                            Func<IList<SequentialItem<T>>, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           StreamSequenceToken? token = null)
         {
             return handle.ResumeAsync(onNextAsync, onErrorAsync, DefaultOnCompleted, token);
         }
@@ -165,7 +164,7 @@ namespace Orleans.Streams
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
                                                                            Func<IList<SequentialItem<T>>, Task> onNextAsync,
                                                                            Func<Task> onCompletedAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           StreamSequenceToken? token = null)
         {
             return handle.ResumeAsync(onNextAsync, DefaultOnError, onCompletedAsync, token);
         }
@@ -184,7 +183,7 @@ namespace Orleans.Streams
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
                                                                            Func<IList<SequentialItem<T>>, Task> onNextAsync,
-                                                                           StreamSequenceToken token = null)
+                                                                           StreamSequenceToken? token = null)
         {
             return handle.ResumeAsync(onNextAsync, DefaultOnError, DefaultOnCompleted, token);
         }

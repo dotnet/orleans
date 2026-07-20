@@ -28,7 +28,7 @@ namespace Orleans.Streams
         [Id(5)]
         public StreamHandshakeToken? LastToken;
         [Id(6)]
-        public string FilterData;
+        public string? FilterData;
 
         [NonSerialized]
         public bool IsRegistered = false;
@@ -42,7 +42,7 @@ namespace Orleans.Streams
         [NonSerialized]
         public StreamSequenceToken? LastProcessedToken;
 
-        public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
             SubscriptionId = subscriptionId;
             StreamId = streamId;
