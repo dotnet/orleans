@@ -47,7 +47,6 @@ namespace Orleans.Runtime.Messaging
 
         public List<SiloAddress> GetConnectedAddresses() => connections.Select(i => i.Key).ToList();
 
-#nullable disable annotations
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
             if (this.connections.TryGetValue(endpoint, out var entry) && entry.NextConnection() is { } connection)
@@ -64,8 +63,6 @@ namespace Orleans.Runtime.Messaging
             // Start a new connection attempt since there are no suitable connections.
             return new(this.GetConnectionAsync(endpoint));
         }
-#nullable enable annotations
-
         public bool TryGetConnection(SiloAddress endpoint, [NotNullWhen(true)] out Connection? connection)
         {
             if (this.connections.TryGetValue(endpoint, out var entry) && entry.NextConnection() is { } c)

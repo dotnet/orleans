@@ -235,7 +235,7 @@ namespace Orleans.Messaging
             {
                 var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
                 var connectionTask = this.connectionManager.GetConnection(siloAddress);
-                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask!;
 
                 return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);
             }
@@ -262,7 +262,7 @@ namespace Orleans.Messaging
                 var gatewayAddress = gatewayAddresses[msgNumber % numGateways];
 
                 var connectionTask = this.connectionManager.GetConnection(gatewayAddress);
-                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask!;
 
                 return ConnectAsync(gatewayAddress, connectionTask, msg, directGatewayMessage: false);
             }
@@ -297,7 +297,7 @@ namespace Orleans.Messaging
             if (gatewayConnection.IsCompletedSuccessfully)
             {
                 this.UpdateBucket(index, (ClientOutboundConnection)gatewayConnection.Result);
-                return gatewayConnection;
+                return gatewayConnection!;
             }
 
             return AddToBucketAsync(index, gatewayConnection, addr);
