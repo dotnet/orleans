@@ -3,6 +3,7 @@
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
     <TargetFrameworks>$(TestTargetFrameworks);netcoreapp3.1</TargetFrameworks>
+    <Nullable>enable</Nullable>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ImplicitUsings>disable</ImplicitUsings>
