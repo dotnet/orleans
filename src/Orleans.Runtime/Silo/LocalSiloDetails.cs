@@ -3,7 +3,6 @@ using System.Net;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal class LocalSiloDetails : ILocalSiloDetails
@@ -27,7 +26,7 @@ namespace Orleans.Runtime
                 var publicProxyEndpoint = endpointOptions.GetPublicProxyEndpoint();
                 return publicProxyEndpoint != null
                         ? SiloAddress.New(publicProxyEndpoint, 0)
-                        : null;
+                        : null!;
             });
         }
 

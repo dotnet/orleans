@@ -5,7 +5,6 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Services;
 
-#nullable disable
 namespace Orleans.Hosting
 {
     /// <summary>
@@ -34,7 +33,7 @@ namespace Orleans.Hosting
             }
 
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-            var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(typeCode, null, SiloAddress.Zero);
+            var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(typeCode, null!, SiloAddress.Zero);
             var grainService = (IGrainService)ActivatorUtilities.CreateInstance(services, serviceType, grainId);
             return grainService;
         }

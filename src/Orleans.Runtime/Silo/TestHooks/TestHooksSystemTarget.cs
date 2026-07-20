@@ -12,7 +12,6 @@ using Orleans.Storage;
 using Orleans.Statistics;
 using Orleans.Runtime.Messaging;
 
-#nullable disable
 namespace Orleans.Runtime.TestHooks
 {
     /// <summary>
@@ -68,12 +67,12 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key)
         {
-            return Task.FromResult(consistentRingProvider.GetPrimaryTargetSilo(key));
+            return Task.FromResult(consistentRingProvider.GetPrimaryTargetSilo(key)!);
         }
 
         public Task<string> GetConsistentRingProviderDiagnosticInfo()
         {
-            return Task.FromResult(consistentRingProvider.ToString()); 
+            return Task.FromResult(consistentRingProvider.ToString()!);
         }
         
         public Task<string> GetServiceId() => Task.FromResult(this.serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
