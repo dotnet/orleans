@@ -109,8 +109,9 @@ public class EventHubCheckpointerTests
         }
     }
 
-    private sealed class TestEventHubReceiver : IEventHubReceiver
+    private sealed class TestEventHubReceiver : IEventHubReceiver, ICancellableEventHubReceiver
     {
+        public bool BlockCloseUntilCanceled { get; set; }
         public int CloseCount { get; private set; }
 
         public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
@@ -118,10 +119,14 @@ public class EventHubCheckpointerTests
             return Task.FromResult<IEnumerable<EventData>>([]);
         }
 
-        public Task CloseAsync()
+        public Task CloseAsync() => CloseAsync(CancellationToken.None);
+
+        public Task CloseAsync(CancellationToken cancellationToken)
         {
             CloseCount++;
-            return Task.CompletedTask;
+            return BlockCloseUntilCanceled
+                ? Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken)
+                : Task.CompletedTask;
         }
     }
 
@@ -201,6 +206,22 @@ public class EventHubCheckpointerTests
         var receiver = await CreateReceiver(checkpointer, cache, eventHubReceiver);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => receiver.Shutdown(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(1, checkpointer.FlushCount);
+        Assert.Equal(1, cache.DisposeCount);
+        Assert.Equal(1, eventHubReceiver.CloseCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task Shutdown_CancelsBlockedReceiverClose()
+    {
+        var checkpointer = new TestCheckpointer();
+        var cache = new TestEventHubQueueCache();
+        var eventHubReceiver = new TestEventHubReceiver { BlockCloseUntilCanceled = true };
+        var receiver = await CreateReceiver(checkpointer, cache, eventHubReceiver);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.Shutdown(TimeSpan.FromMilliseconds(50)).WaitAsync(TimeSpan.FromSeconds(5)));
 
         Assert.Equal(1, checkpointer.FlushCount);
         Assert.Equal(1, cache.DisposeCount);

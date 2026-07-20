@@ -267,11 +267,15 @@ namespace Orleans.Streaming.EventHubs
 
                 // start closing receiver
                 Task closeTask = Task.CompletedTask;
+                using var closeCancellation = timeout == Timeout.InfiniteTimeSpan ? null : new CancellationTokenSource(timeout);
+                var closeCancellationToken = closeCancellation?.Token ?? CancellationToken.None;
                 try
                 {
                     if (localReceiver != null)
                     {
-                        closeTask = localReceiver.CloseAsync();
+                        closeTask = localReceiver is ICancellableEventHubReceiver cancellableReceiver
+                            ? cancellableReceiver.CloseAsync(closeCancellationToken)
+                            : localReceiver.CloseAsync();
                     }
                 }
                 catch (Exception ex)
@@ -292,7 +296,7 @@ namespace Orleans.Streaming.EventHubs
                 // finish return receiver closing task
                 try
                 {
-                    await closeTask;
+                    await closeTask.WaitAsync(closeCancellationToken);
                 }
                 catch (Exception ex)
                 {

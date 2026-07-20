@@ -673,6 +673,22 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Shutdown_IsIdempotent()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
+            var agent = CreateAgent(pubSub: null, queueId, receiver);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            await testAccessor.Shutdown();
+            await testAccessor.Shutdown();
+
+            await receiver.Received(1).Shutdown(Arg.Any<TimeSpan>());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RunQueuePump_ReadsAfterReinitialize()
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);

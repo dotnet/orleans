@@ -4,6 +4,7 @@ using Azure.Messaging.EventHubs.Primitives;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streaming.EventHubs
@@ -29,10 +30,15 @@ namespace Orleans.Streaming.EventHubs
         Task CloseAsync();
     }
 
+    internal interface ICancellableEventHubReceiver
+    {
+        Task CloseAsync(CancellationToken cancellationToken);
+    }
+
     /// <summary>
     /// pass through decorator class for EventHubReceiver
     /// </summary>
-    internal partial class EventHubReceiverProxy : IEventHubReceiver
+    internal partial class EventHubReceiverProxy : IEventHubReceiver, ICancellableEventHubReceiver
     {
         private readonly PartitionReceiver client;
 
@@ -81,9 +87,11 @@ namespace Orleans.Streaming.EventHubs
             return await client.ReceiveBatchAsync(maxCount, waitTime);
         }
 
-        public async Task CloseAsync()
+        public Task CloseAsync() => CloseAsync(CancellationToken.None);
+
+        public async Task CloseAsync(CancellationToken cancellationToken)
         {
-            await client.CloseAsync();
+            await client.CloseAsync(cancellationToken);
         }
 
         [LoggerMessage(

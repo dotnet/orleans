@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -147,7 +148,16 @@ namespace Orleans.Providers.Streams.Common
             var manager = this.pullingAgentManager;
             if (manager != null)
             {
-                await manager.Stop();
+                var stopTask = manager.Stop();
+                try
+                {
+                    await stopTask.WaitAsync(token);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    // The lifecycle deadline only bounds the observer; manager cleanup continues.
+                    stopTask.Ignore();
+                }
             }
 
             stateManager.CommitState();
