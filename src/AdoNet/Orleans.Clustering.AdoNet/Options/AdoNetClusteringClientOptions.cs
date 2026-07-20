@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.Configuration
 {
     public class AdoNetClusteringClientOptions
@@ -7,11 +6,11 @@ namespace Orleans.Configuration
         /// Connection string for Sql
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
 
         /// <summary>
         /// The invariant name of the connector for gatewayProvider's database.
         /// </summary>
-        public string Invariant { get; set; }
+        public string Invariant { get; set; } = null!;
     }
 }

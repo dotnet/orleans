@@ -4,8 +4,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -32,7 +30,7 @@ namespace Orleans.Tests.SqlUtils
         /// A cached task as if there are multiple rounds of reads, it is likely
         /// the bytes read is the same. This saves one allocation.
         /// </summary>
-        private Task<int> _lastTask;
+        private Task<int>? _lastTask;
 
         /// <summary>
         /// The reader to use to read from the database.
@@ -190,7 +188,7 @@ namespace Orleans.Tests.SqlUtils
         {
             if (disposing)
             {
-                _reader = null;
+                _reader = null!;
             }
 
             base.Dispose(disposing);

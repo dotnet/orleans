@@ -6,8 +6,6 @@ using System.Net;
 using System.Reflection;
 using Orleans.Runtime;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif ORLEANS_REMINDERS_PROVIDER
@@ -209,11 +207,11 @@ namespace Orleans.Tests.SqlUtils
             }
 
 
-            internal static Tuple<MembershipEntry, int> GetMembershipEntry(IDataRecord record)
+            internal static Tuple<MembershipEntry?, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
                 DateTime? startTime = record.GetDateTimeValueOrDefault(nameof(Columns.StartTime));
-                MembershipEntry entry = null;
+                MembershipEntry? entry = null;
                 if (startTime.HasValue)
                 {
                     entry = new MembershipEntry
@@ -227,7 +225,7 @@ namespace Orleans.Tests.SqlUtils
                         IAmAliveTime = record.GetDateTimeValue(nameof(Columns.IAmAliveTime))
                     };
 
-                    string suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
+                    string? suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
                     if (!string.IsNullOrWhiteSpace(suspectingSilos))
                     {
                         entry.SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
@@ -247,7 +245,7 @@ namespace Orleans.Tests.SqlUtils
             /// This method is for compatibility with membership tables that
             /// do not contain a SiloName field
             /// </summary>
-            private static string TryGetSiloName(IDataRecord record)
+            private static string? TryGetSiloName(IDataRecord record)
             {
                 int pos;
                 try
@@ -484,7 +482,7 @@ namespace Orleans.Tests.SqlUtils
                 set { Add(nameof(ProxyPort), value); }
             }
 
-            internal List<Tuple<SiloAddress, DateTime>> SuspectTimes
+            internal List<Tuple<SiloAddress, DateTime>>? SuspectTimes
             {
                 set
                 {

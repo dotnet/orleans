@@ -7,7 +7,6 @@ using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Messaging;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.Runtime.Membership
 {
     public partial class AdoNetGatewayListProvider : IGatewayListProvider
@@ -15,7 +14,7 @@ namespace Orleans.Runtime.Membership
         private readonly ILogger _logger;
         private readonly string _clusterId;
         private readonly AdoNetClusteringClientOptions _options;
-        private RelationalOrleansQueries _orleansQueries;
+        private RelationalOrleansQueries _orleansQueries = null!;
         private readonly IServiceProvider _serviceProvider;
         private readonly TimeSpan _maxStaleness;
 

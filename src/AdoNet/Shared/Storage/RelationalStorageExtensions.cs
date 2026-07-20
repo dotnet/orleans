@@ -7,8 +7,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -52,7 +50,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="useSqlParams"><em>TRUE</em> if the query should be in parameterized form. <em>FALSE</em> otherwise.</param>
         /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>The rows affected.</returns>
-        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true, CancellationToken cancellationToken = default)
+        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, IReadOnlyDictionary<string, string>? nameMap = null, IEnumerable<string>? onlyOnceColumns = null, bool useSqlParams = true, CancellationToken cancellationToken = default)
         {
             if(string.IsNullOrWhiteSpace(tableName))
             {
@@ -72,7 +70,7 @@ namespace Orleans.Tests.SqlUtils
             //SqlParameters map is needed in case the query needs to be parameterized in order to avoid two
             //reflection passes as first a query needs to be constructed and after that when a database
             //command object has been created, parameters need to be provided to them.
-            var sqlParameters = new Dictionary<string, object>();
+            var sqlParameters = new Dictionary<string, object?>();
             const string insertIntoValuesTemplate = "INSERT INTO {0} ({1}) SELECT {2};";
             var columns = string.Empty;
             var values = new List<string>();
@@ -82,7 +80,7 @@ namespace Orleans.Tests.SqlUtils
                 //The following assumes the property names will be retrieved in the same
                 //order as is the index iteration done.
                 var onlyOnceRow = new List<string>();
-                var properties = parameters.First().GetType().GetProperties();
+                var properties = parameters.First()!.GetType().GetProperties();
                 columns = string.Join(",", nameMap == null ? properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, pn.Name, endEscapeIndicator)) : properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, (nameMap.TryGetValue(pn.Name, out var pnName) ? pnName : pn.Name), endEscapeIndicator)));
                 if (onlyOnceColumns != null && onlyOnceColumns.Any())
                 {
@@ -94,7 +92,7 @@ namespace Orleans.Tests.SqlUtils
                         var parameterValue = currentProperty.GetValue(onlyOnceData, null);
                         if(useSqlParams)
                         {
-                            var parameterName = string.Format("@{0}", (nameMap.TryGetValue(onlyOnceProperties[i].Name, out var parameter) ? parameter : onlyOnceProperties[i].Name));
+                            var parameterName = string.Format("@{0}", (nameMap!.TryGetValue(onlyOnceProperties[i].Name, out var parameter) ? parameter : onlyOnceProperties[i].Name));
                             onlyOnceRow.Add(parameterName);
                             sqlParameters.Add(parameterName, parameterValue);
                         }
@@ -159,7 +157,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="parameterProvider"></param>
         /// <typeparam name="TResult"></typeparam>
         /// <returns></returns>
-        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, Func<IDataRecord, TResult> selector, Action<IDbCommand> parameterProvider)
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, Func<IDataRecord, TResult> selector, Action<IDbCommand>? parameterProvider)
         {
             return storage.ReadAsync(query, parameterProvider, (record, i, cancellationToken) => Task.FromResult(selector(record)));
         }
@@ -188,7 +186,7 @@ namespace Orleans.Tests.SqlUtils
         /// IEnumerable&lt;Information&gt; informationData = await db.ReadAsync&lt;Information&gt;(query, new { tname = 200000 });
         /// </code>
         /// </example>
-        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default)
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, object? parameters, CancellationToken cancellationToken = default)
         {
             return storage.ReadAsync(query, command =>
             {
@@ -231,7 +229,7 @@ namespace Orleans.Tests.SqlUtils
         /// await db.ExecuteAsync(query, new { tname = "test_table" });
         /// </code>
         /// </example>
-        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default)
+        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, object? parameters, CancellationToken cancellationToken = default)
         {
             return storage.ExecuteAsync(query, command =>
             {

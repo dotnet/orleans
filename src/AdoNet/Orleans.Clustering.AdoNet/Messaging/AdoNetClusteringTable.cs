@@ -5,7 +5,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     public partial class AdoNetClusteringTable : IMembershipTable
@@ -13,7 +12,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly string clusterId;
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
-        private RelationalOrleansQueries orleansQueries;
+        private RelationalOrleansQueries orleansQueries = null!;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 
         public AdoNetClusteringTable(

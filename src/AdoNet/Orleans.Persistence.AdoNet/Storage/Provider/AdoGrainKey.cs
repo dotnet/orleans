@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Text;
 
-#nullable disable
 namespace Orleans.Storage
 {
     /// <summary>
@@ -15,7 +14,7 @@ namespace Orleans.Storage
 
         public long N1Key { get; }
 
-        public string StringKey { get; }
+        public string? StringKey { get; }
 
         public bool IsLongKey { get; }
 
@@ -23,7 +22,7 @@ namespace Orleans.Storage
 
         public bool IsStringKey { get; }
 
-        public AdoGrainKey(long key, string keyExtension)
+        public AdoGrainKey(long key, string? keyExtension)
         {
             N0Key = 0;
             N1Key = key;
@@ -34,7 +33,7 @@ namespace Orleans.Storage
             IsStringKey = false;
         }
 
-        public AdoGrainKey(Guid key, string keyExtension)
+        public AdoGrainKey(Guid key, string? keyExtension)
         {
             var guidKeyBytes = key.ToByteArray();
             N0Key = BitConverter.ToInt64(guidKeyBytes, 0);
@@ -59,7 +58,7 @@ namespace Orleans.Storage
 
         public byte[] GetHashBytes()
         {
-            byte[] bytes = null;
+            byte[]? bytes = null;
             if(IsLongKey)
             {
                 bytes = BitConverter.GetBytes(N1Key);
@@ -79,7 +78,7 @@ namespace Orleans.Storage
 
             if(bytes == null)
             {
-                bytes = Encoding.UTF8.GetBytes(StringKey);
+                bytes = Encoding.UTF8.GetBytes(StringKey!);
             }
 
             if(BitConverter.IsLittleEndian)
@@ -93,7 +92,7 @@ namespace Orleans.Storage
         public override string ToString()
         {
             string primaryKey;
-            string keyExtension = null;
+            string? keyExtension = null;
             if(IsLongKey)
             {
                 primaryKey = N1Key.ToString(CultureInfo.InvariantCulture);
@@ -106,7 +105,7 @@ namespace Orleans.Storage
             }
             else
             {
-                primaryKey = StringKey;
+                primaryKey = StringKey!;
             }
 
             const string GrainIdAndExtensionSeparator = "#";

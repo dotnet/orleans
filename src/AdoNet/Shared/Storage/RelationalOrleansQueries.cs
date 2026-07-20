@@ -6,8 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -128,10 +126,10 @@ namespace Orleans.Tests.SqlUtils
                 record.GetValue<string>("QueryText"));
         }
 
-        internal static ReminderEntry GetReminderEntry(IDataRecord record)
+        internal static ReminderEntry? GetReminderEntry(IDataRecord record)
         {
             //Having non-null field, GrainId, means with the query filter options, an entry was found.
-            string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
+            string? grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
             if (grainId != null)
             {
                 return new ReminderEntry
@@ -155,7 +153,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="grainId">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
-        internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainId grainId,
+        internal Task<ReminderEntry?> ReadReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName)
         {
             return ReadAsync(dbStoredQueries.ReadReminderRowKey, GetReminderEntry, command =>
@@ -363,14 +361,14 @@ namespace Orleans.Tests.SqlUtils
                 }, ret => ret.First());
         }
 
-        private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry, int>> ret)
+        private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry?, int>> ret)
         {
             var retList = ret.ToList();
             var tableVersionEtag = retList[0].Item2;
             var membershipEntries = new List<Tuple<MembershipEntry, string>>();
             if (retList[0].Item1 != null)
             {
-                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1, string.Empty)));
+                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1!, string.Empty)));
             }
             return new MembershipTableData(membershipEntries, new TableVersion(tableVersionEtag, tableVersionEtag.ToString()));
         }
@@ -654,7 +652,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="clusterId">The cluster identifier.</param>
         /// <param name="grainId">The grain identifier.</param>
         /// <returns>The grain activation if found or null if not.</returns>
-        internal Task<AdoNetGrainDirectoryEntry> LookupGrainActivationAsync(string clusterId, string providerId, string grainId)
+        internal Task<AdoNetGrainDirectoryEntry?> LookupGrainActivationAsync(string clusterId, string providerId, string grainId)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
             ArgumentNullException.ThrowIfNull(providerId);

@@ -4,14 +4,13 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.AdoNet.Storage;
 
-#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     internal sealed class AdoNetReminderTable : IReminderTable
     {
         private readonly AdoNetReminderTableOptions options;
         private readonly string serviceId;
-        private RelationalOrleansQueries orleansQueries;
+        private RelationalOrleansQueries orleansQueries = null!;
 
         public AdoNetReminderTable(
             IOptions<ClusterOptions> clusterOptions, 
@@ -36,7 +35,7 @@ namespace Orleans.Runtime.ReminderService
             return this.orleansQueries.ReadReminderRowsAsync(this.serviceId, beginHash, endHash);
         }
 
-        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             return this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName);
         }   
