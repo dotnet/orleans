@@ -585,7 +585,7 @@ public class ShardExecutorTests
     private static IOptions<DurableJobsOptions> CreateOptions(
         int maxConcurrentJobs = 10,
         TimeSpan? overloadBackoffDelay = null,
-        Func<IJobRunContext, Exception, DateTimeOffset?> shouldRetry = null,
+        Func<IJobRunContext, Exception, DateTimeOffset?>? shouldRetry = null,
         bool concurrencySlowStartEnabled = false,
         int? slowStartInitialConcurrency = null,
         TimeSpan? slowStartInterval = null)
@@ -885,4 +885,3 @@ public class ShardExecutorTests
         return (factory, callBox);
     }
 }
-

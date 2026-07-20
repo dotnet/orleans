@@ -23,9 +23,9 @@ namespace UnitTests.SchedulerTests
 
         private UnitTestSchedulingContext() { }
 
-        private IServiceProvider _activationServices;
+        private IServiceProvider _activationServices = null!;
 
-        public WorkItemGroup WorkItemGroup { get; private set; }
+        public WorkItemGroup WorkItemGroup { get; private set; } = null!;
 
         public GrainReference GrainReference => throw new NotImplementedException();
 
@@ -51,7 +51,7 @@ namespace UnitTests.SchedulerTests
 
         object IGrainContext.GrainInstance => throw new NotImplementedException();
 
-        public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
         public Task Deactivated => Task.CompletedTask;
         public void Dispose()
@@ -63,11 +63,11 @@ namespace UnitTests.SchedulerTests
         public object GetTarget() => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
 
-        public void SetComponent<TComponent>(TComponent value) where TComponent : class => throw new NotImplementedException();
+        public void SetComponent<TComponent>(TComponent? value) where TComponent : class => throw new NotImplementedException();
 
-        bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+        bool IEquatable<IGrainContext>.Equals(IGrainContext? other) => ReferenceEquals(this, other);
         void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
-        void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
+        void IGrainContext.Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     /// <summary>
@@ -215,7 +215,7 @@ namespace UnitTests.SchedulerTests
             var result0 = new TaskCompletionSource<bool>();
             var result1 = new TaskCompletionSource<bool>();
 
-            Task t1 = null;
+            Task t1 = null!;
             _rootContext.Scheduler.QueueAction(() =>
             {
                 try
@@ -370,11 +370,11 @@ namespace UnitTests.SchedulerTests
             // Caller RequestContext is protected from clear within QueueTask
             RequestContext.Set(key, value);
             await _rootContext.QueueTask(() => AsyncCheckClearRequestContext(key));
-            Assert.Equal(value, (string)RequestContext.Get(key));
+            Assert.Equal(value, (string)RequestContext.Get(key)!);
 
             // Caller RequestContext is protected from clear within QueueTask even if work is not actually asynchronous.
             await _rootContext.QueueTask(() => NonAsyncCheckClearRequestContext(key));
-            Assert.Equal(value, (string)RequestContext.Get(key));
+            Assert.Equal(value, (string)RequestContext.Get(key)!);
 
             // Caller RequestContext is protected from clear when work is asynchronous.
             async Task asyncCheckClearRequestContext()
@@ -384,7 +384,7 @@ namespace UnitTests.SchedulerTests
                 await Task.Delay(TimeSpan.Zero);
             }
             await asyncCheckClearRequestContext();
-            Assert.Equal(value, (string)RequestContext.Get(key));
+            Assert.Equal(value, (string)RequestContext.Get(key)!);
 
             // Caller RequestContext is NOT protected from clear when work is not asynchronous.
             Task nonAsyncCheckClearRequestContext()

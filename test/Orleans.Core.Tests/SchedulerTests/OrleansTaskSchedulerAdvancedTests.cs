@@ -204,7 +204,7 @@ namespace UnitTests.SchedulerTests
         {
             var context = UnitTestSchedulingContext.Create(_loggerFactory);
 
-            void CheckScheduler(object state)
+            void CheckScheduler(object? state)
             {
                 Assert.IsType<string>(state);
                 Assert.Equal("some state", state as string);
@@ -269,9 +269,9 @@ namespace UnitTests.SchedulerTests
             var wrapperGate = new TaskCompletionSource<bool>();
             var mainTurnGate = new TaskCompletionSource<bool>();
 
-            Task wrapper = null;
-            Task finalTask1 = null;
-            Task finalPromise2 = null;
+            Task wrapper = null!;
+            Task finalTask1 = null!;
+            Task finalPromise2 = null!;
             var wrapperCreated = new TaskCompletionSource<Task>();
 
             context.Scheduler.QueueAction(() =>
@@ -423,8 +423,8 @@ namespace UnitTests.SchedulerTests
             var wrapperGate = new TaskCompletionSource<bool>();
             var mainTurnGate = new TaskCompletionSource<bool>();
 
-            Task wrapper = null;
-            Task finalPromise = null;
+            Task wrapper = null!;
+            Task finalPromise = null!;
             var wrapperCreated = new TaskCompletionSource<Task>();
 
             context.Scheduler.QueueAction(() =>
@@ -550,7 +550,7 @@ namespace UnitTests.SchedulerTests
         {
             var result = new TaskCompletionSource<bool>();
             var n = 0;
-            Task<int>[] tasks = null;
+            Task<int>[] tasks = null!;
             var gates = new SemaphoreSlim[4];
             for (var i = 0; i < 4; i++)
             {
@@ -668,7 +668,7 @@ namespace UnitTests.SchedulerTests
             var context = UnitTestSchedulingContext.Create(_loggerFactory);
 
             var result = new TaskCompletionSource<bool>();
-            Task endOfChain = null;
+            Task endOfChain = null!;
             var n = 0;
             var gate = new SemaphoreSlim(0, 1);
 

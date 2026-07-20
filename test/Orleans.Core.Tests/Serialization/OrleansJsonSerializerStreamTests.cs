@@ -63,7 +63,7 @@ public class OrleansJsonSerializerStreamTests
 
     private sealed class TestPayload
     {
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public int Value { get; set; }
     }
 }

@@ -146,7 +146,7 @@ namespace NonSilo.Tests.Membership
             // Transition to joining.
             this.membershipGossiper.ClearReceivedCalls();
             await manager.UpdateStatus(SiloStatus.Joining);
-            await this.membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default, default, default, default);
+            await this.membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default!, default!, default!, default);
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
             localSiloEntry = manager.MembershipTableSnapshot.Entries[this.localSilo];
             Assert.Equal(SiloStatus.Joining, localSiloEntry.Status);
@@ -862,7 +862,7 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart();
             
             // Test that retries occur after an exception.
-            (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
+            (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default!);
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(1);
             var counter = 0;
             membershipTable.OnReadAll = () => { if (counter++ == 0) throw new Exception("no"); };

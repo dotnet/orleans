@@ -328,7 +328,7 @@ public sealed class ConcurrentLruCacheSoakTests
 
     private static class ConcurrentLruCacheIntegrityChecker
     {
-        public static void Validate<K, V>(ConcurrentLruCache<K, V> cache)
+        public static void Validate<K, V>(ConcurrentLruCache<K, V> cache) where K : notnull
         {
             ConcurrentLruCache<K, V>.ITestAccessor testAccessor = cache;
             // queue counters must be consistent with queues

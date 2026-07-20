@@ -10,7 +10,7 @@ namespace NonSilo.Tests.Membership
     public class InMemoryMembershipTable : IMembershipTable
     {
         private readonly object tableLock = new object();
-        private readonly List<(string, object)> calls = new List<(string, object)>();
+        private readonly List<(string, object?)> calls = new List<(string, object?)>();
         private ImmutableList<(MembershipEntry, string)> entries = ImmutableList<(MembershipEntry, string)>.Empty;
 
         public InMemoryMembershipTable() { }
@@ -27,16 +27,16 @@ namespace NonSilo.Tests.Membership
             this.entries = builder.ToImmutable();
         }
 
-        public List<(string Method, object Arguments)> Calls
+        public List<(string Method, object? Arguments)> Calls
         {
             get
             {
-                lock (this.tableLock) return new List<(string, object)>(this.calls);
+                lock (this.tableLock) return new List<(string, object?)>(this.calls);
             }
         }
 
-        public Action OnReadAll { get; set; }
-        public Action<DateTimeOffset> OnCleanupDefunctSiloEntries { get; set; }
+        public Action? OnReadAll { get; set; }
+        public Action<DateTimeOffset>? OnCleanupDefunctSiloEntries { get; set; }
         public TableVersion Version { get; set; } = new TableVersion(0, "0");
 
         public void ClearCalls()

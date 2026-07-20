@@ -207,7 +207,7 @@ namespace UnitTests.Serialization
         public class JsonPoco
         {
             [JsonProperty("crazy_name")]
-            public string Prop { get; set; }
+            public string? Prop { get; set; }
 
             [JsonProperty("some_flag")]
             public bool Flag { get; set; }

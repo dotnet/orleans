@@ -52,8 +52,8 @@ namespace NonSilo.Tests
                     {
                         clientBuilder.Configure<ClusterOptions>(options =>
                         {
-                            options.ClusterId = null;
-                            options.ServiceId = null;
+                            options.ClusterId = null!;
+                            options.ServiceId = null!;
                         });
 
                         clientBuilder.ConfigureServices(services =>
@@ -72,7 +72,7 @@ namespace NonSilo.Tests
                         clientBuilder.Configure<ClusterOptions>(options =>
                         {
                             options.ClusterId = "someClusterId";
-                            options.ServiceId = null;
+                            options.ServiceId = null!;
                         });
 
                         clientBuilder.ConfigureServices(services =>
@@ -90,7 +90,7 @@ namespace NonSilo.Tests
                     {
                         clientBuilder.Configure<ClusterOptions>(options =>
                         {
-                            options.ClusterId = null;
+                            options.ClusterId = null!;
                             options.ServiceId = "someServiceId";
                         });
 
@@ -176,7 +176,7 @@ namespace NonSilo.Tests
                 })
                 .ConfigureServices(RemoveConfigValidators);
 
-            Assert.Throws<ArgumentNullException>(() => hostBuilder.ConfigureServices(null));
+            Assert.Throws<ArgumentNullException>(() => hostBuilder.ConfigureServices(null!));
 
             var registeredFirst = new int[1];
 

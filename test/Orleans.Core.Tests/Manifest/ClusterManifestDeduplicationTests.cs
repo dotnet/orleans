@@ -371,7 +371,7 @@ namespace UnitTests.Manifest
 
             public bool Equals(GrainType x, GrainType y) => string.Equals(x.ToString(), y.ToString(), StringComparison.OrdinalIgnoreCase);
 
-            public int GetHashCode(GrainType obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ToString());
+            public int GetHashCode(GrainType obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ToString()!);
         }
 
         private sealed class CaseInsensitiveGrainInterfaceTypeComparer : IEqualityComparer<GrainInterfaceType>
@@ -396,7 +396,7 @@ namespace UnitTests.Manifest
             {
             }
 
-            public bool Equals(T x, T y) => ReferenceEquals(x, y);
+            public bool Equals(T? x, T? y) => ReferenceEquals(x, y);
 
             public int GetHashCode(T obj) => RuntimeHelpers.GetHashCode(obj);
         }
@@ -409,7 +409,7 @@ namespace UnitTests.Manifest
             {
             }
 
-            public bool Equals(SiloAddress x, SiloAddress y) => EqualityComparer<SiloAddress>.Default.Equals(x, y);
+            public bool Equals(SiloAddress? x, SiloAddress? y) => EqualityComparer<SiloAddress>.Default.Equals(x, y);
 
             public int GetHashCode(SiloAddress obj) => EqualityComparer<SiloAddress>.Default.GetHashCode(obj);
         }

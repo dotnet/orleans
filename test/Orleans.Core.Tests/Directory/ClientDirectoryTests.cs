@@ -71,15 +71,15 @@ namespace NonSilo.Tests.Directory
             _clusterMembershipService.UpdateSiloStatus(_localSilo, SiloStatus.Active, "local-silo");
 
             _grainFactory = Substitute.For<IInternalGrainFactory>();
-            _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default, default)
+            _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default, default!)
                 .ReturnsForAnyArgs(info => _remoteDirectories.GetOrAdd(info.ArgAt<SiloAddress>(1), k => Substitute.For<IRemoteClientDirectory>()));
             var systemTargetShared = new SystemTargetShared(
                 runtimeClient: null!,
                 localSiloDetails: _localSiloDetails,
                 loggerFactory: _loggerFactory,
                 schedulingOptions: Options.Create(new SchedulingOptions()),
-                grainReferenceActivator: null,
-                timerRegistry: null,
+                grainReferenceActivator: null!,
+                timerRegistry: null!,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
                 grainInstruments: CreateGrainInstruments(),
@@ -234,7 +234,7 @@ namespace NonSilo.Tests.Directory
             // Verify that a silo will ask a remote silo 
             _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remoteSilo");
             var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
-            remoteDirectory.GetClientRoutes(default).ReturnsForAnyArgs(info =>
+            remoteDirectory.GetClientRoutes(default!).ReturnsForAnyArgs(info =>
             {
                 var versionVector = info.ArgAt<ImmutableDictionary<SiloAddress, long>>(0);
                 Assert.NotNull(versionVector);
@@ -287,7 +287,7 @@ namespace NonSilo.Tests.Directory
             IRemoteClientDirectory CreateRemoteDirectory()
             {
                 var remoteDirectory = Substitute.For<IRemoteClientDirectory>();
-                remoteDirectory.GetClientRoutes(default).ReturnsForAnyArgs(info =>
+                remoteDirectory.GetClientRoutes(default!).ReturnsForAnyArgs(info =>
                 {
                     if (numTimesToThrow[0]-- > 0)
                     {
@@ -341,14 +341,14 @@ namespace NonSilo.Tests.Directory
                 var otherRemoteSilo = GetOtherRemoteSilo(silo);
 
                 var remoteDirectory = Substitute.For<IRemoteClientDirectory>();
-                remoteDirectory.GetClientRoutes(default).ReturnsForAnyArgs(info =>
+                remoteDirectory.GetClientRoutes(default!).ReturnsForAnyArgs(info =>
                 {
                     var result = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
                     result[silo] = (ImmutableHashSet.CreateRange(new[] { remoteClientId }), 2);
                     return Task.FromResult(result.ToImmutable());
                 });
 
-                remoteDirectory.OnUpdateClientRoutes(default).ReturnsForAnyArgs(info =>
+                remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(info =>
                 {
                     calledSilos.Add(silo);
                     var callNumber = ++totalUpdateCalls[0];

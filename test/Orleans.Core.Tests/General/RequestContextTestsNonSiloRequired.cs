@@ -105,7 +105,7 @@ namespace UnitTests.General
             RequestContextTestUtils.SetActivityId(activityId2);
             msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
-            foreach (var kvp in msg.RequestContextData)
+            foreach (var kvp in msg.RequestContextData!)
             {
                 headers.Add(kvp.Key, kvp.Value);
             };

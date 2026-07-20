@@ -153,10 +153,10 @@ namespace UnitTests.General
 
                 td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid)));
                 td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid, "Guid-ExtKey-1")));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid, (string)null)));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid, (string?)null)));
                 td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer)));
                 td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer, "Long-ExtKey-2")));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer, (string)null)));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer, (string?)null)));
                 td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(UniqueKey.NewKey(integer).PrimaryKeyToLong(), "Long-ExtKey-2")));
 
                 return td;
@@ -180,7 +180,7 @@ namespace UnitTests.General
             var expectedKey1 = Guid.NewGuid();
             const string expectedKeyExt1 = "1";
             var uk1 = UniqueKey.NewKey(expectedKey1, UniqueKey.Category.KeyExtGrain, all32Bits, expectedKeyExt1);
-            string actualKeyExt1;
+            string? actualKeyExt1;
             var actualKey1 = uk1.PrimaryKeyToGuid(out actualKeyExt1);
             Assert.Equal(expectedKey1, actualKey1); //"UniqueKey objects should preserve the value of their primary key (Guid case #1).");
             Assert.Equal(expectedKeyExt1, actualKeyExt1); //"UniqueKey objects should preserve the value of their key extension (Guid case #1).");
@@ -188,7 +188,7 @@ namespace UnitTests.General
             var expectedKey2 = Guid.NewGuid();
             const string expectedKeyExt2 = "2";
             var uk2 = UniqueKey.NewKey(expectedKey2, UniqueKey.Category.KeyExtGrain, all32Bits, expectedKeyExt2);
-            string actualKeyExt2;
+            string? actualKeyExt2;
             var actualKey2 = uk2.PrimaryKeyToGuid(out actualKeyExt2);
             Assert.Equal(expectedKey2, actualKey2); // "UniqueKey objects should preserve the value of their primary key (Guid case #2).");
             Assert.Equal(expectedKeyExt2, actualKeyExt2); // "UniqueKey objects should preserve the value of their key extension (Guid case #2).");
@@ -205,7 +205,7 @@ namespace UnitTests.General
             var expectedKey = unchecked((long)((((ulong)((uint)n1)) << 32) | ((uint)n2)));
             var uk = UniqueKey.NewKey(expectedKey, UniqueKey.Category.KeyExtGrain, all32Bits, expectedKeyExt);
 
-            string actualKeyExt;
+            string? actualKeyExt;
             var actualKey = uk.PrimaryKeyToLong(out actualKeyExt);
 
             Assert.Equal(expectedKey, actualKey); // "UniqueKey objects should preserve the value of their primary key (long case).");
@@ -235,7 +235,7 @@ namespace UnitTests.General
             using var interner = new Interner<string, string>();
             const string str = "1";
             string r1 = interner.FindOrCreate("1", _ => str);
-            string r2 = interner.FindOrCreate("1", _ => null); // Should always be found
+            string r2 = interner.FindOrCreate("1", _ => null!); // Should always be found
 
             Assert.Equal(r1, r2); // 1: Objects should be equal
             Assert.Same(r1, r2); // 2: Objects should be same / intern'ed

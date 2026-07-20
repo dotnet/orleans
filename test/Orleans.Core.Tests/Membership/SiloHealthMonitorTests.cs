@@ -127,8 +127,8 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task SiloHealthMonitor_SuccessfulProbe()
         {
-            _prober.Probe(default, default).ReturnsForAnyArgs(Task.CompletedTask);
-            _prober.ProbeIndirectly(default, default, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
+            _prober.Probe(default!, default).ReturnsForAnyArgs(Task.CompletedTask);
+            _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
 
             _monitor.Start();
 
@@ -151,8 +151,8 @@ namespace NonSilo.Tests.Membership
         {
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
 
-            _prober.Probe(default, default, default).ReturnsForAnyArgs(info => Task.Delay(TimeSpan.FromSeconds(30)));
-            _prober.ProbeIndirectly(default, default, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
+            _prober.Probe(default!, default, default).ReturnsForAnyArgs(info => Task.Delay(TimeSpan.FromSeconds(30)));
+            _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
             _monitor.Start();
 
             // Let a timer complete
@@ -173,8 +173,8 @@ namespace NonSilo.Tests.Membership
         {
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
 
-            _prober.Probe(default, default).ThrowsAsyncForAnyArgs(new Exception("nope"));
-            _prober.ProbeIndirectly(default, default, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
+            _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("nope"));
+            _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
             _monitor.Start();
 
             // Let a timer complete
@@ -182,7 +182,7 @@ namespace NonSilo.Tests.Membership
             timerCall.Completion.TrySetResult(true);
 
             // Throw directly, instead of timing out the probe
-            _prober.WhenForAnyArgs(s => s.Probe(default, default)).Throw(new Exception("nope"));
+            _prober.WhenForAnyArgs(s => s.Probe(default!, default)).Throw(new Exception("nope"));
             timerCall = await _timerCalls.Reader.ReadAsync();
             timerCall.Completion.TrySetResult(true);
 
@@ -201,8 +201,8 @@ namespace NonSilo.Tests.Membership
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
             _clusterMembershipOptions.EnableIndirectProbes = true;
 
-            _prober.Probe(default, default).ThrowsAsyncForAnyArgs(info => new Exception("nonono!"));
-            _prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(new IndirectProbeResponse
+            _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(info => new Exception("nonono!"));
+            _prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(new IndirectProbeResponse
             {
                 FailureMessage = "fail",
                 IntermediaryHealthScore = 0,
@@ -259,7 +259,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(otherSilo, intermediary);
 
             // Ensure that negative results from unhealthy intermediaries are not considered.
-            _prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(new IndirectProbeResponse
+            _prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(new IndirectProbeResponse
             {
                 FailureMessage = "fail",
                 IntermediaryHealthScore = 1,
@@ -312,7 +312,7 @@ namespace NonSilo.Tests.Membership
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
 
             // Make direct probes fail.
-            _prober.Probe(default, default).ThrowsAsyncForAnyArgs(new Exception("Direct probe failing."));
+            _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("Direct probe failing."));
 
             // Start the monitor and trigger one timer cycle for a direct-probe attempt (which fails).
             _monitor.Start();
