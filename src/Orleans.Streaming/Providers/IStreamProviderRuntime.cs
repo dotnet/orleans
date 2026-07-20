@@ -27,7 +27,7 @@ namespace Orleans.Streams
         /// A Pub Sub runtime interface.
         /// </summary>
         /// <returns></returns>
-        IStreamPubSub PubSub(StreamPubSubType pubSubType);
+        IStreamPubSub? PubSub(StreamPubSubType pubSubType);
     }
 
     /// <summary>

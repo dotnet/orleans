@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -302,11 +303,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 _baseTypeCopier = GetService<IBaseCopier<B>>(this, codecProvider);
             }
 
-            public T DeepCopy(T original, CopyContext context)
+            [return: NotNullIfNotNull(nameof(original))]
+            public T? DeepCopy(T original, CopyContext context)
             {
                 if (original is null)
                 {
-                    return null!;
+                    return default;
                 }
 
                 if (original.GetType() != _fieldType)

@@ -22,11 +22,11 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public override SortedList<TKey, TValue> ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate)
+        public override SortedList<TKey, TValue>? ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate)
         {
             if (surrogate.Values is null)
             {
-                return null!;
+                return null;
             }
             else
             {

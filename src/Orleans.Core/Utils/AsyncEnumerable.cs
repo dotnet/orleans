@@ -214,7 +214,7 @@ namespace Orleans.Runtime.Utilities
                     if (IsInitial) ThrowInvalidInstance();
                     ObjectDisposedException.ThrowIf(IsDisposed, this);
                     if (_value is T typedValue) return typedValue;
-                    return default!;
+                    return default!; // A null value is valid only when T itself admits null.
                 }
             }
 

@@ -118,6 +118,7 @@ namespace Orleans.Serialization.Cloning
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input"/>.</returns>
+        [return: NotNullIfNotNull(nameof(input))]
         T DeepCopy(T input, CopyContext context);
 
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null ? null : DeepCopy((T)input, context);

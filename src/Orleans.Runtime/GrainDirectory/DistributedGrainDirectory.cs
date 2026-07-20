@@ -143,7 +143,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         address,
         cancellationToken);
 
-    private async Task<TResult> InvokeAsync<TState, TResult>(
+    private async Task<TResult?> InvokeAsync<TState, TResult>(
         GrainId grainId,
         Func<IGrainDirectoryPartition, MembershipVersion, TState, CancellationToken, ValueTask<DirectoryResult<TResult>>> func,
         TState state,
@@ -164,7 +164,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 // If there are no members, bail out with the default return value.
                 if (view.Members.Length == 0 && view.Version.Value > 0)
                 {
-                    return default!;
+                    return default;
                 }
 
                 var targetVersion = Math.Max(view.Version.Value + 1, initialRecoveryMembershipVersion);

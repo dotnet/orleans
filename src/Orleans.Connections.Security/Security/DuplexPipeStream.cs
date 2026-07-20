@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Pipelines;
 using System.Threading;
@@ -202,13 +203,13 @@ namespace Orleans.Connections.Security
                 }
 
                 ThrowArgumentException(asyncResult);
-                return default!; // unreachable
             }
 
             /// <summary>Gets the task represented by the IAsyncResult.</summary>
             public static Task? GetTask(IAsyncResult asyncResult) => (asyncResult as TaskAsyncResult)?._task;
 
             /// <summary>Throws an argument exception for the invalid <paramref name="asyncResult"/>.</summary>
+            [DoesNotReturn]
             private static void ThrowArgumentException(IAsyncResult asyncResult) =>
                 throw (asyncResult is null ?
                     new ArgumentNullException(nameof(asyncResult)) :

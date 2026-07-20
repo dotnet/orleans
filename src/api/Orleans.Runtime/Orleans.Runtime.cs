@@ -343,7 +343,7 @@ namespace Orleans.Core
 
         public bool RecordExists { get { throw null; } }
 
-        public TState State { get { throw null; } set { } }
+        public TState? State { get { throw null; } set { } }
 
         public System.Threading.Tasks.Task ClearStateAsync() { throw null; }
 

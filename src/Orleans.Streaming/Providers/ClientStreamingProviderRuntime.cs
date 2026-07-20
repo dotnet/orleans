@@ -71,7 +71,7 @@ namespace Orleans.Providers
             return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 
-        public IStreamPubSub PubSub(StreamPubSubType pubSubType)
+        public IStreamPubSub? PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
             {
@@ -82,7 +82,7 @@ namespace Orleans.Providers
                 case StreamPubSubType.ImplicitOnly:
                     return implicitPubSub;
                 default:
-                    return null!; // Only reachable for undefined enum values.
+                    return null;
             }
         }
 

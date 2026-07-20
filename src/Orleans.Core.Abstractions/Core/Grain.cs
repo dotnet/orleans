@@ -220,6 +220,7 @@ public class Grain<TGrainState> : Grain
     /// <summary>
     /// Gets or sets the grain state.
     /// </summary>
+    [MaybeNull, AllowNull]
     protected TGrainState State
     {
         get => _storage.State;

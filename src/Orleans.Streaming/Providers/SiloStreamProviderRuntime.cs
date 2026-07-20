@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Providers
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
 
-        public IStreamPubSub PubSub(StreamPubSubType pubSubType)
+        public IStreamPubSub? PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
             {
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Providers
                 case StreamPubSubType.ImplicitOnly:
                     return implictPubSub;
                 default:
-                    return null!; // Only reachable for undefined enum values.
+                    return null;
             }
         }
 
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.Providers
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,
-                this.PubSub(pubsubOptions.PubSubType),
+                this.PubSub(pubsubOptions.PubSubType)!, // Configured StreamPubSubType values always select a runtime.
                 adapterFactory,
                 queueBalancer,
                 filter,

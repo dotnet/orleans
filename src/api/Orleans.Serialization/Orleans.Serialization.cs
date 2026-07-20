@@ -1364,6 +1364,7 @@ namespace Orleans.Serialization.Cloning
 
     public partial interface IDeepCopier<T> : IDeepCopier
     {
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
         T DeepCopy(T input, CopyContext context);
         object? IDeepCopier.DeepCopy(object? input, CopyContext context);
     }
@@ -3687,9 +3688,9 @@ namespace Orleans.Serialization.Serializers
         public IValueSerializer<TField> GetValueSerializer<TField>()
             where TField : struct { throw null; }
 
-        public Codecs.IFieldCodec TryGetCodec(System.Type fieldType) { throw null; }
+        public Codecs.IFieldCodec? TryGetCodec(System.Type fieldType) { throw null; }
 
-        public Codecs.IFieldCodec<TField> TryGetCodec<TField>() { throw null; }
+        public Codecs.IFieldCodec<TField>? TryGetCodec<TField>() { throw null; }
 
         public Cloning.IDeepCopier TryGetDeepCopier(System.Type fieldType) { throw null; }
 
@@ -3771,8 +3772,8 @@ namespace Orleans.Serialization.Serializers
     {
         Codecs.IFieldCodec GetCodec(System.Type fieldType);
         Codecs.IFieldCodec<TField> GetCodec<TField>();
-        Codecs.IFieldCodec TryGetCodec(System.Type fieldType);
-        Codecs.IFieldCodec<TField> TryGetCodec<TField>();
+        Codecs.IFieldCodec? TryGetCodec(System.Type fieldType);
+        Codecs.IFieldCodec<TField>? TryGetCodec<TField>();
     }
 
     public partial interface IGeneralizedBaseCodec : IBaseCodec<object>, IBaseCodec

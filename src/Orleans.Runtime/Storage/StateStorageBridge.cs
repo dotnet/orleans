@@ -26,6 +26,7 @@ namespace Orleans.Core
         private GrainState<TState>? _grainState;
 
         /// <inheritdoc/>
+        [MaybeNull, AllowNull]
         public TState State
         {
             get
@@ -33,10 +34,10 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 if (_grainState is { } grainState)
                 {
-                    return grainState.State!;
+                    return grainState.State;
                 }
 
-                return default!;
+                return default;
             }
 
             set

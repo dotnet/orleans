@@ -85,7 +85,7 @@ namespace Orleans.Streams
         private readonly StateStorageBridge<PubSubGrainState> _storage;
         private readonly StreamInstruments _streamInstruments;
 
-        private PubSubGrainState State => _storage.State;
+        private PubSubGrainState State => _storage.State!; // OnActivateAsync reads state before grain calls are dispatched.
 
         public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory, ILogger<PubSubRendezvousGrain> logger, StreamInstruments streamInstruments)
         {

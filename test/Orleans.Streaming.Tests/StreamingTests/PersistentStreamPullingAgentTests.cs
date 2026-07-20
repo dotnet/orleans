@@ -411,19 +411,19 @@ namespace UnitTests.StreamingTests
             public Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
                 => throw new NotSupportedException();
 
-            public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken handshakeToken)
+            public async Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken)
             {
                 DeliveredTokens.Add(item.SequenceToken);
                 Delivered.TrySetResult(true);
                 await releaseDelivery.Task;
-                return null!;
+                return null;
             }
 
             public Task CompleteStream(GuidId subscriptionId) => Task.CompletedTask;
 
             public Task ErrorInStream(GuidId subscriptionId, Exception exc) => Task.CompletedTask;
 
-            public Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId) => Task.FromResult<StreamHandshakeToken>(null!);
+            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId) => Task.FromResult<StreamHandshakeToken?>(null);
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }

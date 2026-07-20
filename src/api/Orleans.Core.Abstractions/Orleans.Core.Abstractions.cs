@@ -1186,7 +1186,7 @@ namespace Orleans
 
         protected Grain(Core.IStorage<TGrainState> storage) { }
 
-        protected TGrainState State { get { throw null; } set { } }
+        protected TGrainState? State { get { throw null; } set { } }
 
         protected virtual System.Threading.Tasks.Task ClearStateAsync() { throw null; }
 
@@ -1489,7 +1489,7 @@ namespace Orleans.Core
 
     public partial interface IStorage<TState> : IStorage
     {
-        TState State { get; set; }
+        TState? State { get; set; }
     }
 }
 
@@ -3335,9 +3335,9 @@ namespace Orleans.Versions
         bool IsEnabled { get; }
 
         System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<Runtime.GrainInterfaceType, Compatibility.CompatibilityStrategy>> GetCompatibilityStrategies();
-        System.Threading.Tasks.Task<Compatibility.CompatibilityStrategy> GetCompatibilityStrategy();
+        System.Threading.Tasks.Task<Compatibility.CompatibilityStrategy?> GetCompatibilityStrategy();
         System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<Runtime.GrainInterfaceType, Selector.VersionSelectorStrategy>> GetSelectorStrategies();
-        System.Threading.Tasks.Task<Selector.VersionSelectorStrategy> GetSelectorStrategy();
+        System.Threading.Tasks.Task<Selector.VersionSelectorStrategy?> GetSelectorStrategy();
     }
 }
 
