@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Threading;
 
-#nullable disable
 namespace Orleans.Runtime;
 
 internal static class GrainMetricsListener
@@ -31,10 +30,10 @@ internal static class GrainMetricsListener
     // Alternatives:
     // 1. Use existing *Statistics counters
     // 2. Copy source code from System.Diagnostics.Metrics.AggregationManager
-    private static void OnMeasurementRecorded(Instrument instrument, int measurement, ReadOnlySpan<KeyValuePair<string, object>> tags, object state)
+    private static void OnMeasurementRecorded(Instrument instrument, int measurement, ReadOnlySpan<KeyValuePair<string, object?>> tags, object? state)
     {
         var typeTag = tags[0];
-        var grainType = (string)typeTag.Value;
+        var grainType = (string)typeTag.Value!;
         if (measurement == 1)
         {
             GrainCounts.AddOrUpdate(grainType, 1, (k, v) => Interlocked.Increment(ref v));

@@ -4,7 +4,6 @@ using Orleans.Configuration;
 using Orleans.Core.Messaging;
 using Orleans.Statistics;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -125,13 +124,13 @@ namespace Orleans.Runtime
         /// The type of the grain for this SimpleGrainStatistic.
         /// </summary>
         [Id(0)]
-        public string GrainType { get; init; }
+        public string GrainType { get; init; } = default!;
 
         /// <summary>
         /// The silo address for this SimpleGrainStatistic.
         /// </summary>
         [Id(1)]
-        public SiloAddress SiloAddress { get; init; }
+        public SiloAddress SiloAddress { get; init; } = default!;
 
         /// <summary>
         /// The number of activations of this grain type on this given silo.
@@ -152,13 +151,13 @@ namespace Orleans.Runtime
         /// The type of the grain for this DetailedGrainStatistic.
         /// </summary>
         [Id(0)]
-        public string GrainType { get; init; }
+        public string GrainType { get; init; } = default!;
 
         /// <summary>
         /// The silo address for this DetailedGrainStatistic.
         /// </summary>
         [Id(1)]
-        public SiloAddress SiloAddress { get; init; }
+        public SiloAddress SiloAddress { get; init; } = default!;
 
         /// <summary>
         /// Unique Id for the grain.
@@ -167,7 +166,6 @@ namespace Orleans.Runtime
         public GrainId GrainId { get; init; }
     }
 
-    #nullable enable
 
     [Serializable, GenerateSerializer, Immutable]
     internal sealed class DetailedGrainReport

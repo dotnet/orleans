@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         /// The failure message if the probe did not succeed.
         /// </summary>
         [Id(3)]
-        public string FailureMessage { get; init; }
+        public string? FailureMessage { get; init; }
 
         /// <inheritdoc />
         public override string ToString() => $"IndirectProbeResponse {{ Succeeded: {Succeeded}, IntermediaryHealthScore: {IntermediaryHealthScore}, ProbeResponseTime: {ProbeResponseTime}, FailureMessage: {FailureMessage} }}";

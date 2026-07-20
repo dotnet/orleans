@@ -27,7 +27,7 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
 
     internal struct ActivationMetricTracker
     {
-        private readonly CatalogInstruments _instruments;
+        private readonly CatalogInstruments? _instruments;
         private readonly ValueStopwatch _stopwatch;
         private readonly bool _usesDirectory;
         private string? _status;
@@ -82,7 +82,7 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
 
     internal readonly struct DeactivationMetricTracker
     {
-        private readonly CatalogInstruments _instruments;
+        private readonly CatalogInstruments? _instruments;
         private readonly ValueStopwatch _stopwatch;
         private readonly string? _via;
         private readonly bool _recorded;
@@ -131,7 +131,7 @@ internal sealed class CatalogInstruments(OrleansInstruments instruments)
             _instruments.OnDeactivationCompleted(_stopwatch.Elapsed, _via);
         }
 
-        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_instruments, _stopwatch, via, _recorded);
+        private DeactivationMetricTracker WithVia(string via) => _via is null ? this : new(_instruments!, _stopwatch, via, _recorded);
     }
 
     private readonly Counter<int> _activationFailedToActivate = instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);

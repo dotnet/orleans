@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics.Metrics;
 
-#nullable disable
 namespace Orleans.Runtime;
 
 internal sealed class MessagingProcessingInstruments
@@ -27,7 +26,7 @@ internal sealed class MessagingProcessingInstruments
 
     private readonly CounterAggregator[] _dispatcherMessagesProcessedCountersOk;
     private readonly CounterAggregator[] _dispatcherMessagesProcessedCountersError;
-    private ObservableGauge<long> _activationDataAll;
+    private ObservableGauge<long>? _activationDataAll;
 
     public MessagingProcessingInstruments(OrleansInstruments instruments)
     {
@@ -101,7 +100,7 @@ internal sealed class MessagingProcessingInstruments
         }
     }
 
-    internal void OnImaMessageEnqueued(IGrainContext context)
+    internal void OnImaMessageEnqueued(IGrainContext? context)
     {
         if (!_imaEnqueuedCounter.Enabled)
         {
