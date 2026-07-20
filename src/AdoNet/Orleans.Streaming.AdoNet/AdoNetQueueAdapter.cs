@@ -31,7 +31,7 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
         return ReceiverFactory(serviceProvider, [Name, adoNetQueueId, streamOptions, clusterOptions, cacheOptions, queries]);
     }
 
-    public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+    public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
     {
         // the ADO.NET provider is not rewindable so we do not support user supplied tokens
         if (token is not null)

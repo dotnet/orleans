@@ -11,7 +11,7 @@ namespace Orleans.Streaming.AdoNet;
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
 internal class AdoNetBatchContainer : IBatchContainer
 {
-    public AdoNetBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+    public AdoNetBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object>? requestContext)
     {
         ArgumentNullException.ThrowIfNull(events);
 
@@ -29,7 +29,7 @@ internal class AdoNetBatchContainer : IBatchContainer
     public List<object> Events { get; }
 
     [Id(2)]
-    public Dictionary<string, object> RequestContext { get; }
+    public Dictionary<string, object>? RequestContext { get; }
 
     [Id(3)]
     public EventSequenceTokenV2 SequenceToken { get; internal set; } = null!;
@@ -88,7 +88,7 @@ internal class AdoNetBatchContainer : IBatchContainer
     /// <summary>
     /// Converts the specified <see cref="AdoNetBatchContainer"/> to a message payload.
     /// </summary>
-    public static byte[] ToMessagePayload(Serializer<AdoNetBatchContainer> serializer, StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+    public static byte[] ToMessagePayload(Serializer<AdoNetBatchContainer> serializer, StreamId streamId, List<object> events, Dictionary<string, object>? requestContext)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(events);

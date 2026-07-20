@@ -1,7 +1,6 @@
 using System.Threading;
 using Microsoft.Extensions.Hosting;
 
-#nullable disable
 namespace Orleans.Streaming.AdoNet;
 
 internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
@@ -31,7 +30,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     private readonly SimpleQueueAdapterCache _cache;
     private readonly AdoNetStreamQueueMapper _adoNetQueueMapper;
 
-    private RelationalOrleansQueries _queries;
+    private RelationalOrleansQueries? _queries;
 
     /// <summary>
     /// Unfortunate implementation detail to account for lack of async lifetime.
