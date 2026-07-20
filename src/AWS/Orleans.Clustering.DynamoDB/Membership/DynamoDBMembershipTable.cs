@@ -7,13 +7,13 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans.Clustering.DynamoDB
 {
     internal partial class DynamoDBMembershipTable : IMembershipTable
@@ -24,7 +24,7 @@ namespace Orleans.Clustering.DynamoDB
         private const int MAX_BATCH_SIZE = 25;
 
         private readonly ILogger logger;
-        private DynamoDBStorage storage;
+        private DynamoDBStorage storage = null!;
         private readonly DynamoDBClusteringOptions options;
         private readonly string clusterId;
 
@@ -110,7 +110,7 @@ namespace Orleans.Clustering.DynamoDB
             return true;
         }
 
-        private bool TryCreateTableVersionRecord(int version, string etag, out SiloInstanceRecord entry)
+        private bool TryCreateTableVersionRecord(int version, string? etag, [NotNullWhen(true)] out SiloInstanceRecord? entry)
         {
             int etagInt;
             if (etag is null)
@@ -435,7 +435,7 @@ namespace Orleans.Clustering.DynamoDB
 
             parse.ProxyPort = tableEntry.ProxyPort;
 
-            parse.SiloAddress = SiloAddress.New(IPAddress.Parse(tableEntry.Address), tableEntry.Port, tableEntry.Generation);
+            parse.SiloAddress = SiloAddress.New(IPAddress.Parse(tableEntry.Address!), tableEntry.Port, tableEntry.Generation);
 
             if (!string.IsNullOrEmpty(tableEntry.SiloName))
             {

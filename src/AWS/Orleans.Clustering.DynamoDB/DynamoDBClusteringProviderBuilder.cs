@@ -4,7 +4,6 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-#nullable disable
 [assembly: RegisterProvider("DynamoDB", "Clustering", "Silo", typeof(DynamoDBClusteringProviderBuilder))]
 [assembly: RegisterProvider("DynamoDB", "Clustering", "Client", typeof(DynamoDBClusteringProviderBuilder))]
 
@@ -12,7 +11,7 @@ namespace Orleans.Hosting;
 
 internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseDynamoDBClustering(options =>
             {
@@ -79,7 +78,7 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
             });
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseDynamoDBClustering(options =>
             {
