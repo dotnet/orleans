@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
@@ -8,18 +9,17 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Connections.Security
 {
     internal partial class TlsClientConnectionMiddleware
     {
         private readonly ConnectionDelegate _next;
         private readonly TlsOptions _options;
-        private readonly ILogger _logger;
-        private readonly X509Certificate2 _certificate;
-        private readonly Func<object, string, X509CertificateCollection, X509Certificate, string[], X509Certificate2> _certificateSelector;
+        private readonly ILogger? _logger;
+        private readonly X509Certificate2? _certificate;
+        private readonly Func<object, string, X509CertificateCollection, X509Certificate?, string[], X509Certificate2?>? _certificateSelector;
 
-        public TlsClientConnectionMiddleware(ConnectionDelegate next, TlsOptions options, ILoggerFactory loggerFactory)
+        public TlsClientConnectionMiddleware(ConnectionDelegate next, TlsOptions options, ILoggerFactory? loggerFactory)
         {
             if (options == null)
             {
@@ -64,7 +64,7 @@ namespace Orleans.Connections.Security
                 leaveOpen: true
             );
 
-            TlsDuplexPipe tlsDuplexPipe = null;
+            TlsDuplexPipe? tlsDuplexPipe = null;
 
             if (_options.RemoteCertificateMode == RemoteCertificateMode.NoCertificate)
             {
@@ -111,11 +111,11 @@ namespace Orleans.Connections.Security
             var sslStream = tlsDuplexPipe.Stream;
 
             using (var cancellationTokeSource = new CancellationTokenSource(_options.HandshakeTimeout))
-            using (cancellationTokeSource.Token.UnsafeRegister(state => ((ConnectionContext)state).Abort(), context))
+            using (cancellationTokeSource.Token.UnsafeRegister(state => ((ConnectionContext)state!).Abort(), context))
             {
                 try
                 {
-                    ClientCertificateSelectionCallback selector = null;
+                    ClientCertificateSelectionCallback? selector = null;
                     if (_certificateSelector != null)
                     {
                         selector = (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
@@ -126,7 +126,11 @@ namespace Orleans.Connections.Security
                                 EnsureCertificateIsAllowedForClientAuth(cert);
                             }
 
+#if NET10_0_OR_GREATER
                             return cert;
+#else
+                            return cert!;
+#endif
                         };
                     }
 
@@ -203,7 +207,7 @@ namespace Orleans.Connections.Security
             }
         }
 
-        private static X509Certificate2 ValidateCertificate(X509Certificate2 certificate, RemoteCertificateMode mode)
+        private static X509Certificate2? ValidateCertificate(X509Certificate2? certificate, RemoteCertificateMode mode)
         {
             switch (mode)
             {
@@ -222,7 +226,7 @@ namespace Orleans.Connections.Security
             }
         }
 
-        protected static void EnsureCertificateIsAllowedForClientAuth(X509Certificate2 certificate)
+        protected static void EnsureCertificateIsAllowedForClientAuth([NotNull] X509Certificate2? certificate)
         {
             if (certificate is null)
             {
@@ -235,7 +239,7 @@ namespace Orleans.Connections.Security
             }
         }
 
-        private static X509Certificate2 ConvertToX509Certificate2(X509Certificate certificate)
+        private static X509Certificate2? ConvertToX509Certificate2(X509Certificate? certificate)
         {
             if (certificate is null)
             {

@@ -8,18 +8,17 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Connections.Security
 {
     internal partial class TlsServerConnectionMiddleware
     {
         private readonly ConnectionDelegate _next;
         private readonly TlsOptions _options;
-        private readonly ILogger _logger;
-        private readonly X509Certificate2 _certificate;
-        private readonly Func<ConnectionContext, string, X509Certificate2> _certificateSelector;
+        private readonly ILogger? _logger;
+        private readonly X509Certificate2? _certificate;
+        private readonly Func<ConnectionContext, string?, X509Certificate2>? _certificateSelector;
 
-        public TlsServerConnectionMiddleware(ConnectionDelegate next, TlsOptions options, ILoggerFactory loggerFactory)
+        public TlsServerConnectionMiddleware(ConnectionDelegate next, TlsOptions options, ILoggerFactory? loggerFactory)
         {
             if (options == null)
             {
@@ -44,7 +43,7 @@ namespace Orleans.Connections.Security
             }
             else
             {
-                EnsureCertificateIsAllowedForServerAuth(_certificate);
+                EnsureCertificateIsAllowedForServerAuth(_certificate!);
             }
 
             _options = options;
@@ -79,7 +78,7 @@ namespace Orleans.Connections.Security
                 leaveOpen: true
             );
 
-            TlsDuplexPipe tlsDuplexPipe = null;
+            TlsDuplexPipe? tlsDuplexPipe = null;
 
             if (_options.RemoteCertificateMode == RemoteCertificateMode.NoCertificate)
             {
@@ -129,25 +128,25 @@ namespace Orleans.Connections.Security
             var sslStream = tlsDuplexPipe.Stream;
 
             using (var cancellationTokeSource = new CancellationTokenSource(_options.HandshakeTimeout))
-            using (cancellationTokeSource.Token.UnsafeRegister(state => ((ConnectionContext)state).Abort(), context))
+            using (cancellationTokeSource.Token.UnsafeRegister(state => ((ConnectionContext)state!).Abort(), context))
             {
                 try
                 {
                     // Adapt to the SslStream signature
-                    ServerCertificateSelectionCallback selector = null;
+                    ServerCertificateSelectionCallback? selector = null;
                     if (_certificateSelector != null)
                     {
                         selector = (sender, name) =>
                         {
                             feature.HostName = name ?? string.Empty;
                             context.Features.Set(sslStream);
-                            var cert = _certificateSelector(context, name);
+                            var cert = _certificateSelector!(context, name);
                             if (cert != null)
                             {
                                 EnsureCertificateIsAllowedForServerAuth(cert);
                             }
 
-                            return cert;
+                            return cert!;
                         };
                     }
                     else if (_certificate != null)
@@ -243,7 +242,7 @@ namespace Orleans.Connections.Security
             }
         }
 
-        private static X509Certificate2 ConvertToX509Certificate2(X509Certificate certificate)
+        private static X509Certificate2? ConvertToX509Certificate2(X509Certificate? certificate)
         {
             if (certificate is null)
             {

@@ -6,7 +6,6 @@ using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans.Connections.Security
 {
     internal class DuplexPipeStream : Stream
@@ -111,7 +110,7 @@ namespace Orleans.Connections.Security
             throw new InvalidOperationException("Read zero bytes unexpectedly");
         }
 
-        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
+        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
         {
             return TaskToApm.Begin(ReadAsync(buffer, offset, count), callback, state);
         }
@@ -149,7 +148,7 @@ namespace Orleans.Connections.Security
             if (r.IsCanceled) throw new OperationCanceledException(cancellationToken);
         }
 
-        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
+        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
         {
             return TaskToApm.Begin(WriteAsync(buffer, offset, count), callback, state);
         }
@@ -177,7 +176,7 @@ namespace Orleans.Connections.Security
             /// <param name="callback">The callback to be invoked upon completion.</param>
             /// <param name="state">The state to be stored in the IAsyncResult.</param>
             /// <returns>An IAsyncResult to represent the task's asynchronous operation.</returns>
-            public static IAsyncResult Begin(Task task, AsyncCallback callback, object state) =>
+            public static IAsyncResult Begin(Task task, AsyncCallback? callback, object? state) =>
                 new TaskAsyncResult(task, state, callback);
 
             /// <summary>Processes an IAsyncResult returned by Begin.</summary>
@@ -207,7 +206,7 @@ namespace Orleans.Connections.Security
             }
 
             /// <summary>Gets the task represented by the IAsyncResult.</summary>
-            public static Task GetTask(IAsyncResult asyncResult) => (asyncResult as TaskAsyncResult)?._task;
+            public static Task? GetTask(IAsyncResult asyncResult) => (asyncResult as TaskAsyncResult)?._task;
 
             /// <summary>Throws an argument exception for the invalid <paramref name="asyncResult"/>.</summary>
             private static void ThrowArgumentException(IAsyncResult asyncResult) =>
@@ -226,13 +225,13 @@ namespace Orleans.Connections.Security
                 /// <summary>The wrapped Task.</summary>
                 internal readonly Task _task;
                 /// <summary>Callback to invoke when the wrapped task completes.</summary>
-                private readonly AsyncCallback _callback;
+                private readonly AsyncCallback? _callback;
 
                 /// <summary>Initializes the IAsyncResult with the Task to wrap and the associated object state.</summary>
                 /// <param name="task">The Task to wrap.</param>
                 /// <param name="state">The new AsyncState value.</param>
                 /// <param name="callback">Callback to invoke when the wrapped task completes.</param>
-                internal TaskAsyncResult(Task task, object state, AsyncCallback callback)
+                internal TaskAsyncResult(Task task, object? state, AsyncCallback? callback)
                 {
                     Debug.Assert(task != null);
                     _task = task;
@@ -265,7 +264,7 @@ namespace Orleans.Connections.Security
                 }
 
                 /// <summary>Gets a user-defined object that qualifies or contains information about an asynchronous operation.</summary>
-                public object AsyncState { get; }
+                public object? AsyncState { get; }
                 /// <summary>Gets a value that indicates whether the asynchronous operation completed synchronously.</summary>
                 /// <remarks>This is set lazily based on whether the <see cref="_task"/> has completed by the time this object is created.</remarks>
                 public bool CompletedSynchronously { get; }

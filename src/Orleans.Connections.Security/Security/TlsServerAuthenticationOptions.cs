@@ -3,10 +3,9 @@ using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 
-#nullable disable
 namespace Orleans.Connections.Security
 {
-    public delegate X509Certificate ServerCertificateSelectionCallback(object sender, string hostName);
+    public delegate X509Certificate ServerCertificateSelectionCallback(object sender, string? hostName);
 
     public class TlsServerAuthenticationOptions
     {
@@ -18,13 +17,13 @@ namespace Orleans.Connections.Security
             }
         };
 
-        public X509Certificate ServerCertificate
+        public X509Certificate? ServerCertificate
         {
             get => Value.ServerCertificate;
             set => Value.ServerCertificate = value;
         }
 
-        public ServerCertificateSelectionCallback ServerCertificateSelectionCallback
+        public ServerCertificateSelectionCallback? ServerCertificateSelectionCallback
         {
             get => Value.ServerCertificateSelectionCallback is null ? null : new ServerCertificateSelectionCallback(Value.ServerCertificateSelectionCallback);
             set => Value.ServerCertificateSelectionCallback = value is null ? null : new System.Net.Security.ServerCertificateSelectionCallback(value);

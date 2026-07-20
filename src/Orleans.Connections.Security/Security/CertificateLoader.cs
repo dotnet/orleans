@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 
-#nullable disable
 namespace Orleans.Connections.Security
 {
     public static class CertificateLoader
@@ -19,8 +18,8 @@ namespace Orleans.Connections.Security
         {
             using (var store = new X509Store(storeName, storeLocation))
             {
-                X509Certificate2Collection storeCertificates = null;
-                X509Certificate2 foundCertificate = null;
+                X509Certificate2Collection? storeCertificates = null;
+                X509Certificate2? foundCertificate = null;
 
                 try
                 {
@@ -76,7 +75,7 @@ namespace Orleans.Connections.Security
                 hasEkuExtension = true;
                 foreach (var oid in extension.EnhancedKeyUsages)
                 {
-                    if (oid.Value.Equals(purposeOid, StringComparison.Ordinal))
+                    if (oid.Value!.Equals(purposeOid, StringComparison.Ordinal))
                     {
                         return true;
                     }
@@ -89,7 +88,7 @@ namespace Orleans.Connections.Security
         internal static bool DoesCertificateHaveAnAccessiblePrivateKey(X509Certificate2 certificate)
             => certificate.HasPrivateKey;
 
-        private static void DisposeCertificates(X509Certificate2Collection certificates, X509Certificate2 except)
+        private static void DisposeCertificates(X509Certificate2Collection? certificates, X509Certificate2? except)
         {
             if (certificates != null)
             {
