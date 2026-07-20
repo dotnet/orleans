@@ -10,6 +10,6 @@ namespace UnitTests.DtosRefOrleans
         }
 
         [Id(0)]
-        public string MyProperty { get; set; }
+        public string? MyProperty { get; set; }
     }
 }

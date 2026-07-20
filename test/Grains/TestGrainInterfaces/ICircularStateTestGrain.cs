@@ -10,7 +10,7 @@
     public class CircularStateTestState
     {
         [Id(0)]
-        public CircularTest1 CircularTest1 { get; set; }
+        public CircularTest1? CircularTest1 { get; set; }
     }
 
     [Serializable]
@@ -18,7 +18,7 @@
     public class CircularTest1
     {
         [Id(0)]
-        public CircularTest2 CircularTest2 { get; set; }
+        public CircularTest2? CircularTest2 { get; set; }
     }
 
     [Serializable]

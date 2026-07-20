@@ -7,7 +7,7 @@ namespace UnitTests.GrainInterfaces
     /// </summary>
     public interface IEchoGrain : IGrainWithGuidKey
     {
-        Task<string> GetLastEcho();
+        Task<string?> GetLastEcho();
 
         Task<string> Echo(string data);
         Task<string> EchoError(string data);
@@ -19,7 +19,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task<int> GetMyIdAsync();
 
-        Task<string> GetLastEchoAsync();
+        Task<string?> GetLastEchoAsync();
 
         Task<string> EchoAsync(string data);
         Task<string> EchoErrorAsync(string data);
@@ -41,7 +41,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task<int> GetMyId();
 
-        Task<string> GetLastEcho();
+        Task<string?> GetLastEcho();
 
         Task<string> Echo(string data);
         Task<string> CallMethodTask_Await(string data);
@@ -54,7 +54,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task<int> GetMyId();
 
-        Task<string> GetLastEcho();
+        Task<string?> GetLastEcho();
 
         Task<string> Echo(string data);
         Task<string> CallMethodTask_Await(string data);

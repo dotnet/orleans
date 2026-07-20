@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -64,9 +65,9 @@ namespace UnitTests.GrainInterfaces
     [GenerateSerializer]
     public class CaseInsensitiveStringEquality : EqualityComparer<string>
     {
-        public override bool Equals(string x, string y)
+        public override bool Equals(string? x, string? y)
         {
-            return x.Equals(y, StringComparison.OrdinalIgnoreCase);
+            return x!.Equals(y, StringComparison.OrdinalIgnoreCase);
         }
 
         public override int GetHashCode(string obj)
@@ -94,10 +95,10 @@ namespace UnitTests.GrainInterfaces
     [GenerateSerializer]
     public class CaseInsensitiveStringComparer : Comparer<string>
     {
-        public override int Compare(string x, string y)
+        public override int Compare(string? x, string? y)
         {
-            var x1 = x.ToLowerInvariant();
-            var y1 = y.ToLowerInvariant();
+            var x1 = x!.ToLowerInvariant();
+            var y1 = y!.ToLowerInvariant();
             return Comparer<string>.Default.Compare(x1, y1);
         }
     }
@@ -116,9 +117,9 @@ namespace UnitTests.GrainInterfaces
         }
 
         [Id(0)]
-        public Dictionary<string, object> MyDictionary { get; set; }
+        public Dictionary<string, object>? MyDictionary { get; set; }
 
-        public override bool Equals(object obj)
+        public override bool Equals([NotNullWhen(true)] object? obj)
         {
             var actual = obj as RootType;
             if (actual == null)
@@ -159,7 +160,7 @@ namespace UnitTests.GrainInterfaces
         public readonly int ReadonlyField;
 
         [Id(6)]
-        public IEchoGrain SomeGrainReference { get; set; }
+        public IEchoGrain? SomeGrainReference { get; set; }
 
         public SomeStruct(int readonlyField)
             : this()
@@ -200,10 +201,10 @@ namespace UnitTests.GrainInterfaces
         public abstract int Int { get; set; }
 
         [Id(1)]
-        public List<ISomeInterface> Interfaces { get; set; }
+        public List<ISomeInterface>? Interfaces { get; set; }
 
         [Id(2)]
-        public SomeAbstractClass[] Classes { get; set; }
+        public SomeAbstractClass[]? Classes { get; set; }
 
         [Obsolete("This field should not be serialized", true)]
         [Id(3)]
@@ -214,7 +215,7 @@ namespace UnitTests.GrainInterfaces
         public int ObsoleteInt { get; set; }
 
         [Id(5)]
-        public IEchoGrain SomeGrainReference { get; set; }
+        public IEchoGrain? SomeGrainReference { get; set; }
         
 #pragma warning disable 618
         public int GetObsoleteInt() => this.ObsoleteInt;
@@ -259,7 +260,7 @@ namespace UnitTests.GrainInterfaces
         public override int Int { get; set; }
 
         [Id(1)]
-        public string AnotherString { get; set; }
+        public string? AnotherString { get; set; }
     }
 
     [Serializable]
@@ -277,7 +278,7 @@ namespace UnitTests.GrainInterfaces
         [Id(1)]
         public string Something { get; set; }
 
-        public override bool Equals(object obj)
+        public override bool Equals([NotNullWhen(true)] object? obj)
         {
             var actual = obj as InnerType;
             if (actual == null)

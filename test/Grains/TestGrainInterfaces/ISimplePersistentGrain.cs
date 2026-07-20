@@ -4,7 +4,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task SetA(int a, bool deactivate);
         Task<Guid> GetVersion();
-        Task<object> GetRequestContext();
+        Task<object?> GetRequestContext();
         Task SetRequestContext(int data);
     }
 }

@@ -94,12 +94,12 @@ namespace UnitTests.GrainInterfaces
 
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class UnserializableTypeCodec : IFieldCodec<UnserializableType>, IDeepCopier<UnserializableType>
+    public sealed class UnserializableTypeCodec : IFieldCodec<UnserializableType?>, IDeepCopier<UnserializableType?>
     {
-        public UnserializableType DeepCopy(UnserializableType input, CopyContext context) => input;
+        public UnserializableType? DeepCopy(UnserializableType? input, CopyContext context) => input;
 
-        public UnserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UnserializableType value) where TBufferWriter : IBufferWriter<byte>
+        public UnserializableType? ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UnserializableType? value) where TBufferWriter : IBufferWriter<byte>
         {
             throw new NotSupportedException(UndeserializableType.FailureMessage);
         }

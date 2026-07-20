@@ -44,7 +44,7 @@ namespace UnitTests.GrainInterfaces
     public class Streaming_ProducerGrain_State
     {
         [Id(0)]
-        public List<IProducerObserver> Producers { get; set; }
+        public List<IProducerObserver>? Producers { get; set; }
     }
 
     [Serializable]
@@ -52,7 +52,7 @@ namespace UnitTests.GrainInterfaces
     public class Streaming_ConsumerGrain_State
     {
         [Id(0)]
-        public List<IConsumerObserver> Consumers { get; set; }
+        public List<IConsumerObserver>? Consumers { get; set; }
     }
 
     [Serializable]
@@ -60,9 +60,9 @@ namespace UnitTests.GrainInterfaces
     public class Streaming_ProducerConsumerGrain_State
     {
         [Id(0)]
-        public List<IProducerObserver> Producers { get; set; }
+        public List<IProducerObserver>? Producers { get; set; }
         [Id(1)]
-        public List<IConsumerObserver> Consumers { get; set; }
+        public List<IConsumerObserver>? Consumers { get; set; }
     }
 
     //------- POCO interfaces for objects that implement the actual test logic ----///

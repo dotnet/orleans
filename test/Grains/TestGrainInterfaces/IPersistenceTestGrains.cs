@@ -49,7 +49,7 @@ namespace UnitTests.GrainInterfaces
         [Id(0)]
         public int Field1 { get; set; }
         [Id(1)]
-        public string Field2 { get; set; }
+        public string? Field2 { get; set; }
         [Id(2)]
         public SortedDictionary<int, int> SortedDict { get; set; }
     }

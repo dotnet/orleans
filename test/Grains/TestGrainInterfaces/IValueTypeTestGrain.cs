@@ -55,7 +55,7 @@ namespace UnitTests.GrainInterfaces
     {
         [ProtoMember(1)]
         [Id(0)]
-        public string TestString { get; set; }
+        public string? TestString { get; set; }
         [ProtoMember(2)]
         [Id(1)]
         private readonly bool[] boolArray;
@@ -70,7 +70,7 @@ namespace UnitTests.GrainInterfaces
         private readonly ClassWithEnumTestData[] classArray;
         [ProtoMember(6)]
         [Id(5)]
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
         public LargeTestData()
         {
@@ -115,17 +115,17 @@ namespace UnitTests.GrainInterfaces
         public class NestedGeneric<T>
         {
             [Id(0)]
-            private T myT;
+            private T? myT;
             [Id(1)]
-            private string s;
+            private string? s;
 
             public NestedGeneric(T t)
             {
                 myT = t;
-                s = myT.ToString();
+                s = myT!.ToString();
             }
 
-            public override string ToString()
+            public override string? ToString()
             {
                 return s;
             }
@@ -133,7 +133,7 @@ namespace UnitTests.GrainInterfaces
             public void SetT(T t)
             {
                 myT = t;
-                s = myT.ToString();
+                s = myT!.ToString();
             }
         }
     }
@@ -221,15 +221,15 @@ namespace UnitTests.GrainInterfaces
     [GenerateSerializer]
     public sealed class ClassWithEmbeddedImmutable
     {
-        [Id(1), Immutable] public IEnumerable<byte> Immutable;
-        [Id(2)] public object Mutable;
+        [Id(1), Immutable] public IEnumerable<byte>? Immutable;
+        [Id(2)] public object? Mutable;
     }
 
     [GenerateSerializer]
     public struct StructWithEmbeddedImmutable
     {
-        [Id(1), Immutable] public byte[] Immutable;
-        [Id(2)] public byte[] Mutable;
+        [Id(1), Immutable] public byte[]? Immutable;
+        [Id(2)] public byte[]? Mutable;
     }
 
     [Serializable]

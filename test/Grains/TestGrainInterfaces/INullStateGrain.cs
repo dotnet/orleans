@@ -4,7 +4,7 @@ namespace UnitTests.GrainInterfaces
     public class NullableState
     {
         [Id(0)]
-        public string Name { get; set; }
+        public string? Name { get; set; }
     }
 
     public interface INullStateGrain : IGrainWithIntegerKey
