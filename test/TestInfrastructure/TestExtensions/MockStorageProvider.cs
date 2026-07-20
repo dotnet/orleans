@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -19,7 +20,7 @@ namespace UnitTests.StorageTests
         {
             return builder.ConfigureServices(services =>
             {
-                services.AddKeyedSingleton<IGrainStorage>(name, (sp, n) => createInstance(sp, n as string));
+                services.AddKeyedSingleton<IGrainStorage>(name, (sp, n) => createInstance(sp, (n as string)!));
 
                 if (typeof(ILifecycleParticipant<ISiloLifecycle>).IsAssignableFrom(typeof(T)))
                 {
@@ -74,8 +75,8 @@ namespace UnitTests.StorageTests
         private readonly ILocalDataStore StateStore;
         private const string stateStoreKey = "State";
         private readonly ILogger logger;
-        public string LastId { get; private set; }
-        public object LastState { get; private set; }
+        public string? LastId { get; private set; }
+        public object? LastState { get; private set; }
 
         public string Name { get; private set; }
 
@@ -119,15 +120,15 @@ namespace UnitTests.StorageTests
         public class SetValueArgs
         {
             [Id(0)]
-            public Type StateType { get; set; }
+            public Type StateType { get; set; } = null!;
             [Id(1)]
-            public string GrainType { get; set; }
+            public string GrainType { get; set; } = null!;
             [Id(2)]
             public GrainId GrainId { get; set; }
             [Id(3)]
-            public string Name { get; set; }
+            public string Name { get; set; } = null!;
             [Id(4)]
-            public object Val { get; set; }
+            public object? Val { get; set; }
 
         }
 
@@ -136,7 +137,7 @@ namespace UnitTests.StorageTests
             SetValue(args.StateType, args.GrainType, args.GrainId, args.Name, args.Val);
         }
 
-        private void SetValue(Type stateType, string grainType, GrainId grainId, string name, object val)
+        private void SetValue(Type stateType, string grainType, GrainId grainId, string name, object? val)
         {
             lock (StateStore)
             {
@@ -148,25 +149,26 @@ namespace UnitTests.StorageTests
                     storedDict[stateStoreKey] = Activator.CreateInstance(stateType);
                 } 
 
-                var storedState = storedDict[stateStoreKey];
-                var field = storedState.GetType().GetProperty(name).GetSetMethod(true);
+                var storedState = storedDict[stateStoreKey]!;
+                var field = storedState.GetType().GetProperty(name)!.GetSetMethod(true)!;
                 field.Invoke(storedState, new[] { val });
                 LastId = GetId(grainId);
                 LastState = storedState;
             }
         }
 
-        public object GetLastState()
+        public object? GetLastState()
         {
             return LastState;
         }
 
+        [return: MaybeNull]
         public T GetLastState<T>()
         {
-            return (T) LastState;
+            return (T)LastState!;
         }
 
-        private object GetLastState<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        private object? GetLastState<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             lock (StateStore)
             {
@@ -174,7 +176,7 @@ namespace UnitTests.StorageTests
                 var storedStateRow = StateStore.ReadRow(keys);
                 if (!storedStateRow.ContainsKey(stateStoreKey))
                 {
-                    storedStateRow[stateStoreKey] = Activator.CreateInstance(grainState.State.GetType());
+                    storedStateRow[stateStoreKey] = Activator.CreateInstance(grainState.State!.GetType());
                 }
 
                 var storedState = storedStateRow[stateStoreKey];
@@ -200,7 +202,7 @@ namespace UnitTests.StorageTests
             {
                 var storedState = GetLastState(grainType, grainId, grainState);
                 grainState.RecordExists = storedState != null;
-                grainState.State = (T)this.copier.Copy(storedState); // Read current state data
+                grainState.State = (T)this.copier.Copy(storedState)!; // Read current state data
             }
             return Task.CompletedTask;
         }
@@ -212,7 +214,7 @@ namespace UnitTests.StorageTests
             lock (StateStore)
             {
                 var storedState = this.copier.Copy(grainState.State); // Store current state data
-                var stateStore = new Dictionary<string, object> {{ stateStoreKey, storedState }};
+                var stateStore = new Dictionary<string, object?> {{ stateStoreKey, storedState }};
                 StateStore.WriteRow(MakeGrainStateKeys(grainType, grainId), stateStore, grainState.ETag);
 
                 LastId = GetId(grainId);
@@ -262,19 +264,19 @@ namespace UnitTests.StorageTests
         /// </summary>
         /// <param name="command">A serial number of the command.</param>
         /// <param name="arg">An opaque command argument</param>
-        public virtual Task<object> ExecuteCommand(int command, object arg)
+        public virtual Task<object> ExecuteCommand(int command, object? arg)
         {
             switch ((Commands)command)
             {
                 case Commands.InitCount:
                     return Task.FromResult<object>(initCount);
                 case Commands.SetValue:
-                    SetValue((SetValueArgs) arg);
+                    SetValue((SetValueArgs)arg!);
                     return Task.FromResult<object>(true); 
                 case Commands.GetProvideState:
                     return Task.FromResult<object>(GetProviderState());
                 case Commands.GetLastState:
-                    return Task.FromResult(GetLastState());
+                    return Task.FromResult<object>(GetLastState()!);
                 case Commands.ResetHistory:
                     ResetHistory();
                     return Task.FromResult<object>(true);

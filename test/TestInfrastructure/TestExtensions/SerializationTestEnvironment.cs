@@ -6,7 +6,7 @@ namespace TestExtensions
 {
     public class SerializationTestEnvironment : IDisposable
     {
-        public SerializationTestEnvironment(Action<IClientBuilder> configureClientBuilder = null)
+        public SerializationTestEnvironment(Action<IClientBuilder>? configureClientBuilder = null)
         {
             var host = new HostBuilder()
                 .UseOrleansClient((ctx, clientBuilder) =>
@@ -24,7 +24,7 @@ namespace TestExtensions
         
         internal OutsideRuntimeClient RuntimeClient { get; set; }
 
-        public static SerializationTestEnvironment InitializeWithDefaults(Action<IClientBuilder> configureClientBuilder = null)
+        public static SerializationTestEnvironment InitializeWithDefaults(Action<IClientBuilder>? configureClientBuilder = null)
         {
             var result = new SerializationTestEnvironment(configureClientBuilder);
             return result;

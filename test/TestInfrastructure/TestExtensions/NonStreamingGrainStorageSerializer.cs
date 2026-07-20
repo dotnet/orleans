@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Storage;
 
 namespace TestExtensions;
@@ -8,7 +9,8 @@ public sealed class NonStreamingGrainStorageSerializer : IGrainStorageSerializer
 
     public NonStreamingGrainStorageSerializer(IGrainStorageSerializer inner) => _inner = inner;
 
-    public BinaryData Serialize<T>(T input) => _inner.Serialize(input);
+    public BinaryData Serialize<T>([AllowNull] T input) => _inner.Serialize(input);
 
+    [return: MaybeNull]
     public T Deserialize<T>(BinaryData input) => _inner.Deserialize<T>(input);
 }

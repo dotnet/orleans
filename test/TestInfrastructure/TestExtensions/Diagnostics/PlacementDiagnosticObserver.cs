@@ -1,4 +1,3 @@
-#nullable enable
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Diagnostics;
