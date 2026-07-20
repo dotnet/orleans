@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers;
 
-#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 {
@@ -40,7 +39,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         SymbolAnalysisContext context,
         INamedTypeSymbol aliasAttributeSymbol,
         INamedTypeSymbol generateSerializerAttributeSymbol,
-        INamedTypeSymbol grainSymbol)
+        INamedTypeSymbol? grainSymbol)
     {
         var symbol = (INamedTypeSymbol)context.Symbol;
 
@@ -54,14 +53,14 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
             if (!symbol.HasAttribute(aliasAttributeSymbol))
             {
-                if (!TryGetDeclarationSyntax(symbol, out InterfaceDeclarationSyntax interfaceDeclaration))
+                if (!TryGetDeclarationSyntax(symbol, out InterfaceDeclarationSyntax? interfaceDeclaration))
                 {
                     return;
                 }
 
                 ReportFor(
                     context,
-                    interfaceDeclaration.GetLocation(),
+                    interfaceDeclaration!.GetLocation(),
                     interfaceDeclaration.Identifier.ToString(),
                     GetArity(interfaceDeclaration),
                     GetNamespaceAndNesting(interfaceDeclaration));
@@ -76,12 +75,12 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
                 if (!methodSymbol.HasAttribute(aliasAttributeSymbol))
                 {
-                    if (!TryGetDeclarationSyntax(methodSymbol, out MethodDeclarationSyntax methodDeclaration))
+                    if (!TryGetDeclarationSyntax(methodSymbol, out MethodDeclarationSyntax? methodDeclaration))
                     {
                         continue;
                     }
 
-                    ReportFor(context, methodDeclaration.GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
+                    ReportFor(context, methodDeclaration!.GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
                 }
             }
 
@@ -106,14 +105,14 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            if (!TryGetDeclarationSyntax(symbol, out TypeDeclarationSyntax typeDeclaration))
+            if (!TryGetDeclarationSyntax(symbol, out TypeDeclarationSyntax? typeDeclaration))
             {
                 return;
             }
 
             ReportFor(
                 context,
-                typeDeclaration.GetLocation(),
+                typeDeclaration!.GetLocation(),
                 typeDeclaration.Identifier.ToString(),
                 GetArity(typeDeclaration),
                 GetNamespaceAndNesting(typeDeclaration));
@@ -135,7 +134,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
     private static string GetNamespaceAndNesting(TypeDeclarationSyntax typeDeclarationSyntax)
     {
-        SyntaxNode node = typeDeclarationSyntax.Parent;
+        SyntaxNode? node = typeDeclarationSyntax.Parent;
         StringBuilder sb = new();
         Stack<string> segments = new();
 
@@ -166,16 +165,16 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         return sb.ToString();
     }
 
-    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, out TSyntax syntax)
+    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, out TSyntax? syntax)
         where TSyntax : SyntaxNode
     {
         syntax = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TSyntax;
         return syntax is not null;
     }
 
-    private static void ReportFor(SymbolAnalysisContext context, Location location, string typeName, int arity, string namespaceAndNesting)
+    private static void ReportFor(SymbolAnalysisContext context, Location location, string typeName, int arity, string? namespaceAndNesting)
     {
-        var builder = ImmutableDictionary.CreateBuilder<string, string>();
+        var builder = ImmutableDictionary.CreateBuilder<string, string?>();
 
         builder.Add("TypeName", typeName);
         builder.Add("NamespaceAndNesting", namespaceAndNesting);

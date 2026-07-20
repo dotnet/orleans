@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class GrainInterfacePropertyDiagnosticAnalyzer : DiagnosticAnalyzer
     {
@@ -30,7 +29,7 @@ namespace Orleans.Analyzers
         {
             if (context.Node is not PropertyDeclarationSyntax syntax) return;
 
-            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
+            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken)!;
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 

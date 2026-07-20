@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers;
 
-#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
 {
@@ -60,7 +59,7 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
                 if (attribute.ConstructorArguments.Length == 1 &&
                     attribute.ConstructorArguments[0].Value is uint idValue)
                 {
-                    var attributeSyntax = (AttributeSyntax)attribute.ApplicationSyntaxReference.GetSyntax();
+                    var attributeSyntax = (AttributeSyntax)attribute.ApplicationSyntaxReference!.GetSyntax();
                     bags.Add(new AttributeArgumentBag<uint>(idValue, attributeSyntax.GetLocation()));
                 }
             }
@@ -85,7 +84,7 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
             {
                 foreach (var bag in filteredBags)
                 {
-                    var builder = ImmutableDictionary.CreateBuilder<string, string>();
+                    var builder = ImmutableDictionary.CreateBuilder<string, string?>();
 
                     builder.Add("IdValue", bag.Value.ToString());
 

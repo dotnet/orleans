@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class AbstractPropertiesCannotBeSerializedAnalyzer : DiagnosticAnalyzer
     {
@@ -59,7 +58,7 @@ namespace Orleans.Analyzers
             }
 
             if (attributeOperation.Operation is IObjectCreationOperation objectCreationOperation &&
-                idAttribute.Equals(objectCreationOperation.Constructor.ContainingType, SymbolEqualityComparer.Default))
+                idAttribute.Equals(objectCreationOperation.Constructor!.ContainingType, SymbolEqualityComparer.Default))
             {
                 context.ReportDiagnostic(Diagnostic.Create(Rule, attributeOperation.Syntax.GetLocation(), context.ContainingSymbol.Name, modifier));
             }

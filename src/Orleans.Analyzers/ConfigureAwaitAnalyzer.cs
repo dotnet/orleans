@@ -7,7 +7,6 @@ using System.Collections.Immutable;
 
 namespace Orleans.Analyzers;
 
-#nullable disable
 /// <summary>
 /// An analyzer that warns when grain code uses ConfigureAwait(false) or ConfigureAwait(ConfigureAwaitOptions)
 /// without the ContinueOnCapturedContext flag.
@@ -123,7 +122,7 @@ public class ConfigureAwaitAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static bool IsConfigureAwaitCall(InvocationExpressionSyntax invocation, out string methodName)
+    private static bool IsConfigureAwaitCall(InvocationExpressionSyntax invocation, out string? methodName)
     {
         methodName = null;
 
@@ -163,7 +162,7 @@ public class ConfigureAwaitAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    private static bool IsTaskLikeType(INamedTypeSymbol type)
+    private static bool IsTaskLikeType(INamedTypeSymbol? type)
     {
         if (type is null)
         {
@@ -181,7 +180,7 @@ public class ConfigureAwaitAnalyzer : DiagnosticAnalyzer
             || fullName.StartsWith("System.Runtime.CompilerServices.ConfiguredCancelableAsyncEnumerable", StringComparison.Ordinal);
     }
 
-    private static bool IsConfigureAwaitOptionsType(ITypeSymbol type)
+    private static bool IsConfigureAwaitOptionsType(ITypeSymbol? type)
     {
         if (type is null)
         {

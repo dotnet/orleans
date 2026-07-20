@@ -10,7 +10,6 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
     [ExportCodeFixProvider(LanguageNames.CSharp)]
     public class GenerateOrleansSerializationAttributesCodeFix : CodeFixProvider
     {
@@ -20,8 +19,8 @@ namespace Orleans.Analyzers
 
         public override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
-            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-            var declaration = root.FindNode(context.Span).FirstAncestorOrSelf<TypeDeclarationSyntax>();
+            var root = (await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
+            var declaration = root.FindNode(context.Span).FirstAncestorOrSelf<TypeDeclarationSyntax>()!;
             foreach (var diagnostic in context.Diagnostics)
             {
                 switch (diagnostic.Id)
@@ -57,7 +56,7 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddSerializationAttributes(TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var semanticModel = (await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
             var compilation = semanticModel.Compilation;
             var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration,
                 compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName),
@@ -80,7 +79,7 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddNonSerializedAttributes(SyntaxNode root, TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var semanticModel = (await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
             var compilation = semanticModel.Compilation;
             var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration,
                 compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName),
@@ -102,7 +101,7 @@ namespace Orleans.Analyzers
             }
 
             var document = editor.GetChangedDocument();
-            root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
 
             var insertUsingDirective = true;
             if (root is CompilationUnitSyntax rootCompilationUnit)

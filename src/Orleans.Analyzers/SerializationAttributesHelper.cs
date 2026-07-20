@@ -22,7 +22,7 @@ namespace Orleans.Analyzers
         }
 
         public static TypeAnalysis AnalyzeTypeDeclaration(SemanticModel semanticModel, TypeDeclarationSyntax declaration,
-            INamedTypeSymbol idAttributeSymbol, INamedTypeSymbol generateSerializerAttributeSymbol, INamedTypeSymbol nonSerializedAttributeSymbol)
+            INamedTypeSymbol? idAttributeSymbol, INamedTypeSymbol? generateSerializerAttributeSymbol, INamedTypeSymbol? nonSerializedAttributeSymbol)
         {
             uint nextId = 0;
             var unannotatedSerializableMembers = new List<MemberDeclarationSyntax>();
@@ -31,7 +31,7 @@ namespace Orleans.Analyzers
                 // Skip members with existing [Id(x)] attributes, but record the highest value of x so that newly added attributes can begin from that value.
                 if (member.TryGetAttribute(semanticModel, idAttributeSymbol, out var attribute))
                 {
-                    var args = attribute.ArgumentList?.Arguments;
+                    var args = attribute!.ArgumentList?.Arguments;
                     if (args.HasValue)
                     {
                         if (args.Value.Count > 0)

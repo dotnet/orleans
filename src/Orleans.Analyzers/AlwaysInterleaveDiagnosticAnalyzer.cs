@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class AlwaysInterleaveDiagnosticAnalyzer : DiagnosticAnalyzer
     {
@@ -55,7 +54,7 @@ namespace Orleans.Analyzers
                 var syntaxReference = attribute.ApplicationSyntaxReference;
 
                 context.ReportDiagnostic(
-                    Diagnostic.Create(Rule, Location.Create(syntaxReference.SyntaxTree, syntaxReference.Span)));
+                    Diagnostic.Create(Rule, Location.Create(syntaxReference!.SyntaxTree, syntaxReference.Span)));
             }
         }
     }
