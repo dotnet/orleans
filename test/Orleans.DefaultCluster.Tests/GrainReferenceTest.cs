@@ -137,13 +137,13 @@ namespace DefaultCluster.Tests.General
             await grain.SetA(56820);
             var input = new GenericGrainReferenceHolder
             {
-                Reference = grain as GrainReference
+                Reference = (grain as GrainReference)!
             };
 
             var json = JsonConvert.SerializeObject(input, settings);
             var output = JsonConvert.DeserializeObject<GenericGrainReferenceHolder>(json, settings);
 
-            Assert.Equal(input.Reference, output.Reference);
+            Assert.Equal(input.Reference, output!.Reference);
             var reference = output.Reference;
             Assert.Equal(56820, await ((ISimpleGrain)reference).GetA());
         }
@@ -154,7 +154,7 @@ namespace DefaultCluster.Tests.General
         {
             [JsonProperty]
             [Id(0)]
-            public GrainReference Reference { get; set; }
+            public GrainReference Reference { get; set; } = null!;
         }
 
         /// <summary>
@@ -216,13 +216,13 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(id,  res);  // "Returned values from call to deserialized grain reference"
         }
 
-        private T NewtonsoftJsonSerializeRoundtrip<T>(T obj)
+        private T? NewtonsoftJsonSerializeRoundtrip<T>(T obj)
         {
             var settings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings(this.HostedCluster.Client.ServiceProvider);
             // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
             string json = JsonConvert.SerializeObject(obj, settings);
-            object other = JsonConvert.DeserializeObject(json, typeof(T), settings);
-            return (T)other;
+            object? other = JsonConvert.DeserializeObject(json, typeof(T), settings);
+            return (T?)other;
         }
     }
 }

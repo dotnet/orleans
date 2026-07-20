@@ -32,7 +32,7 @@ namespace DefaultCluster.Tests.General
         public class Fixture : IAsyncLifetime
         {
             private readonly TestClusterPortAllocator portAllocator;
-            public IHost Host { get; private set; }
+            public IHost Host { get; private set; } = null!;
 
             public Fixture()
             {

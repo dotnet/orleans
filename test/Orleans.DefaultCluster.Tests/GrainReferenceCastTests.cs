@@ -211,7 +211,7 @@ namespace DefaultCluster.Tests
         public async Task FailSideCastAfterContinueWith()
         {
             var grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-            IGeneratorTestDerivedGrain2 cast = null;
+            IGeneratorTestDerivedGrain2? cast = null;
             var av = grain.StringIsNullOrEmpty();
             var av2 = av.ContinueWith(t => Assert.True(t.Result))
                 .ContinueWith(
@@ -227,7 +227,7 @@ namespace DefaultCluster.Tests
                     {
                         // Call a method which the grain does not implement, resulting in a cast failure.
                         Assert.True(t.IsCompletedSuccessfully);
-                        return cast.StringConcat("a", "b", "c");
+                        return cast!.StringConcat("a", "b", "c");
                     })
                 .Unwrap()
                 .ContinueWith(
@@ -236,7 +236,7 @@ namespace DefaultCluster.Tests
                         // Call a method on the common interface, which the grain implements.
                         // This should not throw.
                         Assert.True(t.IsFaulted);
-                        return cast.StringIsNullOrEmpty();
+                        return cast!.StringIsNullOrEmpty();
                     })
                 .Unwrap();
 

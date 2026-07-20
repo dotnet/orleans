@@ -216,9 +216,9 @@ namespace Tester.CodeGenTests
 
         private class ObserverWithGenericMethods : IGrainObserverWithGenericMethods
         {
-            private readonly TaskCompletionSource<object> valueCompletion = new TaskCompletionSource<object>();
+            private readonly TaskCompletionSource<object?> valueCompletion = new TaskCompletionSource<object?>();
 
-            public Task<object> ValueTask => this.valueCompletion.Task;
+            public Task<object?> ValueTask => this.valueCompletion.Task;
 
             public void SetValue<T>(T value)
             {

@@ -17,7 +17,7 @@ namespace DefaultCluster.Tests
     /// </summary>
     public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
-        private object anchor;
+        private object anchor = null!;
         private readonly IRuntimeClient runtimeClient;
 
         /// <summary>

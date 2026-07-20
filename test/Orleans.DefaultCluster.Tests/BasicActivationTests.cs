@@ -134,7 +134,7 @@ namespace DefaultCluster.Tests.General
                 failed = true;
                 foreach (var t in tasks)
                 {
-                    Assert.Equal(typeof(ArgumentException), t.Exception.InnerException.GetType());
+                    Assert.Equal(typeof(ArgumentException), t.Exception!.InnerException!.GetType());
                 }
             }
 

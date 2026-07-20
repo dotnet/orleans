@@ -24,8 +24,8 @@ namespace DefaultCluster.Tests.General
 
         // we keep the observer objects as instance variables to prevent them from
         // being garbage collected prematurely (the runtime stores them as weak references).
-        private SimpleGrainObserver observer1;
-        private SimpleGrainObserver observer2;
+        private SimpleGrainObserver? observer1;
+        private SimpleGrainObserver? observer2;
 
         public ObserverTests(DefaultClusterFixture fixture) : base(fixture)
         {
@@ -374,12 +374,12 @@ namespace DefaultCluster.Tests.General
 
         internal class SimpleGrainObserver : ISimpleGrainObserver
         {
-            private readonly Action<int, int, AsyncResultHandle> action;
-            private readonly AsyncResultHandle result;
+            private readonly Action<int, int, AsyncResultHandle>? action;
+            private readonly AsyncResultHandle? result;
 
             private readonly ILogger logger;
 
-            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result, ILogger logger)
+            public SimpleGrainObserver(Action<int, int, AsyncResultHandle>? action, AsyncResultHandle? result, ILogger logger)
             {
                 this.action = action;
                 this.result = result;
@@ -389,7 +389,7 @@ namespace DefaultCluster.Tests.General
             public void StateChanged(int a, int b)
             {
                 this.logger.LogDebug("SimpleGrainObserver.StateChanged a={A} b={B}", a, b);
-                action?.Invoke(a, b, result);
+                action?.Invoke(a, b, result!);
             }
         }
     }

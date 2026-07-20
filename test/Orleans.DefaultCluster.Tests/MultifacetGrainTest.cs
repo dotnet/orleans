@@ -14,8 +14,8 @@ namespace DefaultCluster.Tests.General
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
-        private IMultifacetWriter writer;
-        private IMultifacetReader reader;
+        private IMultifacetWriter writer = null!;
+        private IMultifacetReader reader = null!;
 
         //int eventCounter;
         private const int EXPECTED_NUMBER_OF_EVENTS = 4;

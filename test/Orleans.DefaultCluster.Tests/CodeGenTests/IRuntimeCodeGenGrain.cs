@@ -3,6 +3,7 @@ namespace Tester.CodeGenTests
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Threading.Tasks;
     using Orleans;
@@ -55,7 +56,7 @@ namespace Tester.CodeGenTests
         Task<Type[]> GetTypesInferred<T, U>(T t, U u, int v);
         Task<T> RoundTrip<T>(T val);
         Task<int> RoundTrip(int val);
-        Task<T> Default<T>();
+        Task<T?> Default<T>();
         Task<string> Default();
         Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IGrain;
         Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value);
@@ -69,7 +70,7 @@ namespace Tester.CodeGenTests
 
     public class GrainWithGenericMethods : Grain, IGrainWithGenericMethods
     {
-        private object state;
+        private object? state;
 
         public Task<Type[]> GetTypesExplicit<T, U, V>()
         {
@@ -96,7 +97,7 @@ namespace Tester.CodeGenTests
             return Task.FromResult(-val);
         }
 
-        public Task<T> Default<T>()
+        public Task<T?> Default<T>()
         {
             return Task.FromResult(default(T));
         }
@@ -116,7 +117,7 @@ namespace Tester.CodeGenTests
             this.state = value;
         }
 
-        public Task<T> GetValue<T>() => Task.FromResult((T) this.state);
+        public Task<T?> GetValue<T>() => Task.FromResult((T?)this.state);
 
         public Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value)
         {
@@ -137,7 +138,7 @@ namespace Tester.CodeGenTests
 
     public interface IGenericGrainWithGenericMethods<T> : IGrainWithGuidKey
     {
-        Task<T> Method(T value);
+        Task<T?> Method(T value);
 #pragma warning disable 693
         Task<T> Method<T>(T value);
 #pragma warning restore 693
@@ -145,7 +146,7 @@ namespace Tester.CodeGenTests
 
     public class GrainWithGenericMethods<T> : Grain, IGenericGrainWithGenericMethods<T>
     {
-        public Task<T> Method(T value) => Task.FromResult(default(T));
+        public Task<T?> Method(T value) => Task.FromResult(default(T));
 
 #pragma warning disable 693
         public Task<T> Method<T>(T value) => Task.FromResult(value);
@@ -188,7 +189,7 @@ namespace Tester.CodeGenTests
     public class GenericGrainState<T>
     {
         [Id(0)]
-        public T @event { get; set; }
+        public T @event { get; set; } = default!;
     }
 
     /// <summary>
@@ -221,7 +222,7 @@ namespace Tester.CodeGenTests
         /// A property with a reserved keyword type and identifier.
         /// </summary>
         [Id(2)]
-        public @event @public { get; set; }
+        public @event @public { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the enum.
@@ -233,7 +234,7 @@ namespace Tester.CodeGenTests
         /// A property with a reserved keyword generic type and identifier.
         /// </summary>
         [Id(4)]
-        public List<@event> @if { get; set; }
+        public List<@event> @if { get; set; } = null!;
 
         public static IEqualityComparer<@event> EventComparer
         {
@@ -260,7 +261,7 @@ namespace Tester.CodeGenTests
             }
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals([NotNullWhen(true)] object? obj)
         {
             if (ReferenceEquals(null, obj))
             {
@@ -280,7 +281,7 @@ namespace Tester.CodeGenTests
 
         public override int GetHashCode() => HashCode.Combine(@if, @public, privateId, Id, Enum);
 
-        public bool Equals(@event other)
+        public bool Equals(@event? other)
         {
             if (ReferenceEquals(null, other))
             {
@@ -311,9 +312,9 @@ namespace Tester.CodeGenTests
 
         private sealed class EventEqualityComparer : IEqualityComparer<@event>
         {
-            public bool Equals(@event x, @event y)
+            public bool Equals(@event? x, @event? y)
             {
-                return x.Equals(y);
+                return x!.Equals(y);
             }
 
             public int GetHashCode(@event obj)
@@ -327,13 +328,13 @@ namespace Tester.CodeGenTests
     public class NestedGeneric<T>
     {
         [Id(0)]
-        public Nested Payload { get; set; }
+        public Nested Payload { get; set; } = null!;
 
         [GenerateSerializer]
         public class Nested
         {
             [Id(0)]
-            public T Value { get; set; }
+            public T Value { get; set; } = default!;
         }
     }
 
@@ -341,13 +342,13 @@ namespace Tester.CodeGenTests
     public class NestedConstructedGeneric
     {
         [Id(0)]
-        public Nested<int> Payload { get; set; }
+        public Nested<int> Payload { get; set; } = null!;
 
         [GenerateSerializer]
         public class Nested<T>
         {
             [Id(0)]
-            public T Value { get; set; }
+            public T Value { get; set; } = default!;
         }
     }
 

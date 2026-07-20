@@ -732,7 +732,7 @@ namespace DefaultCluster.Tests.General
             var target = this.GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             await grain.ScheduleDelayedPingToSelfAndDeactivate(target, s1, TimeSpan.FromSeconds(5));
-            string s2 = null;
+            string? s2 = null;
             await TestingUtils.WaitUntilAsync(
                 async lastTry =>
                 {
@@ -920,7 +920,7 @@ namespace DefaultCluster.Tests.General
             {
             }
 
-            private static async Task<Type[]> GetConcreteGenArgs(IBasicGrain @this)
+            private static async Task<Type?[]> GetConcreteGenArgs(IBasicGrain @this)
             {
                 var genArgTypeNames = await @this.ConcreteGenArgTypeNames();
                 return genArgTypeNames.Select(Type.GetType).ToArray();

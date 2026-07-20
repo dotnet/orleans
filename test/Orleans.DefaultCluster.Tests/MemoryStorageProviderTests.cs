@@ -117,7 +117,7 @@ namespace DefaultCluster.Tests.StorageTests
             Assert.NotNull(latestEtag);
 
             // try delete state with null etag
-            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync<object>("id", null));
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync<object>("id", null!));
 
             // try delete state with wrong etag
             ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync<object>("id", latestEtag + "a"));
@@ -152,7 +152,7 @@ namespace DefaultCluster.Tests.StorageTests
                 };
             }
 
-            public static IGrainState<object> CreateWithEtag(string eTag)
+            public static IGrainState<object> CreateWithEtag(string? eTag)
             {
                 return new TestGrainState
                 {
@@ -162,10 +162,10 @@ namespace DefaultCluster.Tests.StorageTests
             }
 
             [Id(0)]
-            public object State { get; set; }
+            public object State { get; set; } = null!;
 
             [Id(1)]
-            public string ETag { get; set; }
+            public string? ETag { get; set; }
 
             [Id(2)]
             public bool RecordExists { get; set; }
