@@ -240,9 +240,7 @@ namespace Orleans.Runtime
                 throw new ArgumentException($"Could not find a controllable service for type {typeof(IControllable).FullName} and name {providerName}.");
             }
 
-#pragma warning disable CS8619 // IControllable has not yet annotated its nullable command result.
-            return controllable.ExecuteCommand(command, arg!);
-#pragma warning restore CS8619
+            return controllable.ExecuteCommand(command, arg);
         }
 
         public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)

@@ -610,7 +610,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public new static EventDataGeneratorAdapterFactory Create(System.IServiceProvider services, string name) { throw null; }
 
-        public virtual System.Threading.Tasks.Task<object> ExecuteCommand(int command, object arg) { throw null; }
+        public virtual System.Threading.Tasks.Task<object?> ExecuteCommand(int command, object? arg) { throw null; }
 
         public static string[] GenerateEventHubPartitions(int partitionCount) { throw null; }
 

@@ -404,7 +404,7 @@ namespace Orleans.Streams
             }
         }
 
-        public async Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg)
+        public async Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg)
         {
             latestCommandNumber++;
             int commandSeqNumber = latestCommandNumber;
@@ -422,7 +422,7 @@ namespace Orleans.Streams
                     case PersistentStreamProviderCommand.StartAgents:
                     case PersistentStreamProviderCommand.StopAgents:
                         await QueueCommandForExecution(command, commandSeqNumber);
-                        return null!; // These commands have no return value. The signature is constrained to Task<object> by IPersistentStreamPullingManager/IControllable (defined outside this project) and cannot be made nullable without breaking that contract.
+                        return null;
                     case PersistentStreamProviderCommand.GetAgentsState:
                         return managerState;
                     case PersistentStreamProviderCommand.GetNumberRunningAgents:

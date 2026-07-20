@@ -768,7 +768,7 @@ namespace Orleans.Providers.Streams.Common
 
         public static Orleans.Streams.IStreamProvider Create(System.IServiceProvider services, string name) { throw null; }
 
-        public System.Threading.Tasks.Task<object> ExecuteCommand(int command, object arg) { throw null; }
+        public System.Threading.Tasks.Task<object?> ExecuteCommand(int command, object? arg) { throw null; }
 
         public Orleans.Streams.IAsyncStream<T> GetStream<T>(Runtime.StreamId streamId) { throw null; }
 
@@ -966,7 +966,7 @@ namespace Orleans.Providers.Streams.Generator
 
         public Orleans.Streams.IQueueAdapterReceiver CreateReceiver(Orleans.Streams.QueueId queueId) { throw null; }
 
-        public System.Threading.Tasks.Task<object> ExecuteCommand(int command, object arg) { throw null; }
+        public System.Threading.Tasks.Task<object?> ExecuteCommand(int command, object? arg) { throw null; }
 
         public System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler> GetDeliveryFailureHandler(Orleans.Streams.QueueId queueId) { throw null; }
 

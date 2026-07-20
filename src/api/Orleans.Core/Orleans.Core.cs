@@ -1209,7 +1209,7 @@ namespace Orleans.Providers
 {
     public partial interface IControllable
     {
-        System.Threading.Tasks.Task<object> ExecuteCommand(int command, object arg);
+        System.Threading.Tasks.Task<object?> ExecuteCommand(int command, object? arg);
     }
 
     public partial interface IProviderRuntime

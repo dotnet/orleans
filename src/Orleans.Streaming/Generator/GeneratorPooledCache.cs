@@ -44,7 +44,8 @@ namespace Orleans.Providers.Streams.Generator
             //Deserialize payload
             int readOffset = 0;
             ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
-            object payloadObject = this.serializer.Deserialize<object>(payload);
+            // Generated batches always serialize a non-null payload.
+            object payloadObject = this.serializer.Deserialize<object>(payload)!;
             return new GeneratedBatchContainer(cachedMessage.StreamId,
                 payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
         }

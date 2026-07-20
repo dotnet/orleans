@@ -59,14 +59,14 @@ namespace Tester.TestStreamProviders.Controllable
             throw new NotImplementedException();
         }
 
-        public Task<object> ExecuteCommand(int command, object arg)
+        public Task<object?> ExecuteCommand(int command, object? arg)
         {
             switch ((ControllableTestStreamProviderCommands) command)
             {
                 case ControllableTestStreamProviderCommands.AdapterEcho:
-                    return Task.FromResult<object>(Tuple.Create(ControllableTestStreamProviderCommands.AdapterEcho, arg));
+                    return Task.FromResult<object?>(Tuple.Create(ControllableTestStreamProviderCommands.AdapterEcho, arg));
                 case ControllableTestStreamProviderCommands.AdapterFactoryEcho:
-                    return Task.FromResult<object>(Tuple.Create(ControllableTestStreamProviderCommands.AdapterFactoryEcho, arg));
+                    return Task.FromResult<object?>(Tuple.Create(ControllableTestStreamProviderCommands.AdapterFactoryEcho, arg));
             }
             throw new ArgumentOutOfRangeException(nameof(command));
         }

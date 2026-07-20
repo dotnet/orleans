@@ -159,7 +159,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <param name="command"></param>
         /// <param name="arg"></param>
         /// <returns></returns>
-        public virtual Task<object> ExecuteCommand(int command, object arg)
+        public virtual Task<object?> ExecuteCommand(int command, object? arg)
         {
             switch (command)
             {
@@ -172,7 +172,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                 default: break;
 
             }
-            return Task.FromResult((object)true);
+            return Task.FromResult<object?>(true);
         }
 
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)

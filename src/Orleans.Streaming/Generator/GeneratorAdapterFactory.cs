@@ -173,7 +173,7 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <inheritdoc />
-        public Task<object> ExecuteCommand(int command, object arg)
+        public Task<object?> ExecuteCommand(int command, object? arg)
         {
             if (arg == null)
             {
@@ -191,7 +191,7 @@ namespace Orleans.Providers.Streams.Generator
                 SetGeneratorOnReceiver(receiver.Value);
             }
 
-            return Task.FromResult<object>(true);
+            return Task.FromResult<object?>(true);
         }
 
         private class Receiver : IQueueAdapterReceiver

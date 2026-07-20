@@ -124,7 +124,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             ChangeCachePressure = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 13
         }
 
-        public override Task<object> ExecuteCommand(int command, object arg)
+        public override Task<object?> ExecuteCommand(int command, object? arg)
         {
             object? re = null;
             switch (command)
@@ -144,7 +144,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 default: return base.ExecuteCommand(command, arg);
 
             }
-            return Task.FromResult(re!);
+            return Task.FromResult(re);
         }
     }
 

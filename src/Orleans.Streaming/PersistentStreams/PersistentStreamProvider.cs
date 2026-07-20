@@ -188,7 +188,7 @@ namespace Orleans.Providers.Streams.Common
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
         }
 
-        public Task<object> ExecuteCommand(int command, object arg)
+        public Task<object?> ExecuteCommand(int command, object? arg)
         {
             if (command >= (int)PersistentStreamProviderCommand.AdapterCommandStartRange &&
                 command <= (int)PersistentStreamProviderCommand.AdapterCommandEndRange &&
@@ -239,6 +239,6 @@ namespace Orleans.Providers.Streams.Common
             Level = LogLevel.Warning,
             Message = "Got command {Command} with arg {Argument}, but PullingAgentManager is not initialized yet. Ignoring the command."
         )]
-        private partial void LogWarningGotCommand(PersistentStreamProviderCommand command, object argument);
+        private partial void LogWarningGotCommand(PersistentStreamProviderCommand command, object? argument);
     }
 }

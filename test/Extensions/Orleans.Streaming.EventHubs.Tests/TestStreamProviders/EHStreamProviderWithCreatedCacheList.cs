@@ -115,12 +115,12 @@ namespace ServiceBus.Tests.TestStreamProviders
         /// <param name="command"></param>
         /// <param name="arg"></param>
         /// <returns></returns>
-        public override Task<object> ExecuteCommand(int command, object arg)
+        public override Task<object?> ExecuteCommand(int command, object? arg)
         {
             switch (command)
             {
                 case IsCacheBackPressureTriggeredCommand:
-                    return Task.FromResult<object>(this.createdCaches.Any(cache => cache.IsUnderPressure));
+                    return Task.FromResult<object?>(this.createdCaches.Any(cache => cache.IsUnderPressure));
                 default: return base.ExecuteCommand(command, arg);
             }
         }
