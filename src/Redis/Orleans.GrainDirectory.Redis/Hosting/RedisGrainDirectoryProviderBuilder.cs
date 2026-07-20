@@ -9,7 +9,6 @@ using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 
-#nullable disable
 [assembly: RegisterProvider("Redis", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]
 
@@ -17,9 +16,9 @@ namespace Orleans.Hosting;
 
 internal sealed class RedisGrainDirectoryProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddRedisGrainDirectory(name, (OptionsBuilder<RedisGrainDirectoryOptions> optionsBuilder) =>
+        builder.AddRedisGrainDirectory(name!, (OptionsBuilder<RedisGrainDirectoryOptions> optionsBuilder) =>
         {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {

@@ -15,7 +15,6 @@ using Orleans.Storage;
 using StackExchange.Redis;
 using static System.FormattableString;
 
-#nullable disable
 namespace Orleans.Persistence
 {
     /// <summary>
@@ -32,8 +31,8 @@ namespace Orleans.Persistence
         private readonly IActivatorProvider _activatorProvider;
         private readonly IGrainStorageSerializer _grainStorageSerializer;
         private readonly Func<string, GrainId, RedisKey> _getKeyFunc;
-        private IConnectionMultiplexer _connection;
-        private IDatabase _db;
+        private IConnectionMultiplexer _connection = null!;
+        private IDatabase _db = null!;
         private bool _connectionIsShared;
 
         /// <summary>
@@ -97,7 +96,7 @@ namespace Orleans.Persistence
                 var hashEntries = await _db.HashGetAllAsync(key).ConfigureAwait(false);
                 if (hashEntries.Length == 2)
                 {
-                    string eTag = hashEntries.Single(static e => e.Name == "etag").Value;
+                    string? eTag = hashEntries.Single(static e => e.Name == "etag").Value;
                     grainState.ETag = eTag;
 
                     ReadOnlyMemory<byte> data = hashEntries.Single(static e => e.Name == "data").Value;
@@ -175,8 +174,8 @@ namespace Orleans.Persistence
         /// </summary>
         private RedisKey DefaultGetStorageKey(string grainType, GrainId grainId)
         {
-            var grainIdTypeBytes = IdSpan.UnsafeGetArray(grainId.Type.Value);
-            var grainIdKeyBytes = IdSpan.UnsafeGetArray(grainId.Key);
+            var grainIdTypeBytes = IdSpan.UnsafeGetArray(grainId.Type.Value)!;
+            var grainIdKeyBytes = IdSpan.UnsafeGetArray(grainId.Key)!;
             var grainTypeLength = Encoding.UTF8.GetByteCount(grainType);
             var suffix = new byte[grainIdTypeBytes.Length + 1 + grainIdKeyBytes.Length + 1 + grainTypeLength];
             var index = 0;
@@ -205,7 +204,7 @@ namespace Orleans.Persistence
             {
                 RedisValue etag = grainState.ETag ?? "";
                 RedisResult response;
-                string newETag;
+                string? newETag;
                 var key = _getKeyFunc(grainType, grainId);
                 if (_options.DeleteStateOnClear)
                 {
@@ -262,8 +261,8 @@ namespace Orleans.Persistence
             }
 
             var connectionIsShared = _connectionIsShared;
-            _connection = null;
-            _db = null;
+            _connection = null!;
+            _db = null!;
             _connectionIsShared = false;
 
             if (!connectionIsShared)
@@ -281,8 +280,8 @@ namespace Orleans.Persistence
             }
 
             var connectionIsShared = _connectionIsShared;
-            _connection = null;
-            _db = null;
+            _connection = null!;
+            _db = null!;
             _connectionIsShared = false;
 
             if (!connectionIsShared)

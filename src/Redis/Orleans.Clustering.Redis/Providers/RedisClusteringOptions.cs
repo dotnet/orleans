@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.Clustering.Redis
 {
     /// <summary>
@@ -18,7 +17,7 @@ namespace Orleans.Clustering.Redis
         /// Gets or sets the Redis client configuration.
         /// </summary>
         [RedactRedisConfigurationOptions]
-        public ConfigurationOptions ConfigurationOptions { get; set; }
+        public ConfigurationOptions? ConfigurationOptions { get; set; }
 
         /// <summary>
         /// The delegate used to create a Redis connection multiplexer and indicate whether it is shared.
@@ -44,7 +43,7 @@ namespace Orleans.Clustering.Redis
         /// </summary>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisClusteringOptions options)
         {
-            return (await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions), false);
+            return (await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), false);
         }
 
         /// <summary>
