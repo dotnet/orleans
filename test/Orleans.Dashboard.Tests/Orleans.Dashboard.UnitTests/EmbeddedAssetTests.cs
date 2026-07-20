@@ -109,6 +109,7 @@ namespace UnitTests
             var resourceName = $"{ResourcePrefix}index.html";
 
             using var stream = DashboardAssembly.GetManifestResourceStream(resourceName);
+            // The resource's presence is verified by Assembly_ContainsIndexHtml.
             using var reader = new System.IO.StreamReader(stream!);
             var content = reader.ReadToEnd();
 
