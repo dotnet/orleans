@@ -168,7 +168,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                     expectedPurgedBuffers.Add(purgedBufferList[i]);
             });
 
-            IList<IBatchContainer> ignore;
+            IList<IBatchContainer>? ignore;
             this.receiver1.TryPurgeFromCache(out ignore);
             this.receiver2.TryPurgeFromCache(out ignore);
 

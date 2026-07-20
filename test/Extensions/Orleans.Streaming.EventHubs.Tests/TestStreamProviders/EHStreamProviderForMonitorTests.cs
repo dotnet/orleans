@@ -152,7 +152,7 @@ namespace ServiceBus.Tests.TestStreamProviders
     {
         public bool UnderPressure { get; set; }
         private bool wasUnderPressur;
-        public ICacheMonitor CacheMonitor { set; private get; } = null!;
+        public ICacheMonitor? CacheMonitor { set; private get; }
         public CachePressureInjectionMonitor()
         {
             this.UnderPressure = false;

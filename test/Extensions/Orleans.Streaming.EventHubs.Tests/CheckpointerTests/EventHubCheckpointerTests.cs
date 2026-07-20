@@ -77,9 +77,9 @@ public class EventHubCheckpointerTests
 
         public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc) => [];
 
-        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken) => Cursor;
+        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken) => Cursor;
 
-        public void Refresh(object cursor, StreamSequenceToken sequenceToken)
+        public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
             RefreshedCursor = cursor;
             RefreshToken = sequenceToken;
@@ -113,9 +113,9 @@ public class EventHubCheckpointerTests
     {
         public int CloseCount { get; private set; }
 
-        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        public Task<IEnumerable<EventData>?> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
-            return Task.FromResult<IEnumerable<EventData>>([]);
+            return Task.FromResult<IEnumerable<EventData>?>([]);
         }
 
         public Task CloseAsync()
