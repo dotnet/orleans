@@ -120,6 +120,7 @@ namespace Orleans.Runtime
 
             // Initialize the message center
             messageCenter = Services.GetRequiredService<MessageCenter>();
+            runtimeClient.ConsumeServices();
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
             this.SystemStatus = SystemStatus.Created;
