@@ -101,12 +101,19 @@ public sealed class GrainDirectoryShutdownMigrationTests
             return;
         }
 
-        await foreach (var view in membershipService.ViewUpdates.WithCancellation(cancellationToken))
+        try
         {
-            if (expectedMembers.SetEquals(view.Members))
+            await foreach (var view in membershipService.ViewUpdates.WithCancellation(cancellationToken))
             {
-                return;
+                if (expectedMembers.SetEquals(view.Members))
+                {
+                    return;
+                }
             }
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("Timed out waiting for the distributed grain directory membership to stabilize.", exception);
         }
 
         throw new TimeoutException("Timed out waiting for the distributed grain directory membership to stabilize.");
@@ -241,7 +248,14 @@ internal sealed class DelayedMembershipManager(MembershipTableManager inner) : I
         if (status is SiloStatus.ShuttingDown)
         {
             // Model a membership provider which takes long enough to expose concurrent shutdown callbacks.
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // End the artificial delay promptly, but let the real manager publish the requested status.
+            }
         }
 
         await ((IMembershipManager)inner).UpdateLocalStatus(status, cancellationToken);
