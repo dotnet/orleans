@@ -246,7 +246,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (message.CacheInvalidationHeader is { } cacheUpdates && Volatile.Read(ref _isStopping) == 0)
+                if (message.CacheInvalidationHeader is { } cacheUpdates)
                 {
                     lock (cacheUpdates)
                     {
@@ -422,12 +422,6 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (Volatile.Read(ref _isStopping) != 0)
-            {
-                ProcessResponseCallback(message, hostShutdown: result is Message.ResponseTypes.Status);
-                return;
-            }
-
             if (result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))
@@ -471,20 +465,13 @@ namespace Orleans.Runtime
             }
         }
 
-        private void ProcessResponseCallback(Message message, bool hostShutdown = false)
+        private void ProcessResponseCallback(Message message)
         {
             if (callbacks.TryRemove((message.TargetGrain, message.Id), out var callbackData))
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                if (hostShutdown)
-                {
-                    callbackData.OnHostShutdown();
-                }
-                else
-                {
-                    callbackData.DoCallback(message);
-                }
+                callbackData.DoCallback(message);
             }
             else
             {
