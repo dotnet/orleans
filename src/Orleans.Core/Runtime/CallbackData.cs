@@ -8,19 +8,17 @@ namespace Orleans.Runtime
 {
     internal sealed partial class CallbackData
     {
-        private const int CancellationRegistrationNone = 0;
-        private const int CancellationRegistrationPending = 1;
-        private const int CancellationRegistrationPublished = 2;
-        private const int CancellationRegistrationDisposed = 3;
+        private const int StateNone = 0;
+        private const int StateCompleted = 1;
+        private const int StateCancellationRegistrationPending = 2;
+        private const int StateCancellationRegistrationPublished = 4;
 
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
-        private int completed;
-        private int _cancellationRegistrationState;
+        private int _state;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
-        private CancellationToken _cancellationToken;
         private CancellationTokenRegistration _cancellationTokenRegistration;
 
         public CallbackData(
@@ -38,7 +36,7 @@ namespace Orleans.Runtime
 
         public Message Message { get; } // might hold metadata used by response pipeline
 
-        public bool IsCompleted => this.completed == 1;
+        public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
 
         public void SubscribeForCancellation(CancellationToken cancellationToken)
         {
@@ -47,26 +45,25 @@ namespace Orleans.Runtime
                 return;
             }
 
-            _cancellationToken = cancellationToken;
             if (Interlocked.CompareExchange(
-                ref _cancellationRegistrationState,
-                CancellationRegistrationPending,
-                CancellationRegistrationNone) != CancellationRegistrationNone)
+                ref _state,
+                StateCancellationRegistrationPending,
+                StateNone) != StateNone)
             {
                 return;
             }
 
-            var registration = cancellationToken.UnsafeRegister(static arg =>
+            var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
             {
                 var callbackData = (CallbackData)arg!;
-                callbackData.OnCancellation();
+                callbackData.OnCancellation(token);
             }, this);
 
             _cancellationTokenRegistration = registration;
             if (Interlocked.CompareExchange(
-                ref _cancellationRegistrationState,
-                CancellationRegistrationPublished,
-                CancellationRegistrationPending) != CancellationRegistrationPending)
+                ref _state,
+                StateCancellationRegistrationPublished,
+                StateCancellationRegistrationPending) != StateCancellationRegistrationPending)
             {
                 registration.Dispose();
             }
@@ -113,7 +110,7 @@ namespace Orleans.Runtime
             return type.IsDefault ? "unknown" : type.ToString()!;
         }
 
-        private void OnCancellation()
+        private void OnCancellation(CancellationToken cancellationToken)
         {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
@@ -125,7 +122,7 @@ namespace Orleans.Runtime
 
             // Otherwise, cancel the request immediately, without waiting for the callee to acknowledge the
             // cancellation request. The callee will still be signaled.
-            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
+            if (!TryComplete())
             {
                 return;
             }
@@ -136,13 +133,13 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
-            context.Complete(Response.FromException(new OperationCanceledException(_cancellationToken)));
+            context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
             DisposeCancellationRegistration();
         }
 
         public void OnTimeout()
         {
-            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
+            if (!TryComplete())
             {
                 return;
             }
@@ -172,7 +169,7 @@ namespace Orleans.Runtime
 
         public void OnTargetSiloFail()
         {
-            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            if (!TryComplete())
             {
                 return;
             }
@@ -192,7 +189,7 @@ namespace Orleans.Runtime
 
         public void OnHostShutdown()
         {
-            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            if (!TryComplete())
             {
                 return;
             }
@@ -209,7 +206,7 @@ namespace Orleans.Runtime
 
         public void DoCallback(Message response)
         {
-            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            if (!TryComplete())
             {
                 return;
             }
@@ -224,27 +221,14 @@ namespace Orleans.Runtime
             ResponseCallback(response, this.context);
         }
 
+        private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
+
         private void DisposeCancellationRegistration()
         {
-            // Registration can invoke the cancellation callback synchronously before UnsafeRegister
-            // returns. Transfer the state to Disposed and let the publisher dispose in that case.
-            while (true)
+            // If registration is still pending, its publisher observes completion and disposes it.
+            if ((Volatile.Read(ref _state) & StateCancellationRegistrationPublished) != 0)
             {
-                var state = Volatile.Read(ref _cancellationRegistrationState);
-                if (state == CancellationRegistrationDisposed)
-                {
-                    return;
-                }
-
-                if (Interlocked.CompareExchange(ref _cancellationRegistrationState, CancellationRegistrationDisposed, state) == state)
-                {
-                    if (state == CancellationRegistrationPublished)
-                    {
-                        _cancellationTokenRegistration.Dispose();
-                    }
-
-                    return;
-                }
+                _cancellationTokenRegistration.Dispose();
             }
         }
 

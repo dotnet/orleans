@@ -34,7 +34,7 @@ public class CallbackDataTests
     }
 
     [Fact, TestCategory("BVT")]
-    public void CancellationRegistrationAddedAfterCompletionIsDisposed()
+    public void CancellationSubscriptionAfterCompletionDoesNotRetainCallback()
     {
         using var serviceProvider = CreateServiceProvider();
         using var cancellation = new CancellationTokenSource();
