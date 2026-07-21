@@ -241,7 +241,7 @@ internal sealed class DelayedMembershipManager(MembershipTableManager inner) : I
         if (status is SiloStatus.ShuttingDown)
         {
             // Model a membership provider which takes long enough to expose concurrent shutdown callbacks.
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
 
         await ((IMembershipManager)inner).UpdateLocalStatus(status, cancellationToken);
