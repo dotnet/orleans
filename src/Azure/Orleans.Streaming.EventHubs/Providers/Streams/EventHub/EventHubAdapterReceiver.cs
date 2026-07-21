@@ -273,9 +273,7 @@ namespace Orleans.Streaming.EventHubs
                 {
                     if (localReceiver != null)
                     {
-                        closeTask = localReceiver is ICancellableEventHubReceiver cancellableReceiver
-                            ? cancellableReceiver.CloseAsync(closeCancellationToken)
-                            : localReceiver.CloseAsync();
+                        closeTask = localReceiver.CloseAsync(closeCancellationToken);
                     }
                 }
                 catch (Exception ex)

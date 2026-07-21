@@ -28,17 +28,19 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <returns></returns>
         Task CloseAsync();
-    }
 
-    internal interface ICancellableEventHubReceiver
-    {
-        Task CloseAsync(CancellationToken cancellationToken);
+        /// <summary>
+        /// Sends a cleanup message which can be canceled.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the operation.</param>
+        /// <returns>A task representing the operation.</returns>
+        Task CloseAsync(CancellationToken cancellationToken) => CloseAsync();
     }
 
     /// <summary>
     /// pass through decorator class for EventHubReceiver
     /// </summary>
-    internal partial class EventHubReceiverProxy : IEventHubReceiver, ICancellableEventHubReceiver
+    internal partial class EventHubReceiverProxy : IEventHubReceiver
     {
         private readonly PartitionReceiver client;
 

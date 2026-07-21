@@ -109,9 +109,24 @@ public class EventHubCheckpointerTests
         }
     }
 
-    private sealed class TestEventHubReceiver : IEventHubReceiver, ICancellableEventHubReceiver
+    private sealed class TestEventHubReceiver : IEventHubReceiver
     {
-        public bool BlockCloseUntilCanceled { get; set; }
+        public int CloseCount { get; private set; }
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        {
+            return Task.FromResult<IEnumerable<EventData>>([]);
+        }
+
+        public Task CloseAsync()
+        {
+            CloseCount++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class BlockingEventHubReceiver : IEventHubReceiver
+    {
         public int CloseCount { get; private set; }
 
         public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
@@ -124,9 +139,7 @@ public class EventHubCheckpointerTests
         public Task CloseAsync(CancellationToken cancellationToken)
         {
             CloseCount++;
-            return BlockCloseUntilCanceled
-                ? Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken)
-                : Task.CompletedTask;
+            return Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
     }
 
@@ -148,7 +161,7 @@ public class EventHubCheckpointerTests
     private static async Task<EventHubAdapterReceiver> CreateReceiver(
         TestCheckpointer checkpointer,
         TestEventHubQueueCache cache = null,
-        TestEventHubReceiver eventHubReceiver = null)
+        IEventHubReceiver eventHubReceiver = null)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -217,7 +230,7 @@ public class EventHubCheckpointerTests
     {
         var checkpointer = new TestCheckpointer();
         var cache = new TestEventHubQueueCache();
-        var eventHubReceiver = new TestEventHubReceiver { BlockCloseUntilCanceled = true };
+        var eventHubReceiver = new BlockingEventHubReceiver();
         var receiver = await CreateReceiver(checkpointer, cache, eventHubReceiver);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
