@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
-        private int isStopping;
+        private int _isStopping;
 
         private GrainLocator grainLocator;
         private MessageCenter messageCenter;
@@ -180,17 +180,27 @@ namespace Orleans.Runtime
 
                 // Register a callback for the request.
                 callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
+
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
             {
                 context?.Complete();
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    return;
+                }
             }
 
             // Completing callbacks during shutdown can resume application code which issues follow-up
             // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
-            if (Volatile.Read(ref this.isStopping) != 0)
+            if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
                 return;
@@ -528,7 +538,7 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
-            Volatile.Write(ref this.isStopping, 1);
+            Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
             // Once the silo is shutting down it can no longer receive responses, so any requests which
             // are still outstanding will never complete. Fault them now so that in-flight grain calls

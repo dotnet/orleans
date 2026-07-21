@@ -28,6 +28,7 @@ namespace Orleans
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
+        private int _isStopping;
         private bool disposing;
         private bool disposed;
 
@@ -155,7 +156,12 @@ namespace Orleans
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+
+            // Fault callbacks before any cancellation-sensitive waits. Completing them can resume code
+            // which issues follow-up calls, so request admission must already be closed.
+            BreakOutstandingMessages();
 
             if (this.callbackTimerTask is { } task)
             {
@@ -166,11 +172,6 @@ namespace Orleans
             {
                 await messageCenter.StopAsync(cancellationToken);
             }
-
-            // Once messaging has stopped the client can no longer receive responses, so any requests
-            // which are still outstanding will never complete. Fault them now so that in-flight grain
-            // calls observe a terminal result instead of hanging forever.
-            BreakOutstandingMessages();
 
             if (_manifestProvider is { } provider)
             {
@@ -291,12 +292,28 @@ namespace Orleans
             if (!oneWay)
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments);
-                callbackData.SubscribeForCancellation(cancellationToken);
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
+
                 callbacks.TryAdd(message.Id, callbackData);
+                callbackData.SubscribeForCancellation(cancellationToken);
+
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
             }
             else
             {
                 context?.Complete();
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    return;
+                }
             }
 
             LogSendingMessage(logger, message);
@@ -418,8 +435,10 @@ namespace Orleans
         {
             if (this.disposing) return;
             this.disposing = true;
+            Volatile.Write(ref _isStopping, 1);
 
             Utils.SafeExecute(() => this.callbackTimer.Dispose());
+            BreakOutstandingMessages();
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 

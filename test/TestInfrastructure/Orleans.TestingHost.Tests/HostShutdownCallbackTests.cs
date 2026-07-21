@@ -31,6 +31,7 @@ namespace Orleans.TestingHost.Tests
 
             // Start (but do not await) a call to a grain that blocks and never responds.
             var pending = blocker.BlockUntilReleased();
+            var followUp = RetryAfterFailure(pending, blocker);
             Assert.True(await RemoteBlockerGrain.WaitForEntered(key, TimeSpan.FromSeconds(30)), "The blocking call was never entered.");
 
             // Stop the client while the call is in-flight.
@@ -41,7 +42,23 @@ namespace Orleans.TestingHost.Tests
             Assert.True(faulted == pending, "Stopping the client should fault in-flight calls instead of hanging.");
             await Assert.ThrowsAnyAsync<Exception>(async () => await pending);
 
+            var followUpFaulted = await Task.WhenAny(followUp, Task.Delay(TimeSpan.FromSeconds(30)));
+            Assert.True(followUpFaulted == followUp, "Calls issued after client shutdown begins should fault instead of hanging.");
+            await Assert.ThrowsAnyAsync<Exception>(async () => await followUp);
+
             RemoteBlockerGrain.Release(key);
+        }
+
+        private static async Task RetryAfterFailure(Task pending, IRemoteBlockerGrain blocker)
+        {
+            try
+            {
+                await pending;
+            }
+            catch
+            {
+                await blocker.BlockUntilReleased();
+            }
         }
     }
 }
