@@ -182,7 +182,7 @@ namespace Orleans.Runtime
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            CallbackData callbackData = null;
+            CallbackData? callbackData = null;
             if (!oneWay)
             {
                 Debug.Assert(context is not null);
