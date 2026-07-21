@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost.Tests.Grains;
 using TestExtensions;
 using Xunit;
@@ -102,32 +102,39 @@ namespace Orleans.TestingHost.Tests
             await cluster.DeployAsync();
 
             var client = cluster.Client;
+            var launcherHandle = cluster.Silos[0];
+            var remoteHandle = cluster.Silos[1];
 
-            // The launcher is an identity-placed grain: it gives us a deterministic silo to kill, and
-            // the stateless worker it invokes is placed on that same silo.
+            // Place the launcher on the silo which will be killed. The stateless workers it invokes are
+            // placed on that same silo.
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, launcherHandle.SiloAddress);
             var launcher = client.GetGrain<ILauncherGrain>(Guid.NewGuid());
-            var launcherSilo = await launcher.GetSiloIdentity();
+            try
+            {
+                Assert.Equal(launcherHandle.SiloAddress.ToString(), await launcher.GetSiloIdentity());
+            }
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
 
             var remoteKeys = new List<Guid>(PendingCallCount);
             for (var call = 0; call < PendingCallCount; call++)
             {
-                // Each remote blocker must live on a different silo so the worker's call is a genuine
-                // outbound request whose response is severed when the launcher's silo is killed.
-                IRemoteBlockerGrain remote = null;
-                var remoteKey = Guid.Empty;
-                for (var attempt = 0; attempt < 200 && remote is null; attempt++)
+                // Place each blocker on the surviving silo so the worker's call is a genuine outbound
+                // request whose response is severed when the launcher's silo is killed.
+                var remoteKey = Guid.NewGuid();
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, remoteHandle.SiloAddress);
+                var remote = client.GetGrain<IRemoteBlockerGrain>(remoteKey);
+                try
                 {
-                    var key = Guid.NewGuid();
-                    var candidate = client.GetGrain<IRemoteBlockerGrain>(key);
-                    var silo = await candidate.GetSiloIdentity();
-                    if (silo != launcherSilo)
-                    {
-                        remote = candidate;
-                        remoteKey = key;
-                    }
+                    Assert.Equal(remoteHandle.SiloAddress.ToString(), await remote.GetSiloIdentity());
+                }
+                finally
+                {
+                    RequestContext.Remove(IPlacementDirector.PlacementHintKey);
                 }
 
-                Assert.NotNull(remote);
                 remoteKeys.Add(remoteKey);
 
                 // Trigger the outbound call from a stateless worker co-located on the launcher's silo.
@@ -135,8 +142,6 @@ namespace Orleans.TestingHost.Tests
                 await launcher.StartBlockingCall(worker, remote);
                 Assert.True(await RemoteBlockerGrain.WaitForEntered(remoteKey, TimeSpan.FromSeconds(30)), "The blocking call was never entered.");
             }
-
-            var launcherHandle = cluster.Silos.Single(s => s.SiloAddress.ToString() == launcherSilo);
 
             // Kill the launcher's silo (ungraceful) and dispose its host. Prior to the fix this can hang
             // if cancellation interrupts callback timer shutdown before the callbacks are faulted.
