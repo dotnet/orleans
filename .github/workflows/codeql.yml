@@ -14,6 +14,7 @@ on:
     - cron: '0 6 * * 1'  # Run weekly on Monday at 6:00 UTC
 
 jobs:
+  # Keep the final job id as "analyze" so CodeQL matches its analysis_key to the configuration on main.
   generate:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
