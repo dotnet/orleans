@@ -365,6 +365,8 @@ namespace Orleans
         public const int ApplicationServices = 10000;
         public const int BecomeActive = 19999;
         public const int First = int.MinValue;
+        public const int GrainDeactivation = 19998;
+        public const int GrainDirectoryShutdown = 19997;
         public const int Last = int.MaxValue;
         public const int RuntimeGrainServices = 8000;
         public const int RuntimeInitialize = 2000;

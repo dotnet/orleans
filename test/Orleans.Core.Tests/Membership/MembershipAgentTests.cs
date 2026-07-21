@@ -155,7 +155,7 @@ namespace NonSilo.Tests.Membership
 
             await StopLifecycle();
 
-            Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.BecomeActive - 1]);
+            Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.GrainDeactivation]);
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
@@ -202,7 +202,7 @@ namespace NonSilo.Tests.Membership
             cancellation.Cancel();
             await StopLifecycle(cancellation.Token);
 
-            Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.BecomeActive - 1]);
+            Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.GrainDeactivation]);
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
