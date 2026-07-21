@@ -56,11 +56,11 @@ namespace Orleans.Runtime
 
         public MethodInfo InterfaceMethod => request.GetMethod();
 
-        public object? Result { get => TypedResult; set => TypedResult = (TResult)value!; }
+        public object? Result { get => TypedResult; set => TypedResult = (TResult?)value; }
 
         public Response? Response { get; set; }
 
-        public TResult TypedResult { get => Response!.GetResult<TResult>()!; set => Response = Response.FromResult(value); }
+        public TResult? TypedResult { get => Response!.GetResult<TResult>(); set => Response = Response.FromResult(value); }
 
         public IGrainContext? SourceContext { get; }
 

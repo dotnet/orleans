@@ -151,7 +151,7 @@ namespace UnitTests.StreamingTests
             await ErrorInjectionStorageProvider.SetErrorInjection(
                 providerName,
                 new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint },
-                this.HostedCluster.GrainFactory);
+                this.HostedCluster.GrainFactory!);
         }
     }
 }

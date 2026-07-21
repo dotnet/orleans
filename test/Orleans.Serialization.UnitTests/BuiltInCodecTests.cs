@@ -4484,7 +4484,7 @@ namespace Orleans.Serialization.UnitTests
     {
         public object Cast(IAddressable grain, Type interfaceType) => grain;
 
-        public ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        public ValueTask<T?> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
             => throw new NotSupportedException("Grain invocations are not supported in codec tests.");
 
         public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)

@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
@@ -114,17 +113,17 @@ namespace Orleans.Serialization.Invocation
     /// A fulfillable promise.
     /// </summary>
     /// <typeparam name="TResult">The underlying result type.</typeparam>
-    public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult>, IValueTaskSource
+    public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult?>, IValueTaskSource
     {
         // This source is pooled and GetResult returns it to the pool. Continuations must not run inline from SetResult/SetException,
         // or they can reset/reuse this instance before completion unwinds.
-        private ManualResetValueTaskSourceCore<TResult> _core = new() { RunContinuationsAsynchronously = true };
+        private ManualResetValueTaskSourceCore<TResult?> _core = new() { RunContinuationsAsynchronously = true };
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
         /// </summary>
         /// <returns>This instance, as a <see cref="ValueTask{Response}"/>.</returns>
-        public ValueTask<TResult> AsValueTask() => new(this, _core.Version);
+        public ValueTask<TResult?> AsValueTask() => new(this, _core.Version);
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask"/>.
@@ -157,7 +156,7 @@ namespace Orleans.Serialization.Invocation
         /// Completes this instance with a result.
         /// </summary>
         /// <param name="result">The result.</param>
-        public void SetResult([AllowNull] TResult result) => _core.SetResult(result!);
+        public void SetResult(TResult? result) => _core.SetResult(result);
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -232,7 +231,7 @@ namespace Orleans.Serialization.Invocation
         public void Complete() => SetResult(default);
 
         /// <inheritdoc/>
-        public TResult GetResult(short token)
+        public TResult? GetResult(short token)
         {
             bool isValid = token == _core.Version;
             try

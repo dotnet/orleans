@@ -86,11 +86,11 @@ namespace Tester.HeterogeneousSilosTests
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory.GetGrain<ITestGrain>(0));
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Should not fail
-            this.cluster!.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
+            this.cluster!.GrainFactory!.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
 
@@ -149,7 +149,7 @@ namespace Tester.HeterogeneousSilosTests
             {
                 try
                 {
-                    this.cluster!.GrainFactory.GetGrain<T>(0);
+                    this.cluster!.GrainFactory!.GetGrain<T>(0);
                     return;
                 }
                 catch (ArgumentException)
@@ -172,7 +172,7 @@ namespace Tester.HeterogeneousSilosTests
             {
                 try
                 {
-                    this.cluster!.GrainFactory.GetGrain<T>(0);
+                    this.cluster!.GrainFactory!.GetGrain<T>(0);
                 }
                 catch (ArgumentException)
                 {
@@ -192,7 +192,7 @@ namespace Tester.HeterogeneousSilosTests
             var delayTimeout = RefreshInterval.Add(RefreshInterval);
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory.GetGrain<T>(0));
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Start a new silo with TestGrain
@@ -213,7 +213,7 @@ namespace Tester.HeterogeneousSilosTests
             for (var i = 0; i < 5; i++)
             {
                 // Success
-                var g = this.cluster.GrainFactory.GetGrain<T>(i);
+                var g = this.cluster.GrainFactory!.GetGrain<T>(i);
                 await func(g);
             }
 
@@ -233,7 +233,7 @@ namespace Tester.HeterogeneousSilosTests
             }
 
             // Should fail
-            exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
+            exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory!.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
         }
 

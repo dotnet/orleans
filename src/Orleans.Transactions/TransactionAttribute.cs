@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -341,6 +342,7 @@ namespace Orleans
             _response.Dispose();
         }
 
+        [return: MaybeNull]
         public override T GetResult<T>() => _response.GetResult<T>();
     }
 

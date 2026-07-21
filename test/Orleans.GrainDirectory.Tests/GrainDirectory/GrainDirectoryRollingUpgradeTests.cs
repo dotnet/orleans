@@ -75,7 +75,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             await cluster.DeployAsync();
             output.WriteLine($"Cluster deployed with {cluster.Silos.Count} silos (LocalGrainDirectory only).");
 
-            IGrainFactory client = cluster.Client;
+            IGrainFactory client = cluster.Client!;
             var grainId = 0L;
             var nextGrainId = () => Interlocked.Increment(ref grainId);
 
@@ -102,7 +102,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 }
 
                 await cluster.InitializeClientAsync();
-                client = cluster.Client;
+                client = cluster.Client!;
 
                 // Phase 3: Stop old silos one at a time, non-primary first.
                 output.WriteLine($"Phase 3: Removing {oldSilos.Count} old LocalGrainDirectory silos...");
@@ -196,7 +196,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 var view = views[i];
                 for (var partitionIndex = 0; partitionIndex < membershipService.PartitionsPerSilo; partitionIndex++)
                 {
-                    var replica = cluster.InternalClient.GetSystemTarget<IGrainDirectoryTestHooks>(
+                    var replica = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                         GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
                     partitionWaits.Add(replica.WaitForMembershipVersionAsync(view.Version).AsTask());
                 }
@@ -273,7 +273,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
             for (var partitionIndex = 0; partitionIndex < membershipService.PartitionsPerSilo; partitionIndex++)
             {
-                var replica = cluster.InternalClient.GetSystemTarget<IGrainDirectoryTestHooks>(
+                var replica = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                     GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
                 distributedPartitions.Add(replica);
             }
@@ -462,14 +462,14 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             return;
         }
 
-        var grain = cluster.Client.GetGrain<IRollingUpgradeTestGrain>(grainKey);
+        var grain = cluster.Client!.GetGrain<IRollingUpgradeTestGrain>(grainKey);
         var grainId = grain.GetGrainId();
         output.WriteLine($"DETAILED GRAIN REPORTS for failing grain key {grainKey} ({grainId}):");
         foreach (var silo in cluster.Silos)
         {
             try
             {
-                var siloControl = cluster.InternalClient.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo.SiloAddress);
+                var siloControl = cluster.InternalClient!.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo.SiloAddress);
                 var report = await siloControl.GetDetailedGrainReport(grainId);
                 output.WriteLine(report.ToString());
             }

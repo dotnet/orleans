@@ -17,7 +17,7 @@ namespace TestExtensions
 
         internal IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
 
-        public IClusterClient Client => this.HostedCluster.Client;
+        public IClusterClient Client => this.HostedCluster.Client!; // Per-test clusters deploy the client.
 
         protected IGrainFactory GrainFactory => this.Client;
 

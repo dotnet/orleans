@@ -63,7 +63,7 @@ namespace UnitTests.Streaming
             Guid streamId = Guid.NewGuid();
             var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
             // consumer joins first, producer later
-            IStreaming_ConsumerGrain consumer = this.HostedCluster.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
+            IStreaming_ConsumerGrain consumer = this.HostedCluster.GrainFactory!.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
             await Assert.ThrowsAsync<KeyNotFoundException>(() => consumer.BecomeConsumer(streamId, STREAM_PROVIDER_NAME, null!));
         }
 

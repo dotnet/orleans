@@ -20,7 +20,7 @@ namespace DefaultCluster.Tests
 
         public GrainReferenceCastTests(DefaultClusterFixture fixture) : base(fixture)
         {
-            var client = this.HostedCluster.Client;
+            var client = this.HostedCluster.Client!;
             this.internalGrainFactory = client.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
         }
 

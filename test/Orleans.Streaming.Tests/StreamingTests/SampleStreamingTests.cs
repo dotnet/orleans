@@ -44,10 +44,10 @@ namespace UnitTests.StreamingTests
         public async Task StreamingTests_Consumer_Producer(Guid streamId)
         {
             // consumer joins first, producer later
-            var consumer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            var consumer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
-            var producer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
@@ -71,10 +71,10 @@ namespace UnitTests.StreamingTests
         public async Task StreamingTests_Producer_Consumer(Guid streamId)
         {
             // producer joins first, consumer later
-            var producer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
-            var consumer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            var consumer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
@@ -99,10 +99,10 @@ namespace UnitTests.StreamingTests
         public async Task StreamingTests_Producer_InlineConsumer(Guid streamId)
         {
             // producer joins first, consumer later
-            var producer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
-            var consumer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_InlineConsumerGrain>(Guid.NewGuid());
+            var consumer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_InlineConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();

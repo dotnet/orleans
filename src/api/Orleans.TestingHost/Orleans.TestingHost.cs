@@ -82,7 +82,7 @@ namespace Orleans.TestingHost
     {
         public InProcessTestCluster(InProcessTestClusterOptions options, ITestClusterPortAllocator portAllocator) { }
 
-        public IClusterClient Client { get { throw null; } }
+        public IClusterClient? Client { get { throw null; } }
 
         public InProcessTestClusterOptions Options { get { throw null; } }
 
@@ -346,13 +346,13 @@ namespace Orleans.TestingHost
     {
         public TestCluster(TestClusterOptions options, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationSources, ITestClusterPortAllocator portAllocator) { }
 
-        public IClusterClient Client { get { throw null; } }
+        public IClusterClient? Client { get { throw null; } }
 
         public System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> ConfigurationSources { get { throw null; } }
 
         public System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.Tasks.Task<SiloHandle>> CreateSiloAsync { set { } }
 
-        public IGrainFactory GrainFactory { get { throw null; } }
+        public IGrainFactory? GrainFactory { get { throw null; } }
 
         public TestClusterOptions Options { get { throw null; } }
 

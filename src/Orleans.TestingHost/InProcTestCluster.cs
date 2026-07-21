@@ -73,12 +73,12 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>()!;
+    internal IInternalClusterClient? InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
 
     /// <summary>
     /// The client.
     /// </summary>
-    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>()!;
+    public IClusterClient? Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
 
     /// <summary>
     /// The port allocator.
@@ -208,7 +208,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
         }
 
-        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+        await Client!.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle(); // Migration requires a deployed client.
         await deactivated;
     }
 
@@ -291,7 +291,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
             foreach (var silo in silos)
             {
-                var hooks = InternalClient.GetTestHooks(silo);
+                var hooks = InternalClient!.GetTestHooks(silo); // Membership stabilization requires a deployed client.
                 var statuses = await hooks.GetApproximateSiloStatuses();
                 var activeCount = statuses.Count(s => s.Value == SiloStatus.Active);
                 if (activeCount != expectedCount) break;
@@ -354,7 +354,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
     public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
@@ -385,7 +385,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
     public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
         var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();

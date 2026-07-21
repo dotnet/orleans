@@ -101,7 +101,7 @@ namespace Orleans.TestingHost.Tests
             await using var cluster = builder.Build();
             await cluster.DeployAsync();
 
-            var client = cluster.Client;
+            var client = cluster.Client!; // DeployAsync initializes the client.
             var launcherHandle = cluster.Silos[0];
             var remoteHandle = cluster.Silos[1];
 

@@ -26,7 +26,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
     [SkippableFact]
     public async Task Programmatic_Subscribe_Provider_WithExplicitPubsub_TryGetStreamSubscrptionManager()
     {
-        var subGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
+        var subGrain = this.fixture.HostedCluster.GrainFactory!.GetGrain<ISubscribeGrain>(Guid.NewGuid());
         Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
     }
     
@@ -51,9 +51,9 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
         //set up subscription for 10 consumer grains
         var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
-        var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
+        var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory!.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
 
-        var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+        var producer = this.fixture.HostedCluster.GrainFactory!.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
         await ProduceExactCountAsync(producer, EventCountPerPhase);
@@ -293,7 +293,7 @@ public class SubscriptionManager
     private readonly IStreamSubscriptionManager subManager;
     public SubscriptionManager(TestCluster cluster)
     {
-        this.grainFactory = cluster.GrainFactory;
+        this.grainFactory = cluster.GrainFactory!;
         this.serviceProvider = cluster.ServiceProvider;
         var admin = serviceProvider.GetRequiredService<IStreamSubscriptionManagerAdmin>();
         this.subManager = admin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);

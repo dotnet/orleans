@@ -33,7 +33,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         // Move the rebalancer to the first secondary silo, since we will stop it later and we cannot stop
         // the primary in this test setup.
         RequestContext.Set(IPlacementDirector.PlacementHintKey, Cluster.Silos[1].SiloAddress);
-        await Cluster.Client.GetGrain<IActivationRebalancerWorker>(0).Cast<IGrainManagementExtension>().MigrateOnIdle();
+        await Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0).Cast<IGrainManagementExtension>().MigrateOnIdle();
         RequestContext.Remove(IPlacementDirector.PlacementHintKey);
 
         AddTestActivations(tasks, Silo1, 300);

@@ -25,7 +25,7 @@ namespace Tester.ClientConnectionTests
         [Fact]
         public async Task ConnectIsRetryableTest()
         {
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
             var gwEndpoint = gateways.First();
 
             // Create a client with no gateway endpoint and then add a gateway endpoint when the client fails to connect.

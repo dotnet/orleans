@@ -2261,7 +2261,7 @@ namespace Orleans.Runtime
 
         protected System.Threading.Tasks.ValueTask InvokeAsync(IRequest methodDescription) { throw null; }
 
-        protected System.Threading.Tasks.ValueTask<T> InvokeAsync<T>(IRequest methodDescription) { throw null; }
+        protected System.Threading.Tasks.ValueTask<T?> InvokeAsync<T>(IRequest methodDescription) { throw null; }
 
         public static bool operator ==(GrainReference? reference1, GrainReference? reference2) { throw null; }
 
@@ -2434,13 +2434,13 @@ namespace Orleans.Runtime
         [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask DisposeAsync(System.Guid requestId);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> MoveNext<T>(System.Guid requestId, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> MoveNext<T>(System.Guid requestId, System.Threading.CancellationToken cancellationToken);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> MoveNext<T>(System.Guid requestId);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> MoveNext<T>(System.Guid requestId);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request, System.Threading.CancellationToken cancellationToken);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request);
     }
 
     public partial interface IAsyncEnumerableRequest<T> : IRequest, Orleans.Serialization.Invocation.IInvokable, System.IDisposable
@@ -2592,7 +2592,7 @@ namespace Orleans.Runtime
         object Cast(IAddressable grain, System.Type interfaceType);
         void InvokeMethod(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
         System.Threading.Tasks.ValueTask InvokeMethodAsync(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
-        System.Threading.Tasks.ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
+        System.Threading.Tasks.ValueTask<T?> InvokeMethodAsync<T>(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
     }
 
     public partial interface IGrainRuntime

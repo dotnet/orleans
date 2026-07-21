@@ -173,7 +173,7 @@ namespace Orleans.Connections.Security.Tests
                 var client = testCluster.Client;
 
                 // Test that grain calls work over TLS-encrypted connections
-                var grain = client.GetGrain<IPingGrain>("pingu");
+                var grain = client!.GetGrain<IPingGrain>("pingu"); // DeployAsync initializes the client.
                 var expected = "secret chit chat";
                 var actual = await grain.Echo(expected);
                 Assert.Equal(expected, actual);

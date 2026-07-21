@@ -348,7 +348,7 @@ namespace UnitTests.General
             await AssertEventually(async () =>
             {
                 var primaryReport = await TestUtils.GetDetailedGrainReport(
-                    this.HostedCluster.InternalGrainFactory,
+                    this.HostedCluster.InternalGrainFactory!,
                     tableGrainId,
                     this.HostedCluster.Primary!);
 
@@ -364,7 +364,7 @@ namespace UnitTests.General
                 }
 
                 var directoryReport = await TestUtils.GetDetailedGrainReport(
-                    this.HostedCluster.InternalGrainFactory,
+                    this.HostedCluster.InternalGrainFactory!,
                     tableGrainId,
                     directorySilo);
 

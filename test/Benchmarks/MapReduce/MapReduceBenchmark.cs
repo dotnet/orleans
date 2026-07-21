@@ -48,10 +48,10 @@ public class MapReduceBenchmark : IDisposable
     private async Task BenchCore()
     {
         List<Task> initializationTasks = new List<Task>();
-        var mapper = _host.GrainFactory.GetGrain<ITransformGrain<string, List<string>>>(Guid.NewGuid());
+        var mapper = _host.GrainFactory!.GetGrain<ITransformGrain<string, List<string>>>(Guid.NewGuid()); // Benchmark setup deploys the client.
         initializationTasks.Add(mapper.Initialize(new MapProcessor()));
         var reducer =
-            _host.GrainFactory.GetGrain<ITransformGrain<List<string>, Dictionary<string, int>>>(Guid.NewGuid());
+            _host.GrainFactory!.GetGrain<ITransformGrain<List<string>, Dictionary<string, int>>>(Guid.NewGuid()); // Benchmark setup deploys the client.
         initializationTasks.Add(reducer.Initialize(new ReduceProcessor()));
 
         // used for imitation of complex processing pipelines

@@ -57,8 +57,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             Initialize();
 
-            var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
-            var b = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(2);
+            var a = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(1);
+            var b = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(2);
             await a.SetOther(b);
             await a.GetOtherAge(); // prime a's routing cache
             await b.DeactivateSelf();
@@ -72,7 +72,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             Initialize();
 
-            var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
+            var a = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(1);
             await a.GetAge();
             await a.DeactivateSelf();
             for (int i = 0; i < 30; i++)
@@ -85,7 +85,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task DeactivateOnIdleTest_Stress_2_NonReentrant()
         {
             Initialize();
-            var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.CollectionTestGrain");
+            var a = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.CollectionTestGrain");
             await a.IncrCounter();
 
             Task t1 = Task.Run(async () =>
@@ -107,7 +107,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task DeactivateOnIdleTest_Stress_3_Reentrant()
         {
             Initialize();
-            var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.ReentrantCollectionTestGrain");
+            var a = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.ReentrantCollectionTestGrain");
             await a.IncrCounter();
 
             Task t1 = Task.Run(async () =>
@@ -129,7 +129,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task DeactivateOnIdleTest_Stress_4_Timer()
         {
             Initialize();
-            var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.ReentrantCollectionTestGrain");
+            var a = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.ReentrantCollectionTestGrain");
             for (int i = 0; i < 10; i++)
             {
                 await a.StartTimer(TimeSpan.FromMilliseconds(5), TimeSpan.FromMilliseconds(100));
@@ -142,7 +142,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task DeactivateOnIdleTest_Stress_5()
         {
             Initialize();
-            var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
+            var a = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(1);
             await a.IncrCounter();
 
             Task t1 = Task.Run(async () =>
@@ -171,7 +171,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task DeactivateOnIdleTest_Stress_11()
         {
             Initialize();
-            var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
+            var a = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(1);
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 100; i++)
             {
@@ -239,7 +239,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             var targetSilo = this.testCluster.SecondarySilos.First().SiloAddress;
             var directoryView = await WaitForDirectoryView(targetSilo);
-            var grainType = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(0).GetGrainId().Type;
+            var grainType = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(0).GetGrainId().Type;
 
             const int maxCandidateGrainKeys = 1_000_000;
             const int candidateYieldInterval = 4096;
@@ -259,7 +259,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                     continue;
                 }
 
-                ICollectionTestGrain grain = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(grainId);
+                ICollectionTestGrain grain = this.testCluster.GrainFactory!.GetGrain<ICollectionTestGrain>(grainId);
                 string siloHostingActivation;
                 try
                 {

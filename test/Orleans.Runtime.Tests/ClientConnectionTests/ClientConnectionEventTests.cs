@@ -27,7 +27,7 @@ public class ClientConnectionEventTests
         // Burst lot of call, to be sure that we are connected to all silos
         for (int i = 0; i < 100; i++)
         {
-            var grain = cluster.Client.GetGrain<ITestGrain>(i);
+            var grain = cluster.Client!.GetGrain<ITestGrain>(i); // DeployAsync initializes the client.
             await grain.SetLabel(i.ToString());
         }
 
@@ -71,7 +71,7 @@ public class ClientConnectionEventTests
         bool reconnected;
         do
         {
-            cluster.Client.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore();
+            cluster.Client!.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore(); // DeployAsync initializes the client.
             await regainedGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
             reconnected = regainedGatewayTcs.Task.IsCompleted;
         } while (!reconnected && --remainingAttempts > 0);

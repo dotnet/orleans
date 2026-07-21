@@ -121,7 +121,7 @@ public class GrainStorageBenchmark : IDisposable
 
     public async Task<List<Report>> RunAsync(int instance, Func<bool> running)
     {
-        var persistentGrain = this.host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
+        var persistentGrain = this.host.Client!.GetGrain<IPersistentGrain>(Guid.NewGuid()); // Benchmark setup deploys the client.
         // activate grain
         await persistentGrain.Init(payloadSize);
         var iteration = instance % payloadSize;

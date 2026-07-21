@@ -16,8 +16,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     {
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(200);
 
-        protected IClusterClient Client => this.cluster.Client;
-        protected IManagementGrain ManagementGrain => this.cluster.Client.GetGrain<IManagementGrain>(0);
+        protected IClusterClient Client => this.cluster.Client!; // Upgrade test clusters deploy the client.
+        protected IManagementGrain ManagementGrain => this.cluster.Client!.GetGrain<IManagementGrain>(0); // Upgrade test clusters deploy the client.
 #if DEBUG
         private const string BuildConfiguration = "Debug";
 #else

@@ -102,27 +102,27 @@ namespace Orleans.TestingHost
         /// <summary>
         /// The internal client interface.
         /// </summary>
-        internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>()!;
+        internal IInternalClusterClient? InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
 
         /// <summary>
         /// The client.
         /// </summary>
-        public IClusterClient Client => this.InternalClient;
+        public IClusterClient? Client => this.InternalClient;
 
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        public IGrainFactory GrainFactory => this.Client;
+        public IGrainFactory? GrainFactory => this.Client;
 
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
+        internal IInternalGrainFactory? InternalGrainFactory => this.InternalClient;
 
         /// <summary>
         /// Client-side <see cref="IServiceProvider"/> to use in the tests.
         /// </summary>
-        public IServiceProvider ServiceProvider => this.Client.ServiceProvider;
+        public IServiceProvider ServiceProvider => this.Client!.ServiceProvider; // Service access requires an initialized client.
 
         /// <summary>
         /// Delegate used to create and start an individual silo.
@@ -231,7 +231,7 @@ namespace Orleans.TestingHost
         public async Task DeactivateAsync(GrainId grainId)
         {
             var deactivated = WaitForDeactivationAsync(grainId);
-            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle();
+            await GrainFactory!.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle(); // Deactivation requires an initialized client.
             await deactivated;
         }
 
@@ -256,7 +256,7 @@ namespace Orleans.TestingHost
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
             }
 
-            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+            await GrainFactory!.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle(); // Migration requires an initialized client.
             await deactivated;
         }
 
@@ -348,7 +348,7 @@ namespace Orleans.TestingHost
 
                 foreach (var silo in silos)
                 {
-                    var hooks = this.InternalClient.GetTestHooks(silo);
+                    var hooks = this.InternalClient!.GetTestHooks(silo); // Membership stabilization requires an initialized client.
                     var statuses = await hooks.GetApproximateSiloStatuses();
                     var activeCount = statuses.Count(s => s.Value == SiloStatus.Active);
                     if (activeCount != expectedCount) break;
@@ -418,7 +418,7 @@ namespace Orleans.TestingHost
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
             var activeSilos = GetActiveSilos().ToArray();
             var testHooks = activeSilos.Select(GetTestHooks).ToArray();
-            var gatewayManager = this.InternalClient.ServiceProvider.GetRequiredService<GatewayManager>();
+            var gatewayManager = this.InternalClient!.ServiceProvider.GetRequiredService<GatewayManager>(); // Stabilization requires an initialized client.
             var inProcessSilos = activeSilos.OfType<InProcessSiloHandle>().ToArray();
             Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
                 inProcessSilos.Length == activeSilos.Length && GrainDirectoryObserver.CanObserve(inProcessSilos)
@@ -447,7 +447,7 @@ namespace Orleans.TestingHost
                 return inProcessSilo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>();
             }
 
-            return this.InternalClient.GetTestHooks(silo);
+            return this.InternalClient!.GetTestHooks(silo); // Test hooks require an initialized client.
         }
 
         /// <summary>

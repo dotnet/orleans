@@ -119,7 +119,7 @@ namespace Tester
             var timeoutCount = 0;
 
             // Fake Gateway
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
             var port = gateways.First().Port + 2;
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
@@ -166,7 +166,7 @@ namespace Tester
         public async Task ConnectionFromDifferentClusterIsRejected()
         {
             // Arange
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
             var gwEndpoint  = gateways.First().ToIPEndPoint()!;
             var exceptions = new List<Exception>();
 

@@ -106,7 +106,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
     }
 
     /// <inheritdoc/>
-    public ValueTask<(EnumerationResult Status, object Value)> StartEnumeration<T>(Guid requestId, [Immutable] IAsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
+    public ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(Guid requestId, [Immutable] IAsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
     {
         ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_enumerators, requestId, out bool exists);
         if (exists)
@@ -124,11 +124,11 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         Debug.Assert(entry.MaxBatchSize > 0, "Max batch size must be positive.");
         return MoveNextCore(ref entry, requestId, enumerator, cancellationToken);
 
-        static ValueTask<(EnumerationResult Status, object Value)> ThrowAlreadyExists() => ValueTask.FromException<(EnumerationResult Status, object Value)>(new InvalidOperationException("An enumerator with the same id already exists."));
+        static ValueTask<(EnumerationResult Status, object? Value)> ThrowAlreadyExists() => ValueTask.FromException<(EnumerationResult Status, object? Value)>(new InvalidOperationException("An enumerator with the same id already exists."));
     }
 
     /// <inheritdoc/>
-    public ValueTask<(EnumerationResult Status, object Value)> MoveNext<T>(Guid requestId, CancellationToken cancellationToken)
+    public ValueTask<(EnumerationResult Status, object? Value)> MoveNext<T>(Guid requestId, CancellationToken cancellationToken)
     {
         ref var entry = ref CollectionsMarshal.GetValueRefOrNullRef(_enumerators, requestId);
         if (Unsafe.IsNullRef(ref entry))
@@ -144,7 +144,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         return MoveNextCore(ref entry, requestId, typedEnumerator, cancellationToken);
     }
 
-    private ValueTask<(EnumerationResult Status, object Value)> MoveNextCore<T>(
+    private ValueTask<(EnumerationResult Status, object? Value)> MoveNextCore<T>(
         ref EnumeratorState entry,
         Guid requestId,
         IAsyncEnumerator<T> typedEnumerator,
@@ -232,7 +232,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         }
     }
 
-    private async ValueTask<(EnumerationResult Status, object Value)> AwaitMoveNextAsync<T>(
+    private async ValueTask<(EnumerationResult Status, object? Value)> AwaitMoveNextAsync<T>(
         Guid requestId,
         IAsyncEnumerator<T> typedEnumerator,
         Task<bool> moveNextTask,
@@ -270,7 +270,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
    
                 if (hasValue)
                 {
-                    return (EnumerationResult.Element, typedEnumerator.Current!);
+                    return (EnumerationResult.Element, typedEnumerator.Current);
                 }
                 else
                 {
@@ -308,10 +308,10 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         }
     }
 
-    private async ValueTask<(EnumerationResult Status, object Value)> OnTerminateAsync(Guid requestId, EnumerationResult status, object? value)
+    private async ValueTask<(EnumerationResult Status, object? Value)> OnTerminateAsync(Guid requestId, EnumerationResult status, object? value)
     {
         await RemoveEnumeratorAsync(requestId);
-        return (status, value!);
+        return (status, value);
     }
     
     /// <inheritdoc/>

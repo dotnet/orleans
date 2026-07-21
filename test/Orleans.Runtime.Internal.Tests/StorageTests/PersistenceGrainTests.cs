@@ -89,7 +89,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
-            Assert.False(await this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName),
+            Assert.False(await this.HostedCluster.Client!.GetTestHooks(silo).HasStorageProvider(providerName),
                     $"Provider {providerName} on silo {silo.Name} should not be registered");
         }
 
@@ -97,7 +97,7 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_CheckStateInit()
         {
             Guid id = Guid.NewGuid();
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(id);
             bool ok = await grain.CheckStateInit();
             Assert.True(ok, "CheckStateInit OK");
         }
@@ -106,7 +106,7 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_CheckStorageProvider()
         {
             Guid id = Guid.NewGuid();
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(id);
             string providerType = await grain.CheckProviderType();
             Assert.Equal(typeof(MockStorageProvider).FullName, providerType); // StorageProvider provider type
         }
@@ -115,11 +115,11 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_Init()
         {
             Guid id = Guid.NewGuid();
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(id);
             await grain.DoSomething();
 
             //request InitCount on providers on all silos in this cluster
-            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
             object?[] replies = await mgmtGrain.SendControlCommandToProvider<MockStorageProvider>(
                MockStorageProviderName1, (int)MockStorageProvider.Commands.InitCount, null);
 
@@ -133,7 +133,7 @@ namespace UnitTests.StorageTests
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
 
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(guid);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(guid);
 
             // Store initial value in storage
             int initialValue = 567;
@@ -150,7 +150,7 @@ namespace UnitTests.StorageTests
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
 
-            var grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGenericGrain<int>>(guid);
+            var grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGenericGrain<int>>(guid);
 
             // Store initial value in storage
             int initialValue = 567;
@@ -168,7 +168,7 @@ namespace UnitTests.StorageTests
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
 
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(guid);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(guid);
 
             // Store initial value in storage
             int initialValue = 567;
@@ -185,7 +185,7 @@ namespace UnitTests.StorageTests
         {
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(id);
 
             await grain.DoSomething();
             var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
@@ -199,7 +199,7 @@ namespace UnitTests.StorageTests
         {
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(id);
 
             await grain.DoWrite(1);
 
@@ -225,7 +225,7 @@ namespace UnitTests.StorageTests
 
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(guid);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(guid);
 
             await grain.DoSomething();
 
@@ -248,7 +248,7 @@ namespace UnitTests.StorageTests
         {
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
-            IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IMemoryStorageTestGrain>(guid);
+            IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IMemoryStorageTestGrain>(guid);
 
             int val = await grain.GetValue();
 
@@ -271,7 +271,7 @@ namespace UnitTests.StorageTests
         public async Task MemoryStore_Delete()
         {
             Guid id = Guid.NewGuid();
-            var grain = this.HostedCluster.GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
+            var grain = this.HostedCluster.GrainFactory!.GetGrain<IMemoryStorageTestGrain>(id);
             await grain.DoWrite(1);
             await grain.DoDelete();
             int val = await grain.GetValue(); // Should this throw instead?
@@ -291,7 +291,7 @@ namespace UnitTests.StorageTests
             Task<int>[] promises = new Task<int>[numIterations];
             for (int i = 0; i < numIterations; i++)
             {
-                IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IMemoryStorageTestGrain>(Guid.NewGuid());
+                IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IMemoryStorageTestGrain>(Guid.NewGuid());
                 int idx = i; // Capture
                 async Task<int> asyncFunc()
                 {
@@ -318,7 +318,7 @@ namespace UnitTests.StorageTests
         {
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(id);
 
             await grain.DoWrite(1);
 
@@ -342,7 +342,7 @@ namespace UnitTests.StorageTests
         {
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
-            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+            IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(id);
 
             await grain.DoWrite(1);
 
@@ -375,7 +375,7 @@ namespace UnitTests.StorageTests
         {
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
-            IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceErrorGrain>(id);
+            IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceErrorGrain>(id);
             _ = await grain.GetValue();
 
             var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
@@ -438,7 +438,7 @@ namespace UnitTests.StorageTests
         {
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
-            IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceErrorGrain>(id);
+            IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceErrorGrain>(id);
 
             await grain.DoWrite(1);
 
@@ -514,7 +514,7 @@ namespace UnitTests.StorageTests
 
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
-            IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceErrorGrain>(guid);
+            IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceErrorGrain>(guid);
             _ = await grain.GetValue();
 
             var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
@@ -595,7 +595,7 @@ namespace UnitTests.StorageTests
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(guid);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(guid);
 
             var val = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
@@ -621,7 +621,7 @@ namespace UnitTests.StorageTests
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(guid);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(guid);
 
             var val = await grain.GetValue(); // Activate grain
             int expectedVal = 52;
@@ -658,7 +658,7 @@ namespace UnitTests.StorageTests
         {
             Guid id = Guid.NewGuid();
             string providerName = ErrorInjectorProviderName;
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(id);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(id);
 
             var val = await grain.GetValue();
 
@@ -692,7 +692,7 @@ namespace UnitTests.StorageTests
         {
             Guid id = Guid.NewGuid();
             string providerName = ErrorInjectorProviderName;
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(id);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(id);
 
             var val = await grain.GetValue();
 
@@ -733,8 +733,8 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_InconsistentStateException_DeactivatesOnlyCurrentGrain()
         {
-            var target = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(Guid.NewGuid());
-            var proxy = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorProxyGrain>(Guid.NewGuid());
+            var target = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(Guid.NewGuid());
+            var proxy = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorProxyGrain>(Guid.NewGuid());
 
             // Record the original activation ids.
             var targetActivationId = await target.GetActivationId();
@@ -760,7 +760,7 @@ namespace UnitTests.StorageTests
         {
             Guid id = Guid.NewGuid();
             string providerName = ErrorInjectorProviderName;
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(id);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(id);
 
             var val = await grain.GetValue();
 
@@ -788,7 +788,7 @@ namespace UnitTests.StorageTests
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(guid);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(guid);
 
             var val = await grain.GetValue();
             int expectedVal = 72;
@@ -815,7 +815,7 @@ namespace UnitTests.StorageTests
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
-            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(guid);
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceProviderErrorGrain>(guid);
 
             var val = await grain.GetValue();
 
@@ -845,7 +845,7 @@ namespace UnitTests.StorageTests
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
-            IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
+            IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
             _ = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
@@ -876,7 +876,7 @@ namespace UnitTests.StorageTests
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             _ = guid.ToString("N");
-            IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
+            IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
             _ = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
@@ -907,7 +907,7 @@ namespace UnitTests.StorageTests
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
             string id = guid.ToString("N");
-            IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
+            IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
 
             var val = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
@@ -948,7 +948,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(Guid.NewGuid());
+                IPersistenceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceTestGrain>(Guid.NewGuid());
                 Guid guid = grain.GetPrimaryKey();
                 _ = guid.ToString("N");
 
@@ -967,7 +967,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_BadProvider()
         {
-            IBadProviderTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IBadProviderTestGrain>(Guid.NewGuid());
+            IBadProviderTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IBadProviderTestGrain>(Guid.NewGuid());
             var oex = await Assert.ThrowsAsync<BadProviderConfigException>(() => grain.DoSomething());
         }
 
@@ -1001,7 +1001,7 @@ namespace UnitTests.StorageTests
         public async Task MemoryStore_UserGrain_Read_Write()
         {
             Guid id = Guid.NewGuid();
-            IUser grain = this.HostedCluster.GrainFactory.GetGrain<IUser>(id);
+            IUser grain = this.HostedCluster.GrainFactory!.GetGrain<IUser>(id);
 
             string name = id.ToString();
 
@@ -1015,8 +1015,8 @@ namespace UnitTests.StorageTests
             Guid id2 = Guid.NewGuid();
             string name1 = id1.ToString();
             string name2 = id2.ToString();
-            IUser friend1 = this.HostedCluster.GrainFactory.GetGrain<IUser>(id1);
-            IUser friend2 = this.HostedCluster.GrainFactory.GetGrain<IUser>(id2);
+            IUser friend1 = this.HostedCluster.GrainFactory!.GetGrain<IUser>(id1);
+            IUser friend2 = this.HostedCluster.GrainFactory!.GetGrain<IUser>(id2);
             await friend1.SetName(name1);
             await friend2.SetName(name2);
 
@@ -1040,7 +1040,7 @@ namespace UnitTests.StorageTests
         {
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
-            IPersistenceNoStateTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceNoStateTestGrain>(id);
+            IPersistenceNoStateTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IPersistenceNoStateTestGrain>(id);
 
             await grain.DoSomething();
 
@@ -1052,9 +1052,9 @@ namespace UnitTests.StorageTests
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             IUser[] grains = new IUser[3];
-            grains[0] = this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid());
-            grains[1] = this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid());
-            grains[2] = this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid());
+            grains[0] = this.HostedCluster.GrainFactory!.GetGrain<IUser>(Guid.NewGuid());
+            grains[1] = this.HostedCluster.GrainFactory!.GetGrain<IUser>(Guid.NewGuid());
+            grains[2] = this.HostedCluster.GrainFactory!.GetGrain<IUser>(Guid.NewGuid());
 
             GrainStateContainingGrainReferences initialState = new GrainStateContainingGrainReferences();
             foreach (var g in grains)
@@ -1076,7 +1076,7 @@ namespace UnitTests.StorageTests
             GrainStateContainingGrainReferences[] states = new GrainStateContainingGrainReferences[num];
             for (int i = 0; i < num; i++)
             {
-                IUser grain = this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid());
+                IUser grain = this.HostedCluster.GrainFactory!.GetGrain<IUser>(Guid.NewGuid());
                 states[i] = new GrainStateContainingGrainReferences();
                 states[i].GrainList.Add(grain);
                 states[i].GrainDict.Add(grain.GetPrimaryKey().ToString(), grain);
@@ -1115,8 +1115,8 @@ namespace UnitTests.StorageTests
         {
             Guid id1 = Guid.NewGuid();
             Guid id2 = Guid.NewGuid();
-            IReentrentGrainWithState grain1 = this.HostedCluster.GrainFactory.GetGrain<IReentrentGrainWithState>(id1);
-            IReentrentGrainWithState grain2 = this.HostedCluster.GrainFactory.GetGrain<IReentrentGrainWithState>(id2);
+            IReentrentGrainWithState grain1 = this.HostedCluster.GrainFactory!.GetGrain<IReentrentGrainWithState>(id1);
+            IReentrentGrainWithState grain2 = this.HostedCluster.GrainFactory!.GetGrain<IReentrentGrainWithState>(id2);
             await Task.WhenAll(grain1.Setup(grain2), grain2.Setup(grain1));
 
             Task t11 = grain1.Test1();
@@ -1130,7 +1130,7 @@ namespace UnitTests.StorageTests
         public async Task NonReentrentStressGrainWithoutState()
         {
             Guid id1 = Guid.NewGuid();
-            INonReentrantStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory.GetGrain<INonReentrantStressGrainWithoutState>(id1);
+            INonReentrantStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory!.GetGrain<INonReentrantStressGrainWithoutState>(id1);
             await grain1.Test1();
         }
 
@@ -1140,7 +1140,7 @@ namespace UnitTests.StorageTests
         public async Task ReentrentGrain_Task_Delay()
         {
             Guid id1 = Guid.NewGuid();
-            IReentrentGrainWithState grain1 = this.HostedCluster.GrainFactory.GetGrain<IReentrentGrainWithState>(id1);
+            IReentrentGrainWithState grain1 = this.HostedCluster.GrainFactory!.GetGrain<IReentrentGrainWithState>(id1);
 
             await grain1.Task_Delay(DoStart);
         }
@@ -1149,7 +1149,7 @@ namespace UnitTests.StorageTests
         public async Task NonReentrentGrain_Task_Delay()
         {
             Guid id1 = Guid.NewGuid();
-            INonReentrantStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory.GetGrain<INonReentrantStressGrainWithoutState>(id1);
+            INonReentrantStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory!.GetGrain<INonReentrantStressGrainWithoutState>(id1);
 
             await grain1.Task_Delay(DoStart);
         }
@@ -1158,7 +1158,7 @@ namespace UnitTests.StorageTests
         public async Task StateInheritanceTest()
         {
             Guid id1 = Guid.NewGuid();
-            IStateInheritanceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IStateInheritanceTestGrain>(id1);
+            IStateInheritanceTestGrain grain = this.HostedCluster.GrainFactory!.GetGrain<IStateInheritanceTestGrain>(id1);
 
             await grain.SetValue(1);
             int val = await grain.GetValue();
@@ -1168,7 +1168,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task SurrogatePersistence_TypeWithoutPublicConstructor_Read()
         {
-            ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor> grain = HostedCluster.GrainFactory
+            ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor> grain = HostedCluster.GrainFactory!
                 .GetGrain<ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>>(Guid.NewGuid());
             ExternalTypeWithoutPublicConstructor instance = ExternalTypeWithoutPublicConstructor.Create(1, 2);
 
@@ -1182,7 +1182,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_RecordTypeWithoutPublicParameterlessConstructor_Read()
         {
-            IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor> grain = HostedCluster.GrainFactory
+            IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor> grain = HostedCluster.GrainFactory!
                 .GetGrain<IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>>(Guid.NewGuid());
             RecordTypeWithoutPublicParameterlessConstructor instance = new RecordTypeWithoutPublicParameterlessConstructor(1);
 
@@ -1195,7 +1195,7 @@ namespace UnitTests.StorageTests
         // ---------- Utility functions ----------
         private void SetStoredValue<T>(string providerName, string grainType, IGrain grain, string fieldName, int newValue) where T : IControllable
         {
-            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
             // set up SetVal func args
             var args = new MockStorageProvider.SetValueArgs
             {
@@ -1216,7 +1216,7 @@ namespace UnitTests.StorageTests
 
         private async Task SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior)
         {
-            await ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory);
+            await ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory!);
         }
 
         private async Task CheckStorageProviderErrors(Func<Task> taskFunc, Type? expectedException = null)
@@ -1259,7 +1259,7 @@ namespace UnitTests.StorageTests
         {
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
             {
-                if (this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result)
+                if (this.HostedCluster.Client!.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result)
                 {
                     return true;
                 }
@@ -1270,7 +1270,7 @@ namespace UnitTests.StorageTests
         private ProviderState GetStateForStorageProviderInUse<T>(string providerName, bool okNull = false) where T : IControllable
         {
             ProviderState providerState = new ProviderState();
-            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
             object?[] replies = mgmtGrain.SendControlCommandToProvider<T>(
                providerName, (int)MockStorageProvider.Commands.GetProvideState, null).Result;
             object?[] replies2 = mgmtGrain.SendControlCommandToProvider<T>(
@@ -1303,8 +1303,8 @@ namespace UnitTests.StorageTests
             {
                 foreach (var providerName in mockStorageProviders)
                 {
-                    if (!this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result) continue;
-                    IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+                    if (!this.HostedCluster.Client!.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result) continue;
+                    IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
                     _ = mgmtGrain.SendControlCommandToProvider<MockStorageProvider>(
                        providerName, (int)MockStorageProvider.Commands.ResetHistory, null).Result;
                 }

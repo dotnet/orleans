@@ -3576,9 +3576,9 @@ namespace Orleans.Serialization.Invocation
         public static void Return<T>(ResponseCompletionSource<T> obj) { }
     }
 
-    public sealed partial class ResponseCompletionSource<TResult> : IResponseCompletionSource, System.Threading.Tasks.Sources.IValueTaskSource<TResult>, System.Threading.Tasks.Sources.IValueTaskSource
+    public sealed partial class ResponseCompletionSource<TResult> : IResponseCompletionSource, System.Threading.Tasks.Sources.IValueTaskSource<TResult?>, System.Threading.Tasks.Sources.IValueTaskSource
     {
-        public System.Threading.Tasks.ValueTask<TResult> AsValueTask() { throw null; }
+        public System.Threading.Tasks.ValueTask<TResult?> AsValueTask() { throw null; }
 
         public System.Threading.Tasks.ValueTask AsVoidValueTask() { throw null; }
 
@@ -3588,7 +3588,7 @@ namespace Orleans.Serialization.Invocation
 
         public void Complete(Response<TResult> value) { }
 
-        public TResult GetResult(short token) { throw null; }
+        public TResult? GetResult(short token) { throw null; }
 
         public System.Threading.Tasks.Sources.ValueTaskSourceStatus GetStatus(short token) { throw null; }
 
@@ -3598,7 +3598,7 @@ namespace Orleans.Serialization.Invocation
 
         public void SetException(System.Exception exception) { }
 
-        public void SetResult(TResult result) { }
+        public void SetResult(TResult? result) { }
 
         void System.Threading.Tasks.Sources.IValueTaskSource.GetResult(short token) { }
     }

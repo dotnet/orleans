@@ -52,6 +52,7 @@ namespace Orleans.Serialization.Invocation
         public abstract Exception? Exception { get; set; }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract T GetResult<T>();
 
         /// <inheritdoc />
@@ -79,7 +80,8 @@ namespace Orleans.Serialization.Invocation
         public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
 
         /// <inheritdoc/>
-        public override T GetResult<T>() => default!;
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public override T GetResult<T>() => default;
 
         /// <inheritdoc/>
         public override void Dispose() { }
@@ -121,6 +123,7 @@ namespace Orleans.Serialization.Invocation
         public override Exception? Exception { get; set; }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public override T GetResult<T>()
         {
             ExceptionDispatchInfo.Capture(Exception!).Throw();

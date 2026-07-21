@@ -30,7 +30,7 @@ testClusterBuilder.ConfigureClientHost(hostBuilder =>
 
 var testCluster = testClusterBuilder.Build();
 await testCluster.DeployAsync();
-var log = testCluster.Client.ServiceProvider.GetRequiredService<ILogger<Program>>();
+var log = testCluster.Client!.ServiceProvider.GetRequiredService<ILogger<Program>>(); // DeployAsync initializes the client.
 log.LogInformation($"ServiceId: {testCluster.Options.ServiceId}");
 log.LogInformation($"ClusterId: {testCluster.Options.ClusterId}");
 

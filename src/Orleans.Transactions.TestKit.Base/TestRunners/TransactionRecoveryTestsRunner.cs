@@ -53,7 +53,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         public TransactionRecoveryTestsRunner(TestCluster testCluster, Action<string> testOutput)
-            : base(testCluster.GrainFactory, testOutput)
+            : base(testCluster.GrainFactory!, testOutput) // Transaction test clusters initialize a client.
         {
             this.testCluster = testCluster;
             this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>()!;
