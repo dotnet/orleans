@@ -281,7 +281,7 @@ namespace UnitTests.StorageTests
                     ResetHistory();
                     return Task.FromResult<object?>(true);
                 default:
-                    return Task.FromResult<object?>(true); 
+                    return Task.FromResult<object?>(true);
             }
         }
     }
