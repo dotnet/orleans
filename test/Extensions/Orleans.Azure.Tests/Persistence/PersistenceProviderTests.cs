@@ -270,7 +270,8 @@ namespace Tester.AzureUtils.Persistence
                 NullLoggerFactory.Instance,
                 providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>(),
                 providerRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
-                providerRuntime.ServiceProvider.GetRequiredService<IGrainStorageSerializer>());
+                // No storage serializer is registered here, and MockCallsOnly prevents it from being used.
+                providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>()!);
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();
