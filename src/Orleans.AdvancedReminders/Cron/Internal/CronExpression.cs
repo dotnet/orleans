@@ -53,7 +53,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
 
         /// <summary>
         /// Represents a cron expression that fires every second.
-        /// Equals to "* * * * * *". 
+        /// Equals to "* * * * * *".
         /// </summary>
         public static readonly CronExpression EverySecond = Parse("* * * * * *", CronFormat.IncludeSeconds);
 
@@ -96,7 +96,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
         ///<summary>
         /// Constructs a new <see cref="CronExpression"/> based on the specified
         /// cron expression. It's supported expressions consisting of 5 fields:
-        /// minute, hour, day of month, month, day of week. 
+        /// minute, hour, day of month, month, day of week.
         /// If you want to parse non-standard cron expressions use <see cref="Parse(string, CronFormat)"/> with specified CronFields argument.
         /// </summary>
         public static CronExpression Parse(string expression)
@@ -107,7 +107,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
         ///<summary>
         /// Constructs a new <see cref="CronExpression"/> based on the specified
         /// cron expression. It's supported expressions consisting of 5 or 6 fields:
-        /// second (optional), minute, hour, day of month, month, day of week. 
+        /// second (optional), minute, hour, day of month, month, day of week.
         /// </summary>
         public static CronExpression Parse(string expression, CronFormat format)
         {
@@ -196,7 +196,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
         /// <summary>
         /// Returns the list of next occurrences within the given date/time range,
         /// including <paramref name="fromUtc"/> and excluding <paramref name="toUtc"/>
-        /// by default, and UTC time zone. When none of the occurrences found, an 
+        /// by default, and UTC time zone. When none of the occurrences found, an
         /// empty list is returned.
         /// </summary>
         /// <exception cref="ArgumentException"/>
@@ -220,7 +220,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
 
         /// <summary>
         /// Returns the list of next occurrences within the given date/time range, including
-        /// <paramref name="fromUtc"/> and excluding <paramref name="toUtc"/> by default, and 
+        /// <paramref name="fromUtc"/> and excluding <paramref name="toUtc"/> by default, and
         /// specified time zone. When none of the occurrences found, an empty list is returned.
         /// </summary>
         /// <exception cref="ArgumentException"/>
@@ -299,7 +299,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
         /// </summary>
         /// <returns>
         /// A hash code for this instance, suitable for use in hashing algorithms and data
-        /// structures like a hash table. 
+        /// structures like a hash table.
         /// </returns>
         [SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
         public override int GetHashCode()
@@ -349,7 +349,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
             {
                 var currentOffset = zone.GetUtcOffset(fromUtc);
                 var standardOffset = zone.GetUtcOffset(fromLocal);
-               
+
                 if (standardOffset != currentOffset)
                 {
                     var daylightOffset = TimeZoneHelper.GetDaylightOffset(zone, fromLocal);
@@ -476,7 +476,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
                     return NotFound;
                 }
             }
-            
+
             day = minMatchedDay;
 
             goto Retry;

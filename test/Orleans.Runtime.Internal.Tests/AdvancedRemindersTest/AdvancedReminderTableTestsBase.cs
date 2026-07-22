@@ -75,16 +75,30 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
     [SkippableFact]
     public async Task RemindersTable_DurableDeleteMissingReturnsFalse() => await ReminderDeleteMissingReturnsFalse();
 
+    [SkippableFact]
+    public async Task RemindersTable_DurableRejectsStaleUpsert() => await ReminderRejectsStaleUpsert();
+
     protected async Task RemindersParallelUpsert()
     {
-        var upserts = await Task.WhenAll(Enumerable.Range(0, 5).Select(i =>
+        var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(async i =>
         {
-            var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
-            return Task.WhenAll(Enumerable.Range(1, 5).Select(_ =>
-                RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, () => remindersTable.UpsertRow(reminder))));
+            var grainId = MakeTestGrainReference();
+            var attempts = await Task.WhenAll(Enumerable.Range(0, 5).Select(async _ =>
+            {
+                try
+                {
+                    return (Succeeded: true, ETag: await remindersTable.UpsertRow(CreateReminder(grainId, i.ToString())));
+                }
+                catch (Orleans.AdvancedReminders.Runtime.ReminderException)
+                {
+                    return (Succeeded: false, ETag: string.Empty);
+                }
+            }));
+
+            return attempts;
         }));
 
-        Assert.DoesNotContain(upserts, values => values.Distinct().Count() != 5);
+        Assert.DoesNotContain(results, attempts => attempts.Count(result => result.Succeeded) != 1);
     }
 
     protected async Task ReminderSimple()
@@ -134,6 +148,9 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.LastFireUtc = reminder.StartAt.AddMinutes(-5);
         reminder.Priority = ReminderPriority.High;
         reminder.Action = MissedReminderAction.FireImmediately;
+        reminder.ScheduleId = "schedule-2";
+        reminder.JobId = "job-2";
+        reminder.JobShardId = "shard-2";
 
         var updatedETag = await remindersTable.UpsertRow(reminder);
         Assert.False(string.IsNullOrWhiteSpace(updatedETag));
@@ -161,6 +178,27 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         Assert.Null(await remindersTable.ReadRow(grainId, "missing"));
     }
 
+    protected async Task ReminderRejectsStaleUpsert()
+    {
+        var grainId = MakeTestGrainReference();
+        var current = CreateReminder(grainId, "stale_upsert");
+        current.ETag = await remindersTable.UpsertRow(current);
+
+        var stale = CreateReminder(grainId, current.ReminderName);
+        stale.ETag = current.ETag;
+
+        current.Period = TimeSpan.FromMinutes(2);
+        current.ETag = await remindersTable.UpsertRow(current);
+
+        stale.Period = TimeSpan.FromMinutes(3);
+        await Assert.ThrowsAsync<Orleans.AdvancedReminders.Runtime.ReminderException>(() => remindersTable.UpsertRow(stale));
+
+        var stored = await remindersTable.ReadRow(grainId, current.ReminderName);
+        Assert.NotNull(stored);
+        Assert.Equal(TimeSpan.FromMinutes(2), stored.Period);
+        Assert.Equal(current.ETag, stored.ETag);
+    }
+
     protected async Task ReminderCronRoundTrip()
     {
         var reminder = CreateReminder(MakeTestGrainReference(), "cron_roundtrip");
@@ -184,6 +222,9 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         reminder.LastFireUtc = DateTime.UtcNow.AddMinutes(-2);
         reminder.Priority = ReminderPriority.High;
         reminder.Action = MissedReminderAction.FireImmediately;
+        reminder.ScheduleId = "adaptive-schedule";
+        reminder.JobId = "adaptive-job";
+        reminder.JobShardId = "adaptive-shard";
 
         await remindersTable.UpsertRow(reminder);
         var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
@@ -194,6 +235,9 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         AssertTimestampClose(reminder.LastFireUtc, readReminder.LastFireUtc);
         Assert.Equal(reminder.Priority, readReminder.Priority);
         Assert.Equal(reminder.Action, readReminder.Action);
+        Assert.Equal(reminder.ScheduleId, readReminder.ScheduleId);
+        Assert.Equal(reminder.JobId, readReminder.JobId);
+        Assert.Equal(reminder.JobShardId, readReminder.JobShardId);
     }
 
     protected async Task ReminderUnspecifiedTimestampsRoundTrip()
@@ -305,6 +349,9 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         AssertTimestampClose(expected.LastFireUtc, actual.LastFireUtc);
         Assert.Equal(expected.Priority, actual.Priority);
         Assert.Equal(expected.Action, actual.Action);
+        Assert.Equal(expected.ScheduleId, actual.ScheduleId);
+        Assert.Equal(expected.JobId, actual.JobId);
+        Assert.Equal(expected.JobShardId, actual.JobShardId);
         Assert.False(string.IsNullOrWhiteSpace(actual.ETag));
     }
 

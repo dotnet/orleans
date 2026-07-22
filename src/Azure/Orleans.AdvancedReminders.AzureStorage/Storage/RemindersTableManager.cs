@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
@@ -23,6 +24,9 @@ namespace Orleans.AdvancedReminders.AzureStorage
         public string CronTimeZoneId        { get; set; } = string.Empty;
         public string NextDueUtc            { get; set; } = string.Empty;
         public string LastFireUtc           { get; set; } = string.Empty;
+        public string ScheduleId            { get; set; } = string.Empty;
+        public string JobId                 { get; set; } = string.Empty;
+        public string JobShardId            { get; set; } = string.Empty;
         public int Priority                 { get; set; } = (int)ReminderPriority.Normal;
         public int Action                   { get; set; } = (int)MissedReminderAction.Skip;
         public string GrainRefConsistentHash { get; set; } = string.Empty;    // Part of PartitionKey
@@ -33,12 +37,12 @@ namespace Orleans.AdvancedReminders.AzureStorage
         public ETag ETag { get; set; }
 
         public static string ConstructRowKey(GrainId grainId, string reminderName)
-            => AzureTableUtils.SanitizeTableProperty($"{grainId}-{reminderName}");
+            => $"{EncodeKeySegment(grainId.ToString())}!{EncodeKeySegment(reminderName)}";
 
         public static (string LowerBound, string UpperBound) ConstructRowKeyBounds(GrainId grainId)
         {
-            var baseKey = AzureTableUtils.SanitizeTableProperty(grainId.ToString());
-            return (baseKey + '-', baseKey + (char)('-' + 1));
+            var baseKey = EncodeKeySegment(grainId.ToString());
+            return (baseKey + '!', baseKey + (char)('!' + 1));
         }
 
         public static string ConstructPartitionKey(string serviceId, GrainId grainId)
@@ -54,14 +58,20 @@ namespace Orleans.AdvancedReminders.AzureStorage
             // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
             // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
 
-            return AzureTableUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
+            return $"{EncodeKeySegment(serviceId)}!{number:X8}";
         }
 
         public static (string LowerBound, string UpperBound) ConstructPartitionKeyBounds(string serviceId)
         {
-            var baseKey = AzureTableUtils.SanitizeTableProperty(serviceId);
-            return (baseKey + '_', baseKey + (char)('_' + 1));
+            var baseKey = EncodeKeySegment(serviceId);
+            return (baseKey + '!', baseKey + (char)('!' + 1));
         }
+
+        private static string EncodeKeySegment(string value)
+            => Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
 
         public override string ToString() => $"Reminder [PartitionKey={PartitionKey} RowKey={RowKey} GrainId={GrainReference} ReminderName={ReminderName} Deployment={DeploymentId} ServiceId={ServiceId} StartAt={StartAt} Period={Period} CronExpression={CronExpression} CronTimeZoneId={CronTimeZoneId} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action} GrainRefConsistentHash={GrainRefConsistentHash}]";
     }
@@ -140,7 +150,9 @@ namespace Orleans.AdvancedReminders.AzureStorage
         {
             try
             {
-                return await UpsertTableEntryAsync(reminderEntry, TableUpdateMode.Replace);
+                return string.IsNullOrEmpty(reminderEntry.ETag.ToString())
+                    ? await CreateTableEntryAsync(reminderEntry)
+                    : await UpdateTableEntryAsync(reminderEntry, reminderEntry.ETag);
             }
             catch(Exception exc)
             {

@@ -77,9 +77,9 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
     public async Task StartReminder(string reminderName)
     {
         _reminderName = reminderName;
-        
+
         // Register a persistent reminder
-        await RegisterOrUpdateReminder(
+        await RegisterOrUpdateAdvancedReminder(
             reminderName,
             TimeSpan.FromMinutes(2),  // Time to delay before the first tick (must be > 1 minute)
             TimeSpan.FromMinutes(5)); // Period of the reminder (must be > 1 minute)
@@ -88,10 +88,10 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
     public async Task StopReminder()
     {
         // Find and unregister the reminder
-        var reminder = await GetReminder(_reminderName);
+        var reminder = await GetAdvancedReminder(_reminderName);
         if (reminder != null)
         {
-            await UnregisterReminder(reminder);
+            await UnregisterAdvancedReminder(reminder);
         }
     }
 

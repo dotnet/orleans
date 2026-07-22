@@ -15,6 +15,11 @@ namespace Orleans.DurableJobs;
 public abstract class JobShardManager
 {
     /// <summary>
+    /// Gets a value indicating whether this manager's backing store survives a full cluster restart.
+    /// </summary>
+    public virtual bool IsDurableStorage => true;
+
+    /// <summary>
     /// Gets the silo address this manager is associated with.
     /// </summary>
     protected SiloAddress SiloAddress { get; }

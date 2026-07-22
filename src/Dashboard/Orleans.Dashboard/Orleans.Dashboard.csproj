@@ -6,6 +6,8 @@
     <Description>Real-time monitoring and visualization dashboard for Microsoft Orleans showing grain statistics, performance metrics, and cluster health.</Description>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RootNamespace>Orleans.Dashboard</RootNamespace>
   </PropertyGroup>

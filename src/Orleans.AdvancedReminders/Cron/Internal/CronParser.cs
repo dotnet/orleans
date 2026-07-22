@@ -388,7 +388,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
             if (field == CronField.DaysOfWeek) high--;
 
             var bits = GetRangeBits(num1, high, step);
-            
+
             num1 = field.First + step - (high - num1) % step - 1;
             return bits | GetRangeBits(num1, num2, step);
         }

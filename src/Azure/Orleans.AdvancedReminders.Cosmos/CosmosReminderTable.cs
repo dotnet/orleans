@@ -76,7 +76,10 @@ internal partial class CosmosReminderTable : IReminderTable
             var response = await _executor.ExecuteOperation(static async args =>
             {
                 var (self, grainId, requestOptions) = args;
-                var query = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
+                var grainIdText = grainId.ToString();
+                var query = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions)
+                    .Where(entity => entity.GrainId == grainIdText)
+                    .ToFeedIterator();
 
                 var reminders = new List<ReminderEntity>();
                 do
@@ -85,10 +88,6 @@ internal partial class CosmosReminderTable : IReminderTable
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
-                    }
-                    else
-                    {
-                        break;
                     }
                 } while (query.HasMoreResults);
 
@@ -128,10 +127,6 @@ internal partial class CosmosReminderTable : IReminderTable
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
-                    }
-                    else
-                    {
-                        break;
                     }
                 } while (iterator.HasMoreResults);
 
@@ -186,17 +181,25 @@ internal partial class CosmosReminderTable : IReminderTable
         {
             var entity = ToEntity(entry);
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainId));
-            var options = new ItemRequestOptions { IfMatchEtag = entity.ETag };
+            var hasETag = !string.IsNullOrEmpty(entity.ETag);
+            var options = hasETag ? new ItemRequestOptions { IfMatchEtag = entity.ETag } : null;
 
             var response = await _executor.ExecuteOperation(static async args =>
             {
-                var (self, pk, entity, options) = args;
-                var result = await self._container.UpsertItemAsync(entity, pk, options).ConfigureAwait(false);
+                var (self, pk, entity, hasETag, options) = args;
+                var result = hasETag
+                    ? await self._container.ReplaceItemAsync(entity, entity.Id, pk, options).ConfigureAwait(false)
+                    : await self._container.CreateItemAsync(entity, pk).ConfigureAwait(false);
                 return result.Resource;
             },
-            (this, pk, entity, options)).ConfigureAwait(false);
+            (this, pk, entity, hasETag, options)).ConfigureAwait(false);
 
             return response.ETag;
+        }
+        catch (CosmosException exception) when (exception.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
+        {
+            throw new Runtime.ReminderException(
+                $"Could not update reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");
         }
         catch (Exception exc)
         {
@@ -250,10 +253,6 @@ internal partial class CosmosReminderTable : IReminderTable
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
-                    }
-                    else
-                    {
-                        break;
                     }
                 } while (query.HasMoreResults);
 
@@ -352,6 +351,9 @@ internal partial class CosmosReminderTable : IReminderTable
             CronTimeZoneId = entity.CronTimeZoneId ?? string.Empty,
             NextDueUtc = entity.NextDueUtc?.UtcDateTime,
             LastFireUtc = entity.LastFireUtc?.UtcDateTime,
+            ScheduleId = entity.ScheduleId ?? string.Empty,
+            JobId = entity.JobId ?? string.Empty,
+            JobShardId = entity.JobShardId ?? string.Empty,
             Priority = ParsePriority(entity.Priority),
             Action = ParseAction(entity.Action),
             ETag = entity.ETag
@@ -374,8 +376,12 @@ internal partial class CosmosReminderTable : IReminderTable
             CronTimeZoneId = entry.CronTimeZoneId,
             NextDueUtc = entry.NextDueUtc,
             LastFireUtc = entry.LastFireUtc,
+            ScheduleId = entry.ScheduleId,
+            JobId = entry.JobId,
+            JobShardId = entry.JobShardId,
             Priority = (int)entry.Priority,
             Action = (int)entry.Action,
+            ETag = entry.ETag,
         };
     }
 

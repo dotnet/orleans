@@ -45,6 +45,18 @@ internal class ReminderEntity : BaseEntity
     [JsonPropertyName(nameof(LastFireUtc))]
     public DateTimeOffset? LastFireUtc { get; set; }
 
+    [JsonProperty(nameof(ScheduleId))]
+    [JsonPropertyName(nameof(ScheduleId))]
+    public string? ScheduleId { get; set; }
+
+    [JsonProperty(nameof(JobId))]
+    [JsonPropertyName(nameof(JobId))]
+    public string? JobId { get; set; }
+
+    [JsonProperty(nameof(JobShardId))]
+    [JsonPropertyName(nameof(JobShardId))]
+    public string? JobShardId { get; set; }
+
     [JsonProperty(nameof(Priority))]
     [JsonPropertyName(nameof(Priority))]
     public int Priority { get; set; } = (int)Runtime.ReminderPriority.Normal;

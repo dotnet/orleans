@@ -11,6 +11,8 @@
     <DefineConstants>$(DefineConstants);ADVANCED_REMINDERS_COSMOS</DefineConstants>
     <Nullable>enable</Nullable>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>

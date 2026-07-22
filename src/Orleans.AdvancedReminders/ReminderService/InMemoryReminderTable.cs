@@ -15,7 +15,20 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
             this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(ReminderTableGrainId);
         }
 
-        public Task Init() => Task.CompletedTask;
+        public Task Init() => StartAsync();
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            this.isAvailable = true;
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken = default)
+        {
+            this.isAvailable = false;
+            return Task.CompletedTask;
+        }
 
         public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
@@ -61,14 +74,12 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
         {
             Task OnApplicationServicesStart(CancellationToken ct)
             {
-                this.isAvailable = true;
-                return Task.CompletedTask;
+                return this.StartAsync(ct);
             }
 
             Task OnApplicationServicesStop(CancellationToken ct)
             {
-                this.isAvailable = false;
-                return Task.CompletedTask;
+                return this.StopAsync(ct);
             }
 
             lifecycle.Subscribe(

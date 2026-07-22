@@ -11,12 +11,15 @@ CREATE TABLE OrleansAdvancedRemindersTable
 	CronTimeZoneId NVARCHAR(200) NULL,
 	NextDueUtc DATETIME2(3) NULL,
 	LastFireUtc DATETIME2(3) NULL,
+	ScheduleId VARCHAR(64) NULL,
+	JobId VARCHAR(64) NULL,
+	JobShardId VARCHAR(150) NULL,
 	Priority TINYINT NOT NULL CONSTRAINT DF_OrleansAdvancedRemindersTable_Priority DEFAULT (0),
 	Action TINYINT NOT NULL CONSTRAINT DF_OrleansAdvancedRemindersTable_Action DEFAULT (0),
 	GrainHash INT NOT NULL,
 	Version INT NOT NULL,
 
-	CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
+	CONSTRAINT PK_AdvancedReminders_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
 );
 
 IF NOT EXISTS (
@@ -33,64 +36,86 @@ END;
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
 	'AdvancedRemindersUpsertReminderRowKey',
-	'DECLARE @Version AS INT = 0;
+	'DECLARE @NewVersion AS INT = NULL;
 	SET XACT_ABORT, NOCOUNT ON;
 	BEGIN TRANSACTION;
-	UPDATE OrleansAdvancedRemindersTable WITH(UPDLOCK, ROWLOCK, HOLDLOCK)
-	SET
-		StartTime = @StartTime,
-		Period = @Period,
-		CronExpression = @CronExpression,
-		CronTimeZoneId = @CronTimeZoneId,
-		NextDueUtc = @NextDueUtc,
-		LastFireUtc = @LastFireUtc,
-		Priority = @Priority,
-		Action = @Action,
-		GrainHash = @GrainHash,
-		@Version = Version = Version + 1
-	WHERE
-		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
-		AND GrainId = @GrainId AND @GrainId IS NOT NULL
-		AND ReminderName = @ReminderName AND @ReminderName IS NOT NULL;
-
-	INSERT INTO OrleansAdvancedRemindersTable
-	(
-		ServiceId,
-		GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		CronExpression,
-		CronTimeZoneId,
-		NextDueUtc,
-		LastFireUtc,
-		Priority,
-		Action,
-		GrainHash,
-		Version
-	)
-	SELECT
-		@ServiceId,
-		@GrainId,
-		@ReminderName,
-		@StartTime,
-		@Period,
-		@CronExpression,
-		@CronTimeZoneId,
-		@NextDueUtc,
-		@LastFireUtc,
-		@Priority,
-		@Action,
-		@GrainHash,
-		0
-	WHERE
-		@@ROWCOUNT=0;
-	SELECT @Version AS Version;
+	IF @Version = -1
+	BEGIN
+		INSERT INTO OrleansAdvancedRemindersTable
+		(
+			ServiceId,
+			GrainId,
+			ReminderName,
+			StartTime,
+			Period,
+			CronExpression,
+			CronTimeZoneId,
+			NextDueUtc,
+			LastFireUtc,
+			ScheduleId,
+			JobId,
+			JobShardId,
+			Priority,
+			Action,
+			GrainHash,
+			Version
+		)
+		SELECT
+			@ServiceId,
+			@GrainId,
+			@ReminderName,
+			@StartTime,
+			@Period,
+			@CronExpression,
+			@CronTimeZoneId,
+			@NextDueUtc,
+			@LastFireUtc,
+			@ScheduleId,
+			@JobId,
+			@JobShardId,
+			@Priority,
+			@Action,
+			@GrainHash,
+			0
+		WHERE NOT EXISTS
+		(
+			SELECT 1
+			FROM OrleansAdvancedRemindersTable WITH(UPDLOCK, HOLDLOCK)
+			WHERE ServiceId = @ServiceId
+				AND GrainId = @GrainId
+				AND ReminderName = @ReminderName
+		);
+		IF @@ROWCOUNT = 1 SET @NewVersion = 0;
+	END
+	ELSE
+	BEGIN
+		UPDATE OrleansAdvancedRemindersTable WITH(UPDLOCK, ROWLOCK, HOLDLOCK)
+		SET
+			StartTime = @StartTime,
+			Period = @Period,
+			CronExpression = @CronExpression,
+			CronTimeZoneId = @CronTimeZoneId,
+			NextDueUtc = @NextDueUtc,
+			LastFireUtc = @LastFireUtc,
+			ScheduleId = @ScheduleId,
+			JobId = @JobId,
+			JobShardId = @JobShardId,
+			Priority = @Priority,
+			Action = @Action,
+			GrainHash = @GrainHash,
+			@NewVersion = Version = Version + 1
+		WHERE
+			ServiceId = @ServiceId AND @ServiceId IS NOT NULL
+			AND GrainId = @GrainId AND @GrainId IS NOT NULL
+			AND ReminderName = @ReminderName AND @ReminderName IS NOT NULL
+			AND Version = @Version;
+	END;
+	SELECT @NewVersion AS Version WHERE @NewVersion IS NOT NULL;
 	COMMIT TRANSACTION;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'AdvancedRemindersUpsertReminderRowKey'
 );
@@ -107,6 +132,9 @@ SELECT
 		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
+		ScheduleId,
+		JobId,
+		JobShardId,
 		Priority,
 		Action,
 		Version
@@ -115,9 +143,9 @@ SELECT
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND GrainId = @GrainId AND @GrainId IS NOT NULL;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'AdvancedRemindersReadReminderRowsKey'
 );
@@ -134,6 +162,9 @@ SELECT
 		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
+		ScheduleId,
+		JobId,
+		JobShardId,
 		Priority,
 		Action,
 		Version
@@ -143,9 +174,9 @@ SELECT
 		AND GrainId = @GrainId AND @GrainId IS NOT NULL
 		AND ReminderName = @ReminderName AND @ReminderName IS NOT NULL;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'AdvancedRemindersReadReminderRowKey'
 );
@@ -162,6 +193,9 @@ SELECT
 		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
+		ScheduleId,
+		JobId,
+		JobShardId,
 		Priority,
 		Action,
 		Version
@@ -171,9 +205,9 @@ SELECT
 		AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
 		AND GrainHash <= @EndHash AND @EndHash IS NOT NULL;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'AdvancedRemindersReadRangeRows1Key'
 );
@@ -190,6 +224,9 @@ SELECT
 		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
+		ScheduleId,
+		JobId,
+		JobShardId,
 		Priority,
 		Action,
 		Version
@@ -199,9 +236,9 @@ SELECT
 		AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)
 		OR (GrainHash <= @EndHash AND @EndHash IS NOT NULL));
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'AdvancedRemindersReadRangeRows2Key'
 );
@@ -217,12 +254,12 @@ SELECT
 		AND Version = @Version AND @Version IS NOT NULL;
 	SELECT @@ROWCOUNT;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'AdvancedRemindersDeleteReminderRowKey'
-);    
+);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
@@ -231,9 +268,9 @@ SELECT
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
 	'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
+WHERE NOT EXISTS
+(
+    SELECT 1
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'AdvancedRemindersDeleteReminderRowsKey'
-);  
+);

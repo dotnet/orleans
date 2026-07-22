@@ -217,6 +217,9 @@ namespace Orleans.Tests.SqlUtils
                     LastFireUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.LastFireUtc)),
                     Priority = ParsePriority(record.GetInt32(nameof(DbStoredQueries.Columns.Priority))),
                     Action = ParseAction(record.GetInt32(nameof(DbStoredQueries.Columns.Action))),
+                    ScheduleId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.ScheduleId)) ?? string.Empty,
+                    JobId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.JobId)) ?? string.Empty,
+                    JobShardId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.JobShardId)) ?? string.Empty,
 #endif
                     ETag = DbStoredQueries.Converters.GetVersion(record).ToString()
                 };
@@ -268,7 +271,7 @@ namespace Orleans.Tests.SqlUtils
             string cronTimeZoneId,
             DateTime? nextDueUtc,
             DateTime? lastFireUtc,
-            
+
 #if ADVANCED_REMINDERS_ADONET
             Orleans.AdvancedReminders.Runtime.ReminderPriority
 #else
@@ -280,7 +283,11 @@ namespace Orleans.Tests.SqlUtils
 #else
             MissedReminderAction
 #endif
-            action)
+            action,
+            string scheduleId,
+            string jobId,
+            string jobShardId,
+            string eTag)
         {
             return ReadAsync(UpsertReminderRowQuery, DbStoredQueries.Converters.GetVersion, command =>
                 new DbStoredQueries.Columns(command)
@@ -296,9 +303,15 @@ namespace Orleans.Tests.SqlUtils
                     NextDueUtc = nextDueUtc,
                     LastFireUtc = lastFireUtc,
                     Priority = (int)priority,
-                    Action = (int)action
+                    Action = (int)action,
+                    ScheduleId = scheduleId,
+                    JobId = jobId,
+                    JobShardId = jobShardId,
+                    Version = string.IsNullOrEmpty(eTag) ? "-1" : eTag,
                 },
-                ret => ret.First().ToString());
+                ret => ret.Select(version => version.ToString()).FirstOrDefault()
+                    ?? throw new Orleans.AdvancedReminders.Runtime.ReminderException(
+                        $"Could not upsert reminder '{reminderName}' for grain '{grainId}' due to ETag mismatch."));
         }
 #else
         internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,

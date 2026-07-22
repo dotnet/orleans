@@ -20,6 +20,36 @@ namespace UnitTests.AdvancedRemindersTest;
 public class AzureAdvancedReminderConfigurationTests
 {
     [Fact]
+    public void ReminderRowKeys_AreCollisionFreeForPreviouslySanitizedNames()
+    {
+        var grainId = GrainId.Create("test", "row-key");
+
+        var slash = ReminderTableEntry.ConstructRowKey(grainId, "a/b");
+        var underscore = ReminderTableEntry.ConstructRowKey(grainId, "a_b");
+
+        Assert.NotEqual(slash, underscore);
+        Assert.DoesNotContain('/', slash);
+        Assert.DoesNotContain('/', underscore);
+    }
+
+    [Fact]
+    public void ReminderPartitionKeyBounds_DoNotIncludeAnotherEncodedServicePrefix()
+    {
+        const string serviceId = "service";
+        var (lower, upper) = ReminderTableEntry.ConstructPartitionKeyBounds(serviceId);
+        var ownKey = ReminderTableEntry.ConstructPartitionKey(serviceId, 42);
+
+        Assert.EndsWith("!", lower, StringComparison.Ordinal);
+        Assert.Equal(lower[..^1] + '"', upper);
+        Assert.True(string.CompareOrdinal(ownKey, lower) > 0);
+        Assert.True(string.CompareOrdinal(ownKey, upper) < 0);
+
+        var otherServiceKey = ReminderTableEntry.ConstructPartitionKey("service?", 42);
+        Assert.False(string.CompareOrdinal(otherServiceKey, lower) > 0
+            && string.CompareOrdinal(otherServiceKey, upper) < 0);
+    }
+
+    [Fact]
     public void UseAzureTableAdvancedReminderService_ConfiguresDurableJobStorage()
     {
         var blobServiceClient = new BlobServiceClient(new Uri("https://example.blob.core.windows.net"));

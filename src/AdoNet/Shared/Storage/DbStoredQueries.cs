@@ -525,6 +525,21 @@ namespace Orleans.Tests.SqlUtils
                 set { Add(nameof(Action), value); }
             }
 
+            internal string ScheduleId
+            {
+                set { Add(nameof(ScheduleId), value, dbType: DbType.String); }
+            }
+
+            internal string JobId
+            {
+                set { Add(nameof(JobId), value, dbType: DbType.String); }
+            }
+
+            internal string JobShardId
+            {
+                set { Add(nameof(JobShardId), value, dbType: DbType.String); }
+            }
+
             internal TimeSpan Period
             {
                 set

@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using Orleans.AdvancedReminders;
 using Orleans.Dashboard.Implementation.Grains;
 using Orleans.Runtime;
 using Xunit;
@@ -159,17 +162,23 @@ public sealed class DashboardRemindersGrainTests
     }
 
     [Fact]
-    public async Task GetAdvancedReminders_ReadsFullHashRange()
+    public async Task GetAdvancedReminders_UsesCursorPagingAndCachesCount()
     {
         var advancedReminderTable = new AdvancedReminderTableStub();
         var serviceProvider = new ReminderServiceProvider(new ClassicReminderTableStub(), advancedReminderTable);
-        var grain = new DashboardRemindersGrain(serviceProvider);
+        var management = new PagedAdvancedReminderManagementGrain();
+        var grain = new DashboardRemindersGrain(serviceProvider, management);
 
-        await grain.GetAdvancedReminders(1, 50);
+        var first = (await grain.GetAdvancedReminders(1, 1)).Value;
+        var second = (await grain.GetAdvancedReminders(2, 1)).Value;
 
-        Assert.Equal(1, advancedReminderTable.RangeReadCount);
-        Assert.Equal(0u, advancedReminderTable.BeginHash);
-        Assert.Equal(0u, advancedReminderTable.EndHash);
+        Assert.Equal("advanced-reminder-1", Assert.Single(first.Reminders).Name);
+        Assert.Equal("advanced-reminder-2", Assert.Single(second.Reminders).Name);
+        Assert.Equal(2, first.Count);
+        Assert.Equal(2, second.Count);
+        Assert.Equal(2, management.ListCallCount);
+        Assert.Equal(1, management.CountCallCount);
+        Assert.Equal(0, advancedReminderTable.RangeReadCount);
     }
 
     [Fact]
@@ -250,5 +259,55 @@ public sealed class DashboardRemindersGrainTests
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => throw new NotSupportedException();
 
         public Task TestOnlyClearTable() => throw new NotSupportedException();
+    }
+
+    private sealed class PagedAdvancedReminderManagementGrain : IReminderManagementGrain
+    {
+        public int ListCallCount { get; private set; }
+
+        public int CountCallCount { get; private set; }
+
+        public Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string continuationToken = null)
+        {
+            ListCallCount++;
+            var isFirstPage = continuationToken is null;
+            return Task.FromResult(new ReminderManagementPage
+            {
+                Reminders =
+                [
+                    new AdvancedReminderEntry
+                    {
+                        GrainId = GrainId.Create("advanced-grain", isFirstPage ? "1" : "2"),
+                        ReminderName = isFirstPage ? "advanced-reminder-1" : "advanced-reminder-2",
+                        StartAt = new DateTime(2026, 7, 22, isFirstPage ? 10 : 11, 0, 0, DateTimeKind.Utc),
+                    },
+                ],
+                ContinuationToken = isFirstPage ? "next" : null,
+            });
+        }
+
+        public Task<int> CountAllAsync()
+        {
+            CountCallCount++;
+            return Task.FromResult(2);
+        }
+
+        public Task<ReminderManagementPage> ListOverdueAsync(TimeSpan overdueBy, int pageSize = 256, string continuationToken = null) => throw new NotSupportedException();
+
+        public Task<ReminderManagementPage> ListDueInRangeAsync(DateTime fromUtcInclusive, DateTime toUtcInclusive, int pageSize = 256, string continuationToken = null) => throw new NotSupportedException();
+
+        public Task<ReminderManagementPage> ListFilteredAsync(ReminderQueryFilter filter, int pageSize = 256, string continuationToken = null) => throw new NotSupportedException();
+
+        public Task<IEnumerable<AdvancedReminderEntry>> UpcomingAsync(TimeSpan horizon) => throw new NotSupportedException();
+
+        public Task<IEnumerable<AdvancedReminderEntry>> ListForGrainAsync(GrainId grainId) => throw new NotSupportedException();
+
+        public Task SetPriorityAsync(GrainId grainId, string name, ReminderPriority priority) => throw new NotSupportedException();
+
+        public Task SetActionAsync(GrainId grainId, string name, MissedReminderAction action) => throw new NotSupportedException();
+
+        public Task RepairAsync(GrainId grainId, string name) => throw new NotSupportedException();
+
+        public Task DeleteAsync(GrainId grainId, string name) => throw new NotSupportedException();
     }
 }

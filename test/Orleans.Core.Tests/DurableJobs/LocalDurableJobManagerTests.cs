@@ -421,6 +421,29 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public void IdempotentSchedule_UsesStableStripeAcrossCallsAndManagers()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardStripeCount = 7;
+        var first = new LocalDurableJobManager.TestAccessor(CreateManager(new TestJobShardManager(), timeProvider, options));
+        var second = new LocalDurableJobManager.TestAccessor(CreateManager(new TestJobShardManager(), timeProvider, options));
+        var request = new ScheduleJobRequest
+        {
+            IdempotencyKey = "stable-generation",
+            Target = GrainId.Create("test", "stable-stripe"),
+            JobName = "job",
+            DueTime = timeProvider.GetUtcNow().AddMinutes(5),
+        };
+
+        var expected = first.GetWritableShardStripe(request);
+
+        Assert.InRange(expected, 0, options.ShardStripeCount - 1);
+        Assert.All(Enumerable.Range(0, 10), _ => Assert.Equal(expected, first.GetWritableShardStripe(request)));
+        Assert.Equal(expected, second.GetWritableShardStripe(request));
+    }
+
+    [Fact]
     public async Task ExpiredJournaledShard_DrainsUnregistersAndDeletesStorage()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));

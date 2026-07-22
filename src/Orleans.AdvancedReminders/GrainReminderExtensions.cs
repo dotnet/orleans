@@ -25,8 +25,8 @@ public static class GrainReminderExtensions
     /// <param name="dueTime">Due time for this reminder</param>
     /// <param name="period">Frequency period for this reminder</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, TimeSpan dueTime, TimeSpan period)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period);
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, TimeSpan dueTime, TimeSpan period)
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain.
@@ -40,8 +40,8 @@ public static class GrainReminderExtensions
     /// <param name="dueTime">Due time for this reminder</param>
     /// <param name="period">Frequency period for this reminder</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, TimeSpan dueTime, TimeSpan period)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period);
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, TimeSpan dueTime, TimeSpan period)
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp.
@@ -55,8 +55,8 @@ public static class GrainReminderExtensions
     /// <param name="dueAtUtc">UTC timestamp for this reminder's first tick.</param>
     /// <param name="period">Frequency period for this reminder</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, DateTime dueAtUtc, TimeSpan period)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period);
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp.
@@ -70,8 +70,8 @@ public static class GrainReminderExtensions
     /// <param name="dueAtUtc">UTC timestamp for this reminder's first tick.</param>
     /// <param name="period">Frequency period for this reminder</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, DateTime dueAtUtc, TimeSpan period)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period);
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period);
 
     /// <summary>
     /// Registers a persistent, reliable reminder using the provided schedule.
@@ -80,8 +80,8 @@ public static class GrainReminderExtensions
     /// <param name="reminderName">Name of this reminder.</param>
     /// <param name="schedule">Reminder schedule.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, ReminderSchedule schedule)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, Runtime.ReminderPriority.Normal, Runtime.MissedReminderAction.Skip);
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderSchedule schedule)
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, Runtime.ReminderPriority.Normal, Runtime.MissedReminderAction.Skip);
 
     /// <summary>
     /// Registers a persistent, reliable reminder using the provided schedule.
@@ -90,8 +90,8 @@ public static class GrainReminderExtensions
     /// <param name="reminderName">Name of this reminder.</param>
     /// <param name="schedule">Reminder schedule.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, ReminderSchedule schedule)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, Runtime.ReminderPriority.Normal, Runtime.MissedReminderAction.Skip);
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderSchedule schedule)
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, Runtime.ReminderPriority.Normal, Runtime.MissedReminderAction.Skip);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain with adaptive delivery options.
@@ -103,14 +103,14 @@ public static class GrainReminderExtensions
     /// <param name="priority">Reminder priority.</param>
     /// <param name="action">Missed reminder action.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         this Grain grain,
         string reminderName,
         TimeSpan dueTime,
         TimeSpan period,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period, priority, action);
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period, priority, action);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain with adaptive delivery options.
@@ -122,14 +122,14 @@ public static class GrainReminderExtensions
     /// <param name="priority">Reminder priority.</param>
     /// <param name="action">Missed reminder action.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         this IGrainBase grain,
         string reminderName,
         TimeSpan dueTime,
         TimeSpan period,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period, priority, action);
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueTime, period, priority, action);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp with adaptive delivery options.
@@ -141,14 +141,14 @@ public static class GrainReminderExtensions
     /// <param name="priority">Reminder priority.</param>
     /// <param name="action">Missed reminder action.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         this Grain grain,
         string reminderName,
         DateTime dueAtUtc,
         TimeSpan period,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period, priority, action);
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period, priority, action);
 
     /// <summary>
     /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp with adaptive delivery options.
@@ -160,14 +160,14 @@ public static class GrainReminderExtensions
     /// <param name="priority">Reminder priority.</param>
     /// <param name="action">Missed reminder action.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         this IGrainBase grain,
         string reminderName,
         DateTime dueAtUtc,
         TimeSpan period,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period, priority, action);
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, dueAtUtc, period, priority, action);
 
     /// <summary>
     /// Registers a persistent, reliable reminder using the provided schedule with adaptive delivery options.
@@ -178,13 +178,13 @@ public static class GrainReminderExtensions
     /// <param name="priority">Reminder priority.</param>
     /// <param name="action">Missed reminder action.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         this Grain grain,
         string reminderName,
         ReminderSchedule schedule,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, priority, action);
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, priority, action);
 
     /// <summary>
     /// Registers a persistent, reliable reminder using the provided schedule with adaptive delivery options.
@@ -195,16 +195,16 @@ public static class GrainReminderExtensions
     /// <param name="priority">Reminder priority.</param>
     /// <param name="action">Missed reminder action.</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+    public static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         this IGrainBase grain,
         string reminderName,
         ReminderSchedule schedule,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, priority, action);
+        => RegisterOrUpdateAdvancedReminder(IsRemindable(grain), grain?.GrainContext, reminderName, schedule, priority, action);
 
-    private static Task<IGrainReminder> RegisterOrUpdateReminder(bool remindable, IGrainContext? grainContext, string reminderName, TimeSpan dueTime, TimeSpan period)
-        => RegisterOrUpdateReminder(
+    private static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(bool remindable, IGrainContext? grainContext, string reminderName, TimeSpan dueTime, TimeSpan period)
+        => RegisterOrUpdateAdvancedReminder(
             remindable,
             grainContext,
             reminderName,
@@ -212,8 +212,8 @@ public static class GrainReminderExtensions
             Runtime.ReminderPriority.Normal,
             Runtime.MissedReminderAction.Skip);
 
-    private static Task<IGrainReminder> RegisterOrUpdateReminder(bool remindable, IGrainContext? grainContext, string reminderName, DateTime dueAtUtc, TimeSpan period)
-        => RegisterOrUpdateReminder(
+    private static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(bool remindable, IGrainContext? grainContext, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        => RegisterOrUpdateAdvancedReminder(
             remindable,
             grainContext,
             reminderName,
@@ -221,7 +221,7 @@ public static class GrainReminderExtensions
             Runtime.ReminderPriority.Normal,
             Runtime.MissedReminderAction.Skip);
 
-    private static Task<IGrainReminder> RegisterOrUpdateReminder(
+    private static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         bool remindable,
         IGrainContext? grainContext,
         string reminderName,
@@ -229,7 +229,7 @@ public static class GrainReminderExtensions
         TimeSpan period,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(
+        => RegisterOrUpdateAdvancedReminder(
             remindable,
             grainContext,
             reminderName,
@@ -237,7 +237,7 @@ public static class GrainReminderExtensions
             priority,
             action);
 
-    private static Task<IGrainReminder> RegisterOrUpdateReminder(
+    private static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         bool remindable,
         IGrainContext? grainContext,
         string reminderName,
@@ -245,7 +245,7 @@ public static class GrainReminderExtensions
         TimeSpan period,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(
+        => RegisterOrUpdateAdvancedReminder(
             remindable,
             grainContext,
             reminderName,
@@ -253,7 +253,7 @@ public static class GrainReminderExtensions
             priority,
             action);
 
-    private static Task<IGrainReminder> RegisterOrUpdateReminder(
+    private static Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(
         bool remindable,
         IGrainContext? grainContext,
         string reminderName,
@@ -275,7 +275,7 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminder">Reminder to unregister.</param>
     /// <returns>Completion promise for this operation.</returns>
-    public static Task UnregisterReminder(this Grain grain, IGrainReminder reminder) => UnregisterReminder(grain?.GrainContext, reminder);
+    public static Task UnregisterAdvancedReminder(this Grain grain, IGrainReminder reminder) => UnregisterAdvancedReminder(grain?.GrainContext, reminder);
 
     /// <summary>
     /// Unregisters a previously registered reminder.
@@ -283,9 +283,9 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminder">Reminder to unregister.</param>
     /// <returns>Completion promise for this operation.</returns>
-    public static Task UnregisterReminder(this IGrainBase grain, IGrainReminder reminder) => UnregisterReminder(grain?.GrainContext, reminder);
+    public static Task UnregisterAdvancedReminder(this IGrainBase grain, IGrainReminder reminder) => UnregisterAdvancedReminder(grain?.GrainContext, reminder);
 
-    private static Task UnregisterReminder(IGrainContext? grainContext, IGrainReminder reminder)
+    private static Task UnregisterAdvancedReminder(IGrainContext? grainContext, IGrainReminder reminder)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         return GetReminderRegistry(grainContext).UnregisterReminder(grainContext.GrainId, reminder);
@@ -297,7 +297,7 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Reminder to return</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder?> GetReminder(this Grain grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
+    public static Task<IGrainReminder?> GetAdvancedReminder(this Grain grain, string reminderName) => GetAdvancedReminder(grain?.GrainContext, reminderName);
 
     /// <summary>
     /// Returns a previously registered reminder.
@@ -305,9 +305,9 @@ public static class GrainReminderExtensions
     /// <param name="grain">A grain.</param>
     /// <param name="reminderName">Reminder to return</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder?> GetReminder(this IGrainBase grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
+    public static Task<IGrainReminder?> GetAdvancedReminder(this IGrainBase grain, string reminderName) => GetAdvancedReminder(grain?.GrainContext, reminderName);
 
-    private static Task<IGrainReminder?> GetReminder(IGrainContext? grainContext, string reminderName)
+    private static Task<IGrainReminder?> GetAdvancedReminder(IGrainContext? grainContext, string reminderName)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
@@ -319,15 +319,15 @@ public static class GrainReminderExtensions
     /// Returns a list of all reminders registered by the grain.
     /// </summary>
     /// <returns>Promise for list of Reminders registered for this grain.</returns>
-    public static Task<List<IGrainReminder>> GetReminders(this Grain grain) => GetReminders(grain?.GrainContext);
+    public static Task<List<IGrainReminder>> GetAdvancedReminders(this Grain grain) => GetAdvancedReminders(grain?.GrainContext);
 
     /// <summary>
     /// Returns a list of all reminders registered by the grain.
     /// </summary>
     /// <returns>Promise for list of Reminders registered for this grain.</returns>
-    public static Task<List<IGrainReminder>> GetReminders(this IGrainBase grain) => GetReminders(grain?.GrainContext);
+    public static Task<List<IGrainReminder>> GetAdvancedReminders(this IGrainBase grain) => GetAdvancedReminders(grain?.GrainContext);
 
-    private static Task<List<IGrainReminder>> GetReminders(IGrainContext? grainContext)
+    private static Task<List<IGrainReminder>> GetAdvancedReminders(IGrainContext? grainContext)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         return GetReminderRegistry(grainContext).GetReminders(grainContext.GrainId);

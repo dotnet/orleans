@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Orleans.DurableJobs;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Xunit;
 
@@ -9,6 +10,51 @@ namespace Tester.DurableJobs;
 [TestCategory("BVT"), TestCategory("DurableJobs")]
 public class JournaledJobShardStateTests
 {
+    [Fact]
+    public void IdempotentSchedule_PreservesPriorityAndTraceAcrossSnapshotReplay()
+    {
+        var shardId = new JobShardId("shard-idempotent");
+        var start = DateTimeOffset.UtcNow;
+        var codec = new NoOpJournalRecordCodec();
+        var source = new JournaledJobShardState(shardId, start, start.AddHours(1), codec);
+        var request = new ScheduleJobRequest
+        {
+            IdempotencyKey = "generation-1",
+            Target = GrainId.Create("type", "idempotent-target"),
+            JobName = "job",
+            DueTime = start.AddMinutes(5),
+            Priority = 3,
+            Metadata = new Dictionary<string, string> { ["key"] = "value" },
+            TraceParent = "00-00000000000000000000000000000001-0000000000000001-01",
+            TraceState = "vendor=value",
+        };
+
+        var scheduled = Assert.IsType<DurableJob>(source.TryScheduleJob(request));
+        var repeated = Assert.IsType<DurableJob>(source.TryScheduleJob(request));
+
+        Assert.Same(scheduled, repeated);
+        Assert.Equal(1, source.Count);
+        var replayedState = new JournaledJobShardState(shardId, start, start.AddHours(1));
+        replayedState.Apply(DurableJobShardJournalRecord.ForSnapshot(source.CaptureSnapshot()));
+        var replayed = Assert.Single(replayedState.CaptureSnapshot().Jobs).Job;
+        Assert.Equal(scheduled.Id, replayed.Id);
+        Assert.Equal(request.Priority, replayed.Priority);
+        Assert.Equal(request.TraceParent, replayed.TraceParent);
+        Assert.Equal(request.TraceState, replayed.TraceState);
+        Assert.Equal(request.Metadata, replayed.Metadata);
+
+        Assert.Throws<InvalidOperationException>(() => source.TryScheduleJob(new ScheduleJobRequest
+        {
+            IdempotencyKey = request.IdempotencyKey,
+            Target = request.Target,
+            JobName = request.JobName,
+            DueTime = request.DueTime,
+            Priority = request.Priority + 1,
+            Metadata = request.Metadata,
+        }));
+        Assert.Equal(1, source.Count);
+    }
+
     [Fact]
     public void Replay_FoldsScheduleRetryAndRemoveOperations()
     {
@@ -144,4 +190,14 @@ public class JournaledJobShardStateTests
         TargetGrainId = GrainId.Create("type", id),
         ShardId = shardId.Value
     };
+
+    private sealed class NoOpJournalRecordCodec : IDurableValueCommandCodec<DurableJobShardJournalRecord>
+    {
+        public void WriteSet(DurableJobShardJournalRecord value, JournalStreamWriter writer)
+        {
+        }
+
+        public void Apply(JournalBufferReader input, IDurableValueCommandHandler<DurableJobShardJournalRecord> consumer)
+            => throw new NotSupportedException();
+    }
 }

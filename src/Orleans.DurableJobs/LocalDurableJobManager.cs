@@ -174,9 +174,11 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         return new ScheduleJobRequest
         {
+            IdempotencyKey = request.IdempotencyKey,
             Target = request.Target,
             JobName = request.JobName,
             DueTime = request.DueTime,
+            Priority = request.Priority,
             Metadata = request.Metadata,
             TraceParent = traceParent,
             TraceState = traceState,
@@ -616,7 +618,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     }
 
     private WritableShardKey GetWritableShardKey(ScheduleJobRequest request)
-        => new(GetShardStartTime(request.DueTime), GetShardStripe());
+        => new(GetShardStartTime(request.DueTime), GetShardStripe(request.IdempotencyKey));
 
     private IDictionary<string, string> CreateShardMetadata(WritableShardKey shardKey)
     {
@@ -637,11 +639,16 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         return new DateTimeOffset(bucketTicks, TimeSpan.Zero);
     }
 
-    private int GetShardStripe()
+    private int GetShardStripe(string? idempotencyKey)
     {
         if (_options.ShardStripeCount <= 1)
         {
             return 0;
+        }
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return DurableJobIdentity.GetStableHashCode(idempotencyKey) % _options.ShardStripeCount;
         }
 
         // Round-robin assignment. Stripe selection is a write-side fan-out knob only:

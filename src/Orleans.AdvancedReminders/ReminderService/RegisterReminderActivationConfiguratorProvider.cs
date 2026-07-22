@@ -165,6 +165,7 @@ internal sealed class RegisterReminderActivationConfiguratorProvider : IConfigur
                         "Failed [RegisterReminder] activation registration for grain {GrainId}, reminder {ReminderName}.",
                         grainContext.GrainId,
                         registration.Name);
+                    throw;
                 }
             }
         }

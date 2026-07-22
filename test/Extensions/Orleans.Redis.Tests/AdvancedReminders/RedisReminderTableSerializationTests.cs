@@ -92,6 +92,48 @@ public class RedisReminderTableSerializationTests
     }
 
     [Fact]
+    public void ConvertFromEntry_RoundTripsDurableJobIdentityFields()
+    {
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "redis-job-fields"),
+            ReminderName = "r",
+            StartAt = DateTime.UtcNow,
+            Period = TimeSpan.FromMinutes(1),
+            ScheduleId = "schedule-1",
+            JobId = "job-1",
+            JobShardId = "shard-1",
+        };
+
+        var (_, payload) = InvokeConvertFromEntry(entry);
+        var segments = ParseSegments(payload);
+        var roundTripped = InvokeConvertToEntry(payload);
+
+        Assert.Equal(entry.ScheduleId, segments[12]!.Value<string>());
+        Assert.Equal(entry.JobId, segments[13]!.Value<string>());
+        Assert.Equal(entry.JobShardId, segments[14]!.Value<string>());
+        Assert.Equal(entry.ScheduleId, roundTripped.ScheduleId);
+        Assert.Equal(entry.JobId, roundTripped.JobId);
+        Assert.Equal(entry.JobShardId, roundTripped.JobShardId);
+    }
+
+    [Fact]
+    public void ConvertToEntry_LegacyPayloadDefaultsDurableJobIdentityFields()
+    {
+        var payload = BuildPayload(
+            GrainId.Create("test", "redis-legacy"),
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip,
+            numericEnums: true);
+
+        var entry = InvokeConvertToEntry(payload);
+
+        Assert.Empty(entry.ScheduleId);
+        Assert.Empty(entry.JobId);
+        Assert.Empty(entry.JobShardId);
+    }
+
+    [Fact]
     public void ConvertToEntry_ParsesNumericPriorityAndAction()
     {
         var grainId = GrainId.Create("test", "redis-parse-numeric");

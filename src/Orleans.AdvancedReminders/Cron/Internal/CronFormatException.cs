@@ -22,7 +22,7 @@ namespace Orleans.AdvancedReminders.Cron.Internal
         public CronFormatException() : this(BaseMessage)
         {
         }
-        
+
         /// <summary>
         /// Initializes a new instance of the <see cref="CronFormatException"/> class with
         /// a specified error message.

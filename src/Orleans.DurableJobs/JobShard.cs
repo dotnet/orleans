@@ -151,7 +151,14 @@ public abstract class JobShard : IJobShard
             throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
         }
 
-        var jobId = Guid.NewGuid().ToString();
+        var jobId = DurableJobIdentity.CreateId(request);
+        if (_jobQueue.TryGetJob(jobId, out var existing))
+        {
+            return DurableJobIdentity.IsEquivalent(existing!, request)
+                ? existing
+                : throw new InvalidOperationException($"Idempotency key '{request.IdempotencyKey}' is already associated with a different durable job request.");
+        }
+
         var job = new DurableJob
         {
             Id = jobId,
@@ -162,9 +169,10 @@ public abstract class JobShard : IJobShard
             Metadata = request.Metadata,
             TraceParent = request.TraceParent,
             TraceState = request.TraceState,
+            Priority = request.Priority,
         };
 
-        await PersistAddJobAsync(jobId, request.JobName, request.DueTime, request.Target, request.Metadata, cancellationToken);
+        await PersistAddJobAsync(job, cancellationToken);
         _jobQueue.Enqueue(job, 0);
         return job;
     }
@@ -204,14 +212,10 @@ public abstract class JobShard : IJobShard
     /// <summary>
     /// Persists the addition of a new job to the underlying storage.
     /// </summary>
-    /// <param name="jobId">The unique identifier of the job.</param>
-    /// <param name="jobName">The name of the job.</param>
-    /// <param name="dueTime">The time when the job should be executed.</param>
-    /// <param name="target">The grain identifier of the target grain.</param>
-    /// <param name="metadata">Optional metadata to associate with the job.</param>
+    /// <param name="job">The complete durable job to persist.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    protected abstract Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+    protected abstract Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken);
 
     /// <summary>
     /// Persists the removal of a job from the underlying storage.

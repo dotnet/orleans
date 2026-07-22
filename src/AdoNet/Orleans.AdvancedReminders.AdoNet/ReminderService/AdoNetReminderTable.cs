@@ -14,7 +14,7 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
         private RelationalOrleansQueries orleansQueries = default!;
 
         public AdoNetReminderTable(
-            IOptions<ClusterOptions> clusterOptions, 
+            IOptions<ClusterOptions> clusterOptions,
             IOptions<AdoNetReminderTableOptions> storageOptions)
         {
             this.serviceId = clusterOptions.Value.ServiceId;
@@ -39,8 +39,8 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
         public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
             return this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName);
-        }   
-        
+        }
+
         public Task<string> UpsertRow(ReminderEntry entry)
         {
             NormalizeUtcFields(entry);
@@ -56,7 +56,11 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
                 entry.NextDueUtc,
                 entry.LastFireUtc,
                 entry.Priority,
-                entry.Action);
+                entry.Action,
+                entry.ScheduleId,
+                entry.JobId,
+                entry.JobShardId,
+                entry.ETag);
         }
 
         internal static void NormalizeUtcFields(ReminderEntry entry)
@@ -74,7 +78,7 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            return this.orleansQueries.DeleteReminderRowAsync(this.serviceId, grainId, reminderName, eTag);            
+            return this.orleansQueries.DeleteReminderRowAsync(this.serviceId, grainId, reminderName, eTag);
         }
 
         public Task TestOnlyClearTable()

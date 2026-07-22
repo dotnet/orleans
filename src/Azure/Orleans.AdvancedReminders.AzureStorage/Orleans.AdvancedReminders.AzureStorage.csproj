@@ -10,6 +10,8 @@
     <RootNamespace>Orleans.AdvancedReminders.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);ADVANCED_REMINDERS_AZURE</DefineConstants>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>

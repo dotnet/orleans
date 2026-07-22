@@ -6,14 +6,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.Cron.Internal;
 using Orleans.AdvancedReminders.Timers;
+using Orleans.DurableJobs;
 using Orleans.Runtime;
 
 namespace Orleans.AdvancedReminders.Runtime.ReminderService;
 
-internal sealed class ReminderRegistry(IServiceProvider serviceProvider, IOptions<ReminderOptions> options) : IReminderRegistry
+internal sealed class ReminderRegistry(
+    IServiceProvider serviceProvider,
+    IOptions<ReminderOptions> options,
+    [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider) : IReminderRegistry
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly ReminderOptions _options = options.Value;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     public Task<IGrainReminder> RegisterOrUpdateReminder(
         GrainId callingGrainId,
@@ -23,7 +28,7 @@ internal sealed class ReminderRegistry(IServiceProvider serviceProvider, IOption
         Runtime.MissedReminderAction action)
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        ValidateSchedule(reminderName, schedule, priority, action);
+        ReminderValidation.Validate(_options, reminderName, schedule, priority, action, _timeProvider.GetUtcNow().UtcDateTime);
         return GetReminderService().RegisterOrUpdateReminder(callingGrainId, reminderName, schedule, priority, action);
     }
 
@@ -48,7 +53,17 @@ internal sealed class ReminderRegistry(IServiceProvider serviceProvider, IOption
     private IReminderService GetReminderService()
         => _serviceProvider.GetRequiredService<IReminderService>();
 
-    private void ValidateSchedule(string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action)
+}
+
+internal static class ReminderValidation
+{
+    public static void Validate(
+        ReminderOptions options,
+        string reminderName,
+        ReminderSchedule schedule,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action,
+        DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(reminderName))
         {
@@ -60,17 +75,17 @@ internal sealed class ReminderRegistry(IServiceProvider serviceProvider, IOption
         switch (schedule.Kind)
         {
             case Runtime.ReminderScheduleKind.Interval:
-                ValidateIntervalSchedule(schedule, reminderName);
+                ValidateIntervalSchedule(options, schedule, reminderName);
                 break;
             case Runtime.ReminderScheduleKind.Cron:
-                ValidateCronSchedule(schedule);
+                ValidateCronSchedule(options, schedule, reminderName, utcNow);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(schedule), schedule.Kind, "Unsupported reminder schedule kind.");
         }
     }
 
-    private void ValidateIntervalSchedule(ReminderSchedule schedule, string reminderName)
+    private static void ValidateIntervalSchedule(ReminderOptions options, ReminderSchedule schedule, string reminderName)
     {
         if (schedule.Period is not { } period)
         {
@@ -111,21 +126,29 @@ internal sealed class ReminderRegistry(IServiceProvider serviceProvider, IOption
             throw new ArgumentOutOfRangeException(nameof(schedule), "Cannot use negative period to create a reminder");
         }
 
-        if (period < _options.MinimumReminderPeriod)
+        if (period < options.MinimumReminderPeriod)
         {
             throw new ArgumentException(
-                $"Cannot register reminder {reminderName} as requested period ({period}) is less than minimum allowed reminder period ({_options.MinimumReminderPeriod})");
+                $"Cannot register reminder {reminderName} as requested period ({period}) is less than minimum allowed reminder period ({options.MinimumReminderPeriod})");
         }
     }
 
-    private static void ValidateCronSchedule(ReminderSchedule schedule)
+    private static void ValidateCronSchedule(ReminderOptions options, ReminderSchedule schedule, string reminderName, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(schedule.CronExpression))
         {
             throw new ArgumentException("Cannot use null or empty cron expression for the reminder", nameof(schedule));
         }
 
-        _ = ReminderCronSchedule.Parse(schedule.CronExpression, schedule.CronTimeZoneId);
+        var cron = ReminderCronSchedule.Parse(schedule.CronExpression, schedule.CronTimeZoneId);
+        var first = cron.GetNextOccurrence(utcNow, inclusive: true);
+        var second = first is null ? null : cron.GetNextOccurrence(first.Value);
+        if (first is not null && second is not null && second.Value - first.Value < options.MinimumReminderPeriod)
+        {
+            throw new ArgumentException(
+                $"Cannot register reminder {reminderName} because its cron interval ({second.Value - first.Value}) is less than minimum allowed reminder period ({options.MinimumReminderPeriod})",
+                nameof(schedule));
+        }
     }
 
     private static void ValidatePriorityAndAction(Runtime.ReminderPriority priority, Runtime.MissedReminderAction action)

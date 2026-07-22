@@ -154,16 +154,24 @@ namespace Orleans.AdvancedReminders.Redis
             const string UpsertScript =
                 """
                 local key = KEYS[1]
-                local from = '[' .. ARGV[1] -- start of the conditional (with etag) key range
-                local to = '[' .. ARGV[2] -- end of the conditional (with etag) key range
-                local value = ARGV[3]
+                local expectedFrom = '[' .. ARGV[1]
+                local expectedTo = '[' .. ARGV[2]
+                local allFrom = '[' .. ARGV[3]
+                local allTo = '[' .. ARGV[4]
+                local value = ARGV[5]
+                local expectedETag = ARGV[6]
 
-                -- Remove all entries for this reminder
-                local remRes = redis.call('ZREMRANGEBYLEX', key, from, to);
+                if expectedETag == '' then
+                    local existing = redis.call('ZRANGEBYLEX', key, allFrom, allTo, 'LIMIT', 0, 1)
+                    if #existing ~= 0 then
+                        return 0
+                    end
+                elseif redis.call('ZREMRANGEBYLEX', key, expectedFrom, expectedTo) ~= 1 then
+                    return 0
+                end
 
-                -- Add the new reminder entry
-                local addRes = redis.call('ZADD', key, 0, value);
-                return { key, from, to, value, remRes, addRes }
+                redis.call('ZADD', key, 0, value)
+                return 1
                 """;
 
             try
@@ -171,8 +179,18 @@ namespace Orleans.AdvancedReminders.Redis
                 LogDebugUpsertRow(new(entry), entry.ETag);
 
                 var (newETag, value) = ConvertFromEntry(entry);
-                var (from, to) = GetFilter(entry.GrainId, entry.ReminderName);
-                var res = await _db.ScriptEvaluateAsync(UpsertScript, keys: new[] { _hashSetKey }, values: new[] { from, to, value });
+                var (expectedFrom, expectedTo) = GetFilter(entry.GrainId, entry.ReminderName, entry.ETag);
+                var (allFrom, allTo) = GetFilter(entry.GrainId, entry.ReminderName);
+                var result = await _db.ScriptEvaluateAsync(
+                    UpsertScript,
+                    keys: new[] { _hashSetKey },
+                    values: new RedisValue[] { expectedFrom, expectedTo, allFrom, allTo, value, entry.ETag });
+                if ((long)result != 1)
+                {
+                    throw new Runtime.ReminderException(
+                        $"Could not update reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");
+                }
+
                 return newETag.ToString();
             }
             catch (Exception exception) when (exception is not Runtime.ReminderException)
@@ -237,6 +255,9 @@ namespace Orleans.AdvancedReminders.Redis
                 Priority = ReadReminderPriority(segments, 9),
                 Action = ReadMissedReminderAction(segments, 10),
                 CronTimeZoneId = ReadNullableString(segments, 11),
+                ScheduleId = ReadNullableString(segments, 12),
+                JobId = ReadNullableString(segments, 13),
+                JobShardId = ReadNullableString(segments, 14),
             };
         }
 
@@ -412,6 +433,9 @@ namespace Orleans.AdvancedReminders.Redis
                 writer.WriteNumberValue((int)entry.Priority);
                 writer.WriteNumberValue((int)entry.Action);
                 writer.WriteStringValue(entry.CronTimeZoneId ?? string.Empty);
+                writer.WriteStringValue(entry.ScheduleId ?? string.Empty);
+                writer.WriteStringValue(entry.JobId ?? string.Empty);
+                writer.WriteStringValue(entry.JobShardId ?? string.Empty);
                 writer.WriteEndArray();
             }
 

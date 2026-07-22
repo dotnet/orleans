@@ -60,4 +60,10 @@ public sealed class DurableJob
     /// </summary>
     [Id(7)]
     public string? TraceState { get; init; }
+
+    /// <summary>
+    /// Gets the priority used to order this job relative to other jobs with the same due time.
+    /// </summary>
+    [Id(8)]
+    public int Priority { get; init; }
 }

@@ -116,6 +116,9 @@ namespace Orleans.AdvancedReminders.AzureStorage
                     CronTimeZoneId = tableEntry.CronTimeZoneId,
                     NextDueUtc = ParseOptionalUtcDateTime(tableEntry.NextDueUtc),
                     LastFireUtc = ParseOptionalUtcDateTime(tableEntry.LastFireUtc),
+                    ScheduleId = tableEntry.ScheduleId,
+                    JobId = tableEntry.JobId,
+                    JobShardId = tableEntry.JobShardId,
                     Priority = ParsePriority(tableEntry.Priority),
                     Action = ParseAction(tableEntry.Action),
                     ETag = eTag,
@@ -185,6 +188,9 @@ namespace Orleans.AdvancedReminders.AzureStorage
                 CronTimeZoneId = remEntry.CronTimeZoneId ?? string.Empty,
                 NextDueUtc = remEntry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
                 LastFireUtc = remEntry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+                ScheduleId = remEntry.ScheduleId ?? string.Empty,
+                JobId = remEntry.JobId ?? string.Empty,
+                JobShardId = remEntry.JobShardId ?? string.Empty,
                 Priority = (int)remEntry.Priority,
                 Action = (int)remEntry.Action,
 
@@ -266,6 +272,8 @@ namespace Orleans.AdvancedReminders.AzureStorage
                 if (result == null)
                 {
                     LogWarningReminderUpsertFailed(entry);
+                    throw new Runtime.ReminderException(
+                        $"Could not update reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");
                 }
                 return result!;
             }

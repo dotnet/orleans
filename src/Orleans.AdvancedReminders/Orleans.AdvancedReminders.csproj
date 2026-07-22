@@ -3,13 +3,20 @@
     <PackageId>Microsoft.Orleans.AdvancedReminders</PackageId>
     <Title>Microsoft Orleans Advanced Reminders</Title>
     <Description>Advanced reminders for Microsoft Orleans with schedule-based APIs and job-backed delivery.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS_PROVIDER</DefineConstants>
     <Nullable>enable</Nullable>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />

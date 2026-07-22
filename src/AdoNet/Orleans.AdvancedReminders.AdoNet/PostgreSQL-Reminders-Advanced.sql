@@ -10,18 +10,21 @@ CREATE TABLE OrleansAdvancedRemindersTable
     CronTimeZoneId varchar(200) NULL,
     NextDueUtc timestamptz(3) NULL,
     LastFireUtc timestamptz(3) NULL,
+    ScheduleId varchar(64) NULL,
+    JobId varchar(64) NULL,
+    JobShardId varchar(150) NULL,
     Priority smallint NOT NULL DEFAULT 0,
     Action smallint NOT NULL DEFAULT 0,
     GrainHash integer NOT NULL,
     Version integer NOT NULL,
 
-    CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
+    CONSTRAINT PK_AdvancedReminders_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
 );
 
-CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
+CREATE INDEX IX_AdvancedReminders_NextDueUtc_Priority
     ON OrleansAdvancedRemindersTable(ServiceId, NextDueUtc, Priority);
 
-CREATE FUNCTION upsert_reminder_row(
+CREATE FUNCTION upsert_advanced_reminder_row(
     ServiceIdArg    OrleansAdvancedRemindersTable.ServiceId%TYPE,
     GrainIdArg      OrleansAdvancedRemindersTable.GrainId%TYPE,
     ReminderNameArg OrleansAdvancedRemindersTable.ReminderName%TYPE,
@@ -31,62 +34,51 @@ CREATE FUNCTION upsert_reminder_row(
     CronTimeZoneIdArg OrleansAdvancedRemindersTable.CronTimeZoneId%TYPE,
     NextDueUtcArg   OrleansAdvancedRemindersTable.NextDueUtc%TYPE,
     LastFireUtcArg  OrleansAdvancedRemindersTable.LastFireUtc%TYPE,
+    ScheduleIdArg   OrleansAdvancedRemindersTable.ScheduleId%TYPE,
+    JobIdArg        OrleansAdvancedRemindersTable.JobId%TYPE,
+    JobShardIdArg   OrleansAdvancedRemindersTable.JobShardId%TYPE,
     PriorityArg     OrleansAdvancedRemindersTable.Priority%TYPE,
     ActionArg       OrleansAdvancedRemindersTable.Action%TYPE,
-    GrainHashArg    OrleansAdvancedRemindersTable.GrainHash%TYPE
+    GrainHashArg    OrleansAdvancedRemindersTable.GrainHash%TYPE,
+    ExpectedVersionArg OrleansAdvancedRemindersTable.Version%TYPE
   )
   RETURNS TABLE(version integer) AS
 $func$
 DECLARE
-    VersionVar int := 0;
+    VersionVar int := NULL;
 BEGIN
+    IF ExpectedVersionArg = -1 THEN
+        INSERT INTO OrleansAdvancedRemindersTable
+            (ServiceId, GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId,
+             NextDueUtc, LastFireUtc, ScheduleId, JobId, JobShardId, Priority, Action, GrainHash, Version)
+        VALUES
+            (ServiceIdArg, GrainIdArg, ReminderNameArg, StartTimeArg, PeriodArg, CronExpressionArg, CronTimeZoneIdArg,
+             NextDueUtcArg, LastFireUtcArg, ScheduleIdArg, JobIdArg, JobShardIdArg, PriorityArg, ActionArg, GrainHashArg, 0)
+        ON CONFLICT (ServiceId, GrainId, ReminderName) DO NOTHING
+        RETURNING Version INTO VersionVar;
+    ELSE
+        UPDATE OrleansAdvancedRemindersTable
+        SET StartTime = StartTimeArg,
+            Period = PeriodArg,
+            CronExpression = CronExpressionArg,
+            CronTimeZoneId = CronTimeZoneIdArg,
+            NextDueUtc = NextDueUtcArg,
+            LastFireUtc = LastFireUtcArg,
+            ScheduleId = ScheduleIdArg,
+            JobId = JobIdArg,
+            JobShardId = JobShardIdArg,
+            Priority = PriorityArg,
+            Action = ActionArg,
+            GrainHash = GrainHashArg,
+            Version = Version + 1
+        WHERE ServiceId = ServiceIdArg
+          AND GrainId = GrainIdArg
+          AND ReminderName = ReminderNameArg
+          AND Version = ExpectedVersionArg
+        RETURNING Version INTO VersionVar;
+    END IF;
 
-    INSERT INTO OrleansAdvancedRemindersTable
-    (
-        ServiceId,
-        GrainId,
-        ReminderName,
-        StartTime,
-        Period,
-        CronExpression,
-        CronTimeZoneId,
-        NextDueUtc,
-        LastFireUtc,
-        Priority,
-        Action,
-        GrainHash,
-        Version
-    )
-    SELECT
-        ServiceIdArg,
-        GrainIdArg,
-        ReminderNameArg,
-        StartTimeArg,
-        PeriodArg,
-        CronExpressionArg,
-        CronTimeZoneIdArg,
-        NextDueUtcArg,
-        LastFireUtcArg,
-        PriorityArg,
-        ActionArg,
-        GrainHashArg,
-        0
-    ON CONFLICT (ServiceId, GrainId, ReminderName)
-        DO UPDATE SET
-            StartTime = excluded.StartTime,
-            Period = excluded.Period,
-            CronExpression = excluded.CronExpression,
-            CronTimeZoneId = excluded.CronTimeZoneId,
-            NextDueUtc = excluded.NextDueUtc,
-            LastFireUtc = excluded.LastFireUtc,
-            Priority = excluded.Priority,
-            Action = excluded.Action,
-            GrainHash = excluded.GrainHash,
-            Version = OrleansAdvancedRemindersTable.Version + 1
-    RETURNING
-        OrleansAdvancedRemindersTable.Version INTO STRICT VersionVar;
-
-    RETURN QUERY SELECT VersionVar AS version;
+    RETURN QUERY SELECT VersionVar AS version WHERE VersionVar IS NOT NULL;
 
 END
 $func$ LANGUAGE plpgsql;
@@ -95,7 +87,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'AdvancedRemindersUpsertReminderRowKey','
-    SELECT * FROM upsert_reminder_row(
+    SELECT * FROM upsert_advanced_reminder_row(
         @ServiceId,
         @GrainId,
         @ReminderName,
@@ -105,9 +97,13 @@ VALUES
         @CronTimeZoneId,
         @NextDueUtc,
         @LastFireUtc,
+        @ScheduleId,
+        @JobId,
+        @JobShardId,
         @Priority::smallint,
         @Action::smallint,
-        @GrainHash
+        @GrainHash,
+        @Version
     );
 ');
 
@@ -124,6 +120,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
@@ -146,6 +145,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
@@ -169,6 +171,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
@@ -192,6 +197,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
@@ -202,7 +210,7 @@ VALUES
         OR (GrainHash <= @EndHash AND @EndHash IS NOT NULL));
 ');
 
-CREATE FUNCTION delete_reminder_row(
+CREATE FUNCTION delete_advanced_reminder_row(
     ServiceIdArg    OrleansAdvancedRemindersTable.ServiceId%TYPE,
     GrainIdArg      OrleansAdvancedRemindersTable.GrainId%TYPE,
     ReminderNameArg OrleansAdvancedRemindersTable.ReminderName%TYPE,
@@ -233,7 +241,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'AdvancedRemindersDeleteReminderRowKey','
-    SELECT * FROM delete_reminder_row(
+    SELECT * FROM delete_advanced_reminder_row(
         @ServiceId,
         @GrainId,
         @ReminderName,

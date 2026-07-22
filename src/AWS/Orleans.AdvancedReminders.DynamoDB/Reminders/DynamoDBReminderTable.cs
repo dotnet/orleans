@@ -25,6 +25,9 @@ namespace Orleans.AdvancedReminders.DynamoDB
         private const string CRON_TIME_ZONE_ID_PROPERTY_NAME = "CronTimeZoneId";
         private const string NEXT_DUE_UTC_PROPERTY_NAME = "NextDueUtc";
         private const string LAST_FIRE_UTC_PROPERTY_NAME = "LastFireUtc";
+        private const string SCHEDULE_ID_PROPERTY_NAME = "ScheduleId";
+        private const string JOB_ID_PROPERTY_NAME = "JobId";
+        private const string JOB_SHARD_ID_PROPERTY_NAME = "JobShardId";
         private const string PRIORITY_PROPERTY_NAME = "Priority";
         private const string ACTION_PROPERTY_NAME = "Action";
         private const string GRAIN_HASH_PROPERTY_NAME = "GrainHash";
@@ -224,13 +227,16 @@ namespace Orleans.AdvancedReminders.DynamoDB
         {
             return new ReminderEntry
             {
-                ETag = item[ETAG_PROPERTY_NAME].N,
+                ETag = ReadETag(item[ETAG_PROPERTY_NAME]),
                 GrainId = GrainId.Parse(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S, CultureInfo.InvariantCulture),
                 CronExpression = ReadOptionalString(item, CRON_EXPRESSION_PROPERTY_NAME),
                 CronTimeZoneId = ReadOptionalString(item, CRON_TIME_ZONE_ID_PROPERTY_NAME),
                 NextDueUtc = ReadOptionalDateTime(item, NEXT_DUE_UTC_PROPERTY_NAME),
                 LastFireUtc = ReadOptionalDateTime(item, LAST_FIRE_UTC_PROPERTY_NAME),
+                ScheduleId = ReadOptionalString(item, SCHEDULE_ID_PROPERTY_NAME),
+                JobId = ReadOptionalString(item, JOB_ID_PROPERTY_NAME),
+                JobShardId = ReadOptionalString(item, JOB_SHARD_ID_PROPERTY_NAME),
                 Priority = ReadPriority(item),
                 Action = ReadAction(item),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
@@ -240,6 +246,14 @@ namespace Orleans.AdvancedReminders.DynamoDB
 
         private static string ReadOptionalString(Dictionary<string, AttributeValue> item, string propertyName)
             => item.TryGetValue(propertyName, out var value) ? value.S ?? string.Empty : string.Empty;
+
+        private static string ReadETag(AttributeValue value)
+            => !string.IsNullOrEmpty(value.S) ? value.S : value.N;
+
+        private static AttributeValue CreateETagValue(string eTag)
+            => Guid.TryParseExact(eTag, "N", out _)
+                ? new AttributeValue(eTag)
+                : new AttributeValue { N = eTag };
 
         private static DateTime? ReadOptionalDateTime(Dictionary<string, AttributeValue> item, string propertyName)
         {
@@ -313,7 +327,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
 
             try
             {
-                var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = eTag } } };
+                var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, CreateETagValue(eTag) } };
                 var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
 
                 await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
@@ -387,7 +401,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     { REMINDER_NAME_PROPERTY_NAME, new AttributeValue(entry.ReminderName) },
                     { PRIORITY_PROPERTY_NAME, new AttributeValue { N = ((int)entry.Priority).ToString(CultureInfo.InvariantCulture) } },
                     { ACTION_PROPERTY_NAME, new AttributeValue { N = ((int)entry.Action).ToString(CultureInfo.InvariantCulture) } },
-                    { ETAG_PROPERTY_NAME, new AttributeValue { N = Random.Shared.Next().ToString(CultureInfo.InvariantCulture) } }
+                    { ETAG_PROPERTY_NAME, new AttributeValue(Guid.NewGuid().ToString("N")) }
                 };
 
             if (!string.IsNullOrWhiteSpace(entry.CronExpression))
@@ -410,14 +424,52 @@ namespace Orleans.AdvancedReminders.DynamoDB
                 fields[LAST_FIRE_UTC_PROPERTY_NAME] = new AttributeValue(lastFireUtc.ToString("O"));
             }
 
+            if (!string.IsNullOrEmpty(entry.ScheduleId))
+            {
+                fields[SCHEDULE_ID_PROPERTY_NAME] = new AttributeValue(entry.ScheduleId);
+            }
+
+            if (!string.IsNullOrEmpty(entry.JobId))
+            {
+                fields[JOB_ID_PROPERTY_NAME] = new AttributeValue(entry.JobId);
+            }
+
+            if (!string.IsNullOrEmpty(entry.JobShardId))
+            {
+                fields[JOB_SHARD_ID_PROPERTY_NAME] = new AttributeValue(entry.JobShardId);
+            }
+
             try
             {
                 LogDebugUpsertRow(logger, entry, entry.ETag);
 
-                await this.storage.PutEntryAsync(this.options.TableName, fields);
+                if (string.IsNullOrEmpty(entry.ETag))
+                {
+                    await this.storage.PutEntryAsync(
+                        this.options.TableName,
+                        fields,
+                        $"attribute_not_exists({ETAG_PROPERTY_NAME})");
+                }
+                else
+                {
+                    var conditionalValues = new Dictionary<string, AttributeValue>
+                    {
+                        [CURRENT_ETAG_ALIAS] = CreateETagValue(entry.ETag),
+                    };
+                    await this.storage.PutEntryAsync(
+                        this.options.TableName,
+                        fields,
+                        $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
+                        conditionalValues);
+                }
 
-                entry.ETag = fields[ETAG_PROPERTY_NAME].N;
+                entry.ETag = ReadETag(fields[ETAG_PROPERTY_NAME]);
                 return entry.ETag;
+            }
+            catch (ConditionalCheckFailedException)
+            {
+                throw new Runtime.ReminderException(
+                    $"Could not update reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");
             }
             catch (Exception exc)
             {

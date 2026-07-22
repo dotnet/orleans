@@ -41,6 +41,8 @@ internal sealed class JournaledJobShardManager : JobShardManager
     // conflicts triggering InconsistentStateException → the journaling layer's recovery path.
     private readonly ConcurrentDictionary<string, bool> _ownedShards = new(StringComparer.Ordinal);
 
+    public override bool IsDurableStorage => _storageProvider is not VolatileJournalStorageProvider;
+
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
         IJournaledStateManagerFactory stateManagerFactory,

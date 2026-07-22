@@ -11,7 +11,7 @@ namespace Orleans.AdvancedReminders
     /// Interface for implementations of the underlying storage for reminder data:
     /// Azure Table, SQL, development emulator grain, and a mock implementation.
     /// Defined as a grain interface for the development emulator grain case.
-    /// </summary>  
+    /// </summary>
     public interface IReminderTable
     {
         /// <summary>
@@ -66,7 +66,7 @@ namespace Orleans.AdvancedReminders
         /// </summary>
         /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">The reminder name.</param>
-        /// /// <param name="eTag">The ETag.</param>
+        /// <param name="eTag">The ETag.</param>
         /// <returns>true if a row with <paramref name="grainId"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
         Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
 
@@ -164,7 +164,7 @@ namespace Orleans.AdvancedReminders
         public GrainId GrainId { get; set; }
 
         /// <summary>
-        /// Gets or sets the name of the reminder. Forms the reminder primary key together with 
+        /// Gets or sets the name of the reminder. Forms the reminder primary key together with
         /// <see cref="GrainId"/>.
         /// </summary>
         [Id(1)]
@@ -227,9 +227,27 @@ namespace Orleans.AdvancedReminders
         [Id(9)]
         public Runtime.MissedReminderAction Action { get; set; } = Runtime.MissedReminderAction.Skip;
 
+        /// <summary>
+        /// Gets or sets the stable identifier for the currently scheduled occurrence.
+        /// </summary>
+        [Id(11)]
+        public string ScheduleId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the durable job identifier for the currently scheduled occurrence.
+        /// </summary>
+        [Id(12)]
+        public string JobId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the durable job shard identifier for the currently scheduled occurrence.
+        /// </summary>
+        [Id(13)]
+        public string JobShardId { get; set; } = string.Empty;
+
         /// <inheritdoc/>
         public override string ToString()
-            => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period} Cron={CronExpression} CronTimeZoneId={CronTimeZoneId} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action}>";
+            => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period} Cron={CronExpression} CronTimeZoneId={CronTimeZoneId} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action} ScheduleId={ScheduleId} JobId={JobId} JobShardId={JobShardId}>";
 
         /// <summary>
         /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.

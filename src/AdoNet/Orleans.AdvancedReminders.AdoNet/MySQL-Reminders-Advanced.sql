@@ -10,12 +10,15 @@ CREATE TABLE OrleansAdvancedRemindersTable
     CronTimeZoneId NVARCHAR(200) NULL,
     NextDueUtc DATETIME NULL,
     LastFireUtc DATETIME NULL,
+    ScheduleId VARCHAR(64) NULL,
+    JobId VARCHAR(64) NULL,
+    JobShardId VARCHAR(150) NULL,
     Priority TINYINT NOT NULL DEFAULT 0,
     Action TINYINT NOT NULL DEFAULT 0,
     GrainHash INT NOT NULL,
     Version INT NOT NULL,
 
-    CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
+    CONSTRAINT PK_AdvancedReminders_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
 );
 
 CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
@@ -25,7 +28,34 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'AdvancedRemindersUpsertReminderRowKey','
-    INSERT INTO OrleansAdvancedRemindersTable
+    SET @NewVersion := NULL;
+    START TRANSACTION;
+
+    UPDATE OrleansAdvancedRemindersTable
+    SET
+        StartTime = @StartTime,
+        Period = @Period,
+        CronExpression = @CronExpression,
+        CronTimeZoneId = @CronTimeZoneId,
+        NextDueUtc = @NextDueUtc,
+        LastFireUtc = @LastFireUtc,
+        ScheduleId = @ScheduleId,
+        JobId = @JobId,
+        JobShardId = @JobShardId,
+        Priority = @Priority,
+        Action = @Action,
+        GrainHash = @GrainHash,
+        Version = LAST_INSERT_ID(Version + 1)
+    WHERE
+        ServiceId = @ServiceId AND @ServiceId IS NOT NULL
+        AND GrainId = @GrainId AND @GrainId IS NOT NULL
+        AND ReminderName = @ReminderName AND @ReminderName IS NOT NULL
+        AND Version = @Version
+        AND @Version >= 0;
+
+    SET @NewVersion := IF(ROW_COUNT() = 1, LAST_INSERT_ID(), NULL);
+
+    INSERT IGNORE INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
         GrainId,
@@ -36,13 +66,15 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         GrainHash,
         Version
     )
-    VALUES
-    (
+    SELECT
         @ServiceId,
         @GrainId,
         @ReminderName,
@@ -52,26 +84,19 @@ VALUES
         @CronTimeZoneId,
         @NextDueUtc,
         @LastFireUtc,
+        @ScheduleId,
+        @JobId,
+        @JobShardId,
         @Priority,
         @Action,
         @GrainHash,
-        last_insert_id(0)
-    )
-    ON DUPLICATE KEY
-    UPDATE
-        StartTime = @StartTime,
-        Period = @Period,
-        CronExpression = @CronExpression,
-        CronTimeZoneId = @CronTimeZoneId,
-        NextDueUtc = @NextDueUtc,
-        LastFireUtc = @LastFireUtc,
-        Priority = @Priority,
-        Action = @Action,
-        GrainHash = @GrainHash,
-        Version = last_insert_id(Version+1);
+        0
+    WHERE @Version = -1;
 
+    SET @NewVersion := IF(ROW_COUNT() = 1, 0, @NewVersion);
 
-    SELECT last_insert_id() AS Version;
+    SELECT @NewVersion AS Version WHERE @NewVersion IS NOT NULL;
+    COMMIT;
 ');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -87,6 +112,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
@@ -109,6 +137,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
@@ -132,6 +163,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
@@ -155,6 +189,9 @@ VALUES
         CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
+        ScheduleId,
+        JobId,
+        JobShardId,
         Priority,
         Action,
         Version
