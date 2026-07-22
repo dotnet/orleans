@@ -14,7 +14,8 @@ on:
     - cron: '0 6 * * 1'  # Run weekly on Monday at 6:00 UTC
 
 jobs:
-  analyze:
+  # Keep the final job id as "analyze" so CodeQL matches its analysis_key to the configuration on main.
+  generate:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -49,4 +50,38 @@ jobs:
         uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13 # v4
         with:
           category: "/language:${{ matrix.language }}"
-          upload: ${{ github.event_name == 'merge_group' && 'never' || 'always' }}
+          upload: never
+          post-processed-sarif-path: sarif-results
+
+      - name: Stage CodeQL results
+        if: github.event_name != 'merge_group'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: sarif-results
+          retention-days: 1
+
+  analyze:
+    name: Upload CodeQL results
+    if: github.event_name != 'merge_group'
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Download CodeQL results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: codeql-sarif-*
+          path: sarif-results
+
+      - name: Upload CodeQL results
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4
+        with:
+          sarif_file: sarif-results

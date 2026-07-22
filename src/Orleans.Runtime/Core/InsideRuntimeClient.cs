@@ -37,6 +37,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
+        private int _isStopping;
 
         private GrainLocator grainLocator;
         private MessageCenter messageCenter;
@@ -46,7 +47,7 @@ namespace Orleans.Runtime
         private IGrainCallCancellationManager _cancellationManager;
         private HostedClient hostedClient;
 
-        private HostedClient HostedClient => this.hostedClient ??= this.ServiceProvider.GetRequiredService<HostedClient>();
+        private HostedClient HostedClient => this.hostedClient;
         private readonly MessageFactory messageFactory;
         private IGrainReferenceRuntime grainReferenceRuntime;
         private Task callbackTimerTask;
@@ -64,7 +65,7 @@ namespace Orleans.Runtime
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
         {
@@ -112,15 +113,25 @@ namespace Orleans.Runtime
 
         public GrainFactory ConcreteGrainFactory { get; }
 
-        private GrainLocator GrainLocator
-            => this.grainLocator ?? (this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>());
+        private GrainLocator GrainLocator => this.grainLocator;
 
-        private List<IIncomingGrainCallFilter> GrainCallFilters
-            => this.grainCallFilters ??= new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>());
+        private List<IIncomingGrainCallFilter> GrainCallFilters => this.grainCallFilters;
 
-        private MessageCenter MessageCenter => this.messageCenter ?? (this.messageCenter = this.ServiceProvider.GetRequiredService<MessageCenter>());
+        private MessageCenter MessageCenter => this.messageCenter;
 
-        public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
+        public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime;
+
+        internal void ConsumeServices()
+        {
+            this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>();
+            this.grainCallFilters = new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>());
+            this.messageCenter = this.ServiceProvider.GetRequiredService<MessageCenter>();
+            this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
+            this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>();
+            _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
+            sharedCallbackData.CancellationManager = _cancellationManager;
+            systemSharedCallbackData.CancellationManager = _cancellationManager;
+        }
 
         public void SendRequest(
             GrainReference target,
@@ -140,7 +151,6 @@ namespace Orleans.Runtime
                 message.SendingSilo = MySilo;
 
             IGrainContext sendingActivation = RuntimeContext.Current;
-            message.MessageReceiver = sendingActivation ?? HostedClient;
 
             if (sendingActivation == null)
             {
@@ -156,13 +166,11 @@ namespace Orleans.Runtime
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
             SharedCallbackData sharedData;
-            IMessageReceiverCache targetCache = target;
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
                 message.IsSystemMessage = true;
                 sharedData = this.systemSharedCallbackData;
-                targetCache = null;
             }
             else
             {
@@ -175,30 +183,41 @@ namespace Orleans.Runtime
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
+            CallbackData callbackData = null;
             if (!oneWay)
             {
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
+
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
             {
                 context?.Complete();
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    return;
+                }
+            }
+
+            // Completing callbacks during shutdown can resume application code which issues follow-up
+            // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
+            if (Volatile.Read(ref _isStopping) != 0)
+            {
+                callbackData?.OnHostShutdown();
+                return;
             }
 
             this.messagingTrace.OnSendRequest(message);
-
-            if (targetCache?.MessageReceiver is IMessageReceiver receiver)
-            {
-                receiver.ReceiveMessage(message, targetCache);
-            }
-            else
-            {
-                this.MessageCenter.AddressAndSendMessage(message, targetCache);
-            }
+            this.MessageCenter.AddressAndSendMessage(message);
         }
 
         public void SendResponse(Message request, Response response)
@@ -409,7 +428,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     LogTraceNoCallbackForRejection(this.logger, message);
-                    this.MessageCenter.AddressAndSendMessage(message, targetCache: null);
+                    this.MessageCenter.AddressAndSendMessage(message);
                     return;
                 }
 
@@ -529,10 +548,33 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
+            Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+            // Once the silo is shutting down it can no longer receive responses, so any requests which
+            // are still outstanding will never complete. Fault them now so that in-flight grain calls
+            // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
+            // deactivation and host disposal during an ungraceful shutdown. This must happen before
+            // waiting for the timer task since that wait observes the shutdown cancellation token.
+            BreakOutstandingMessages();
+
             if (this.callbackTimerTask is { } task)
             {
                 await task.WaitAsync(tc);
+            }
+        }
+
+        private void BreakOutstandingMessages()
+        {
+            foreach (var (_, callback) in callbacks)
+            {
+                try
+                {
+                    callback.OnHostShutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningWhileProcessingCallbackExpiry(this.logger, exception);
+                }
             }
         }
 
@@ -568,9 +610,7 @@ namespace Orleans.Runtime
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
-            sharedCallbackData.CancellationManager = _cancellationManager;
-            systemSharedCallbackData.CancellationManager = _cancellationManager;
+            ConsumeServices();
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 

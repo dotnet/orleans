@@ -72,16 +72,19 @@ namespace Orleans.Providers
             if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
             {
                 // no block or block full, get new block and try again
-                currentBuffer = bufferPool.Allocate();
-                //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
-                // if this fails with clean block, then requested size is too big
-                if (!currentBuffer.TryGetSegment(size, out segment))
+                var newBuffer = bufferPool.Allocate();
+                // if this fails with a clean block, then requested size is too big; return the
+                // unused block to the pool and fail rather than leaking a block that is never committed.
+                if (!newBuffer.TryGetSegment(size, out segment))
                 {
+                    newBuffer.Dispose();
                     string errmsg = string.Format(CultureInfo.InvariantCulture,
                         "Message size is too big. MessageSize: {0}", size);
                     throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                 }
+                currentBuffer = newBuffer;
+                //call EvictionStrategy's OnBlockAllocated method
+                this.evictionStrategy.OnBlockAllocated(currentBuffer);
             }
             // encode namespace, offset, partitionkey, properties and payload into segment
             int writeOffset = 0;

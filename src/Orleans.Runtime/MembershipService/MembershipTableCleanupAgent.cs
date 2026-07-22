@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
             IMembershipTable membershipTableProvider,
             IMembershipManager membershipManager,
             ILocalSiloDetails localSiloDetails,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider,
             ILogger<MembershipTableCleanupAgent> log)
         {
             _clusterMembershipOptions = clusterMembershipOptions.Value;
@@ -151,7 +152,7 @@ namespace Orleans.Runtime.MembershipService
                     if (defunctSiloEntryCount > maxDefunctSiloEntries)
                     {
                         var newestEntryToRemove = newestDefunctEntries.Peek();
-                        var excessBeforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveIAmAliveTime);
+                        var excessBeforeDate = GetDefunctSiloCleanupCutoff(newestEntryToRemove.EffectiveUpdateTime);
                         if (!beforeDate.HasValue || excessBeforeDate > beforeDate.Value)
                         {
                             beforeDate = excessBeforeDate;
@@ -246,7 +247,7 @@ namespace Orleans.Runtime.MembershipService
 
             private static int Compare(DefunctSiloEntryPriority left, DefunctSiloEntryPriority right)
             {
-                var result = left._entry.EffectiveIAmAliveTime.CompareTo(right._entry.EffectiveIAmAliveTime);
+                var result = left._entry.EffectiveUpdateTime.CompareTo(right._entry.EffectiveUpdateTime);
                 return result != 0 ? result : left._entry.SiloAddress.CompareTo(right._entry.SiloAddress);
             }
         }

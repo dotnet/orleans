@@ -68,6 +68,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
+    internal ClusterMembershipSnapshot LatestClusterMembershipSnapshot => _membershipService.ClusterMembershipService.CurrentSnapshot;
 
     // The recovery membership value is used to avoid a race between concurrent registration & recovery operations which could lead to lost registrations.
     // This could occur when a new activation is created and begins registering itself with a host which crashes. Concurrently, the new owner initiates
@@ -187,6 +188,13 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 // This likely indicates that the target silo has been declared dead.
                 ++attempts;
+                var latestClusterMembership = LatestClusterMembershipSnapshot;
+                if (!CanInvokeClusterMember(latestClusterMembership, owner))
+                {
+                    view = await _membershipService.RefreshViewAsync(latestClusterMembership.Version, cancellationToken);
+                    continue;
+                }
+
                 await Task.Delay(delay, cancellationToken);
                 delay *= 1.5;
                 continue;
@@ -212,6 +220,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             return result;
         }
     }
+
+    internal static bool CanInvokeClusterMember(ClusterMembershipSnapshot snapshot, SiloAddress siloAddress)
+        => snapshot.GetSiloStatus(siloAddress) is SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown;
 
     public async ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionIndex)
     {
@@ -304,8 +315,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
 
-        // Transition into 'ShuttingDown'/'Stopping' stage, removing ourselves from directory membership, but allow some time for hand-off before transitioning to 'Dead'.
-        observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.BecomeActive - 1, NoOpStart, OnShuttingDown);
+        // Keep the directory available until shutdown-triggered grain migrations have completed.
+        observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.GrainDirectoryShutdown, NoOpStart, OnShuttingDown);
 
         static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
 

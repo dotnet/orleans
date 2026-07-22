@@ -468,11 +468,13 @@ namespace Orleans.Runtime
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, RunOnRuntimeInitializeStart, RunOnRuntimeInitializeStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, RunOnRuntimeServicesStart, RunOnRuntimeServicesStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, RunOnRuntimeGrainServicesStart);
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, RunOnBecomeActiveStart, RunOnBecomeActiveStop);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, RunOnBecomeActiveStart);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.GrainDeactivation, NoOpStart, RunOnBecomeActiveStop);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, RunOnActiveStart, RunOnActiveStop);
 
             // Stage callbacks are dispatched onto the thread pool so that any blocking
             // work in the silo start/stop paths does not stall the lifecycle scheduler.
+            static Task NoOpStart(CancellationToken ct) => Task.CompletedTask;
             Task RunOnRuntimeInitializeStart(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStart(ct));
             Task RunOnRuntimeInitializeStop(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStop(ct));
             Task RunOnRuntimeServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStart(ct));

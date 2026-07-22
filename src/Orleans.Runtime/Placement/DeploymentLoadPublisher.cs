@@ -114,7 +114,7 @@ namespace Orleans.Runtime
                 foreach (var siloAddress in members)
                 {
                     // No need to make a grain call to ourselves.
-                    if (siloAddress == _siloDetails.SiloAddress)
+                    if (siloAddress.Equals(_siloDetails.SiloAddress))
                     {
                         continue;
                     }

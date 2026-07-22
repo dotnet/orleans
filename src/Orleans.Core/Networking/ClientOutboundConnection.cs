@@ -56,7 +56,6 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message message)
         {
-            message.SendingSilo ??= RemoteSiloAddress;
             this.messageCenter.DispatchLocalMessage(message);
         }
 
@@ -106,7 +105,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
                 msg.TargetSilo = null;
-                this.messageCenter.SendMessage(msg, receiverCache: null);
+                this.messageCenter.SendMessage(msg);
                 return false;
             }
 
@@ -124,7 +123,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;
-                this.messageCenter.SendMessage(msg, receiverCache: null);
+                this.messageCenter.SendMessage(msg);
             }
             else
             {
@@ -167,7 +166,7 @@ namespace Orleans.Runtime.Messaging
         protected override void OnSendMessageFailure(Message message, string error)
         {
             message.TargetSilo = null;
-            this.messageCenter.SendMessage(message, receiverCache: null);
+            this.messageCenter.SendMessage(message);
         }
 
         [LoggerMessage(

@@ -108,6 +108,10 @@ public static class ReminderEvents
     {
         Unknown = 0,
         Unregistered = 1,
+        /// <summary>
+        /// Unused. Retained for compatibility.
+        /// </summary>
+        [Obsolete("Unused, will be removed in a future version.")]
         Replaced = 2,
         RemovedFromRange = 3,
         RemovedFromTable = 4,

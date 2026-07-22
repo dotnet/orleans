@@ -21,6 +21,7 @@ using System.Linq;
 using System.Net;
 using System.Numerics;
 #if NET8_0_OR_GREATER
+using System.Collections.Frozen;
 using System.Xml.Linq;
 using Orleans.Runtime;
 using Orleans.Runtime.Serialization;
@@ -3411,6 +3412,131 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool IsImmutable => false;
     }
+
+#if NET8_0_OR_GREATER
+    public class FrozenDictionaryCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<FrozenDictionary<string, int>, FrozenDictionaryCodec<string, int>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override FrozenDictionary<string, int> CreateValue()
+        {
+            var result = new Dictionary<string, int>();
+            var len = Random.Next(17);
+            for (var i = 0; i < len + 5; i++)
+            {
+                result[Random.Next().ToString()] = Random.Next();
+            }
+
+            return result.ToFrozenDictionary();
+        }
+
+        protected override FrozenDictionary<string, int>[] TestValues => [null, FrozenDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override bool Equals(FrozenDictionary<string, int> left, FrozenDictionary<string, int> right) => ReferenceEquals(left, right) || left is not null && right is not null && left.Count == right.Count && left.All(kv => right.TryGetValue(kv.Key, out var value) && value == kv.Value);
+
+        [Fact]
+        public void PreservesKeyComparer()
+        {
+            var original = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["one"] = 1
+            }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Same(StringComparer.OrdinalIgnoreCase, result.Comparer);
+            Assert.Equal(1, result["ONE"]);
+        }
+    }
+
+    public class FrozenDictionaryCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<FrozenDictionary<string, int>, FrozenDictionaryCopier<string, int>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override bool IsImmutable => true;
+        protected override FrozenDictionary<string, int> CreateValue()
+        {
+            var result = new Dictionary<string, int>();
+            var len = Random.Next(17);
+            for (var i = 0; i < len + 5; i++)
+            {
+                result[Random.Next().ToString()] = Random.Next();
+            }
+
+            return result.ToFrozenDictionary();
+        }
+
+        protected override FrozenDictionary<string, int>[] TestValues => [null, FrozenDictionary<string, int>.Empty, CreateValue(), CreateValue(), CreateValue()];
+        protected override bool Equals(FrozenDictionary<string, int> left, FrozenDictionary<string, int> right) => ReferenceEquals(left, right) || left is not null && right is not null && left.Count == right.Count && left.All(kv => right.TryGetValue(kv.Key, out var value) && value == kv.Value);
+    }
+
+    public class FrozenSetCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<FrozenSet<string>, FrozenSetCodec<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override FrozenSet<string> CreateValue()
+        {
+            var hashSet = new HashSet<string>();
+            var len = Random.Next(17);
+            for (var i = 0; i < len + 5; i++)
+            {
+                _ = hashSet.Add(Random.Next().ToString());
+            }
+
+            return hashSet.ToFrozenSet();
+        }
+
+        protected override FrozenSet<string>[] TestValues => [null, FrozenSet<string>.Empty, CreateValue(), CreateValue(), CreateValue()];
+
+        protected override bool Equals(FrozenSet<string> left, FrozenSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
+
+        [Fact]
+        public void PreservesKeyComparer()
+        {
+            var original = new[] { "one" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Same(StringComparer.OrdinalIgnoreCase, result.Comparer);
+            Assert.Contains("ONE", (IReadOnlySet<string>)result);
+        }
+    }
+
+    public class FrozenSetCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<FrozenSet<string>, FrozenSetCopier<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override FrozenSet<string> CreateValue()
+        {
+            var hashSet = new HashSet<string>();
+            var len = Random.Next(17);
+            for (var i = 0; i < len + 5; i++)
+            {
+                _ = hashSet.Add(Random.Next().ToString());
+            }
+
+            return hashSet.ToFrozenSet();
+        }
+
+        protected override FrozenSet<string>[] TestValues => [null, FrozenSet<string>.Empty, CreateValue(), CreateValue(), CreateValue()];
+
+        protected override bool Equals(FrozenSet<string> left, FrozenSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
+
+        protected override bool IsImmutable => true;
+    }
+
+    public sealed class FrozenSetMutableCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<FrozenSet<object>, FrozenSetCopier<object>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override FrozenSet<object> CreateValue()
+        {
+            var hashSet = new HashSet<object>();
+            var len = Random.Next(17);
+            for (var i = 0; i < len + 5; i++)
+            {
+                _ = hashSet.Add(Random.Next());
+            }
+
+            return hashSet.ToFrozenSet();
+        }
+
+        protected override FrozenSet<object>[] TestValues => [null, FrozenSet<object>.Empty, CreateValue(), CreateValue(), CreateValue()];
+
+        protected override bool Equals(FrozenSet<object> left, FrozenSet<object> right) => ReferenceEquals(left, right) || left.SetEquals(right);
+
+        protected override bool IsImmutable => false;
+    }
+#endif
 
     public class UriTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Uri, UriCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {

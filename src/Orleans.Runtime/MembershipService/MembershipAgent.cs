@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -36,7 +37,8 @@ namespace Orleans.Runtime.MembershipService
             IOptions<ClusterMembershipOptions> options,
             ILogger<MembershipAgent> log,
             IAsyncTimerFactory timerFactory,
-            IRemoteSiloProber siloProber)
+            IRemoteSiloProber siloProber,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             this.membershipManager = membershipManager;
             this.localSilo = localSilo;
@@ -46,7 +48,8 @@ namespace Orleans.Runtime.MembershipService
             this.siloProber = siloProber;
             this.iAmAliveTimer = timerFactory.Create(
                 this.clusterMembershipOptions.IAmAliveTablePublishTimeout,
-                nameof(UpdateIAmAlive));
+                nameof(UpdateIAmAlive),
+                timeProvider);
         }
 
         internal interface ITestAccessor

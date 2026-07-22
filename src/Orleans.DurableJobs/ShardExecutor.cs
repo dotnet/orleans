@@ -4,13 +4,13 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Diagnostics;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-
 namespace Orleans.DurableJobs;
 
 /// <summary>
@@ -40,7 +40,7 @@ internal sealed partial class ShardExecutor
         IOptions<DurableJobsOptions> options,
         IOverloadDetector overloadDetector,
         ILogger<ShardExecutor> logger,
-        TimeProvider? timeProvider = null,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null,
         DurableJobsInstruments? durableJobsInstruments = null)
     {
         _grainFactory = grainFactory;

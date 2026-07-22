@@ -40,9 +40,38 @@ public class ClusterMembershipSnapshotTests
         Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(silo, new MembershipVersion(2)));
     }
 
+    [Fact]
+    public void ClusterMembershipSnapshot_TryFormat_MatchesToString()
+    {
+        var member = new ClusterMember(CreateSiloAddress(1), SiloStatus.Active, "silo");
+        var snapshot = CreateSnapshot(member, version: 2);
+
+        AssertSpanFormattable(snapshot);
+        AssertSpanFormattable(snapshot.Version);
+        AssertSpanFormattable(member);
+        AssertSpanFormattable(member.SiloAddress);
+    }
+
     private static ClusterMembershipSnapshot CreateSnapshot(ClusterMember member, long version)
         => new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(member.SiloAddress, member), new MembershipVersion(version));
 
     private static SiloAddress CreateSiloAddress(int generation, int port = 11111)
         => SiloAddress.New(new IPEndPoint(IPAddress.Loopback, port), generation);
+
+    private static void AssertSpanFormattable(ISpanFormattable value)
+    {
+        var expected = value.ToString(null, null);
+        Span<char> destination = stackalloc char[expected.Length];
+
+        Assert.True(value.TryFormat(destination, out var charsWritten, default, null));
+        Assert.Equal(expected.Length, charsWritten);
+        Assert.Equal(expected, destination[..charsWritten].ToString());
+
+        if (expected.Length > 0)
+        {
+            Span<char> tooSmall = stackalloc char[expected.Length - 1];
+            Assert.False(value.TryFormat(tooSmall, out charsWritten, default, null));
+            Assert.Equal(0, charsWritten);
+        }
+    }
 }

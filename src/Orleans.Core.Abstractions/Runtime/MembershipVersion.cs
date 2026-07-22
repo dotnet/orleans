@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(MembershipVersionConverter))]
-    public readonly struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
+    public readonly struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>, ISpanFormattable
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="MembershipVersion"/> struct.
@@ -44,7 +44,29 @@ namespace Orleans.Runtime
         public override int GetHashCode() => this.Value.GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString() => Value != MinValue.Value ? $"{Value}" : "default";
+        public override string ToString() => Value != MinValue.Value ? Value.ToString() : "default";
+
+        /// <inheritdoc/>
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider)
+            => Value != MinValue.Value ? Value.ToString(format, formatProvider) : "default";
+
+        /// <inheritdoc/>
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+        {
+            if (Value != MinValue.Value)
+            {
+                return Value.TryFormat(destination, out charsWritten, format, provider);
+            }
+
+            if ("default".AsSpan().TryCopyTo(destination))
+            {
+                charsWritten = "default".Length;
+                return true;
+            }
+
+            charsWritten = 0;
+            return false;
+        }
 
         /// <summary>
         /// Compares the provided operands for equality.

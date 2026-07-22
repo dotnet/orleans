@@ -809,6 +809,8 @@ namespace Orleans.Providers.Streams.Common
 
         public object GetCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) { throw null; }
 
+        public void Refresh(object cursorObj, Orleans.Streams.StreamSequenceToken sequenceToken) { }
+
         public void RemoveOldestMessage() { }
 
         public bool TryGetNextMessage(object cursorObj, out Orleans.Streams.IBatchContainer message) { throw null; }
@@ -1834,6 +1836,11 @@ namespace Orleans.Streams
         public override bool Equals(object obj) { throw null; }
 
         public override int GetHashCode() { throw null; }
+    }
+
+    public static partial class StreamingTimeProviderNames
+    {
+        public const string Streaming = "Orleans.Streaming";
     }
 
     public partial class StreamPosition

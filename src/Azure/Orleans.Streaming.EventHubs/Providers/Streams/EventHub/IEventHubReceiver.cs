@@ -4,6 +4,7 @@ using Azure.Messaging.EventHubs.Primitives;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streaming.EventHubs
@@ -27,6 +28,13 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <returns></returns>
         Task CloseAsync();
+
+        /// <summary>
+        /// Sends a cleanup message which can be canceled.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the operation.</param>
+        /// <returns>A task representing the operation.</returns>
+        Task CloseAsync(CancellationToken cancellationToken) => CloseAsync();
     }
 
     /// <summary>
@@ -81,9 +89,11 @@ namespace Orleans.Streaming.EventHubs
             return await client.ReceiveBatchAsync(maxCount, waitTime);
         }
 
-        public async Task CloseAsync()
+        public Task CloseAsync() => CloseAsync(CancellationToken.None);
+
+        public async Task CloseAsync(CancellationToken cancellationToken)
         {
-            await client.CloseAsync();
+            await client.CloseAsync(cancellationToken);
         }
 
         [LoggerMessage(

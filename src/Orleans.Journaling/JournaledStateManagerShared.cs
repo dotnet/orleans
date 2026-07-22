@@ -1,5 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
@@ -8,7 +10,7 @@ internal sealed class JournaledStateManagerShared
     public JournaledStateManagerShared(
         ILogger<JournaledStateManager> logger,
         IOptions<JournaledStateManagerOptions> options,
-        TimeProvider timeProvider,
+        [FromKeyedServices(JournalingTimeProviderNames.Journaling)] TimeProvider timeProvider,
         IServiceProvider serviceProvider,
         JournalingInstruments? instruments = null)
         : this(logger, CreateOptions(options), timeProvider, instruments, serviceProvider)

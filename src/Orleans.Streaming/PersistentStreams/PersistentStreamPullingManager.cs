@@ -117,14 +117,20 @@ namespace Orleans.Streams
 
         public async Task Stop()
         {
+            var balancer = this.queueBalancer;
+            if (balancer is null)
+            {
+                return;
+            }
+
             await StopAgents();
             if (queuePrintTimer != null)
             {
                 queuePrintTimer.Dispose();
                 this.queuePrintTimer = null;
             }
-            await this.queueBalancer.Shutdown();
             this.queueBalancer = null;
+            await balancer.Shutdown();
         }
 
         public async Task StartAgents()
@@ -373,8 +379,7 @@ namespace Orleans.Streams
 
                 agents.Add(agent);
                 deactivatedAgents[queueId] = agent;
-                var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
-                var task = OrleansTaskExtentions.SafeExecute(agentGrainRef.Shutdown);
+                var task = OrleansTaskExtentions.SafeExecute(() => agent.RunOrQueueTask(agent.Shutdown));
                 task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_11,
                     $"PersistentStreamPullingAgent {agent.QueueId} failed to Shutdown.");
                 removeTasks.Add(task);

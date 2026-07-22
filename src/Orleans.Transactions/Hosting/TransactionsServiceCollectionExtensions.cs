@@ -34,7 +34,10 @@ namespace Orleans.Hosting
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.AddSingleton<ITransactionClient, TransactionClient>();
             services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
-            services.TryAddSingleton<ITransactionOverloadDetector, TransactionOverloadDetector>();
+            services.TryAddSingleton<ITransactionOverloadDetector>(sp => new TransactionOverloadDetector(
+                sp.GetRequiredService<ITransactionAgentStatistics>(),
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<TransactionRateLoadSheddingOptions>>(),
+                sp.GetKeyedService<TimeProvider>(TransactionTimeProviderNames.Transactions) ?? TimeProvider.System));
             return services;
         }
     }

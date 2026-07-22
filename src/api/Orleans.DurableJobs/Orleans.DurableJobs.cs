@@ -71,6 +71,11 @@ namespace Orleans.DurableJobs
         Failed = 2
     }
 
+    public static partial class DurableJobTimeProviderNames
+    {
+        public const string DurableJobs = "Orleans.DurableJobs";
+    }
+
     public partial interface IDurableJobHandler
     {
         System.Threading.Tasks.Task ExecuteJobAsync(IJobRunContext context, System.Threading.CancellationToken cancellationToken);

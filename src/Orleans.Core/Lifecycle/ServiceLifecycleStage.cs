@@ -47,7 +47,17 @@ namespace Orleans
         /// and the gateway, no other component should run
         /// at this stage
         /// </summary>
-        public const int BecomeActive = Active-1;
+        public const int BecomeActive = Active - 1;
+
+        /// <summary>
+        /// Deactivate grain activations during silo shutdown.
+        /// </summary>
+        public const int GrainDeactivation = BecomeActive - 1;
+
+        /// <summary>
+        /// Stop the grain directory after shutdown-triggered grain migrations have completed.
+        /// </summary>
+        public const int GrainDirectoryShutdown = GrainDeactivation - 1;
 
         /// <summary>
         /// Validate connectivity to active cluster members before becoming active.

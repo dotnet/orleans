@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -66,6 +67,7 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloHealthMonitor localSiloHealthMonitor,
             IMembershipManager membershipService,
             ILocalSiloDetails localSiloDetails,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider,
             MessagingInstruments? messagingInstruments = null)
         {
             TargetSiloAddress = siloAddress;
@@ -78,7 +80,8 @@ namespace Orleans.Runtime.MembershipService
             _log = loggerFactory.CreateLogger<SiloHealthMonitor>();
             _pingTimer = asyncTimerFactory.Create(
                 _clusterMembershipOptions.CurrentValue.ProbeTimeout,
-                nameof(SiloHealthMonitor));
+                nameof(SiloHealthMonitor),
+                timeProvider);
             _onProbeResult = onProbeResult;
             _elapsedSinceLastSuccessfulResponse = ValueStopwatch.StartNew();
         }

@@ -65,6 +65,10 @@ namespace Orleans.Hosting
             services.AddOptions();
             services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+
+            // Catch-all keyed TimeProvider: consumers resolve their area's clock via [FromKeyedServices(TimeProviderNames.X)];
+            // unless an area has been explicitly overridden, this fallback supplies the unkeyed default provider.
+            services.TryAddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<SchedulerInstruments>();
             services.TryAddSingleton<ConsistentRingInstruments>();

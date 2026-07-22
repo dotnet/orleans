@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     /// Represents an immutable snapshot of cluster membership state.
     /// </summary>
     [GenerateSerializer, Immutable]
-    internal sealed class MembershipTableSnapshot
+    internal sealed class MembershipTableSnapshot : ISpanFormattable
     {
         private static readonly MembershipTableSnapshot InitialValue = new(MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
 
@@ -198,6 +198,59 @@ namespace Orleans.Runtime
             foreach (var entry in this.Entries) sb.Append($", {entry.Value}");
             sb.Append(']');
             return sb.ToString();
+        }
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+        {
+            var written = 0;
+
+            if (!destination.TryWrite($"[Version: {this.Version}, {this.Entries.Count} silos", out var length))
+            {
+                goto fail;
+            }
+
+            Advance(ref destination, ref written, length);
+
+            foreach (var entry in this.Entries)
+            {
+                if (!destination.TryWrite($", {entry.Value}", out length))
+                {
+                    goto fail;
+                }
+
+                Advance(ref destination, ref written, length);
+            }
+
+            if (!Append(ref destination, ref written, "]"))
+            {
+                goto fail;
+            }
+
+            charsWritten = written;
+            return true;
+
+        fail:
+            charsWritten = 0;
+            return false;
+
+            static bool Append(ref Span<char> destination, ref int written, ReadOnlySpan<char> value)
+            {
+                if (!value.TryCopyTo(destination))
+                {
+                    return false;
+                }
+
+                Advance(ref destination, ref written, value.Length);
+                return true;
+            }
+
+            static void Advance(ref Span<char> destination, ref int written, int length)
+            {
+                destination = destination[length..];
+                written += length;
+            }
         }
     }
 }

@@ -162,11 +162,11 @@ namespace Orleans.TestingHost
 
         public bool TryGetGrainContext(Runtime.GrainId grainId, out Runtime.IGrainContext? grainContext) { throw null; }
 
+        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
+
         public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.GrainId grainId) { throw null; }
 
         public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.IAddressable grain) { throw null; }
-
-        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
 
         public System.Threading.Tasks.Task WaitForLivenessToStabilizeAsync(bool didKill = false) { throw null; }
     }
@@ -428,11 +428,11 @@ namespace Orleans.TestingHost
 
         public bool TryGetGrainContext(Runtime.GrainId grainId, out Runtime.IGrainContext? grainContext) { throw null; }
 
+        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
+
         public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.GrainId grainId) { throw null; }
 
         public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.IAddressable grain) { throw null; }
-
-        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
 
         public System.Threading.Tasks.Task WaitForLivenessToStabilizeAsync(bool didKill = false) { throw null; }
     }
@@ -548,6 +548,11 @@ namespace Orleans.TestingHost
         public static TestSiloSpecificOptions Create(TestCluster testCluster, TestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false) { throw null; }
 
         public System.Collections.Generic.Dictionary<string, string> ToDictionary() { throw null; }
+    }
+
+    public static partial class TimeProviderTestingExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseTimeProviderForBackgroundAreas(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.TimeProvider timeProvider) { throw null; }
     }
 }
 

@@ -4,6 +4,6 @@ namespace Orleans.Runtime
 {
     internal interface IAsyncTimerFactory
     {
-        IAsyncTimer Create(TimeSpan period, string name);
+        IAsyncTimer Create(TimeSpan period, string name, TimeProvider timeProvider);
     }
 }

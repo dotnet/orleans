@@ -47,7 +47,7 @@ public static class DurableJobsExtensions
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
             sp.GetRequiredService<IOptions<SiloMessagingOptions>>(),
-            sp.GetService<TimeProvider>(),
+            sp.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
             sp.GetRequiredService<DurableJobsInstruments>()));
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {

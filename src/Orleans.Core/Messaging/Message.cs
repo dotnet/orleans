@@ -7,7 +7,7 @@ using System.Threading;
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable, IMessageReceiverCache
+    internal sealed class Message : ISpanFormattable
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -266,10 +266,6 @@ namespace Orleans.Runtime
                 _headers.SetFlag(MessageFlags.HasInterfaceType, !value.IsDefault);
             }
         }
-
-        // This is the receiver of the REPLY to this message
-        [field: NonSerialized]
-        public object? MessageReceiver { get; set; }
 
         public bool IsExpirableMessage()
         {

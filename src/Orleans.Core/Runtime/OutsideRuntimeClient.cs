@@ -28,6 +28,7 @@ namespace Orleans
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
+        private int _isStopping;
         private bool disposing;
         private bool disposed;
 
@@ -46,7 +47,6 @@ namespace Orleans
 
         private readonly SharedCallbackData sharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
-        private readonly ConcurrentDictionary<GrainId, SiloAddress> _grainMappingCache = new();
         private Task callbackTimerTask;
 
         public GrainAddress CurrentActivationAddress
@@ -73,7 +73,7 @@ namespace Orleans
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
         {
@@ -156,7 +156,12 @@ namespace Orleans
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+
+            // Fault callbacks before any cancellation-sensitive waits. Completing them can resume code
+            // which issues follow-up calls, so request admission must already be closed.
+            BreakOutstandingMessages();
 
             if (this.callbackTimerTask is { } task)
             {
@@ -253,7 +258,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Instance.SendResponse(message);
             message.BodyObject = response;
 
-            MessageCenter.SendMessage(message, receiverCache: request);
+            MessageCenter.SendMessage(message);
         }
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
@@ -270,17 +275,11 @@ namespace Orleans
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
             message.TargetGrain = targetGrainId;
-            IMessageReceiverCache targetCache = target;
 
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
-                targetCache = null;
-            }
-            else if (_grainMappingCache.TryGetValue(targetGrainId, out var cachedSilo))
-            {
-                message.TargetSilo = cachedSilo;
             }
 
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
@@ -293,16 +292,32 @@ namespace Orleans
             if (!oneWay)
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments);
-                callbackData.SubscribeForCancellation(cancellationToken);
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
+
                 callbacks.TryAdd(message.Id, callbackData);
+                callbackData.SubscribeForCancellation(cancellationToken);
+
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
             }
             else
             {
                 context?.Complete();
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    return;
+                }
             }
 
             LogSendingMessage(logger, message);
-            MessageCenter.SendMessage(message, receiverCache: targetCache);
+            MessageCenter.SendMessage(message);
         }
 
         public void ReceiveResponse(Message response)
@@ -354,7 +369,6 @@ namespace Orleans
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
                 callbackData.DoCallback(response);
-                _grainMappingCache[response.SendingGrain] = response.SendingSilo;
             }
             else
             {
@@ -421,8 +435,10 @@ namespace Orleans
         {
             if (this.disposing) return;
             this.disposing = true;
+            Volatile.Write(ref _isStopping, 1);
 
             Utils.SafeExecute(() => this.callbackTimer.Dispose());
+            BreakOutstandingMessages();
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
@@ -437,6 +453,21 @@ namespace Orleans
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
                     callback.Value.OnTargetSiloFail();
+                }
+            }
+        }
+
+        private void BreakOutstandingMessages()
+        {
+            foreach (var (_, callback) in callbacks)
+            {
+                try
+                {
+                    callback.OnHostShutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorWhileProcessingCallbackExpiry(logger, exception);
                 }
             }
         }

@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Immutable;
 using System.Linq;
 using Orleans.Runtime.GrainDirectory;
 using TestExtensions;
@@ -9,6 +10,24 @@ namespace UnitTests.GrainDirectory;
 [TestCategory("BVT"), TestCategory("Directory")]
 public sealed class GrainDirectoryPartitionTests
 {
+    private static readonly SiloAddress TestSiloAddress = SiloAddress.FromParsableString("127.0.0.1:11111@123");
+
+    [Theory]
+    [InlineData(SiloStatus.Active, true)]
+    [InlineData(SiloStatus.Joining, true)]
+    [InlineData(SiloStatus.ShuttingDown, true)]
+    [InlineData(SiloStatus.Stopping, false)]
+    [InlineData(SiloStatus.Dead, false)]
+    public void CanInvokeClusterMember_RequiresAvailableStatus(SiloStatus status, bool expected)
+    {
+        var members = ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(
+            TestSiloAddress,
+            new ClusterMember(TestSiloAddress, status, "TestSilo"));
+        var snapshot = new ClusterMembershipSnapshot(members, new MembershipVersion(1));
+
+        Assert.Equal(expected, DistributedGrainDirectory.CanInvokeClusterMember(snapshot, TestSiloAddress));
+    }
+
     [Fact]
     public void GetSnapshotTransferRanges_ReturnsOnlyPreviousOwnerIntersections()
     {

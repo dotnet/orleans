@@ -506,7 +506,7 @@ namespace Orleans.Runtime
 {
     [GenerateSerializer]
     [Immutable]
-    public sealed partial class ClusterMember : System.IEquatable<ClusterMember>
+    public sealed partial class ClusterMember : System.IEquatable<ClusterMember>, System.ISpanFormattable, System.IFormattable
     {
         public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name) { }
 
@@ -525,12 +525,16 @@ namespace Orleans.Runtime
 
         public override int GetHashCode() { throw null; }
 
+        string System.IFormattable.ToString(string format, System.IFormatProvider formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider provider) { throw null; }
+
         public override string ToString() { throw null; }
     }
 
     [GenerateSerializer]
     [Immutable]
-    public sealed partial class ClusterMembershipSnapshot
+    public sealed partial class ClusterMembershipSnapshot : System.ISpanFormattable, System.IFormattable
     {
         public ClusterMembershipSnapshot(System.Collections.Immutable.ImmutableDictionary<SiloAddress, ClusterMember> members, MembershipVersion version) { }
 
@@ -547,6 +551,10 @@ namespace Orleans.Runtime
         public SiloStatus GetSiloStatus(SiloAddress silo, MembershipVersion seenAtVersion) { throw null; }
 
         public SiloStatus GetSiloStatus(SiloAddress silo) { throw null; }
+
+        string System.IFormattable.ToString(string format, System.IFormatProvider formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider provider) { throw null; }
 
         public override string ToString() { throw null; }
     }

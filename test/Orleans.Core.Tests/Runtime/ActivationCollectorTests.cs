@@ -195,10 +195,10 @@ namespace UnitTests.Runtime
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
-            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
 
             var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
-            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments());
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments(), TimeProvider.System);
 
             var activation1 = PrepareActivation(1, collector);
             var activation2 = PrepareActivation(1, collector);
@@ -230,10 +230,10 @@ namespace UnitTests.Runtime
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
-            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
 
             var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
-            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments());
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments(), TimeProvider.System);
 
             var totalActivations = 500;
             var activations = new List<IActivationWorkingSetMember>();
@@ -341,10 +341,10 @@ namespace UnitTests.Runtime
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
-            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
 
             var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
-            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments());
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector }, CreateCatalogInstruments(), TimeProvider.System);
 
             var inactiveActivation1 = PrepareActivation(1, collector);
             var activeActivation = PrepareActivation(1, collector);

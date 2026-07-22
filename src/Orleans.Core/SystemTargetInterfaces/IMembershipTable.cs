@@ -249,7 +249,7 @@ namespace Orleans
 
     [GenerateSerializer]
     [Serializable]
-    public sealed class MembershipEntry
+    public sealed class MembershipEntry : ISpanFormattable
     {
         /// <summary>
         /// The silo unique identity (ip:port:epoch). Used mainly by the Membership Protocol.
@@ -314,6 +314,35 @@ namespace Orleans
                 var startTimeUtc = DateTime.SpecifyKind(StartTime, DateTimeKind.Utc);
                 var iAmAliveTimeUtc = DateTime.SpecifyKind(IAmAliveTime, DateTimeKind.Utc);
                 return startTimeUtc > iAmAliveTimeUtc ? startTimeUtc : iAmAliveTimeUtc;
+            }
+        }
+
+        /// <summary>
+        /// Gets the most recent time at which this entry is known to have been updated. This is the later of
+        /// <see cref="EffectiveIAmAliveTime"/> and the most recent time at which a silo voted to suspect this
+        /// silo (see <see cref="SuspectTimes"/>). Declaring a silo dead records a suspect vote, so this value
+        /// reflects a recent death declaration even when the silo last reported itself alive long ago. It is
+        /// used to retain the most-recently-updated defunct entries when cleaning up the membership table, so
+        /// that recently-declared-dead silos remain visible in membership snapshots.
+        /// </summary>
+        internal DateTime EffectiveUpdateTime
+        {
+            get
+            {
+                var result = EffectiveIAmAliveTime;
+                if (SuspectTimes is { } suspectTimes)
+                {
+                    foreach (var vote in suspectTimes)
+                    {
+                        var voteTimeUtc = DateTime.SpecifyKind(vote.Item2, DateTimeKind.Utc);
+                        if (voteTimeUtc > result)
+                        {
+                            result = voteTimeUtc;
+                        }
+                    }
+                }
+
+                return result;
             }
         }
 
@@ -427,6 +456,11 @@ namespace Orleans
         }
 
         public override string ToString() => $"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}";
+
+        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+            => destination.TryWrite($"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}", out charsWritten);
 
         public string ToFullString()
         {

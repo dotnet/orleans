@@ -60,17 +60,25 @@ namespace UnitTests.Grains
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
         {
             TimeSpan usePeriod = p ?? this.period;
-            this.logger.LogInformation("Starting reminder {ReminderName}.", reminderName);
             TimeSpan dueTime;
             if (reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2))
                 dueTime = TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimumReminderPeriod;
             else dueTime = usePeriod - TimeSpan.FromSeconds(2);
 
+            return await StartReminder(reminderName, dueTime, usePeriod, validate);
+        }
+
+        public Task<IGrainReminder> StartReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+            => StartReminder(reminderName, dueTime, period, validate: false);
+
+        private async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan dueTime, TimeSpan period, bool validate)
+        {
+            this.logger.LogInformation("Starting reminder {ReminderName}.", reminderName);
             IGrainReminder r;
             if (validate)
-                r = await this.RegisterOrUpdateReminder(reminderName, dueTime, usePeriod);
+                r = await this.RegisterOrUpdateReminder(reminderName, dueTime, period);
             else
-                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, usePeriod);
+                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, period);
 
             this.allReminders[reminderName] = new(r);
             this.sequence[reminderName] = 0;
