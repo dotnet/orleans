@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Storage;
 using Orleans.Statistics;
 using Orleans.Runtime.Messaging;
@@ -131,11 +132,38 @@ namespace Orleans.Runtime.TestHooks
 
         public async Task<bool> WaitForGrainDirectoryMembershipVersion(TimeSpan timeout)
         {
-            var membershipVersion = this.serviceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Version;
-            var grainDirectory = this.serviceProvider.GetRequiredService<LocalGrainDirectory>();
+            var targetVersion = this.serviceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Version;
+            object directory;
+            Func<MembershipVersion> getAppliedVersion;
+            if (this.serviceProvider.GetService<DistributedGrainDirectory>() is { } distributedDirectory)
+            {
+                directory = distributedDirectory;
+                getAppliedVersion = () => distributedDirectory.AppliedMembershipVersion;
+            }
+            else
+            {
+                var localDirectory = this.serviceProvider.GetRequiredService<LocalGrainDirectory>();
+                directory = localDirectory;
+                getAppliedVersion = () => localDirectory.AppliedMembershipVersion;
+            }
+
+            if (getAppliedVersion() >= targetVersion)
+            {
+                return true;
+            }
+
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var subscription = GrainDirectoryEvents.AllEvents.Subscribe(
+                new MembershipVersionAppliedObserver(directory, targetVersion, completion));
+
             try
             {
-                await grainDirectory.WaitForMembershipVersion(membershipVersion).WaitAsync(timeout);
+                if (getAppliedVersion() >= targetVersion)
+                {
+                    return true;
+                }
+
+                await completion.Task.WaitAsync(timeout);
                 return true;
             }
             catch (TimeoutException)
@@ -228,6 +256,28 @@ namespace Orleans.Runtime.TestHooks
                 if (value is ManifestEvents.ClusterManifestUpdated update
                     && ReferenceEquals(update.Source, manifestProvider)
                     && expectedSilos.SetEquals(update.Manifest.Silos.Keys))
+                {
+                    completion.TrySetResult();
+                }
+            }
+        }
+
+        private sealed class MembershipVersionAppliedObserver(
+            object directory,
+            MembershipVersion targetVersion,
+            TaskCompletionSource completion) : IObserver<GrainDirectoryEvents.GrainDirectoryEvent>
+        {
+            public void OnCompleted()
+            {
+            }
+
+            public void OnError(Exception error) => completion.TrySetException(error);
+
+            public void OnNext(GrainDirectoryEvents.GrainDirectoryEvent value)
+            {
+                if (value is GrainDirectoryEvents.MembershipVersionApplied update
+                    && ReferenceEquals(update.Source, directory)
+                    && update.Version >= targetVersion)
                 {
                     completion.TrySetResult();
                 }

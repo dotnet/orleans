@@ -303,13 +303,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                     partnerFilter: (state, silo, partitionIndex) => partitionIndex == state.PartitionIndex && silo.Equals(state.SiloAddress));
             });
 
-    internal Task ProcessMembershipUpdateAsync(DirectoryMembershipSnapshot current) =>
-        this.QueueAction(
-            static state => state.Self.ProcessMembershipUpdate(state.Current),
-            (Self: this, Current: current),
+    internal async Task ProcessMembershipUpdateAsync(DirectoryMembershipSnapshot current)
+    {
+        var completion = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await this.QueueAction(
+            static state => state.Completion.SetResult(state.Self.ProcessMembershipUpdate(state.Current)),
+            (Self: this, Current: current, Completion: completion),
             nameof(ProcessMembershipUpdate));
+        await await completion.Task;
+    }
 
-    private void ProcessMembershipUpdate(DirectoryMembershipSnapshot current)
+    private Task ProcessMembershipUpdate(DirectoryMembershipSnapshot current)
     {
         GrainRuntime.CheckRuntimeContext(this);
 
@@ -325,6 +329,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
         var removedRange = previousRange.Difference(_currentRange).SingleOrDefault();
         var addedRange = _currentRange.Difference(previousRange).SingleOrDefault();
+        var currentViewChangeTasks = new List<Task>(2);
 
 #if DEBUG
         Debug.Assert(addedRange.IsEmpty ^ removedRange.IsEmpty || addedRange.IsEmpty && removedRange.IsEmpty); // Either the range grew or it shrank, but not both.
@@ -342,15 +347,26 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
         if (!removedRange.IsEmpty)
         {
-            _viewChangeTasks.Add(ReleaseRangeAsync(previous, current, removedRange));
+            var task = ReleaseRangeAsync(previous, current, removedRange);
+            _viewChangeTasks.Add(task);
+            currentViewChangeTasks.Add(task);
         }
 
         if (!addedRange.IsEmpty)
         {
-            _viewChangeTasks.Add(AcquireRangeAsync(previous, current, addedRange));
+            var task = AcquireRangeAsync(previous, current, addedRange);
+            _viewChangeTasks.Add(task);
+            currentViewChangeTasks.Add(task);
         }
 
         _viewUpdates.Publish(current);
+        return CompleteMembershipUpdateAsync(current.Version, currentViewChangeTasks);
+    }
+
+    private async Task CompleteMembershipUpdateAsync(MembershipVersion version, List<Task> viewChangeTasks)
+    {
+        await Task.WhenAll(viewChangeTasks);
+        GrainDirectoryEvents.EmitMembershipVersionApplied(this, _id, _partitionIndex, version);
     }
 
     private async Task ReleaseRangeAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRange removedRange)

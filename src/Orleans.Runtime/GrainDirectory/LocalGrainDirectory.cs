@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -27,11 +28,9 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IServiceProvider _serviceProvider;
         private readonly DirectoryInstruments _directoryInstruments;
         private readonly CancellationTokenSource _membershipUpdatesCancellation = new();
-        private readonly object membershipVersionAppliedLock = new();
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
         private ClusterMembershipSnapshot appliedClusterMembershipSnapshot = ClusterMembershipSnapshot.Default;
-        private MembershipVersion lastAppliedMembershipVersion = MembershipVersion.MinValue;
-        private TaskCompletionSource membershipVersionApplied = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private long appliedMembershipVersion = MembershipVersion.MinValue.Value;
         private GrainDirectoryResolver? grainDirectoryResolver;
         private bool hasAppliedClusterMembershipSnapshot;
 
@@ -46,6 +45,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal IGrainDirectoryCache DirectoryCache { get; }
         private readonly bool disposeDirectoryCache;
         internal LocalGrainDirectoryPartition DirectoryPartition { get; }
+        internal MembershipVersion AppliedMembershipVersion => new(Volatile.Read(ref appliedMembershipVersion));
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
         public RemoteGrainDirectory CacheValidator { get; }
@@ -216,25 +216,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        internal async Task WaitForMembershipVersion(MembershipVersion targetVersion)
-        {
-            while (true)
-            {
-                Task versionApplied;
-                lock (membershipVersionAppliedLock)
-                {
-                    if (lastAppliedMembershipVersion >= targetVersion)
-                    {
-                        return;
-                    }
-
-                    versionApplied = membershipVersionApplied.Task;
-                }
-
-                await versionApplied;
-            }
-        }
-
         private Task ApplyMembershipSnapshot()
         {
             return CacheValidator.RunOrQueueTask(() =>
@@ -281,16 +262,8 @@ namespace Orleans.Runtime.GrainDirectory
 
                 appliedClusterMembershipSnapshot = snapshot;
                 hasAppliedClusterMembershipSnapshot = true;
-
-                TaskCompletionSource versionApplied;
-                lock (membershipVersionAppliedLock)
-                {
-                    lastAppliedMembershipVersion = snapshot.Version;
-                    versionApplied = membershipVersionApplied;
-                    membershipVersionApplied = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                }
-
-                versionApplied.TrySetResult();
+                Volatile.Write(ref appliedMembershipVersion, snapshot.Version.Value);
+                GrainDirectoryEvents.EmitMembershipVersionApplied(this, MyAddress, partitionIndex: -1, snapshot.Version);
             }
         }
 
