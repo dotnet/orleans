@@ -7,7 +7,7 @@ internal static class ReminderOptionsDefaults
     /// <summary>
     /// Minimum period for registering a reminder ... we want to enforce a lower bound <see cref="ReminderOptions.MinimumReminderPeriod"/>.
     /// </summary>
-    /// <remarks>Increase this period, reminders are supposed to be less frequent ... we use 2 seconds just to reduce the running time of the unit tests</remarks>
+    /// <remarks>The default is one minute. Tests can configure a shorter period to reduce their running time.</remarks>
     public const uint MinimumReminderPeriodMinutes = 1;
 
     /// <summary>

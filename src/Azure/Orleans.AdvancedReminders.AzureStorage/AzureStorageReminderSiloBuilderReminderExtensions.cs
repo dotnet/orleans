@@ -59,17 +59,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloBuilder UseAzureTableAdvancedReminderService(this ISiloBuilder builder, string connectionString)
         {
-            builder.UseAzureTableAdvancedReminderService(options =>
-            {
-                if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
-                {
-                    options.TableServiceClient = new(uri);
-                }
-                else
-                {
-                    options.TableServiceClient = new(connectionString);
-                }
-            });
+            builder.ConfigureServices(services => services.UseAzureTableAdvancedReminderService(connectionString));
             return builder;
         }
     }

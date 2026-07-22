@@ -37,7 +37,7 @@ public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
             clusterOptions,
             Options.Create(new RedisReminderTableOptions
             {
-                ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
+                ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString),
                 EntryExpiry = TimeSpan.FromHours(1),
             }));
     }

@@ -329,7 +329,7 @@ public static class ServiceCollectionExtensions
         catch
         {
             // If reminders are not configured, return empty response
-            return Results.Json(new AdvancedReminderResponse { Reminders = [], Count = 0 }, jsonOptions);
+            return Results.Json(new ReminderResponse { Reminders = [], Count = 0 }, jsonOptions);
         }
     }
 
@@ -347,7 +347,7 @@ public static class ServiceCollectionExtensions
         catch
         {
             // If advanced reminders are not configured, return empty response
-            return Results.Json(new ReminderResponse { Reminders = [], Count = 0 }, jsonOptions);
+            return Results.Json(new AdvancedReminderResponse { Reminders = [], Count = 0 }, jsonOptions);
         }
     }
 

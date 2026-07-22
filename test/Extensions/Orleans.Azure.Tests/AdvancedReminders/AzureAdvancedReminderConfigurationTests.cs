@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.AzureStorage;
@@ -31,6 +32,29 @@ public class AzureAdvancedReminderConfigurationTests
 
         Assert.Same(blobServiceClient, options.BlobServiceClient);
         Assert.Equal("advanced-reminder-jobs-test", options.ContainerName);
+    }
+
+    [Fact]
+    public void SiloBuilderConnectionStringOverload_ConfiguresTableAndBlobClients()
+    {
+        var builder = new TestSiloBuilder();
+
+        builder.UseAzureTableAdvancedReminderService("UseDevelopmentStorage=true");
+
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var reminderOptions = serviceProvider.GetRequiredService<IOptions<AzureTableReminderStorageOptions>>().Value;
+        var jobOptions = serviceProvider.GetRequiredService<IOptions<AzureBlobJournalStorageOptions>>().Value;
+
+        Assert.NotNull(reminderOptions.TableServiceClient);
+        Assert.NotNull(reminderOptions.BlobServiceClient);
+        Assert.Same(reminderOptions.BlobServiceClient, jobOptions.BlobServiceClient);
+    }
+
+    private sealed class TestSiloBuilder : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = new ServiceCollection();
+
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 }
 
