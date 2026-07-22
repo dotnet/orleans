@@ -28,7 +28,7 @@ export default class Reminders extends React.Component<RemindersProps> {
 
   render() {
     const isAdvanced = this.props.reminderKind === 'advanced';
-    const totalPages = Math.ceil(this.props.remindersData.count / 25);
+    const totalPages = Math.ceil(this.props.remindersData.count / 50);
     const showFirst = this.props.page > 2;
     const showPrevious = this.props.page > 1;
     const showNext = totalPages > this.props.page;
