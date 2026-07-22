@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using NonSilo.Tests.Testing;
 using Orleans.DurableJobs;
 using Orleans.Runtime.Messaging;
 using Xunit;
@@ -237,6 +238,37 @@ public class ShardExecutorTests
     }
 
     [Fact]
+    public async Task RunShardAsync_WhenShardStartExceedsTimerLimit_WaitsInBoundedSteps()
+    {
+        var timeProvider = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions(maxConcurrentJobs: 10);
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var shard = CreateJobShard([], startTime: timeProvider.GetUtcNow().AddDays(100));
+        var executor = new ShardExecutor(
+            CreateGrainFactory(),
+            options,
+            overloadDetector,
+            NullLogger<ShardExecutor>.Instance,
+            timeProvider);
+
+        var runTask = executor.RunShardAsync(shard, CancellationToken.None);
+        await timeProvider.WaitForCreatedTimerCountAsync(1);
+        Assert.False(runTask.IsCompleted);
+
+        timeProvider.Advance(DurableJobTimeLimits.MaximumTimerDelay);
+        await timeProvider.WaitForCreatedTimerCountAsync(2);
+        Assert.False(runTask.IsCompleted);
+
+        timeProvider.Advance(DurableJobTimeLimits.MaximumTimerDelay);
+        await timeProvider.WaitForCreatedTimerCountAsync(3);
+        Assert.False(runTask.IsCompleted);
+
+        timeProvider.Advance(TimeSpan.FromDays(1));
+        await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(3, timeProvider.CreatedTimerCount);
+    }
+
+    [Fact]
     public async Task RunShardAsync_WaitsForAllJobsToComplete_BeforeReturning()
     {
         var options = CreateOptions(maxConcurrentJobs: 5);
@@ -398,6 +430,55 @@ public class ShardExecutorTests
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
         
+        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunShardAsync_WhenJobFailsWithoutRetry_RemovesJob()
+    {
+        var options = CreateOptions(maxConcurrentJobs: 10, shouldRetry: (_, _) => null);
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var jobs = CreateJobs(1);
+        var shard = CreateJobShard(jobs);
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var extension = Substitute.For<IDurableJobReceiverExtension>();
+        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(DurableJobRunResult.Failed(new InvalidOperationException("terminal failure")));
+        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
+
+        await executor.RunShardAsync(shard, CancellationToken.None);
+
+        await shard.Received(1).RemoveJobAsync("job-0", CancellationToken.None);
+        await shard.DidNotReceive().RetryJobLaterAsync(Arg.Any<IJobRunContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunShardAsync_DefaultRetryPolicyUsesConfiguredTimeProvider()
+    {
+        var now = new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(now);
+        var options = Options.Create(new DurableJobsOptions
+        {
+            MaxConcurrentJobsPerSilo = 10,
+            ConcurrencySlowStartEnabled = false,
+        });
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var jobs = CreateJobs(1, now.AddSeconds(-1));
+        var shard = CreateJobShard(jobs, startTime: now.AddMinutes(-1));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var extension = Substitute.For<IDurableJobReceiverExtension>();
+        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(DurableJobRunResult.Failed(new InvalidOperationException("retryable failure")));
+        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance, timeProvider);
+
+        await executor.RunShardAsync(shard, CancellationToken.None);
+
+        await shard.Received(1).RetryJobLaterAsync(
+            Arg.Any<IJobRunContext>(),
+            now.AddSeconds(2),
+            CancellationToken.None);
         await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -885,4 +966,3 @@ public class ShardExecutorTests
         return (factory, callBox);
     }
 }
-

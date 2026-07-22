@@ -111,7 +111,7 @@ public sealed class RegisterReminderAttribute : Attribute
 
     private static void ValidateNonNegativeFinite(double value, string argumentName)
     {
-        if (double.IsNaN(value) || double.IsInfinity(value) || value < 0)
+        if (double.IsNaN(value) || double.IsInfinity(value) || value < 0 || value > TimeSpan.MaxValue.TotalSeconds)
         {
             throw new ArgumentOutOfRangeException(argumentName);
         }
@@ -119,7 +119,7 @@ public sealed class RegisterReminderAttribute : Attribute
 
     private static void ValidatePositiveFinite(double value, string argumentName)
     {
-        if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0)
+        if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0 || value > TimeSpan.MaxValue.TotalSeconds)
         {
             throw new ArgumentOutOfRangeException(argumentName);
         }

@@ -203,6 +203,8 @@ namespace Orleans.Hosting
 
     public sealed partial class DurableJobsOptions
     {
+        public System.TimeSpan AdoptionFailureWindow { get { throw null; } set { } }
+
         public bool ConcurrencySlowStartEnabled { get { throw null; } set { } }
 
         public System.TimeSpan JobStatusPollInterval { get { throw null; } set { } }

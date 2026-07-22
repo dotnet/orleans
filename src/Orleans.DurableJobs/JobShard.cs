@@ -166,7 +166,7 @@ public abstract class JobShard : IJobShard
             Name = request.JobName,
             DueTime = request.DueTime,
             ShardId = Id,
-            Metadata = request.Metadata,
+            Metadata = DurableJobIdentity.SnapshotMetadata(request.Metadata),
             TraceParent = request.TraceParent,
             TraceState = request.TraceState,
             Priority = request.Priority,

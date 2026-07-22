@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.Logging;
@@ -40,23 +41,43 @@ namespace Orleans.AdvancedReminders.Redis
             _hashSetKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/advanced-reminders");
         }
 
-        public async Task Init()
+        public Task Init() => StartAsync(CancellationToken.None);
+
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
+            Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>? creationTask = null;
             try
             {
-                (_muxer, _muxerIsShared) = await _redisOptions.CreateMultiplexer(_redisOptions);
+                creationTask = _redisOptions.CreateMultiplexer(_redisOptions);
+                (_muxer, _muxerIsShared) = await creationTask.WaitAsync(cancellationToken);
                 _db = _muxer.GetDatabase();
 
                 if (_redisOptions.EntryExpiry is { } expiry)
                 {
-                    await _db.KeyExpireAsync(_hashSetKey, expiry);
+                    await _db.KeyExpireAsync(_hashSetKey, expiry).WaitAsync(cancellationToken);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                if (_muxer is not null)
+                {
+                    await DisposeAsync().ConfigureAwait(false);
+                }
+                else if (creationTask is not null)
+                {
+                    _ = DisposeMultiplexerWhenCreatedAsync(creationTask);
+                }
+
+                throw;
             }
             catch (Exception exception)
             {
                 throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
             }
         }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+            => await DisposeAsync().AsTask().WaitAsync(cancellationToken);
 
         public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
@@ -160,6 +181,7 @@ namespace Orleans.AdvancedReminders.Redis
                 local allTo = '[' .. ARGV[4]
                 local value = ARGV[5]
                 local expectedETag = ARGV[6]
+                local expiryMilliseconds = tonumber(ARGV[7])
 
                 if expectedETag == '' then
                     local existing = redis.call('ZRANGEBYLEX', key, allFrom, allTo, 'LIMIT', 0, 1)
@@ -171,6 +193,9 @@ namespace Orleans.AdvancedReminders.Redis
                 end
 
                 redis.call('ZADD', key, 0, value)
+                if expiryMilliseconds > 0 then
+                    redis.call('PEXPIRE', key, expiryMilliseconds)
+                end
                 return 1
                 """;
 
@@ -181,10 +206,13 @@ namespace Orleans.AdvancedReminders.Redis
                 var (newETag, value) = ConvertFromEntry(entry);
                 var (expectedFrom, expectedTo) = GetFilter(entry.GrainId, entry.ReminderName, entry.ETag);
                 var (allFrom, allTo) = GetFilter(entry.GrainId, entry.ReminderName);
+                var expiryMilliseconds = _redisOptions.EntryExpiry is { } expiry
+                    ? Math.Max(1, (long)Math.Ceiling(expiry.TotalMilliseconds))
+                    : -1;
                 var result = await _db.ScriptEvaluateAsync(
                     UpsertScript,
                     keys: new[] { _hashSetKey },
-                    values: new RedisValue[] { expectedFrom, expectedTo, allFrom, allTo, value, entry.ETag });
+                    values: new RedisValue[] { expectedFrom, expectedTo, allFrom, allTo, value, entry.ETag, expiryMilliseconds });
                 if ((long)result != 1)
                 {
                     throw new Runtime.ReminderException(
@@ -234,6 +262,23 @@ namespace Orleans.AdvancedReminders.Redis
             if (!muxerIsShared)
             {
                 await muxer.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
+        private static async Task DisposeMultiplexerWhenCreatedAsync(
+            Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> creationTask)
+        {
+            try
+            {
+                var (multiplexer, isShared) = await creationTask.ConfigureAwait(false);
+                if (!isShared)
+                {
+                    await multiplexer.DisposeAsync().ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                // Observe a late connection failure after initialization was canceled.
             }
         }
 

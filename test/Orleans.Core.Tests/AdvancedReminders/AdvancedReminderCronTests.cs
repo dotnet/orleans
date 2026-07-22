@@ -932,6 +932,20 @@ public class ReminderCronScheduleTests
     }
 
     [Fact]
+    public void Schedule_NormalizeTimeZoneIdForStorage_RejectsCustomRulesWhichCannotBeRestored()
+    {
+        var zone = TimeZoneInfo.CreateCustomTimeZone(
+            "Orleans/Test-Custom-Zone",
+            TimeSpan.FromHours(3),
+            "Orleans custom zone",
+            "Orleans custom zone");
+
+        var exception = Assert.Throws<ArgumentException>(() => ReminderCronSchedule.NormalizeTimeZoneIdForStorage(zone));
+
+        Assert.Contains("cannot be stored", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Schedule_Parse_WithUnknownTimeZone_ThrowsCronFormatException()
     {
         var exception = Assert.Throws<CronFormatException>(() => ReminderCronSchedule.Parse("0 9 * * *", "Definitely/Not-A-TimeZone"));
@@ -956,6 +970,17 @@ public class ReminderCronScheduleTests
         var second = ReminderCronSchedule.Parse("0 9 * * *", "Europe/Berlin");
 
         Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void Schedule_Parse_BoundsTheProcessWideCache()
+    {
+        for (var index = 1; index <= ReminderCronSchedule.MaxCacheEntries + 100; index++)
+        {
+            _ = ReminderCronSchedule.Parse($"0{new string(' ', index)}9 * * *");
+        }
+
+        Assert.InRange(ReminderCronSchedule.CacheCount, 1, ReminderCronSchedule.MaxCacheEntries);
     }
 }
 

@@ -162,7 +162,7 @@ public sealed class DashboardRemindersGrainTests
     }
 
     [Fact]
-    public async Task GetAdvancedReminders_UsesCursorPagingAndCachesCount()
+    public async Task GetAdvancedReminders_UsesCursorPagingWithoutFullTableCount()
     {
         var advancedReminderTable = new AdvancedReminderTableStub();
         var serviceProvider = new ReminderServiceProvider(new ClassicReminderTableStub(), advancedReminderTable);
@@ -174,11 +174,30 @@ public sealed class DashboardRemindersGrainTests
 
         Assert.Equal("advanced-reminder-1", Assert.Single(first.Reminders).Name);
         Assert.Equal("advanced-reminder-2", Assert.Single(second.Reminders).Name);
-        Assert.Equal(2, first.Count);
-        Assert.Equal(2, second.Count);
+        Assert.Equal(0, first.Count);
+        Assert.Equal(0, second.Count);
+        Assert.True(first.HasMore);
+        Assert.False(second.HasMore);
         Assert.Equal(2, management.ListCallCount);
-        Assert.Equal(1, management.CountCallCount);
+        Assert.Equal(0, management.CountCallCount);
         Assert.Equal(0, advancedReminderTable.RangeReadCount);
+    }
+
+    [Fact]
+    public async Task GetAdvancedReminders_PageBeyondReplayLimitDoesNotScanOrCountTable()
+    {
+        var advancedReminderTable = new AdvancedReminderTableStub();
+        var serviceProvider = new ReminderServiceProvider(new ClassicReminderTableStub(), advancedReminderTable);
+        var management = new PagedAdvancedReminderManagementGrain();
+        var grain = new DashboardRemindersGrain(serviceProvider, management);
+
+        var response = (await grain.GetAdvancedReminders(int.MaxValue, 1)).Value;
+
+        Assert.Empty(response.Reminders);
+        Assert.Equal(0, response.Count);
+        Assert.False(response.HasMore);
+        Assert.Equal(0, management.ListCallCount);
+        Assert.Equal(0, management.CountCallCount);
     }
 
     [Fact]

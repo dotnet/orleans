@@ -47,12 +47,20 @@ public static class DurableJobsExtensions
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
             sp.GetRequiredService<IOptions<SiloMessagingOptions>>(),
+            sp.GetRequiredService<IInternalGrainFactory>(),
             sp.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
             sp.GetRequiredService<DurableJobsInstruments>()));
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
             return new DurableJobReceiverExtension(
+                grainContextAccessor.GrainContext,
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>());
+        });
+        services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobExecutionExtension), (sp, _) =>
+        {
+            var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
+            return new DurableJobExecutionExtension(
                 grainContextAccessor.GrainContext,
                 sp.GetRequiredService<DurableJobReceiverExtensionShared>());
         });

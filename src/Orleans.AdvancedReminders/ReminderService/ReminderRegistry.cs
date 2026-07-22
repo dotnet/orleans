@@ -57,6 +57,8 @@ internal sealed class ReminderRegistry(
 
 internal static class ReminderValidation
 {
+    private const int MaxCronIntervalsToValidate = 10_000;
+
     public static void Validate(
         ReminderOptions options,
         string reminderName,
@@ -75,7 +77,7 @@ internal static class ReminderValidation
         switch (schedule.Kind)
         {
             case Runtime.ReminderScheduleKind.Interval:
-                ValidateIntervalSchedule(options, schedule, reminderName);
+                ValidateIntervalSchedule(options, schedule, reminderName, utcNow);
                 break;
             case Runtime.ReminderScheduleKind.Cron:
                 ValidateCronSchedule(options, schedule, reminderName, utcNow);
@@ -85,7 +87,11 @@ internal static class ReminderValidation
         }
     }
 
-    private static void ValidateIntervalSchedule(ReminderOptions options, ReminderSchedule schedule, string reminderName)
+    private static void ValidateIntervalSchedule(
+        ReminderOptions options,
+        ReminderSchedule schedule,
+        string reminderName,
+        DateTime utcNow)
     {
         if (schedule.Period is not { } period)
         {
@@ -102,6 +108,11 @@ internal static class ReminderValidation
             if (dueTime.Ticks < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(schedule), "Cannot use negative dueTime to create a reminder");
+            }
+
+            if (dueTime > DateTime.MaxValue - utcNow)
+            {
+                throw new ArgumentOutOfRangeException(nameof(schedule), "The due time exceeds the supported date range");
             }
         }
         else if (schedule.DueAtUtc is { } dueAtUtc)
@@ -141,13 +152,32 @@ internal static class ReminderValidation
         }
 
         var cron = ReminderCronSchedule.Parse(schedule.CronExpression, schedule.CronTimeZoneId);
-        var first = cron.GetNextOccurrence(utcNow, inclusive: true);
-        var second = first is null ? null : cron.GetNextOccurrence(first.Value);
-        if (first is not null && second is not null && second.Value - first.Value < options.MinimumReminderPeriod)
+        var precision = ReminderCronParser.DetectFormat(schedule.CronExpression) == CronFormat.IncludeSeconds
+            ? TimeSpan.FromSeconds(1)
+            : TimeSpan.FromMinutes(1);
+        if (options.MinimumReminderPeriod <= precision)
         {
-            throw new ArgumentException(
-                $"Cannot register reminder {reminderName} because its cron interval ({second.Value - first.Value}) is less than minimum allowed reminder period ({options.MinimumReminderPeriod})",
-                nameof(schedule));
+            return;
+        }
+
+        var previous = cron.GetNextOccurrence(utcNow, inclusive: true);
+        for (var index = 0; index < MaxCronIntervalsToValidate && previous is not null; index++)
+        {
+            var next = cron.GetNextOccurrence(previous.Value);
+            if (next is null)
+            {
+                return;
+            }
+
+            var interval = next.Value - previous.Value;
+            if (interval < options.MinimumReminderPeriod)
+            {
+                throw new ArgumentException(
+                    $"Cannot register reminder {reminderName} because its cron interval ({interval}) is less than minimum allowed reminder period ({options.MinimumReminderPeriod})",
+                    nameof(schedule));
+            }
+
+            previous = next;
         }
     }
 

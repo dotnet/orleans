@@ -42,6 +42,7 @@ public class JournaledJobShardStateTests
         Assert.Equal(request.TraceParent, replayed.TraceParent);
         Assert.Equal(request.TraceState, replayed.TraceState);
         Assert.Equal(request.Metadata, replayed.Metadata);
+        Assert.NotSame(request.Metadata, scheduled.Metadata);
 
         Assert.Throws<InvalidOperationException>(() => source.TryScheduleJob(new ScheduleJobRequest
         {

@@ -19,6 +19,7 @@ public sealed class ReminderManagementGrain(
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider) : Grain, IReminderManagementGrain
 {
     private const int ScanBucketCount = 256;
+    private const int MaxPageSize = 4_096;
     private const ulong ScanBucketWidth = (ulong)uint.MaxValue / ScanBucketCount + 1;
     private readonly IReminderTable _reminderTable = reminderTable;
     private readonly TimeProvider _timeProvider = timeProvider;
@@ -66,7 +67,7 @@ public sealed class ReminderManagementGrain(
     public async Task<ReminderManagementPage> ListFilteredAsync(ReminderQueryFilter filter, int pageSize = 256, string? continuationToken = null)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        if (pageSize <= 0)
+        if (pageSize is <= 0 or > MaxPageSize)
         {
             throw new ArgumentOutOfRangeException(nameof(pageSize));
         }
@@ -101,7 +102,7 @@ public sealed class ReminderManagementGrain(
         var now = GetUtcNow();
         var upper = horizon > DateTime.MaxValue - now ? DateTime.MaxValue : now.Add(horizon);
         return (await GetAllAsync())
-            .Where(reminder => GetDueTime(reminder) <= upper)
+            .Where(reminder => GetDueTime(reminder) >= now && GetDueTime(reminder) <= upper)
             .OrderBy(reminder => reminder, ReminderEntryComparer.Instance)
             .ToList();
     }

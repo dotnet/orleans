@@ -106,4 +106,11 @@ public class InMemoryDurableJobsTests : HostedTestClusterEnsureDefaultStarted
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.JobRetry(cts.Token);
     }
+
+    [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
+    public async Task HandlerExecutionUsesAnExclusiveGrainTurn()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.HandlerExecutionUsesAnExclusiveGrainTurn(cts.Token);
+    }
 }

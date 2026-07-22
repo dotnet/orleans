@@ -13,6 +13,7 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService;
 
 internal sealed class AdvancedReminderService : IReminderService, ILifecycleParticipant<ISiloLifecycle>
 {
+    internal static readonly TimeSpan RecoveryHeartbeatPeriod = TimeSpan.FromMinutes(1);
     private const string GrainIdMetadataKey = "grain-id";
     private const string ReminderNameMetadataKey = "reminder-name";
     private const string ScheduleIdMetadataKey = "schedule-id";
@@ -26,6 +27,8 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
     private readonly ILogger<AdvancedReminderService> _logger;
     private readonly ReminderOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly CancellationTokenSource _recoveryMonitorCts = new();
+    private Task? _recoveryMonitorTask;
 
     public AdvancedReminderService(
         IReminderTable reminderTable,
@@ -172,6 +175,15 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
 
         var now = GetUtcNow();
         var due = entry.NextDueUtc ?? entry.StartAt;
+        if (due > now)
+        {
+            // A job can become observable before its due time after a clock adjustment.
+            // Replace it with a new occurrence instead of firing the reminder early.
+            PrepareNewSchedule(entry);
+            await PersistAndScheduleCoreAsync(entry, cancellationToken);
+            return;
+        }
+
         var overdueBy = now > due ? now - due : TimeSpan.Zero;
         var isMissed = overdueBy > _options.MissedReminderGracePeriod;
 
@@ -197,7 +209,25 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
                 entry.StartAt,
                 string.IsNullOrWhiteSpace(entry.CronExpression) ? entry.Period : TimeSpan.Zero,
                 now);
-            await remindable.ReceiveReminder(entry.ReminderName, status);
+            try
+            {
+                await remindable.ReceiveReminder(entry.ReminderName, status);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                // Match the classic reminder service: a callback failure is isolated to this
+                // tick and must not permanently stop a recurring reminder.
+                _logger.LogError(
+                    exception,
+                    "Error delivering reminder {ReminderName} to grain {GrainId}.",
+                    reminderName,
+                    grainId);
+            }
+
             entry.LastFireUtc = now;
 
             // The reminder callback can call back into this dispatcher using the same Orleans call chain.
@@ -274,8 +304,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
     private async Task ScheduleAndPersistHandleAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
         var due = entry.NextDueUtc ?? entry.StartAt;
-        var now = GetUtcNow();
-        var dueTime = new DateTimeOffset(due <= now ? now.AddMilliseconds(1) : due, TimeSpan.Zero);
+        var dueTime = new DateTimeOffset(due, TimeSpan.Zero);
         var grainIdText = entry.GrainId.ToString();
         var dispatcher = GetDispatcher(entry.GrainId);
         var job = await _jobManager.ScheduleJobAsync(
@@ -422,6 +451,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
             await _grainFactory.GetGrain<IAdvancedReminderRecoveryGrain>(0)
                 .StartAsync(force: !_jobShardManager.IsDurableStorage, timeout.Token)
                 .WaitAsync(timeout.Token);
+            _recoveryMonitorTask ??= MonitorRecoveryAsync(_recoveryMonitorCts.Token);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -431,7 +461,49 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
         }
     }
 
-    private Task StopAsync(CancellationToken cancellationToken) => _reminderTable.StopAsync(cancellationToken);
+    private async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _recoveryMonitorCts.Cancel();
+        if (_recoveryMonitorTask is not null)
+        {
+            try
+            {
+                await _recoveryMonitorTask.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _recoveryMonitorCts.IsCancellationRequested)
+            {
+            }
+        }
+
+        await _reminderTable.StopAsync(cancellationToken);
+    }
+
+    private async Task MonitorRecoveryAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RecoveryHeartbeatPeriod, _timeProvider);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                try
+                {
+                    await _grainFactory.GetGrain<IAdvancedReminderRecoveryGrain>(0)
+                        .StartAsync(force: false, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Error checking advanced reminder recovery service health.");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
 
     private DateTime GetUtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
 

@@ -16,6 +16,7 @@ namespace Orleans.Dashboard.Implementation.Grains;
 
 internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
 {
+    private const int MaxPageTokenReplayCount = 32;
     private static readonly Immutable<ReminderResponse> EmptyReminders = new ReminderResponse
     {
         Reminders = []
@@ -30,8 +31,6 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
     private readonly IReminderManagementGrain _advancedReminderManagement;
     private readonly ClassicReminderTable _classicReminderTable;
     private readonly Dictionary<(int PageSize, int PageNumber), string> _advancedPageTokens = new();
-    private DateTime _advancedCacheExpiresUtc;
-    private int? _advancedCount;
 
     public DashboardRemindersGrain(IServiceProvider serviceProvider, IGrainFactory grainFactory)
         : this(serviceProvider, grainFactory.GetReminderManagementGrain())
@@ -59,6 +58,8 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return EmptyReminders;
         }
 
+        ValidatePagingArguments(pageNumber, pageSize);
+
         var reminderData = await _classicReminderTable.ReadRows(0, 0);
 
         if (!reminderData.Reminders.Any())
@@ -66,12 +67,15 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return EmptyReminders;
         }
 
+        var skip = GetSkipCount(pageNumber, pageSize, reminderData.Reminders.Count);
         return new ReminderResponse
         {
-            Reminders = reminderData
+            Reminders = skip is null
+                ? []
+                : reminderData
                 .Reminders
                 .OrderBy(x => x.StartAt)
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(skip.Value)
                 .Take(pageSize)
                 .Select(ToReminderInfo)
                 .ToArray(),
@@ -87,29 +91,21 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return EmptyAdvancedReminders;
         }
 
-        if (pageNumber <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(pageNumber));
-        }
-
-        if (pageSize <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(pageSize));
-        }
+        ValidatePagingArguments(pageNumber, pageSize);
 
         if (_advancedReminderManagement is null)
         {
             return await GetAdvancedRemindersFromTable(pageNumber, pageSize);
         }
 
-        RefreshAdvancedCacheIfExpired();
         var token = await GetAdvancedPageToken(pageNumber, pageSize);
         if (pageNumber > 1 && token is null)
         {
             return new AdvancedReminderResponse
             {
                 Reminders = [],
-                Count = await GetAdvancedCount(),
+                Count = 0,
+                HasMore = false,
             }.AsImmutable();
         }
 
@@ -119,7 +115,8 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
         return new AdvancedReminderResponse
         {
             Reminders = page.Reminders.Select(ToAdvancedReminderInfo).ToArray(),
-            Count = await GetAdvancedCount(),
+            Count = 0,
+            HasMore = page.ContinuationToken is not null,
         }.AsImmutable();
     }
 
@@ -132,17 +129,21 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return EmptyAdvancedReminders;
         }
 
+        var skip = GetSkipCount(pageNumber, pageSize, reminderData.Reminders.Count);
         return new AdvancedReminderResponse
         {
-            Reminders = reminderData
+            Reminders = skip is null
+                ? []
+                : reminderData
                 .Reminders
                 .OrderBy(x => x.NextDueUtc ?? x.StartAt)
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(skip.Value)
                 .Take(pageSize)
                 .Select(ToAdvancedReminderInfo)
                 .ToArray(),
 
-            Count = reminderData.Reminders.Count
+            Count = reminderData.Reminders.Count,
+            HasMore = skip is not null && skip.Value + pageSize < reminderData.Reminders.Count,
         }.AsImmutable();
     }
 
@@ -156,6 +157,11 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
         if (_advancedPageTokens.TryGetValue((pageSize, pageNumber), out var cached))
         {
             return cached;
+        }
+
+        if (pageNumber - 1 > MaxPageTokenReplayCount)
+        {
+            return null;
         }
 
         var currentPage = 1;
@@ -175,20 +181,23 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
         return token;
     }
 
-    private async Task<int> GetAdvancedCount()
-        => _advancedCount ??= await _advancedReminderManagement.CountAllAsync();
-
-    private void RefreshAdvancedCacheIfExpired()
+    private static void ValidatePagingArguments(int pageNumber, int pageSize)
     {
-        var now = DateTime.UtcNow;
-        if (now < _advancedCacheExpiresUtc)
+        if (pageNumber <= 0)
         {
-            return;
+            throw new ArgumentOutOfRangeException(nameof(pageNumber));
         }
 
-        _advancedPageTokens.Clear();
-        _advancedCount = null;
-        _advancedCacheExpiresUtc = now.AddSeconds(15);
+        if (pageSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageSize));
+        }
+    }
+
+    private static int? GetSkipCount(int pageNumber, int pageSize, int count)
+    {
+        var skip = ((long)pageNumber - 1) * pageSize;
+        return skip >= count ? null : (int)skip;
     }
 
     private static ReminderInfo ToReminderInfo(ClassicReminderEntry entry)

@@ -90,9 +90,36 @@ internal sealed class JournaledJobShardManager : JobShardManager
         await foreach (var storageId in _catalog.ListAsync(JobShardId.StoragePrefix, cancellationToken))
         {
             var descriptor = await GetDescriptorAsync(storageId, cancellationToken);
-            if (descriptor is null || descriptor.Poisoned || descriptor.StartTime > maxDueTime)
+            if (descriptor is null || descriptor.StartTime > maxDueTime)
             {
                 continue;
+            }
+
+            var recoveringPoisonedShard = false;
+            if (descriptor.Poisoned)
+            {
+                var now = _timeProvider.GetUtcNow();
+                if (descriptor.LastAdoptedTime is not { } poisonedAt)
+                {
+                    // Older versions did not persist a poison timestamp. Start the
+                    // quarantine window when the legacy marker is first observed instead
+                    // of immediately risking another crash loop during an upgrade.
+                    await TrySetPoisonedTimeAsync(descriptor, now, cancellationToken);
+                    continue;
+                }
+
+                if (poisonedAt > now)
+                {
+                    await TrySetPoisonedTimeAsync(descriptor, now, cancellationToken);
+                    continue;
+                }
+
+                if (now - poisonedAt < _options.AdoptionFailureWindow)
+                {
+                    continue;
+                }
+
+                recoveringPoisonedShard = true;
             }
 
             if (descriptor.MembershipVersion > membershipSnapshot.Version)
@@ -131,7 +158,11 @@ internal sealed class JournaledJobShardManager : JobShardManager
             }
 
             // Try to claim orphaned or adopted shard.
-            var claimedShard = await TryClaimShardAsync(descriptor, isAdopted, cancellationToken);
+            var claimedShard = await TryClaimShardAsync(
+                descriptor,
+                isAdopted: isAdopted && !recoveringPoisonedShard,
+                recoveringPoisonedShard: recoveringPoisonedShard,
+                cancellationToken: cancellationToken);
             if (claimedShard is null)
             {
                 // Either poisoned shard or someone else took ownership.
@@ -293,7 +324,11 @@ internal sealed class JournaledJobShardManager : JobShardManager
         return false;
     }
 
-    private async ValueTask<JournaledJobShard?> TryClaimShardAsync(ShardCatalogProperties descriptor, bool isAdopted, CancellationToken cancellationToken)
+    private async ValueTask<JournaledJobShard?> TryClaimShardAsync(
+        ShardCatalogProperties descriptor,
+        bool isAdopted,
+        bool recoveringPoisonedShard,
+        CancellationToken cancellationToken)
     {
         var adoptedCount = descriptor.AdoptedCount;
         var set = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -305,9 +340,23 @@ internal sealed class JournaledJobShardManager : JobShardManager
         };
         List<string>? remove = null;
 
-        if (isAdopted)
+        if (recoveringPoisonedShard)
         {
-            // Increment adopted count for shards taken from dead owners.
+            adoptedCount = 0;
+            set[AdoptedCountProperty] = "0";
+            remove = [PoisonedProperty, LastAdoptedTimeProperty];
+        }
+        else if (isAdopted)
+        {
+            var now = _timeProvider.GetUtcNow();
+            if (descriptor.LastAdoptedTime is not { } lastAdoptedTime
+                || lastAdoptedTime > now
+                || now - lastAdoptedTime > _options.AdoptionFailureWindow)
+            {
+                adoptedCount = 0;
+            }
+
+            // Increment the count only for repeated adoptions within the configured failure window.
             adoptedCount++;
             if (adoptedCount > _options.MaxAdoptedCount)
             {
@@ -317,7 +366,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             }
 
             set[AdoptedCountProperty] = adoptedCount.ToString(CultureInfo.InvariantCulture);
-            set[LastAdoptedTimeProperty] = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
+            set[LastAdoptedTimeProperty] = now.ToString("O", CultureInfo.InvariantCulture);
         }
         else
         {
@@ -347,6 +396,22 @@ internal sealed class JournaledJobShardManager : JobShardManager
                 [PoisonedProperty] = bool.TrueString,
                 [AdoptedCountProperty] = adoptedCount.ToString(CultureInfo.InvariantCulture),
                 [LastAdoptedTimeProperty] = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture),
+                [MembershipVersionProperty] = GetMembershipVersionString()
+            },
+            remove: null,
+            cancellationToken);
+    }
+
+    private async Task TrySetPoisonedTimeAsync(
+        ShardCatalogProperties descriptor,
+        DateTimeOffset poisonedAt,
+        CancellationToken cancellationToken)
+    {
+        await UpdateMetadataAsync(
+            descriptor,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [LastAdoptedTimeProperty] = poisonedAt.ToString("O", CultureInfo.InvariantCulture),
                 [MembershipVersionProperty] = GetMembershipVersionString()
             },
             remove: null,
@@ -497,6 +562,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             DateTimeOffset startTime,
             DateTimeOffset endTime,
             int adoptedCount,
+            DateTimeOffset? lastAdoptedTime,
             bool poisoned,
             bool closed,
             IReadOnlyDictionary<string, string> metadata)
@@ -509,6 +575,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             StartTime = startTime;
             EndTime = endTime;
             AdoptedCount = adoptedCount;
+            LastAdoptedTime = lastAdoptedTime;
             Poisoned = poisoned;
             Closed = closed;
             Metadata = metadata;
@@ -529,6 +596,8 @@ internal sealed class JournaledJobShardManager : JobShardManager
         public DateTimeOffset EndTime { get; }
 
         public int AdoptedCount { get; }
+
+        public DateTimeOffset? LastAdoptedTime { get; }
 
         public bool Poisoned { get; }
 
@@ -563,6 +632,11 @@ internal sealed class JournaledJobShardManager : JobShardManager
                         ? parsedAdoptedCount
                         : 0;
 
+                var lastAdoptedTime = values.TryGetValue(LastAdoptedTimeProperty, out var lastAdoptedTimeValue)
+                    && DateTimeOffset.TryParse(lastAdoptedTimeValue, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedLastAdoptedTime)
+                        ? parsedLastAdoptedTime
+                        : (DateTimeOffset?)null;
+
                 var poisoned = values.TryGetValue(PoisonedProperty, out var poisonedValue)
                     && bool.TryParse(poisonedValue, out var parsedPoisoned)
                     && parsedPoisoned;
@@ -581,7 +655,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
                 }
 
                 var shardId = JobShardId.FromJournalId(storageId);
-                return new(storageId, shardId, properties, owner, membershipVersion, minDueTime, maxDueTime, adoptedCount, poisoned, closed, metadata);
+                return new(storageId, shardId, properties, owner, membershipVersion, minDueTime, maxDueTime, adoptedCount, lastAdoptedTime, poisoned, closed, metadata);
             }
             catch (Exception exception) when (exception is ArgumentException or FormatException)
             {

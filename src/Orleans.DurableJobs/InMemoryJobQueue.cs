@@ -347,7 +347,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var queueChangedTask = queueChanged.WaitAsync(waitCancellation.Token);
-        var delayTask = Task.Delay(delay.Value, _timeProvider, waitCancellation.Token);
+        var delayTask = Task.Delay(DurableJobTimeLimits.ClampTimerDelay(delay.Value), _timeProvider, waitCancellation.Token);
         var completedTask = await Task.WhenAny(queueChangedTask, delayTask);
         waitCancellation.Cancel();
         await completedTask;

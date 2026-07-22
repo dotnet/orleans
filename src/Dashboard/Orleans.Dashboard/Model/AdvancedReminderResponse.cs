@@ -10,4 +10,7 @@ internal sealed class AdvancedReminderResponse
 
     [Id(1)]
     public AdvancedReminderInfo[] Reminders { get; set; }
+
+    [Id(2)]
+    public bool HasMore { get; set; }
 }

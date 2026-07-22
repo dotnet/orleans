@@ -120,7 +120,7 @@ public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
 {
     private readonly ILocalDurableJobManager _jobManager;
     private readonly ILogger<NotificationGrain> _logger;
-    private IDurableJob? _durableJob;
+    private DurableJob? _durableJob;
 
     public NotificationGrain(
         ILocalDurableJobManager jobManager,
@@ -161,7 +161,7 @@ public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
             return;
         }
 
-        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableJob);
+        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableJob, CancellationToken.None);
         _logger.LogInformation("Notification {JobId} canceled: {Canceled}", _durableJob.Id, canceled);
         
         if (canceled)
@@ -344,9 +344,9 @@ public class PaymentProcessorGrain : Grain, IDurableJobHandler
 ```csharp
 public class WorkflowGrain : Grain, IDurableJobHandler
 {
-    private readonly Dictionary<string, TaskCompletionSource> _pendingJobs = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _pendingJobs = new();
 
-    public async Task<IDurableJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
+    public async Task<DurableJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
     {
         var job = await _jobManager.ScheduleJobAsync(
             new ScheduleJobRequest
@@ -371,7 +371,7 @@ public class WorkflowGrain : Grain, IDurableJobHandler
         }
     }
 
-    public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         // Execute the workflow step...
         
@@ -424,9 +424,9 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ShardDuration` | `TimeSpan` | 1 minute | Duration of each job shard. Smaller values reduce latency but increase overhead. |
-| `MaxConcurrentJobsPerSilo` | `int` | 100 | Maximum number of jobs that can execute simultaneously on a silo. |
-| `ShouldRetry` | `Func<IDurableJobContext, Exception, DateTimeOffset?>` | 3 retries with exp. backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
+| `ShardDuration` | `TimeSpan` | 1 hour | Duration of each job shard. Smaller values reduce latency but increase overhead. |
+| `MaxConcurrentJobsPerSilo` | `int` | 10,000 × processor count | Maximum number of jobs that can execute simultaneously on a silo. |
+| `ShouldRetry` | `Func<IJobRunContext, Exception, DateTimeOffset?>` | 5 total attempts with exponential backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
 
 ## Best Practices
 
@@ -437,7 +437,7 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 
 2. **Implement Idempotent Job Handlers**: Jobs may be retried, ensure handlers are idempotent
    ```csharp
-   public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken ct)
+   public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken ct)
    {
        var jobId = context.Job.Id;
        // Check if already processed
@@ -460,7 +460,7 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 
 4. **Handle Cancellation**: Respect the cancellation token
    ```csharp
-   public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken ct)
+   public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken ct)
    {
        await SomeLongRunningOperation(ct);
    }

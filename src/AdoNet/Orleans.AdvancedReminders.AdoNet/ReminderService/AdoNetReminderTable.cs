@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -21,9 +22,14 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
             this.options = storageOptions.Value;
         }
 
-        public async Task Init()
+        public Task Init() => StartAsync(CancellationToken.None);
+
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
-            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString);
+            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(
+                this.options.Invariant,
+                this.options.ConnectionString,
+                cancellationToken);
         }
 
         public Task<ReminderTableData> ReadRows(GrainId grainId)

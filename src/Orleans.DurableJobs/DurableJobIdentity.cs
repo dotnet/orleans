@@ -33,6 +33,24 @@ internal static class DurableJobIdentity
         return BinaryPrimitives.ReadInt32LittleEndian(hash) & int.MaxValue;
     }
 
+    public static IReadOnlyDictionary<string, string>? SnapshotMetadata(IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is null)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, string>(metadata.Count, StringComparer.Ordinal);
+        foreach (var (key, value) in metadata)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(key);
+            ArgumentNullException.ThrowIfNull(value);
+            result.Add(key, value);
+        }
+
+        return result;
+    }
+
     private static bool MetadataEquals(IReadOnlyDictionary<string, string>? left, IReadOnlyDictionary<string, string>? right)
     {
         if (ReferenceEquals(left, right))

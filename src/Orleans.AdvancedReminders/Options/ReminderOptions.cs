@@ -28,6 +28,23 @@ public sealed class ReminderOptions
     /// Gets or sets the grace period after a scheduled fire time before a reminder is considered missed.
     /// </summary>
     public TimeSpan MissedReminderGracePeriod { get; set; } = TimeSpan.FromSeconds(ReminderOptionsDefaults.MissedReminderGracePeriodSeconds);
+
+    /// <summary>
+    /// Gets or sets the initial delay used when retrying reminder persistence or durable-job scheduling.
+    /// Subsequent failures use exponential backoff with jitter.
+    /// </summary>
+    public TimeSpan SchedulingRetryInitialDelay { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Gets or sets the maximum delay between reminder scheduling retries.
+    /// </summary>
+    public TimeSpan SchedulingRetryMaxDelay { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Gets or sets how long a reminder may remain overdue with a persisted durable-job handle before
+    /// reconciliation treats the handle as stale and safely attempts to recreate the job.
+    /// </summary>
+    public TimeSpan StaleJobRecoveryDelay { get; set; } = TimeSpan.FromMinutes(15);
 }
 
 /// <summary>
@@ -66,14 +83,32 @@ internal sealed partial class ReminderOptionsValidator : IConfigurationValidator
             LogWarnFastReminderInterval(options.Value.MinimumReminderPeriod, ReminderOptionsDefaults.MinimumReminderPeriodMinutes);
         }
 
-        if (options.Value.InitializationTimeout <= TimeSpan.Zero)
+        var maxTimerDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 2L);
+        if (options.Value.InitializationTimeout <= TimeSpan.Zero || options.Value.InitializationTimeout > maxTimerDelay)
         {
-            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.InitializationTimeout)} must be greater than {TimeSpan.Zero}");
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.InitializationTimeout)} must be greater than zero and no greater than {maxTimerDelay}");
         }
 
         if (options.Value.MissedReminderGracePeriod <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MissedReminderGracePeriod)} must be greater than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.SchedulingRetryInitialDelay <= TimeSpan.Zero
+            || options.Value.SchedulingRetryInitialDelay > maxTimerDelay)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.SchedulingRetryInitialDelay)} must be greater than zero and no greater than {maxTimerDelay}");
+        }
+
+        if (options.Value.SchedulingRetryMaxDelay < options.Value.SchedulingRetryInitialDelay
+            || options.Value.SchedulingRetryMaxDelay > maxTimerDelay)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.SchedulingRetryMaxDelay)} must be at least {nameof(ReminderOptions.SchedulingRetryInitialDelay)} and no greater than {maxTimerDelay}");
+        }
+
+        if (options.Value.StaleJobRecoveryDelay <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.StaleJobRecoveryDelay)} must be greater than {TimeSpan.Zero}");
         }
     }
 

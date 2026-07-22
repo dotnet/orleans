@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.AdvancedReminders.DynamoDB
@@ -58,7 +59,9 @@ namespace Orleans.AdvancedReminders.DynamoDB
         }
 
         /// <summary>Initialize current instance with specific global configuration and logger</summary>
-        public Task Init()
+        public Task Init() => StartAsync(CancellationToken.None);
+
+        public Task StartAsync(CancellationToken cancellationToken)
         {
             this.storage = new DynamoDBStorage(
                 this.logger,
@@ -110,7 +113,8 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
-                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex });
+                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex },
+                cancellationToken: cancellationToken);
         }
 
         /// <summary>

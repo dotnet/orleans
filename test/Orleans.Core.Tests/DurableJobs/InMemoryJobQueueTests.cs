@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using NonSilo.Tests.Testing;
 using Orleans.DurableJobs;
 using Orleans.Runtime;
 using Xunit;
@@ -130,7 +131,7 @@ public class InMemoryJobQueueTests
 
         Assert.Equal(id, repeatedId);
         Assert.True(DurableJobIdentity.IsEquivalent(job, request));
-        Assert.False(DurableJobIdentity.IsEquivalent(job, new ScheduleJobRequest
+        var conflictingRequest = new ScheduleJobRequest
         {
             IdempotencyKey = request.IdempotencyKey,
             Target = request.Target,
@@ -138,7 +139,9 @@ public class InMemoryJobQueueTests
             DueTime = request.DueTime.AddSeconds(1),
             Priority = request.Priority,
             Metadata = request.Metadata,
-        }));
+        };
+        Assert.Equal(id, DurableJobIdentity.CreateId(conflictingRequest));
+        Assert.False(DurableJobIdentity.IsEquivalent(job, conflictingRequest));
     }
 
     [Fact]
@@ -193,6 +196,34 @@ public class InMemoryJobQueueTests
 
         Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(job.Id, enumerator.Current.Job.Id);
+    }
+
+    [Fact]
+    public async Task GetAsyncEnumerator_WithDelayBeyondTimerLimit_WaitsInBoundedSteps()
+    {
+        var timeProvider = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var job = CreateJob("far-future", timeProvider.GetUtcNow().AddDays(100));
+        queue.Enqueue(job, 0);
+        queue.MarkAsComplete();
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        var moveNextTask = enumerator.MoveNextAsync().AsTask();
+        await timeProvider.WaitForCreatedTimerCountAsync(1);
+        Assert.False(moveNextTask.IsCompleted);
+
+        timeProvider.Advance(DurableJobTimeLimits.MaximumTimerDelay);
+        await timeProvider.WaitForCreatedTimerCountAsync(2);
+        Assert.False(moveNextTask.IsCompleted);
+
+        timeProvider.Advance(DurableJobTimeLimits.MaximumTimerDelay);
+        await timeProvider.WaitForCreatedTimerCountAsync(3);
+        Assert.False(moveNextTask.IsCompleted);
+
+        timeProvider.Advance(TimeSpan.FromDays(1));
+        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(job.Id, enumerator.Current.Job.Id);
+        Assert.Equal(3, timeProvider.CreatedTimerCount);
     }
 
     [Fact]
@@ -498,4 +529,5 @@ public class InMemoryJobQueueTests
         context.DequeueCount.Returns(dequeueCount);
         return context;
     }
+
 }

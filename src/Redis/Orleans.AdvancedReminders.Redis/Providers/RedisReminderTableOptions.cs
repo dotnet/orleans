@@ -26,8 +26,9 @@ namespace Orleans.AdvancedReminders.Redis
         public Func<RedisReminderTableOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
 
         /// <summary>
-        /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
-        /// Setting a value different from null will cause reminder entries to be deleted after some period of time.
+        /// Table inactivity expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
+        /// All reminders share one Redis key, so every successful upsert refreshes this expiry for the entire table.
+        /// If the table receives no successful upserts for the configured period, all reminders are deleted together.
         /// </summary>
         public TimeSpan? EntryExpiry { get; set; } = null;
 
@@ -60,6 +61,14 @@ namespace Orleans.AdvancedReminders.Redis
             if (_options.ConfigurationOptions == null)
             {
                 throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisReminderTable)}. {nameof(RedisReminderTableOptions)}.{nameof(_options.ConfigurationOptions)} is required.");
+            }
+            if (_options.CreateMultiplexer == null)
+            {
+                throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisReminderTable)}. {nameof(RedisReminderTableOptions)}.{nameof(_options.CreateMultiplexer)} is required.");
+            }
+            if (_options.EntryExpiry is { } expiry && expiry <= TimeSpan.Zero)
+            {
+                throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisReminderTable)}. {nameof(RedisReminderTableOptions)}.{nameof(_options.EntryExpiry)} must be greater than zero.");
             }
         }
     }

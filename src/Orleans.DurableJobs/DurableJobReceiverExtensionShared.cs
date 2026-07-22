@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
 
@@ -17,15 +18,18 @@ internal sealed class DurableJobReceiverExtensionShared
         ILogger<DurableJobReceiverExtension> logger,
         IOptions<DurableJobsOptions> options,
         IOptions<SiloMessagingOptions> messagingOptions,
+        IInternalGrainFactory grainFactory,
         TimeProvider? timeProvider = null,
         DurableJobsInstruments? durableJobsInstruments = null)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(grainFactory);
 
         Logger = logger;
         MessagingOptions = messagingOptions.Value;
         Options = options.Value;
+        GrainFactory = grainFactory;
         DurableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         TimeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -46,6 +50,7 @@ internal sealed class DurableJobReceiverExtensionShared
     /// Gets the durable jobs options used by every <see cref="DurableJobReceiverExtension"/> instance on the silo.
     /// </summary>
     public DurableJobsOptions Options { get; }
+    public IInternalGrainFactory GrainFactory { get; }
     public DurableJobsInstruments DurableJobsInstruments { get; }
 
     /// <summary>

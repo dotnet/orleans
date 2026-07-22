@@ -34,6 +34,7 @@ public sealed class JobShardTests
         Assert.Equal(request.DueTime, persisted.DueTime);
         Assert.Equal(request.Priority, persisted.Priority);
         Assert.Equal(request.Metadata, persisted.Metadata);
+        Assert.NotSame(request.Metadata, persisted.Metadata);
         Assert.Equal(request.TraceParent, persisted.TraceParent);
         Assert.Equal(request.TraceState, persisted.TraceState);
     }

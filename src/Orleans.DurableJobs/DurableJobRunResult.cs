@@ -61,12 +61,19 @@ public sealed class DurableJobRunResult
     /// <remarks>
     /// The job will remain in an inline polling loop without being re-queued.
     /// The polling loop will hold a concurrency slot until the job completes or fails.
-    /// TODO: Add validation for minimum/maximum poll delays to prevent abuse.
     /// TODO: Consider concurrency slot management for long-running polls.
     /// </remarks>
     public static DurableJobRunResult PollAfter(TimeSpan delay)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(delay, TimeSpan.Zero, nameof(delay));
+        if (delay > DurableJobTimeLimits.MaximumTimerDelay)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(delay),
+                delay,
+                $"The polling delay must be no greater than {DurableJobTimeLimits.MaximumTimerDelay}.");
+        }
+
         return new(DurableJobRunStatus.PollAfter, delay, null);
     }
 

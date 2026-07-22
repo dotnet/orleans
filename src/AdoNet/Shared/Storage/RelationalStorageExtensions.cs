@@ -159,9 +159,18 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="parameterProvider"></param>
         /// <typeparam name="TResult"></typeparam>
         /// <returns></returns>
-        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, Func<IDataRecord, TResult> selector, Action<IDbCommand> parameterProvider)
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(
+            this IRelationalStorage storage,
+            string query,
+            Func<IDataRecord, TResult> selector,
+            Action<IDbCommand> parameterProvider,
+            CancellationToken cancellationToken = default)
         {
-            return storage.ReadAsync(query, parameterProvider, (record, i, cancellationToken) => Task.FromResult(selector(record)));
+            return storage.ReadAsync(
+                query,
+                parameterProvider,
+                (record, i, token) => Task.FromResult(selector(record)),
+                cancellationToken: cancellationToken);
         }
 
         /// <summary>

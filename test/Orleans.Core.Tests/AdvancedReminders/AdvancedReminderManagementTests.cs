@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans;
 using Orleans.AdvancedReminders;
@@ -660,6 +661,34 @@ public class ReminderManagementGrainTests
     }
 
     [Fact]
+    public async Task UpcomingAsync_ExcludesOverdueReminders()
+    {
+        var now = new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero);
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "overdue"),
+                ReminderName = "overdue",
+                StartAt = now.UtcDateTime.AddMinutes(-1),
+                NextDueUtc = now.UtcDateTime.AddMinutes(-1),
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "upcoming"),
+                ReminderName = "upcoming",
+                StartAt = now.UtcDateTime.AddMinutes(1),
+                NextDueUtc = now.UtcDateTime.AddMinutes(1),
+                Period = TimeSpan.FromMinutes(1),
+            });
+        var grain = new ReminderManagementGrain(table, new FakeTimeProvider(now));
+
+        var reminders = (await grain.UpcomingAsync(TimeSpan.FromMinutes(5))).ToArray();
+
+        Assert.Equal("upcoming", Assert.Single(reminders).ReminderName);
+    }
+
+    [Fact]
     public async Task UpcomingAsync_NegativeHorizon_Throws()
     {
         var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
@@ -676,6 +705,17 @@ public class ReminderManagementGrainTests
 
         var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: 0));
+
+        Assert.Equal("pageSize", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_WithExcessivePageSize_Throws()
+    {
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: int.MaxValue));
 
         Assert.Equal("pageSize", exception.ParamName);
     }

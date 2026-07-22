@@ -9,6 +9,7 @@ internal partial class CosmosReminderTable : IReminderTable
 {
     private const HttpStatusCode TooManyRequests = (HttpStatusCode)429;
     private const string PARTITION_KEY_PATH = "/PartitionKey";
+    private static readonly SemaphoreSlim EmulatorResourceCreationLock = new(1, 1);
     private readonly CosmosReminderTableOptions _options;
     private readonly ClusterOptions _clusterOptions;
     private readonly ILogger _logger;
@@ -32,7 +33,9 @@ internal partial class CosmosReminderTable : IReminderTable
         _executor = options.Value.OperationExecutor;
     }
 
-    public async Task Init()
+    public Task Init() => StartAsync(CancellationToken.None);
+
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         var stopWatch = Stopwatch.StartNew();
 
@@ -40,16 +43,16 @@ internal partial class CosmosReminderTable : IReminderTable
         {
             LogDebugInitializingCosmosReminderTable(_clusterOptions.ServiceId, _options.ContainerName);
 
-            await InitializeCosmosClient();
+            await InitializeCosmosClient(cancellationToken);
 
             if (_options.IsResourceCreationEnabled)
             {
                 if (_options.CleanResourcesOnInitialization)
                 {
-                    await TryDeleteDatabase();
+                    await TryDeleteDatabase(cancellationToken);
                 }
 
-                await TryCreateCosmosResources();
+                await TryCreateCosmosResources(cancellationToken);
             }
 
             _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
@@ -57,6 +60,10 @@ internal partial class CosmosReminderTable : IReminderTable
             stopWatch.Stop();
 
             LogTraceInitializingCosmosReminderTableTook(stopWatch.ElapsedMilliseconds);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exc)
         {
@@ -280,11 +287,15 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    private async Task InitializeCosmosClient()
+    private async Task InitializeCosmosClient(CancellationToken cancellationToken)
     {
         try
         {
-            _client = await _options.CreateClient!(_serviceProvider).ConfigureAwait(false);
+            _client = await _options.CreateClient!(_serviceProvider).AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -294,15 +305,19 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    private async Task TryDeleteDatabase()
+    private async Task TryDeleteDatabase(CancellationToken cancellationToken)
     {
         try
         {
-            await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
         {
             return;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -312,30 +327,58 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    private async Task TryCreateCosmosResources()
+    private async Task TryCreateCosmosResources(CancellationToken cancellationToken)
     {
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput).ConfigureAwait(false);
+        if (_client.Endpoint.IsLoopback)
+        {
+            await EmulatorResourceCreationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await TryCreateCosmosResourcesCore(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                EmulatorResourceCreationLock.Release();
+            }
+
+            return;
+        }
+
+        await TryCreateCosmosResourcesCore(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task TryCreateCosmosResourcesCore(CancellationToken cancellationToken)
+    {
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(
+            _options.DatabaseName,
+            _options.DatabaseThroughput,
+            requestOptions: null,
+            cancellationToken).ConfigureAwait(false);
         var db = dbResponse.Database;
 
         var remindersCollection = new ContainerProperties(_options.ContainerName, PARTITION_KEY_PATH);
 
         remindersCollection.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         remindersCollection.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
-        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartAt/*" });
-        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Period/*" });
+        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartAt/?" });
+        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Period/?" });
         remindersCollection.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
 
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
-            var collResponse = await db.CreateContainerIfNotExistsAsync(remindersCollection, _options.ContainerThroughputProperties).ConfigureAwait(false);
+            var collResponse = await db.CreateContainerIfNotExistsAsync(
+                remindersCollection,
+                _options.ContainerThroughputProperties,
+                requestOptions: null,
+                cancellationToken).ConfigureAwait(false);
 
             if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || collResponse.StatusCode == HttpStatusCode.Created)
             {
                 break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
             }
 
-            await Task.Delay(1000);
+            await Task.Delay(1000, cancellationToken);
         }
     }
 

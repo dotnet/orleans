@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Amazon.Runtime.CredentialManagement;
 
@@ -104,7 +105,13 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
         /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        public async Task InitializeTable(
+            string tableName,
+            List<KeySchemaElement> keys,
+            List<AttributeDefinition> attributes,
+            List<GlobalSecondaryIndex> secondaryIndexes = null,
+            string ttlAttributeName = null,
+            CancellationToken cancellationToken = default)
         {
             if (!this._createIfNotExists && !this._updateIfExists)
             {
@@ -114,10 +121,10 @@ namespace Orleans.Transactions.DynamoDB
 
             try
             {
-                TableDescription tableDescription = await GetTableDescription(tableName);
+                TableDescription tableDescription = await GetTableDescription(tableName, cancellationToken);
                 await (tableDescription == null
-                    ? CreateTableAsync(tableName, keys, attributes, secondaryIndexes, ttlAttributeName)
-                    : UpdateTableAsync(tableDescription, attributes, secondaryIndexes, ttlAttributeName));
+                    ? CreateTableAsync(tableName, keys, attributes, secondaryIndexes, ttlAttributeName, cancellationToken)
+                    : UpdateTableAsync(tableDescription, attributes, secondaryIndexes, ttlAttributeName, cancellationToken));
             }
             catch (Exception exc)
             {
@@ -173,11 +180,11 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        private async Task<TableDescription> GetTableDescription(string tableName)
+        private async Task<TableDescription> GetTableDescription(string tableName, CancellationToken cancellationToken = default)
         {
             try
             {
-                var description = await _ddbClient.DescribeTableAsync(tableName);
+                var description = await _ddbClient.DescribeTableAsync(tableName, cancellationToken);
                 if (description.Table != null)
                     return description.Table;
             }
@@ -188,7 +195,13 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async ValueTask CreateTableAsync(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        private async ValueTask CreateTableAsync(
+            string tableName,
+            List<KeySchemaElement> keys,
+            List<AttributeDefinition> attributes,
+            List<GlobalSecondaryIndex> secondaryIndexes,
+            string ttlAttributeName,
+            CancellationToken cancellationToken)
         {
             if (!_createIfNotExists)
             {
@@ -222,15 +235,15 @@ namespace Orleans.Transactions.DynamoDB
             {
                 try
                 {
-                    await _ddbClient.CreateTableAsync(request);
+                    await _ddbClient.CreateTableAsync(request, cancellationToken);
                 }
                 catch (ResourceInUseException)
                 {
                     // The table has already been created.
                 }
 
-                TableDescription tableDescription = await TableWaitOnStatusAsync(tableName, TableStatus.CREATING, TableStatus.ACTIVE);
-                tableDescription = await TableUpdateTtlAsync(tableDescription, ttlAttributeName);
+                TableDescription tableDescription = await TableWaitOnStatusAsync(tableName, TableStatus.CREATING, TableStatus.ACTIVE, cancellationToken);
+                tableDescription = await TableUpdateTtlAsync(tableDescription, ttlAttributeName, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -239,7 +252,12 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        private async ValueTask UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        private async ValueTask UpdateTableAsync(
+            TableDescription tableDescription,
+            List<AttributeDefinition> attributes,
+            List<GlobalSecondaryIndex> secondaryIndexes,
+            string ttlAttributeName,
+            CancellationToken cancellationToken)
         {
             if (!this._updateIfExists)
             {
@@ -255,7 +273,7 @@ namespace Orleans.Transactions.DynamoDB
             if (tableDescription.TableStatus == TableStatus.CREATING
                 || tableDescription.TableStatus == TableStatus.UPDATING)
             {
-                tableDescription = await TableWaitOnStatusAsync(tableDescription.TableName, tableDescription.TableStatus, TableStatus.ACTIVE);
+                tableDescription = await TableWaitOnStatusAsync(tableDescription.TableName, tableDescription.TableStatus, TableStatus.ACTIVE, cancellationToken);
             }
 
             var request = new UpdateTableRequest
@@ -282,11 +300,11 @@ namespace Orleans.Transactions.DynamoDB
                     || (request.ProvisionedThroughput?.WriteCapacityUnits ?? 0) != tableDescription.ProvisionedThroughput?.WriteCapacityUnits   // PROVISIONED Throughput write capacity change
                     || (tableDescription.ProvisionedThroughput?.ReadCapacityUnits != 0 && tableDescription.ProvisionedThroughput?.WriteCapacityUnits != 0 && this._useProvisionedThroughput == false /* from PROVISIONED to PAY_PER_REQUEST */))
                 {
-                    await _ddbClient.UpdateTableAsync(request);
-                    tableDescription = await TableWaitOnStatusAsync(tableDescription.TableName, TableStatus.UPDATING, TableStatus.ACTIVE);
+                    await _ddbClient.UpdateTableAsync(request, cancellationToken);
+                    tableDescription = await TableWaitOnStatusAsync(tableDescription.TableName, TableStatus.UPDATING, TableStatus.ACTIVE, cancellationToken);
                 }
 
-                tableDescription = await TableUpdateTtlAsync(tableDescription, ttlAttributeName);
+                tableDescription = await TableUpdateTtlAsync(tableDescription, ttlAttributeName, cancellationToken);
 
                 // Wait for all table indexes to become ACTIVE.
                 // We can only have one GSI in CREATING state at one time.
@@ -299,7 +317,12 @@ namespace Orleans.Transactions.DynamoDB
                         if (globalSecondaryIndex.IndexStatus == IndexStatus.CREATING
                             || globalSecondaryIndex.IndexStatus == IndexStatus.UPDATING)
                         {
-                            tableDescription = await TableIndexWaitOnStatusAsync(tableDescription.TableName, globalSecondaryIndex.IndexName, globalSecondaryIndex.IndexStatus, IndexStatus.ACTIVE);
+                            tableDescription = await TableIndexWaitOnStatusAsync(
+                                tableDescription.TableName,
+                                globalSecondaryIndex.IndexName,
+                                globalSecondaryIndex.IndexStatus,
+                                IndexStatus.ACTIVE,
+                                cancellationToken);
                         }
                     }
                 }
@@ -309,7 +332,7 @@ namespace Orleans.Transactions.DynamoDB
 
                 foreach (var secondaryIndex in secondaryIndexesToCreate)
                 {
-                    await TableCreateSecondaryIndex(tableDescription.TableName, attributes, secondaryIndex);
+                    await TableCreateSecondaryIndex(tableDescription.TableName, attributes, secondaryIndex, cancellationToken);
                 }
             }
             catch (Exception exc)
@@ -319,7 +342,11 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        private async Task TableCreateSecondaryIndex(string tableName, List<AttributeDefinition> attributes, GlobalSecondaryIndex secondaryIndex)
+        private async Task TableCreateSecondaryIndex(
+            string tableName,
+            List<AttributeDefinition> attributes,
+            GlobalSecondaryIndex secondaryIndex,
+            CancellationToken cancellationToken)
         {
             await _ddbClient.UpdateTableAsync(new UpdateTableRequest
             {
@@ -338,21 +365,24 @@ namespace Orleans.Transactions.DynamoDB
                     }
                 },
                 AttributeDefinitions = attributes
-            });
+            }, cancellationToken);
 
             // Adding a GSI to a table is an eventually consistent operation and we might miss the table UPDATING status if we query the table status imediatelly after the table update call.
             // Creating a GSI takes significantly longer than 1 second and therefore this delay does not add time to the total duration of this method.
-            await Task.Delay(1000);
+            await Task.Delay(1000, cancellationToken);
 
             // When adding a GSI, the table briefly changes its status to UPDATING. The GSI creation process usually takes longer.
             // For this reason, we will wait for both the table and the index to become ACTIVE before marking the operation as complete.
-            await TableWaitOnStatusAsync(tableName, TableStatus.UPDATING, TableStatus.ACTIVE);
-            await TableIndexWaitOnStatusAsync(tableName, secondaryIndex.IndexName, IndexStatus.CREATING, IndexStatus.ACTIVE);
+            await TableWaitOnStatusAsync(tableName, TableStatus.UPDATING, TableStatus.ACTIVE, cancellationToken);
+            await TableIndexWaitOnStatusAsync(tableName, secondaryIndex.IndexName, IndexStatus.CREATING, IndexStatus.ACTIVE, cancellationToken);
         }
 
-        private async ValueTask<TableDescription> TableUpdateTtlAsync(TableDescription tableDescription, string ttlAttributeName)
+        private async ValueTask<TableDescription> TableUpdateTtlAsync(
+            TableDescription tableDescription,
+            string ttlAttributeName,
+            CancellationToken cancellationToken)
         {
-            var describeTimeToLive = (await _ddbClient.DescribeTimeToLiveAsync(tableDescription.TableName)).TimeToLiveDescription;
+            var describeTimeToLive = (await _ddbClient.DescribeTimeToLiveAsync(tableDescription.TableName, cancellationToken)).TimeToLiveDescription;
 
             // We can only handle updates to the table TTL from DISABLED to ENABLED.
             // This is because updating the TTL attribute requires (1) disabling the table TTL and (2) re-enabling it with the new TTL attribute.
@@ -376,9 +406,9 @@ namespace Orleans.Transactions.DynamoDB
                 {
                     TableName = tableDescription.TableName,
                     TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
-                });
+                }, cancellationToken);
 
-                return await TableWaitOnStatusAsync(tableDescription.TableName, TableStatus.UPDATING, TableStatus.ACTIVE);
+                return await TableWaitOnStatusAsync(tableDescription.TableName, TableStatus.UPDATING, TableStatus.ACTIVE, cancellationToken);
             }
             catch (AmazonDynamoDBException ddbEx)
             {
@@ -390,7 +420,12 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        private async Task<TableDescription> TableWaitOnStatusAsync(string tableName, TableStatus whileStatus, TableStatus desiredStatus, int delay = 2000)
+        private async Task<TableDescription> TableWaitOnStatusAsync(
+            string tableName,
+            TableStatus whileStatus,
+            TableStatus desiredStatus,
+            CancellationToken cancellationToken,
+            int delay = 2000)
         {
             TableDescription ret = null;
 
@@ -398,10 +433,10 @@ namespace Orleans.Transactions.DynamoDB
             {
                 if (ret != null)
                 {
-                    await Task.Delay(delay);
+                    await Task.Delay(delay, cancellationToken);
                 }
 
-                ret = await GetTableDescription(tableName);
+                ret = await GetTableDescription(tableName, cancellationToken);
             } while (ret.TableStatus == whileStatus);
 
             if (ret.TableStatus != desiredStatus)
@@ -412,7 +447,13 @@ namespace Orleans.Transactions.DynamoDB
             return ret;
         }
 
-        private async Task<TableDescription> TableIndexWaitOnStatusAsync(string tableName, string indexName, IndexStatus whileStatus, IndexStatus desiredStatus = null, int delay = 2000)
+        private async Task<TableDescription> TableIndexWaitOnStatusAsync(
+            string tableName,
+            string indexName,
+            IndexStatus whileStatus,
+            IndexStatus desiredStatus,
+            CancellationToken cancellationToken,
+            int delay = 2000)
         {
             TableDescription ret;
             GlobalSecondaryIndexDescription index = null;
@@ -421,10 +462,10 @@ namespace Orleans.Transactions.DynamoDB
             {
                 if (index != null)
                 {
-                    await Task.Delay(delay);
+                    await Task.Delay(delay, cancellationToken);
                 }
 
-                ret = await GetTableDescription(tableName);
+                ret = await GetTableDescription(tableName, cancellationToken);
                 index = ret.GlobalSecondaryIndexes?.Find(index => index.IndexName == indexName);
             } while (index != null && index.IndexStatus == whileStatus);
 

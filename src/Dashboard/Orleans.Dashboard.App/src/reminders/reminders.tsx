@@ -10,6 +10,7 @@ interface Reminder {
 
 interface RemindersData {
   count: number;
+  hasMore?: boolean;
   reminders: Reminder[];
 }
 
@@ -31,23 +32,22 @@ export default class Reminders extends React.Component<RemindersProps> {
     const totalPages = Math.ceil(this.props.remindersData.count / 50);
     const showFirst = this.props.page > 2;
     const showPrevious = this.props.page > 1;
-    const showNext = totalPages > this.props.page;
-    const showLast = totalPages > this.props.page + 1;
+    const showNext = isAdvanced
+      ? this.props.remindersData.hasMore === true
+      : totalPages > this.props.page;
     return (
       <div>
-        <div className="row">
-          <div className="col-md-12">
-            <CounterWidget
-              icon="calendar"
-              counter={this.props.remindersData.count}
-              title={
-                isAdvanced
-                  ? 'Advanced Reminders Count'
-                  : 'Classic Reminders Count'
-              }
-            />
+        {!isAdvanced ? (
+          <div className="row">
+            <div className="col-md-12">
+              <CounterWidget
+                icon="calendar"
+                counter={this.props.remindersData.count}
+                title="Classic Reminders Count"
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
         <div className="card reminder-table-switch">
           <div className="card-body">
             <div className="btn-group" role="group" aria-label="Reminder table">
@@ -81,7 +81,7 @@ export default class Reminders extends React.Component<RemindersProps> {
             <ReminderTable data={this.props.remindersData.reminders} />
           </Panel>
         )}
-        {totalPages > 1 ? (
+        {showPrevious || showNext ? (
           <div className="card">
             <div className="card-body">
               <div style={{ textAlign: 'center' }}>
@@ -109,15 +109,6 @@ export default class Reminders extends React.Component<RemindersProps> {
                     href={this.getPageHref(this.props.page + 1)}
                   >
                     Next <i className="fa fa-arrow-circle-right" />
-                  </a>
-                ) : null}
-                <span> </span>
-                {showLast ? (
-                  <a
-                    className="btn btn-default bg-purple"
-                    href={this.getPageHref(totalPages)}
-                  >
-                    Last <i className="fa fa-arrow-circle-right" />
                   </a>
                 ) : null}
               </div>

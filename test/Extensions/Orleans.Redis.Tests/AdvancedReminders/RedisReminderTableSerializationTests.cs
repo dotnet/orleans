@@ -4,10 +4,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using NSubstitute;
 using Orleans.AdvancedReminders.Redis;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -23,6 +26,42 @@ namespace Tester.Redis.AdvancedReminders;
 [TestCategory("Redis"), TestCategory("Reminders")]
 public class RedisReminderTableSerializationTests
 {
+    [Fact]
+    public async Task StartAsync_WhenConnectionCreationOutlivesCancellation_DisposesLateOwnedMultiplexer()
+    {
+        var creation = new TaskCompletionSource<(IConnectionMultiplexer Multiplexer, bool IsShared)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var multiplexer = Substitute.For<IConnectionMultiplexer>();
+        var options = Options.Create(new AdvancedRedisReminderTableOptions
+        {
+            CreateMultiplexer = _ => creation.Task,
+        });
+        var clusterOptions = Options.Create(new ClusterOptions
+        {
+            ServiceId = "test-service",
+            ClusterId = "test-cluster",
+        });
+        var table = new RedisReminderTable(
+            NullLogger<RedisReminderTable>.Instance,
+            clusterOptions,
+            options);
+        using var cancellation = new CancellationTokenSource();
+
+        var startTask = table.StartAsync(cancellation.Token);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => startTask);
+
+        creation.SetResult((multiplexer, IsShared: false));
+        for (var attempt = 0; attempt < 100
+            && !multiplexer.ReceivedCalls().Any(call => call.GetMethodInfo().Name == nameof(IAsyncDisposable.DisposeAsync));
+            attempt++)
+        {
+            await Task.Yield();
+        }
+
+        await multiplexer.Received(1).DisposeAsync();
+    }
+
     [Fact]
     public void ConvertFromEntry_WritesPriorityAndActionAsNumbers()
     {

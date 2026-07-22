@@ -14,6 +14,8 @@ namespace Orleans.Hosting;
 /// </summary>
 public sealed class DurableJobsOptions
 {
+    private static readonly Func<IJobRunContext, Exception, DateTimeOffset?> DefaultShouldRetryPolicy = DefaultShouldRetry;
+
     /// <summary>
     /// Gets or sets the duration of each job shard. Smaller values reduce latency but increase overhead.
     /// For optimal alignment with hour boundaries, choose durations that evenly divide 60 minutes
@@ -83,9 +85,10 @@ public sealed class DurableJobsOptions
     /// Gets or sets the function that determines whether a failed job should be retried and when.
     /// The function receives the job context and the exception that caused the failure, and returns
     /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.
-    /// Default: Retry up to 5 times with exponential backoff (2^n seconds).
+    /// Default: Make up to 5 total attempts (the initial attempt plus up to 4 retries)
+    /// with exponential backoff (2^n seconds).
     /// </summary>
-    public Func<IJobRunContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
+    public Func<IJobRunContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetryPolicy;
 
     /// <summary>
     /// Gets or sets the maximum amount of time the shard operation processor will wait for
@@ -101,10 +104,10 @@ public sealed class DurableJobsOptions
     public TimeSpan ShardBatchLingerDelay { get; set; } = TimeSpan.Zero;
 
     /// <summary>
-    /// Gets or sets the maximum number of times a shard can be adopted from a dead owner before
-    /// being marked as poisoned. A shard that repeatedly causes silos to crash will exceed this
-    /// threshold as it bounces between owners. When the next adoption would cause the adopted count
-    /// to exceed this value, the shard is considered poisoned and will no longer be assigned to any silo.
+    /// Gets or sets the maximum number of times a shard can be adopted from a dead owner within
+    /// <see cref="AdoptionFailureWindow"/> before being quarantined as poisoned. A shard that repeatedly
+    /// causes silos to crash will exceed this threshold as it bounces between owners. Poisoned shards
+    /// become eligible for a fresh recovery attempt after the failure window elapses.
     /// Default: 3.
     /// </summary>
     /// <remarks>
@@ -117,6 +120,14 @@ public sealed class DurableJobsOptions
     /// </para>
     /// </remarks>
     public int MaxAdoptedCount { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the rolling window used to count repeated shard adoptions from failed silos.
+    /// Adoptions separated by more than this duration start a new count. A poisoned shard is
+    /// quarantined for this duration and then becomes eligible for recovery.
+    /// Default: 15 minutes.
+    /// </summary>
+    public TimeSpan AdoptionFailureWindow { get; set; } = TimeSpan.FromMinutes(15);
 
     /// <summary>
     /// Gets or sets the maximum number of orphaned shards a silo may claim immediately
@@ -164,14 +175,22 @@ public sealed class DurableJobsOptions
     public TimeSpan ShardClaimRampUpDuration { get; set; } = TimeSpan.FromMinutes(5);
 
     private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, Exception ex)
+        => DefaultShouldRetry(jobContext, DateTimeOffset.UtcNow);
+
+    internal DateTimeOffset? GetRetryTime(IJobRunContext jobContext, Exception exception, TimeProvider timeProvider)
+        => ReferenceEquals(ShouldRetry, DefaultShouldRetryPolicy)
+            ? DefaultShouldRetry(jobContext, timeProvider.GetUtcNow())
+            : ShouldRetry(jobContext, exception);
+
+    private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, DateTimeOffset now)
     {
-        // Default retry logic: retry up to 5 times with exponential backoff
+        // Default retry logic: make up to 5 total attempts with exponential backoff.
         if (jobContext.DequeueCount >= 5)
         {
             return null;
         }
         var delay = TimeSpan.FromSeconds(Math.Pow(2, jobContext.DequeueCount));
-        return DateTimeOffset.UtcNow.Add(delay);
+        return DateTimeOffset.MaxValue - now <= delay ? DateTimeOffset.MaxValue : now.Add(delay);
     }
 }
 
@@ -193,6 +212,10 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
         }
+        if (options.ShardActivationBufferPeriod < TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardActivationBufferPeriod must be non-negative.");
+        }
         if (options.ShardStripeCount <= 0)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be greater than zero.");
@@ -204,6 +227,14 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         if (options.JobStatusPollInterval <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.JobStatusPollInterval must be greater than zero.");
+        }
+        if (options.MaxConcurrentJobsPerSilo <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxConcurrentJobsPerSilo must be greater than zero.");
+        }
+        if (options.OverloadBackoffDelay <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.OverloadBackoffDelay must be greater than zero.");
         }
         if (options.ShouldRetry is null)
         {
@@ -225,9 +256,21 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         {
             throw new OrleansConfigurationException("DurableJobsOptions.MaxAdoptedCount must be greater than or equal to zero.");
         }
+        if (options.AdoptionFailureWindow <= TimeSpan.Zero || options.AdoptionFailureWindow > DurableJobTimeLimits.MaximumTimerDelay)
+        {
+            throw new OrleansConfigurationException($"DurableJobsOptions.AdoptionFailureWindow must be greater than zero and no greater than {DurableJobTimeLimits.MaximumTimerDelay}.");
+        }
         if (options.ShardBatchLingerDelay < TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardBatchLingerDelay must be non-negative.");
+        }
+        if (options.ShardActivationBufferPeriod > DurableJobTimeLimits.MaximumTimerDelay
+            || options.JobStatusPollInterval > DurableJobTimeLimits.MaximumTimerDelay
+            || options.OverloadBackoffDelay > DurableJobTimeLimits.MaximumTimerDelay
+            || options.ShardBatchLingerDelay > DurableJobTimeLimits.MaximumTimerDelay
+            || (options.ConcurrencySlowStartEnabled && options.SlowStartInterval > DurableJobTimeLimits.MaximumTimerDelay))
+        {
+            throw new OrleansConfigurationException($"DurableJobs timer intervals must be no greater than {DurableJobTimeLimits.MaximumTimerDelay}.");
         }
         if (options.ShardClaimInitialBudget < 0)
         {
