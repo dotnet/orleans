@@ -95,6 +95,27 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Rem_Grain_CanRestartBeforeRemovedReminderIsPurged()
+        {
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+
+            await grain.StartReminder(DR);
+            await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 1, cts.Token);
+
+            var unregisteredTask = observer.WaitForReminderUnregisteredAsync(grainId, DR, cts.Token);
+            await grain.StopReminder(DR);
+            await unregisteredTask;
+
+            await grain.StartReminder(DR);
+            var restartedCount = await WaitForAdditionalReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 1, cts.Token);
+            Assert.Equal(1, restartedCount);
+
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cts.Token);
+        }
+
+        [Fact]
         public async Task Rem_Grain_LongPeriod()
         {
             using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
