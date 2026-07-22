@@ -31,4 +31,17 @@ public class DynamoDBReminderStorageOptionsExtensionsTests
         Assert.False(options.CreateIfNotExists);
         Assert.False(options.UpdateIfExists);
     }
+
+    [Fact]
+    public void ParseConnectionString_PreservesEqualsCharactersInCredentials()
+    {
+        const string secretKey = "c2VjcmV0PT0=";
+        const string accessKey = "YWNjZXNzPQ==";
+        var options = new DynamoDBReminderStorageOptions();
+
+        options.ParseConnectionString($"SecretKey={secretKey};AccessKey={accessKey}");
+
+        Assert.Equal(secretKey, options.SecretKey);
+        Assert.Equal(accessKey, options.AccessKey);
+    }
 }
