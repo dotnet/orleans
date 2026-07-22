@@ -433,12 +433,10 @@ function showReminders(reminderKind: 'classic' | 'advanced', page?: string) {
   renderLoading();
 
   let remindersData = { count: 0, reminders: [] };
-  let pageNum: number;
-  if (page) {
-    pageNum = parseInt(page);
-  } else {
-    pageNum = 1;
-  }
+  const parsedPage = Number(page);
+  const pageNum = Number.isSafeInteger(parsedPage) && parsedPage > 0
+    ? parsedPage
+    : 1;
 
   const renderReminders = function () {
     if (routeIndex != thisRouteIndex) return;
