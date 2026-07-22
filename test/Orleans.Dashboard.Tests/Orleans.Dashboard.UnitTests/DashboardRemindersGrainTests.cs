@@ -79,13 +79,21 @@ public sealed class DashboardRemindersGrainTests
                     LastFireUtc = lastFire,
                     Priority = ReminderPriority.High,
                     Action = MissedReminderAction.FireImmediately,
+                },
+                new AdvancedReminderEntry
+                {
+                    GrainId = GrainId.Create("advanced-grain", "utc-key"),
+                    ReminderName = "advanced-utc-reminder",
+                    StartAt = startAt,
+                    CronExpression = "0 * * * * *",
+                    NextDueUtc = nextDue,
                 }));
         var grain = new DashboardRemindersGrain(serviceProvider);
 
         var response = (await grain.GetAdvancedReminders(1, 50)).Value;
 
-        Assert.Equal(1, response.Count);
-        var advanced = Assert.Single(response.Reminders);
+        Assert.Equal(2, response.Count);
+        var advanced = Assert.Single(response.Reminders, reminder => reminder.Name == "advanced-reminder");
         Assert.Equal("advanced-reminder", advanced.Name);
         Assert.Equal("0 */5 * * * *", advanced.CronExpression);
         Assert.Equal("Europe/Paris", advanced.CronTimeZoneId);
@@ -93,6 +101,10 @@ public sealed class DashboardRemindersGrainTests
         Assert.Equal(lastFire, advanced.LastFireUtc);
         Assert.Equal("High", advanced.Priority);
         Assert.Equal("FireImmediately", advanced.MissedAction);
+
+        var utc = Assert.Single(response.Reminders, reminder => reminder.Name == "advanced-utc-reminder");
+        Assert.Equal("0 * * * * *", utc.CronExpression);
+        Assert.Empty(utc.CronTimeZoneId);
     }
 
     [Fact]
