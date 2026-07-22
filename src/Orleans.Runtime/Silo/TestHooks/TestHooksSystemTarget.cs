@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
 using Orleans.Statistics;
@@ -125,6 +126,21 @@ namespace Orleans.Runtime.TestHooks
             finally
             {
                 this.siloStatusOracle.UnSubscribeFromSiloStatusEvents(listener);
+            }
+        }
+
+        public async Task<bool> WaitForGrainDirectoryMembershipVersion(TimeSpan timeout)
+        {
+            var membershipVersion = this.serviceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Version;
+            var grainDirectory = this.serviceProvider.GetRequiredService<LocalGrainDirectory>();
+            try
+            {
+                await grainDirectory.WaitForMembershipVersion(membershipVersion).WaitAsync(timeout);
+                return true;
+            }
+            catch (TimeoutException)
+            {
+                return false;
             }
         }
 

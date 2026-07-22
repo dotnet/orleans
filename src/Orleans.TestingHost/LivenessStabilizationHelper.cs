@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Core.Diagnostics;
@@ -21,16 +20,12 @@ internal static class LivenessStabilizationHelper
     {
         ArgumentNullException.ThrowIfNull(gatewayManager);
 
-        var stopwatch = Stopwatch.StartNew();
         if (!await WaitForExpectedActiveSilosAsync(activeSilos, testHooks, timeout))
         {
             return false;
         }
 
-        var remaining = timeout - stopwatch.Elapsed;
-        return remaining <= TimeSpan.Zero
-            ? ActiveGatewaysMatch(gatewayManager, activeSilos)
-            : await WaitForExpectedActiveGatewaysAsync(activeSilos, gatewayManager, remaining);
+        return await WaitForExpectedActiveGatewaysAsync(activeSilos, gatewayManager, timeout);
     }
 
     public static async Task<bool> WaitForExpectedActiveSilosAsync(
@@ -43,7 +38,6 @@ internal static class LivenessStabilizationHelper
 
         if (activeSilos.Count == 0)
         {
-            await Task.Delay(timeout);
             return false;
         }
 
@@ -52,6 +46,13 @@ internal static class LivenessStabilizationHelper
         {
             var waitTasks = testHooks.Select(hooks => hooks.WaitForActiveSilos(expectedActiveSilos, timeout));
             var results = await Task.WhenAll(waitTasks).WaitAsync(timeout);
+            if (!results.All(static result => result))
+            {
+                return false;
+            }
+
+            waitTasks = testHooks.Select(hooks => hooks.WaitForGrainDirectoryMembershipVersion(timeout));
+            results = await Task.WhenAll(waitTasks).WaitAsync(timeout);
             return results.All(static result => result);
         }
         catch (TimeoutException)
@@ -95,11 +96,6 @@ internal static class LivenessStabilizationHelper
         {
             return GatewaysMatch(gatewayManager.GetLiveGateways(), expectedGateways);
         }
-    }
-
-    private static bool ActiveGatewaysMatch(GatewayManager gatewayManager, IReadOnlyCollection<SiloHandle> activeSilos)
-    {
-        return GatewaysMatch(gatewayManager.GetLiveGateways(), GetExpectedGatewayAddresses(activeSilos));
     }
 
     private static HashSet<SiloAddress> GetExpectedGatewayAddresses(IReadOnlyCollection<SiloHandle> activeSilos)

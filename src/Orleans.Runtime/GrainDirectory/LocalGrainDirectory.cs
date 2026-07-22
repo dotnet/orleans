@@ -27,8 +27,11 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IServiceProvider _serviceProvider;
         private readonly DirectoryInstruments _directoryInstruments;
         private readonly CancellationTokenSource _membershipUpdatesCancellation = new();
+        private readonly object membershipVersionAppliedLock = new();
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
         private ClusterMembershipSnapshot appliedClusterMembershipSnapshot = ClusterMembershipSnapshot.Default;
+        private MembershipVersion lastAppliedMembershipVersion = MembershipVersion.MinValue;
+        private TaskCompletionSource membershipVersionApplied = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private GrainDirectoryResolver? grainDirectoryResolver;
         private bool hasAppliedClusterMembershipSnapshot;
 
@@ -213,6 +216,25 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+        internal async Task WaitForMembershipVersion(MembershipVersion targetVersion)
+        {
+            while (true)
+            {
+                Task versionApplied;
+                lock (membershipVersionAppliedLock)
+                {
+                    if (lastAppliedMembershipVersion >= targetVersion)
+                    {
+                        return;
+                    }
+
+                    versionApplied = membershipVersionApplied.Task;
+                }
+
+                await versionApplied;
+            }
+        }
+
         private Task ApplyMembershipSnapshot()
         {
             return CacheValidator.RunOrQueueTask(() =>
@@ -259,6 +281,16 @@ namespace Orleans.Runtime.GrainDirectory
 
                 appliedClusterMembershipSnapshot = snapshot;
                 hasAppliedClusterMembershipSnapshot = true;
+
+                TaskCompletionSource versionApplied;
+                lock (membershipVersionAppliedLock)
+                {
+                    lastAppliedMembershipVersion = snapshot.Version;
+                    versionApplied = membershipVersionApplied;
+                    membershipVersionApplied = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+
+                versionApplied.TrySetResult();
             }
         }
 
