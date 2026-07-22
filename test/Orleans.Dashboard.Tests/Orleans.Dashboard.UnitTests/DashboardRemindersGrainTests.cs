@@ -58,7 +58,7 @@ public sealed class DashboardRemindersGrainTests
     }
 
     [Fact]
-    public async Task GetAdvancedReminders_ReturnsScheduleDetails()
+    public async Task GetAdvancedReminders_ReturnsCronScheduleWithTimeZone()
     {
         var startAt = new DateTime(2026, 7, 22, 10, 0, 0, DateTimeKind.Utc);
         var nextDue = startAt.AddHours(1);
@@ -79,7 +79,30 @@ public sealed class DashboardRemindersGrainTests
                     LastFireUtc = lastFire,
                     Priority = ReminderPriority.High,
                     Action = MissedReminderAction.FireImmediately,
-                },
+                }));
+        var grain = new DashboardRemindersGrain(serviceProvider);
+
+        var response = (await grain.GetAdvancedReminders(1, 50)).Value;
+
+        Assert.Equal(1, response.Count);
+        var advanced = Assert.Single(response.Reminders);
+        Assert.Equal("advanced-reminder", advanced.Name);
+        Assert.Equal("0 */5 * * * *", advanced.CronExpression);
+        Assert.Equal("Europe/Paris", advanced.CronTimeZoneId);
+        Assert.Equal(nextDue, advanced.NextDueUtc);
+        Assert.Equal(lastFire, advanced.LastFireUtc);
+        Assert.Equal("High", advanced.Priority);
+        Assert.Equal("FireImmediately", advanced.MissedAction);
+    }
+
+    [Fact]
+    public async Task GetAdvancedReminders_ReturnsCronScheduleWithoutTimeZoneAsUtcDefault()
+    {
+        var startAt = new DateTime(2026, 7, 22, 10, 0, 0, DateTimeKind.Utc);
+        var nextDue = startAt.AddHours(1);
+        var serviceProvider = new ReminderServiceProvider(
+            new ClassicReminderTableStub(),
+            new AdvancedReminderTableStub(
                 new AdvancedReminderEntry
                 {
                     GrainId = GrainId.Create("advanced-grain", "utc-key"),
@@ -92,19 +115,12 @@ public sealed class DashboardRemindersGrainTests
 
         var response = (await grain.GetAdvancedReminders(1, 50)).Value;
 
-        Assert.Equal(2, response.Count);
-        var advanced = Assert.Single(response.Reminders, reminder => reminder.Name == "advanced-reminder");
-        Assert.Equal("advanced-reminder", advanced.Name);
-        Assert.Equal("0 */5 * * * *", advanced.CronExpression);
-        Assert.Equal("Europe/Paris", advanced.CronTimeZoneId);
-        Assert.Equal(nextDue, advanced.NextDueUtc);
-        Assert.Equal(lastFire, advanced.LastFireUtc);
-        Assert.Equal("High", advanced.Priority);
-        Assert.Equal("FireImmediately", advanced.MissedAction);
-
-        var utc = Assert.Single(response.Reminders, reminder => reminder.Name == "advanced-utc-reminder");
+        Assert.Equal(1, response.Count);
+        var utc = Assert.Single(response.Reminders);
+        Assert.Equal("advanced-utc-reminder", utc.Name);
         Assert.Equal("0 * * * * *", utc.CronExpression);
         Assert.Empty(utc.CronTimeZoneId);
+        Assert.Equal(nextDue, utc.NextDueUtc);
     }
 
     [Fact]
