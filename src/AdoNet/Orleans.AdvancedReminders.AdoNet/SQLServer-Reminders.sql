@@ -32,7 +32,7 @@ END;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'UpsertReminderRowKey',
+	'AdvancedRemindersUpsertReminderRowKey',
 	'DECLARE @Version AS INT = 0;
 	SET XACT_ABORT, NOCOUNT ON;
 	BEGIN TRANSACTION;
@@ -92,12 +92,12 @@ WHERE NOT EXISTS
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'UpsertReminderRowKey'
+    WHERE oqt.[QueryKey] = 'AdvancedRemindersUpsertReminderRowKey'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'ReadReminderRowsKey',
+	'AdvancedRemindersReadReminderRowsKey',
 	'SELECT
 		GrainId,
 		ReminderName,
@@ -119,12 +119,12 @@ WHERE NOT EXISTS
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'ReadReminderRowsKey'
+    WHERE oqt.[QueryKey] = 'AdvancedRemindersReadReminderRowsKey'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'ReadReminderRowKey',
+	'AdvancedRemindersReadReminderRowKey',
 	'SELECT
 		GrainId,
 		ReminderName,
@@ -147,12 +147,12 @@ WHERE NOT EXISTS
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'ReadReminderRowKey'
+    WHERE oqt.[QueryKey] = 'AdvancedRemindersReadReminderRowKey'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'ReadRangeRows1Key',
+	'AdvancedRemindersReadRangeRows1Key',
 	'SELECT
 		GrainId,
 		ReminderName,
@@ -175,12 +175,12 @@ WHERE NOT EXISTS
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'ReadRangeRows1Key'
+    WHERE oqt.[QueryKey] = 'AdvancedRemindersReadRangeRows1Key'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'ReadRangeRows2Key',
+	'AdvancedRemindersReadRangeRows2Key',
 	'SELECT
 		GrainId,
 		ReminderName,
@@ -203,12 +203,12 @@ WHERE NOT EXISTS
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'ReadRangeRows2Key'
+    WHERE oqt.[QueryKey] = 'AdvancedRemindersReadRangeRows2Key'
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'DeleteReminderRowKey',
+	'AdvancedRemindersDeleteReminderRowKey',
 	'DELETE FROM OrleansAdvancedRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
@@ -221,12 +221,12 @@ WHERE NOT EXISTS
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'DeleteReminderRowKey'
+    WHERE oqt.[QueryKey] = 'AdvancedRemindersDeleteReminderRowKey'
 );    
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'DeleteReminderRowsKey',
+	'AdvancedRemindersDeleteReminderRowsKey',
 	'DELETE FROM OrleansAdvancedRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
@@ -235,5 +235,5 @@ WHERE NOT EXISTS
 ( 
     SELECT 1 
     FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'DeleteReminderRowsKey'
+    WHERE oqt.[QueryKey] = 'AdvancedRemindersDeleteReminderRowsKey'
 );  

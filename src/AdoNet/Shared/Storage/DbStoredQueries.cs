@@ -105,6 +105,42 @@ namespace Orleans.Tests.SqlUtils
 
 #if REMINDERS_ADONET || TESTER_SQLUTILS || ORLEANS_REMINDERS_PROVIDER
 
+#if ADVANCED_REMINDERS_ADONET
+        /// <summary>
+        /// A query template to read advanced reminder entries.
+        /// </summary>
+        internal string AdvancedRemindersReadReminderRowsKey => queries[nameof(AdvancedRemindersReadReminderRowsKey)];
+
+        /// <summary>
+        /// A query template to read advanced reminder entries with ranges.
+        /// </summary>
+        internal string AdvancedRemindersReadRangeRows1Key => queries[nameof(AdvancedRemindersReadRangeRows1Key)];
+
+        /// <summary>
+        /// A query template to read advanced reminder entries with ranges.
+        /// </summary>
+        internal string AdvancedRemindersReadRangeRows2Key => queries[nameof(AdvancedRemindersReadRangeRows2Key)];
+
+        /// <summary>
+        /// A query template to read an advanced reminder entry.
+        /// </summary>
+        internal string AdvancedRemindersReadReminderRowKey => queries[nameof(AdvancedRemindersReadReminderRowKey)];
+
+        /// <summary>
+        /// A query template to upsert an advanced reminder row.
+        /// </summary>
+        internal string AdvancedRemindersUpsertReminderRowKey => queries[nameof(AdvancedRemindersUpsertReminderRowKey)];
+
+        /// <summary>
+        /// A query template to delete an advanced reminder row.
+        /// </summary>
+        internal string AdvancedRemindersDeleteReminderRowKey => queries[nameof(AdvancedRemindersDeleteReminderRowKey)];
+
+        /// <summary>
+        /// A query template to delete all advanced reminder rows.
+        /// </summary>
+        internal string AdvancedRemindersDeleteReminderRowsKey => queries[nameof(AdvancedRemindersDeleteReminderRowsKey)];
+#else
         /// <summary>
         /// A query template to read reminder entries.
         /// </summary>
@@ -139,6 +175,7 @@ namespace Orleans.Tests.SqlUtils
         /// A query template to delete all reminder rows.
         /// </summary>
         internal string DeleteReminderRowsKey => queries[nameof(DeleteReminderRowsKey)];
+#endif
 
 #endif
 

@@ -106,7 +106,7 @@ public class InProcessTestClusterBuilderTimeProviderTests
                 return;
             }
 
-            await Task.Delay(50, cancellation.Token);
+            await Task.Delay(50);
         }
 
         Assert.Fail($"Reminder '{reminderName}' did not reach {expectedCount} ticks.");

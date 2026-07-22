@@ -24,7 +24,7 @@ ON OrleansAdvancedRemindersTable(ServiceId, NextDueUtc, Priority);
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'UpsertReminderRowKey','
+    'AdvancedRemindersUpsertReminderRowKey','
     INSERT INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
@@ -77,7 +77,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadReminderRowsKey','
+    'AdvancedRemindersReadReminderRowsKey','
     SELECT
         GrainId,
         ReminderName,
@@ -99,7 +99,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadReminderRowKey','
+    'AdvancedRemindersReadReminderRowKey','
     SELECT
         GrainId,
         ReminderName,
@@ -122,7 +122,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadRangeRows1Key','
+    'AdvancedRemindersReadRangeRows1Key','
     SELECT
         GrainId,
         ReminderName,
@@ -145,7 +145,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadRangeRows2Key','
+    'AdvancedRemindersReadRangeRows2Key','
     SELECT
         GrainId,
         ReminderName,
@@ -168,7 +168,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'DeleteReminderRowKey','
+    'AdvancedRemindersDeleteReminderRowKey','
     DELETE FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
@@ -181,7 +181,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'DeleteReminderRowsKey','
+    'AdvancedRemindersDeleteReminderRowsKey','
     DELETE FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL;

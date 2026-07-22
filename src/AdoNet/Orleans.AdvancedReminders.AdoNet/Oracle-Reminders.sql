@@ -96,7 +96,7 @@ RETURN NUMBER IS
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'UpsertReminderRowKey','
+    'AdvancedRemindersUpsertReminderRowKey','
     SELECT UpsertReminderRow(:ServiceId, :GrainHash, :GrainId, :ReminderName, :StartTime, :Period, :CronExpression, :CronTimeZoneId, :NextDueUtc, :LastFireUtc, :Priority, :Action) AS Version FROM DUAL
 ');
 /
@@ -104,7 +104,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadReminderRowsKey','
+    'AdvancedRemindersReadReminderRowsKey','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
     FROM OrleansAdvancedRemindersTable
     WHERE
@@ -116,7 +116,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadReminderRowKey','
+    'AdvancedRemindersReadReminderRowKey','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
     FROM OrleansAdvancedRemindersTable
     WHERE
@@ -129,7 +129,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadRangeRows1Key','
+    'AdvancedRemindersReadRangeRows1Key','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
     FROM OrleansAdvancedRemindersTable
     WHERE
@@ -142,7 +142,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadRangeRows2Key','
+    'AdvancedRemindersReadRangeRows2Key','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
     FROM OrleansAdvancedRemindersTable
     WHERE
@@ -155,7 +155,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'DeleteReminderRowKey','
+    'AdvancedRemindersDeleteReminderRowKey','
     SELECT DeleteReminderRow(:ServiceId, :GrainId, :ReminderName, :Version) AS RESULT FROM DUAL
 ');
 /
@@ -163,7 +163,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'DeleteReminderRowsKey','
+    'AdvancedRemindersDeleteReminderRowsKey','
     DELETE FROM OrleansAdvancedRemindersTable
     WHERE ServiceId = :ServiceId AND :ServiceId IS NOT NULL
 ');

@@ -94,7 +94,7 @@ $func$ LANGUAGE plpgsql;
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'UpsertReminderRowKey','
+    'AdvancedRemindersUpsertReminderRowKey','
     SELECT * FROM upsert_reminder_row(
         @ServiceId,
         @GrainId,
@@ -114,7 +114,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadReminderRowsKey','
+    'AdvancedRemindersReadReminderRowsKey','
     SELECT
         GrainId,
         ReminderName,
@@ -136,7 +136,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadReminderRowKey','
+    'AdvancedRemindersReadReminderRowKey','
     SELECT
         GrainId,
         ReminderName,
@@ -159,7 +159,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadRangeRows1Key','
+    'AdvancedRemindersReadRangeRows1Key','
     SELECT
         GrainId,
         ReminderName,
@@ -182,7 +182,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'ReadRangeRows2Key','
+    'AdvancedRemindersReadRangeRows2Key','
     SELECT
         GrainId,
         ReminderName,
@@ -232,7 +232,7 @@ $func$ LANGUAGE plpgsql;
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'DeleteReminderRowKey','
+    'AdvancedRemindersDeleteReminderRowKey','
     SELECT * FROM delete_reminder_row(
         @ServiceId,
         @GrainId,
@@ -244,7 +244,7 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-    'DeleteReminderRowsKey','
+    'AdvancedRemindersDeleteReminderRowsKey','
     DELETE FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
