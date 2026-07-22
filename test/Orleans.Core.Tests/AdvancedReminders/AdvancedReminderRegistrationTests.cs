@@ -2250,6 +2250,12 @@ public class AdvancedReminderServiceTests
     }
 
     [Fact]
+    public void ReminderTableData_ToString_ClosesOuterCollection()
+    {
+        Assert.Equal("[0 reminders: []].", new ReminderTableData().ToString());
+    }
+
+    [Fact]
     public void TryGetReminderMetadata_ReturnsExpectedValues()
     {
         var grainId = GrainId.Create("test", "metadata");

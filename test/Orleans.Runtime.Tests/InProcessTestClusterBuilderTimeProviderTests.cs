@@ -11,7 +11,9 @@ namespace Tester;
 
 public class InProcessTestClusterBuilderTimeProviderTests
 {
-    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan ReminderDueTime = TimeSpan.FromHours(1);
+    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromHours(12);
+    private static readonly TimeSpan DueTimeBoundary = TimeSpan.FromMinutes(1);
 
     [Fact, TestCategory("BVT")]
     public async Task ConfigureHost_CanRegisterTimeProvider_ForClientAndSiloServices()
@@ -40,13 +42,13 @@ public class InProcessTestClusterBuilderTimeProviderTests
         var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         const string reminderName = nameof(ConfigureHost_CanControlReminderDueTimeUsingFakeTimeProvider);
 
-        await grain.StartReminder(reminderName, ReminderPeriod, validate: true);
+        await grain.StartReminder(reminderName, ReminderDueTime, ReminderPeriod);
 
-        fakeTimeProvider.Advance(TimeSpan.FromMilliseconds(1800));
+        fakeTimeProvider.Advance(ReminderDueTime - DueTimeBoundary);
         await Task.Delay(100);
         await AssertReminderTickCountAsync(grain, reminderName, expectedCount: 0);
 
-        fakeTimeProvider.Advance(TimeSpan.FromMilliseconds(200));
+        fakeTimeProvider.Advance(DueTimeBoundary);
         await WaitForReminderTickCountAsync(grain, reminderName, expectedCount: 1);
     }
 
@@ -62,9 +64,9 @@ public class InProcessTestClusterBuilderTimeProviderTests
         var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         const string reminderName = nameof(ConfigureHost_CanAdvanceFakeTimeToTriggerSubsequentReminderTicks);
 
-        await grain.StartReminder(reminderName, ReminderPeriod, validate: true);
+        await grain.StartReminder(reminderName, ReminderDueTime, ReminderPeriod);
 
-        fakeTimeProvider.Advance(TimeSpan.FromSeconds(2));
+        fakeTimeProvider.Advance(ReminderDueTime);
         await WaitForReminderTickCountAsync(grain, reminderName, expectedCount: 1);
 
         fakeTimeProvider.Advance(ReminderPeriod);
@@ -80,7 +82,7 @@ public class InProcessTestClusterBuilderTimeProviderTests
         builder.ConfigureHost(hostBuilder => hostBuilder.Services.AddSingleton<TimeProvider>(fakeTimeProvider));
         builder.ConfigureSilo((_, siloBuilder) =>
         {
-            siloBuilder.Configure<ReminderOptions>(options => options.MinimumReminderPeriod = ReminderPeriod);
+            siloBuilder.Configure<ReminderOptions>(options => options.MinimumReminderPeriod = TimeSpan.FromMinutes(1));
             siloBuilder.UseInMemoryReminderService();
         });
 

@@ -146,7 +146,7 @@ namespace Orleans.AdvancedReminders
         /// Returns a <see cref="string" /> that represents this instance.
         /// </summary>
         /// <returns>A <see cref="string" /> that represents this instance.</returns>
-        public override string ToString() => $"[{Reminders.Count} reminders: {Utils.EnumerableToString(Reminders)}.";
+        public override string ToString() => $"[{Reminders.Count} reminders: {Utils.EnumerableToString(Reminders)}].";
     }
 
     /// <summary>
