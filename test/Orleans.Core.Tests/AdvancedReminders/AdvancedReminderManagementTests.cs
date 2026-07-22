@@ -156,6 +156,19 @@ public class ReminderIteratorTests
 public class ReminderManagementGrainExtensionsTests
 {
     [Fact]
+    public void GetReminderManagementGrain_UsesWellKnownSingletonKey()
+    {
+        var grainFactory = Substitute.For<IGrainFactory>();
+        var expected = Substitute.For<IReminderManagementGrain>();
+        grainFactory.GetGrain<IReminderManagementGrain>(ReminderManagementGrainExtensions.GrainKey).Returns(expected);
+
+        var result = grainFactory.GetReminderManagementGrain();
+
+        Assert.Same(expected, result);
+        grainFactory.Received(1).GetGrain<IReminderManagementGrain>(ReminderManagementGrainExtensions.GrainKey);
+    }
+
+    [Fact]
     public async Task EnumerateAllAsync_ReadsAllPages()
     {
         var managementGrain = Substitute.For<IReminderManagementGrain>();

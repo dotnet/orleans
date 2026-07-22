@@ -11,6 +11,20 @@ namespace Orleans.AdvancedReminders;
 public static class ReminderManagementGrainExtensions
 {
     /// <summary>
+    /// The well-known key of the advanced reminder management grain.
+    /// </summary>
+    public const long GrainKey = 0;
+
+    /// <summary>
+    /// Gets the singleton advanced reminder management grain reference.
+    /// </summary>
+    public static IReminderManagementGrain GetReminderManagementGrain(this IGrainFactory grainFactory)
+    {
+        ArgumentNullException.ThrowIfNull(grainFactory);
+        return grainFactory.GetGrain<IReminderManagementGrain>(GrainKey);
+    }
+
+    /// <summary>
     /// Creates an iterator facade for reminder management paging APIs.
     /// </summary>
     public static IReminderIterator CreateIterator(this IReminderManagementGrain managementGrain)

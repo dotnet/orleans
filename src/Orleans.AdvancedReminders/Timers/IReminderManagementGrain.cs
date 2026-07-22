@@ -6,7 +6,10 @@ namespace Orleans.AdvancedReminders;
 /// <summary>
 /// Administrative management API for advanced reminders.
 /// </summary>
-public interface IReminderManagementGrain : IGrainWithGuidKey
+/// <remarks>
+/// Obtain the singleton grain reference using <see cref="ReminderManagementGrainExtensions.GetReminderManagementGrain(IGrainFactory)"/>.
+/// </remarks>
+public interface IReminderManagementGrain : IGrainWithIntegerKey
 {
     /// <summary>
     /// Returns a page of reminders across the whole reminder table.

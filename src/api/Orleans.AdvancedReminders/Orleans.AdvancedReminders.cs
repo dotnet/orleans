@@ -120,7 +120,7 @@ namespace Orleans.AdvancedReminders
         System.Collections.Generic.IAsyncEnumerable<ReminderEntry> EnumerateOverdueAsync(System.TimeSpan overdueBy, int pageSize = 256, System.Threading.CancellationToken cancellationToken = default);
     }
 
-    public partial interface IReminderManagementGrain : IGrainWithGuidKey, IGrain, Orleans.Runtime.IAddressable
+    public partial interface IReminderManagementGrain : IGrainWithIntegerKey, IGrain, Orleans.Runtime.IAddressable
     {
         System.Threading.Tasks.Task<int> CountAllAsync();
         System.Threading.Tasks.Task DeleteAsync(Orleans.Runtime.GrainId grainId, string name);
@@ -471,7 +471,7 @@ namespace Orleans.AdvancedReminders
         public System.Collections.Generic.IAsyncEnumerable<ReminderEntry> EnumerateOverdueAsync(System.TimeSpan overdueBy, int pageSize = 256, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
-    public sealed partial class ReminderManagementGrain : Grain, IReminderManagementGrain, IGrainWithGuidKey, IGrain, Orleans.Runtime.IAddressable
+    public sealed partial class ReminderManagementGrain : Grain, IReminderManagementGrain, IGrainWithIntegerKey, IGrain, Orleans.Runtime.IAddressable
     {
         public ReminderManagementGrain(IReminderTable reminderTable) { }
 
@@ -508,6 +508,8 @@ namespace Orleans.AdvancedReminders
 
     public static partial class ReminderManagementGrainExtensions
     {
+        public const long GrainKey = 0;
+
         public static IReminderIterator CreateIterator(this IReminderManagementGrain managementGrain) { throw null; }
 
         public static System.Collections.Generic.IAsyncEnumerable<ReminderEntry> EnumerateAllAsync(this IReminderManagementGrain managementGrain, int pageSize = 256, System.Threading.CancellationToken cancellationToken = default) { throw null; }
@@ -517,6 +519,8 @@ namespace Orleans.AdvancedReminders
         public static System.Collections.Generic.IAsyncEnumerable<ReminderEntry> EnumerateFilteredAsync(this IReminderManagementGrain managementGrain, ReminderQueryFilter filter, int pageSize = 256, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static System.Collections.Generic.IAsyncEnumerable<ReminderEntry> EnumerateOverdueAsync(this IReminderManagementGrain managementGrain, System.TimeSpan overdueBy, int pageSize = 256, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static IReminderManagementGrain GetReminderManagementGrain(this IGrainFactory grainFactory) { throw null; }
     }
 
     [GenerateSerializer]
