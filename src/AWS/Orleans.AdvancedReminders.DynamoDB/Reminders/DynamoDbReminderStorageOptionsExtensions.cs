@@ -24,7 +24,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
         {
             var parameters = connectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
-            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
+            var serviceConfig = Array.Find(parameters, p => p.StartsWith($"{ServicePropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
                 var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -32,7 +32,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     options.Service = value[1];
             }
 
-            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
+            var secretKeyConfig = Array.Find(parameters, p => p.StartsWith($"{SecretKeyPropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
                 var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -40,7 +40,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     options.SecretKey = value[1];
             }
 
-            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
+            var accessKeyConfig = Array.Find(parameters, p => p.StartsWith($"{AccessKeyPropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
                 var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -48,7 +48,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     options.AccessKey = value[1];
             }
 
-            var readCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(ReadCapacityUnitsPropertyName));
+            var readCapacityUnitsConfig = Array.Find(parameters, p => p.StartsWith($"{ReadCapacityUnitsPropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(readCapacityUnitsConfig))
             {
                 var value = readCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -56,7 +56,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     options.ReadCapacityUnits = int.Parse(value[1]);
             }
 
-            var writeCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(WriteCapacityUnitsPropertyName));
+            var writeCapacityUnitsConfig = Array.Find(parameters, p => p.StartsWith($"{WriteCapacityUnitsPropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(writeCapacityUnitsConfig))
             {
                 var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -64,7 +64,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     options.WriteCapacityUnits = int.Parse(value[1]);
             }
 
-            var useProvisionedThroughputConfig = Array.Find(parameters, p => p.Contains(UseProvisionedThroughputPropertyName));
+            var useProvisionedThroughputConfig = Array.Find(parameters, p => p.StartsWith($"{UseProvisionedThroughputPropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(useProvisionedThroughputConfig))
             {
                 var value = useProvisionedThroughputConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -72,7 +72,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     options.UseProvisionedThroughput = bool.Parse(value[1]);
             }
 
-            var createIfNotExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(CreateIfNotExistsPropertyName));
+            var createIfNotExistsPropertyNameConfig = Array.Find(parameters, p => p.StartsWith($"{CreateIfNotExistsPropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(createIfNotExistsPropertyNameConfig))
             {
                 var value = createIfNotExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -80,7 +80,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
                     options.CreateIfNotExists = bool.Parse(value[1]);
             }
 
-            var updateIfExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(UpdateIfExistsPropertyName));
+            var updateIfExistsPropertyNameConfig = Array.Find(parameters, p => p.StartsWith($"{UpdateIfExistsPropertyName}=", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(updateIfExistsPropertyNameConfig))
             {
                 var value = updateIfExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);

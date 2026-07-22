@@ -1,0 +1,34 @@
+using Orleans.AdvancedReminders.DynamoDB;
+using Xunit;
+
+namespace AWSUtils.Tests.AdvancedReminders;
+
+[TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
+public class DynamoDBReminderStorageOptionsExtensionsTests
+{
+    [Fact]
+    public void ParseConnectionString_MatchesOnlyCaseInsensitiveKeyPrefixes()
+    {
+        const string connectionString =
+            "Ignored=Service;service=eu-west-1;" +
+            "Ignored=SecretKey;secretkey=secret;" +
+            "Ignored=AccessKey;accesskey=access;" +
+            "Ignored=ReadCapacityUnits;readcapacityunits=7;" +
+            "Ignored=WriteCapacityUnits;writecapacityunits=9;" +
+            "Ignored=UseProvisionedThroughput;useprovisionedthroughput=false;" +
+            "Ignored=CreateIfNotExists;createifnotexists=false;" +
+            "Ignored=UpdateIfExists;updateifexists=false";
+        var options = new DynamoDBReminderStorageOptions();
+
+        options.ParseConnectionString(connectionString);
+
+        Assert.Equal("eu-west-1", options.Service);
+        Assert.Equal("secret", options.SecretKey);
+        Assert.Equal("access", options.AccessKey);
+        Assert.Equal(7, options.ReadCapacityUnits);
+        Assert.Equal(9, options.WriteCapacityUnits);
+        Assert.False(options.UseProvisionedThroughput);
+        Assert.False(options.CreateIfNotExists);
+        Assert.False(options.UpdateIfExists);
+    }
+}
