@@ -9,10 +9,21 @@ internal sealed class AdvancedReminderJobBackendValidator(IServiceProvider servi
 {
     public void ValidateConfiguration()
     {
-        if (serviceProvider.GetService<JobShardManager>() is null)
+        if (!IsServiceRegistered(typeof(JobShardManager)))
         {
             throw new OrleansConfigurationException(
                 "AdvancedReminders requires a durable jobs backend. Configure UseInMemoryDurableJobs() or a storage-backed durable jobs provider before starting the silo.");
         }
+
+        if (!IsServiceRegistered(typeof(IReminderTable)))
+        {
+            throw new OrleansConfigurationException(
+                "AdvancedReminders requires a reminder table provider. Configure UseInMemoryAdvancedReminderService() or a storage-backed advanced reminder provider before starting the silo.");
+        }
     }
+
+    private bool IsServiceRegistered(Type serviceType)
+        => serviceProvider.GetService<IServiceProviderIsService>() is { } serviceProviderIsService
+            ? serviceProviderIsService.IsService(serviceType)
+            : serviceProvider.GetService(serviceType) is not null;
 }

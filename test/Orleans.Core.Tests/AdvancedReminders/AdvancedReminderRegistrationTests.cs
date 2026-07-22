@@ -18,6 +18,7 @@ using Orleans.DurableJobs;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Cron.Internal;
 using Orleans.AdvancedReminders.Runtime;
+using Orleans.AdvancedReminders.Runtime.Hosting;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.AdvancedReminders.Timers;
 using Orleans.Hosting;
@@ -900,6 +901,24 @@ public class SiloBuilderReminderExtensionsTests
         });
 
         Assert.Contains("UseInMemoryDurableJobs()", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddAdvancedReminders_WithoutReminderTable_FailsValidation()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAdvancedReminders();
+        services.UseInMemoryDurableJobs();
+
+        using var provider = services.BuildServiceProvider();
+        var validator = provider.GetServices<IConfigurationValidator>()
+            .OfType<AdvancedReminderJobBackendValidator>()
+            .Single();
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Contains("UseInMemoryAdvancedReminderService()", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
