@@ -196,6 +196,26 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         Assert.Equal(reminder.Action, readReminder.Action);
     }
 
+    protected async Task ReminderUnspecifiedTimestampsRoundTrip()
+    {
+        var reminder = CreateReminder(MakeTestGrainReference(), "unspecified_timestamps_roundtrip");
+        reminder.StartAt = DateTime.SpecifyKind(reminder.StartAt, DateTimeKind.Unspecified);
+        reminder.NextDueUtc = DateTime.SpecifyKind(reminder.StartAt.AddMinutes(10), DateTimeKind.Unspecified);
+        reminder.LastFireUtc = DateTime.SpecifyKind(reminder.StartAt.AddMinutes(-2), DateTimeKind.Unspecified);
+
+        await remindersTable.UpsertRow(reminder);
+
+        Assert.Equal(DateTimeKind.Utc, reminder.StartAt.Kind);
+        Assert.Equal(DateTimeKind.Utc, reminder.NextDueUtc.Value.Kind);
+        Assert.Equal(DateTimeKind.Utc, reminder.LastFireUtc.Value.Kind);
+
+        var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+        Assert.NotNull(readReminder);
+        AssertTimestampClose(reminder.StartAt, readReminder.StartAt);
+        AssertTimestampClose(reminder.NextDueUtc, readReminder.NextDueUtc);
+        AssertTimestampClose(reminder.LastFireUtc, readReminder.LastFireUtc);
+    }
+
     protected async Task ReminderCronTimeZoneRoundTrip()
     {
         var reminder = CreateReminder(MakeTestGrainReference(), "cron_timezone_roundtrip");

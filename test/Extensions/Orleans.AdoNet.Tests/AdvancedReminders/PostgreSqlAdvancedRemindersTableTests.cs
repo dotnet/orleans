@@ -53,5 +53,8 @@ public class PostgreSqlAdvancedRemindersTableTests : AdvancedReminderTableTestsB
     public async Task RemindersTable_PostgreSql_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
     [SkippableFact]
+    public async Task RemindersTable_PostgreSql_UnspecifiedTimestampsRoundTrip() => await ReminderUnspecifiedTimestampsRoundTrip();
+
+    [SkippableFact]
     public async Task RemindersTable_PostgreSql_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 }

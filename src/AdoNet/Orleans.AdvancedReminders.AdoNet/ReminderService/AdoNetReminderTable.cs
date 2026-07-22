@@ -43,10 +43,7 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
         
         public Task<string> UpsertRow(ReminderEntry entry)
         {
-            if (entry.StartAt.Kind is DateTimeKind.Unspecified)
-            {
-                entry.StartAt = new DateTime(entry.StartAt.Ticks, DateTimeKind.Utc);
-            }
+            NormalizeUtcFields(entry);
 
             return this.orleansQueries.UpsertReminderRowAsync(
                 this.serviceId,
@@ -61,6 +58,19 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
                 entry.Priority,
                 entry.Action);
         }
+
+        internal static void NormalizeUtcFields(ReminderEntry entry)
+        {
+            entry.StartAt = NormalizeUtcKind(entry.StartAt);
+            entry.NextDueUtc = NormalizeUtcKind(entry.NextDueUtc);
+            entry.LastFireUtc = NormalizeUtcKind(entry.LastFireUtc);
+        }
+
+        private static DateTime NormalizeUtcKind(DateTime value)
+            => value.Kind is DateTimeKind.Unspecified ? DateTime.SpecifyKind(value, DateTimeKind.Utc) : value;
+
+        private static DateTime? NormalizeUtcKind(DateTime? value)
+            => value.HasValue ? NormalizeUtcKind(value.Value) : null;
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
