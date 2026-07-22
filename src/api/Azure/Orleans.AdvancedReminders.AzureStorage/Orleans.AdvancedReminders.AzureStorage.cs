@@ -106,6 +106,8 @@ namespace Orleans.AdvancedReminders.AzureStorage
     public partial class AzureTableReminderStorageOptionsValidator : AzureStorageOperationOptionsValidator<AzureTableReminderStorageOptions>
     {
         public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(default!, default!) { }
+
+        public override void ValidateConfiguration() { }
     }
 }
 

@@ -31,6 +31,7 @@ namespace Orleans.Hosting
             services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
             services.Configure<AzureTableReminderStorageOptions>(configure);
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();
+            AddStorageOptionsValidator(services);
             return services;
         }
 
@@ -53,7 +54,7 @@ namespace Orleans.Hosting
             services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
             configureOptions?.Invoke(services.AddOptions<AzureTableReminderStorageOptions>());
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();
-            services.AddTransient<IConfigurationValidator>(sp => new AzureTableReminderStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableReminderStorageOptions>>().Get(Options.DefaultName), Options.DefaultName));
+            AddStorageOptionsValidator(services);
             return services;
         }
 
@@ -99,6 +100,13 @@ namespace Orleans.Hosting
                 });
         }
 #pragma warning restore ORLEANSEXP005
+
+        private static void AddStorageOptionsValidator(IServiceCollection services)
+        {
+            services.AddTransient<IConfigurationValidator>(sp => new AzureTableReminderStorageOptionsValidator(
+                sp.GetRequiredService<IOptionsMonitor<AzureTableReminderStorageOptions>>().Get(Options.DefaultName),
+                Options.DefaultName));
+        }
 
         private static Uri CreateBlobServiceUri(Uri serviceUri)
         {

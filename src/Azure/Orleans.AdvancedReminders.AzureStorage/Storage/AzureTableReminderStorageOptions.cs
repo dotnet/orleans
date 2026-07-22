@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Orleans.Runtime;
 
 namespace Orleans.AdvancedReminders.AzureStorage
 {
@@ -34,6 +35,22 @@ namespace Orleans.AdvancedReminders.AzureStorage
         /// <param name="name">The option name to be validated.</param>
         public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(options, name)
         {
+        }
+
+        /// <inheritdoc />
+        public override void ValidateConfiguration()
+        {
+            base.ValidateConfiguration();
+
+            if (Options.BlobServiceClient is null)
+            {
+                throw new OrleansConfigurationException($"Configuration for {nameof(AzureTableReminderStorageOptions)} {Name} is invalid. {nameof(Options.BlobServiceClient)} is not configured.");
+            }
+
+            if (string.IsNullOrWhiteSpace(Options.JobContainerName))
+            {
+                throw new OrleansConfigurationException($"Configuration for {nameof(AzureTableReminderStorageOptions)} {Name} is invalid. {nameof(Options.JobContainerName)} is not valid.");
+            }
         }
     }
 }
