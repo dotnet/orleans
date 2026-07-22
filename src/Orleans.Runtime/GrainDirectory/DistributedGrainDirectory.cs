@@ -11,7 +11,6 @@ using Orleans.Concurrency;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
-using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory;
@@ -79,9 +78,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     // precise by also tracking the sets of ranges which need to be recovered, but that complicates things somewhat since it would require tracking the ranges
     // for each recovery version.
     private long _recoveryMembershipVersion;
-    private long _appliedMembershipVersion = MembershipVersion.MinValue.Value;
     internal long RecoveryMembershipVersion => Volatile.Read(ref _recoveryMembershipVersion);
-    internal MembershipVersion AppliedMembershipVersion => new(Volatile.Read(ref _appliedMembershipVersion));
     private Task _runTask = Task.CompletedTask;
     private ActivationDirectory _localActivations;
     private GrainDirectoryResolver? _grainDirectoryResolver;
@@ -368,7 +365,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 {
                     tasks.RemoveAll(t => t.IsCompleted);
                     var changes = update.ClusterMembershipSnapshot.CreateUpdate(previousUpdate);
-                    var updateTasks = new List<Task>();
 
                     foreach (var change in changes.Changes)
                     {
@@ -376,7 +372,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                         {
                             foreach (var partition in _partitions)
                             {
-                                updateTasks.Add(partition.OnSiloRemovedFromClusterAsync(change));
+                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change)));
                             }
                         }
                     }
@@ -386,10 +382,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
                     foreach (var partition in _partitions)
                     {
-                        updateTasks.Add(partition.ProcessMembershipUpdateAsync(current));
+                        tasks.Add(ObserveMembershipUpdateTask(partition.ProcessMembershipUpdateAsync(current)));
                     }
-
-                    tasks.Add(ObserveMembershipUpdateTask(CompleteMembershipUpdateAsync(current.Version, updateTasks)));
 
                     var deltaSize = currentRanges.SizePercent - previousRanges.SizePercent;
                     var meanSizePercent = current.Members.Length > 0 ? 100.0 / current.Members.Length : 0f;
@@ -411,28 +405,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
 
         await Task.WhenAll(tasks).SuppressThrowing();
-    }
-
-    private async Task CompleteMembershipUpdateAsync(MembershipVersion version, List<Task> updateTasks)
-    {
-        await Task.WhenAll(updateTasks);
-        UpdateAppliedMembershipVersion(version);
-        GrainDirectoryEvents.EmitMembershipVersionApplied(this, Silo, partitionIndex: -1, version);
-    }
-
-    private void UpdateAppliedMembershipVersion(MembershipVersion version)
-    {
-        var current = Volatile.Read(ref _appliedMembershipVersion);
-        while (current < version.Value)
-        {
-            var observed = Interlocked.CompareExchange(ref _appliedMembershipVersion, version.Value, current);
-            if (observed == current)
-            {
-                return;
-            }
-
-            current = observed;
-        }
     }
 
     private async Task ObserveMembershipUpdateTask(Task task)

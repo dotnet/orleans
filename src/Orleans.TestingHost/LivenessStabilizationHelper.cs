@@ -16,11 +16,18 @@ internal static class LivenessStabilizationHelper
         IReadOnlyCollection<SiloHandle> activeSilos,
         IReadOnlyCollection<ITestHooks> testHooks,
         GatewayManager gatewayManager,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence = null)
     {
         ArgumentNullException.ThrowIfNull(gatewayManager);
 
         if (!await WaitForExpectedActiveSilosAsync(activeSilos, testHooks, timeout))
+        {
+            return false;
+        }
+
+        if (waitForGrainDirectoryConvergence is not null
+            && !await waitForGrainDirectoryConvergence(timeout))
         {
             return false;
         }
@@ -46,13 +53,6 @@ internal static class LivenessStabilizationHelper
         {
             var waitTasks = testHooks.Select(hooks => hooks.WaitForActiveSilos(expectedActiveSilos, timeout));
             var results = await Task.WhenAll(waitTasks).WaitAsync(timeout);
-            if (!results.All(static result => result))
-            {
-                return false;
-            }
-
-            waitTasks = testHooks.Select(hooks => hooks.WaitForGrainDirectoryMembershipVersion(timeout));
-            results = await Task.WhenAll(waitTasks).WaitAsync(timeout);
             return results.All(static result => result);
         }
         catch (TimeoutException)

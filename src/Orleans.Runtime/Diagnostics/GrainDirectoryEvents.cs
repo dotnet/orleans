@@ -57,18 +57,16 @@ internal static class GrainDirectoryEvents
     }
 
     internal sealed class MembershipVersionApplied(
-        object source,
+        SiloAddress siloAddress,
+        MembershipVersion version) : GrainDirectoryEvent(siloAddress, partitionIndex: -1, version, RingRange.Empty);
+
+    internal sealed class MembershipVersionObserved(
         SiloAddress siloAddress,
         int partitionIndex,
-        MembershipVersion version) : GrainDirectoryEvent(siloAddress, partitionIndex, version, RingRange.Empty)
-    {
-        public readonly object Source = source;
-    }
+        MembershipVersion version) : GrainDirectoryEvent(siloAddress, partitionIndex, version, RingRange.Empty);
 
     internal static void EmitMembershipVersionApplied(
-        object source,
         SiloAddress siloAddress,
-        int partitionIndex,
         MembershipVersion version)
     {
         if (!Listener.IsEnabled(nameof(MembershipVersionApplied)))
@@ -76,12 +74,31 @@ internal static class GrainDirectoryEvents
             return;
         }
 
-        Emit(source, siloAddress, partitionIndex, version);
+        Emit(siloAddress, version);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Emit(object source, SiloAddress siloAddress, int partitionIndex, MembershipVersion version)
+        static void Emit(SiloAddress siloAddress, MembershipVersion version)
         {
-            Listener.Write(nameof(MembershipVersionApplied), new MembershipVersionApplied(source, siloAddress, partitionIndex, version));
+            Listener.Write(nameof(MembershipVersionApplied), new MembershipVersionApplied(siloAddress, version));
+        }
+    }
+
+    internal static void EmitMembershipVersionObserved(
+        SiloAddress siloAddress,
+        int partitionIndex,
+        MembershipVersion version)
+    {
+        if (!Listener.IsEnabled(nameof(MembershipVersionObserved)))
+        {
+            return;
+        }
+
+        Emit(siloAddress, partitionIndex, version);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(SiloAddress siloAddress, int partitionIndex, MembershipVersion version)
+        {
+            Listener.Write(nameof(MembershipVersionObserved), new MembershipVersionObserved(siloAddress, partitionIndex, version));
         }
     }
 

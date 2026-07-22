@@ -14,7 +14,6 @@ namespace Orleans.Runtime.TestHooks
         Task<int> UnregisterGrainForTesting(GrainId grain);
         Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses();
         Task<bool> WaitForActiveSilos(SiloAddress[] expectedActiveSilos, TimeSpan timeout);
-        Task<bool> WaitForGrainDirectoryMembershipVersion(TimeSpan timeout);
         Task<bool> WaitForClusterManifest(SiloAddress[] expectedSilos, TimeSpan timeout);
     }
 

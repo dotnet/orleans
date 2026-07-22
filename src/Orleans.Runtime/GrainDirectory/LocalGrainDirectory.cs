@@ -30,7 +30,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly CancellationTokenSource _membershipUpdatesCancellation = new();
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
         private ClusterMembershipSnapshot appliedClusterMembershipSnapshot = ClusterMembershipSnapshot.Default;
-        private long appliedMembershipVersion = MembershipVersion.MinValue.Value;
         private GrainDirectoryResolver? grainDirectoryResolver;
         private bool hasAppliedClusterMembershipSnapshot;
 
@@ -45,7 +44,6 @@ namespace Orleans.Runtime.GrainDirectory
         internal IGrainDirectoryCache DirectoryCache { get; }
         private readonly bool disposeDirectoryCache;
         internal LocalGrainDirectoryPartition DirectoryPartition { get; }
-        internal MembershipVersion AppliedMembershipVersion => new(Volatile.Read(ref appliedMembershipVersion));
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
         public RemoteGrainDirectory CacheValidator { get; }
@@ -262,8 +260,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 appliedClusterMembershipSnapshot = snapshot;
                 hasAppliedClusterMembershipSnapshot = true;
-                Volatile.Write(ref appliedMembershipVersion, snapshot.Version.Value);
-                GrainDirectoryEvents.EmitMembershipVersionApplied(this, MyAddress, partitionIndex: -1, snapshot.Version);
+                GrainDirectoryEvents.EmitMembershipVersionApplied(MyAddress, snapshot.Version);
             }
         }
 

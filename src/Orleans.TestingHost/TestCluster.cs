@@ -41,6 +41,7 @@ namespace Orleans.TestingHost
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
         private readonly InMemoryTransportConnectionHub _transportHub = new();
+        private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
         private bool _disposed;
         private int startedInstances;
 
@@ -425,8 +426,18 @@ namespace Orleans.TestingHost
             var activeSilos = GetActiveSilos().ToArray();
             var testHooks = activeSilos.Select(GetTestHooks).ToArray();
             var gatewayManager = this.InternalClient.ServiceProvider.GetRequiredService<GatewayManager>();
+            var inProcessSilos = activeSilos.OfType<InProcessSiloHandle>().ToArray();
+            Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
+                inProcessSilos.Length == activeSilos.Length
+                    ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(inProcessSilos, timeout)
+                    : null;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
-            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(activeSilos, testHooks, gatewayManager, stabilizationTime))
+            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
+                activeSilos,
+                testHooks,
+                gatewayManager,
+                stabilizationTime,
+                waitForGrainDirectoryConvergence))
             {
                 WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
             }
@@ -986,6 +997,7 @@ namespace Orleans.TestingHost
                 ClientHost = null;
 
                 PortAllocator?.Dispose();
+                _grainDirectoryObserver.Dispose();
             });
 
             _disposed = true;
