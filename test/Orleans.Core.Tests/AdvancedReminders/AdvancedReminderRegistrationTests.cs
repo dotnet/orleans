@@ -127,7 +127,8 @@ public class RegisterReminderAttributeTests
 [TestCategory("Reminders")]
 public class RegisterReminderActivationConfiguratorProviderTests
 {
-    private static readonly GrainProperties EmptyGrainProperties = new(ImmutableDictionary<string, string>.Empty);
+    private static readonly GrainProperties EmptyGrainProperties = new(
+        ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal));
 
     [Fact]
     public void TryGetConfigurator_ReturnsFalse_WhenNoRegisterReminderAttribute()
@@ -897,7 +898,7 @@ public class SiloBuilderReminderExtensionsTests
             }
         });
 
-        Assert.Contains("durable jobs backend", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("UseInMemoryDurableJobs()", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
