@@ -426,13 +426,13 @@ function renderPage(jsx: JSX.Element, path: string) {
   loadData();
 });
 
-(routie as any)('/reminders/:page?', function (page?: string) {
+function showReminders(reminderKind: 'classic' | 'advanced', page?: string) {
   const thisRouteIndex = ++routeIndex;
   events.clearAll();
   scroll();
   renderLoading();
 
-  let remindersData: any[] = [];
+  let remindersData = { count: 0, reminders: [] };
   let pageNum: number;
   if (page) {
     pageNum = parseInt(page);
@@ -444,30 +444,42 @@ function renderPage(jsx: JSX.Element, path: string) {
     if (routeIndex != thisRouteIndex) return;
     renderPage(
       <Page title="Reminders">
-        <Reminders remindersData={remindersData} page={pageNum} />
+        <Reminders
+          remindersData={remindersData}
+          reminderKind={reminderKind}
+          page={pageNum}
+        />
       </Page>,
       '#/reminders'
     );
-  };
-
-  const rerouteToLastPage = function (lastPage: number) {
-    return (document.location.hash = `/reminders/${lastPage}`);
   };
 
   let loadDataIsPending = false;
   const loadData = function (cb?: any) {
     if (!loadDataIsPending) {
       loadDataIsPending = true;
-      http.get(`Reminders/${pageNum}`, function (err, data) {
+      const endpoint =
+        reminderKind === 'advanced' ? 'AdvancedReminders' : 'Reminders';
+      http.get(`${endpoint}/${pageNum}`, function (err, data) {
         remindersData = data;
+      }).finally(() => {
+        loadDataIsPending = false;
         renderReminders();
-      }).finally(() => loadDataIsPending = false);
+      });
     }
   };
 
   events.on('long-refresh', loadData);
 
   loadData();
+}
+
+(routie as any)('/reminders/advanced/:page?', function (page?: string) {
+  showReminders('advanced', page);
+});
+
+(routie as any)('/reminders/:page?', function (page?: string) {
+  showReminders('classic', page);
 });
 
 (routie as any)('/trace', function () {

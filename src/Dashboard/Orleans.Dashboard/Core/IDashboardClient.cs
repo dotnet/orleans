@@ -16,6 +16,8 @@ internal interface IDashboardClient
 
     Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize);
 
+    Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(int pageNumber, int pageSize);
+
     Task<Immutable<SiloRuntimeStatistics[]>> HistoricalStats(string siloAddress);
 
     Task<Immutable<Dictionary<string, string>>> SiloProperties(string siloAddress);

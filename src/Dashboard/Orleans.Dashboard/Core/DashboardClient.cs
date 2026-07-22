@@ -21,6 +21,8 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
 
     public async Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize) => await _remindersGrain.GetReminders(pageNumber, pageSize);
 
+    public async Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(int pageNumber, int pageSize) => await _remindersGrain.GetAdvancedReminders(pageNumber, pageSize);
+
     public async Task<Immutable<SiloRuntimeStatistics[]>> HistoricalStats(string siloAddress) => await Silo(siloAddress).GetRuntimeStatistics();
 
     public async Task<Immutable<Dictionary<string, string>>> SiloProperties(string siloAddress) => await Silo(siloAddress).GetExtendedProperties();

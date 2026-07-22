@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Dashboard.Abstractions\Orleans.Dashboard.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
     <ProjectReference Include="..\..\Orleans.Reminders\Orleans.Reminders.csproj" />
     <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="..\..\Orleans.Sdk\Orleans.Sdk.csproj" />

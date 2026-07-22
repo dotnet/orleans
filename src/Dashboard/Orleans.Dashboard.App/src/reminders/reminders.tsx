@@ -1,5 +1,6 @@
 import React from 'react';
 import CounterWidget from '../components/counter-widget';
+import AdvancedReminderTable from '../components/advanced-reminder-table';
 import ReminderTable from '../components/reminder-table';
 import Panel from '../components/panel';
 
@@ -14,11 +15,19 @@ interface RemindersData {
 
 interface RemindersProps {
   remindersData: RemindersData;
+  reminderKind: 'classic' | 'advanced';
   page: number;
 }
 
 export default class Reminders extends React.Component<RemindersProps> {
+  getPageHref(page: number) {
+    return this.props.reminderKind === 'advanced'
+      ? `#/reminders/advanced/${page}`
+      : `#/reminders/${page}`;
+  }
+
   render() {
+    const isAdvanced = this.props.reminderKind === 'advanced';
     const totalPages = Math.ceil(this.props.remindersData.count / 25);
     const showFirst = this.props.page > 2;
     const showPrevious = this.props.page > 1;
@@ -31,49 +40,90 @@ export default class Reminders extends React.Component<RemindersProps> {
             <CounterWidget
               icon="calendar"
               counter={this.props.remindersData.count}
-              title="Reminders Count"
+              title={
+                isAdvanced
+                  ? 'Advanced Reminders Count'
+                  : 'Classic Reminders Count'
+              }
             />
           </div>
         </div>
-        <Panel title="Reminders" subTitle={`Page ${this.props.page}`}>
-          <div>
-            <ReminderTable data={this.props.remindersData.reminders} />
-            <div style={{ textAlign: 'center' }}>
-              {showFirst ? (
-                <a className="btn btn-default bg-purple" href={'#/reminders/1'}>
-                  <i className="fa fa-arrow-circle-left" /> First
-                </a>
-              ) : null}
-              <span> </span>
-              {showPrevious ? (
-                <a
-                  className="btn btn-default bg-purple"
-                  href={`#/reminders/${this.props.page - 1}`}
-                >
-                  <i className="fa fa-arrow-circle-left" /> Previous
-                </a>
-              ) : null}
-              <span> </span>
-              {showNext ? (
-                <a
-                  className="btn btn-default bg-purple"
-                  href={`#/reminders/${this.props.page + 1}`}
-                >
-                  Next <i className="fa fa-arrow-circle-right" />
-                </a>
-              ) : null}
-              <span> </span>
-              {showLast ? (
-                <a
-                  className="btn btn-default bg-purple"
-                  href={`#/reminders/${totalPages}`}
-                >
-                  Last <i className="fa fa-arrow-circle-right" />
-                </a>
-              ) : null}
+        <div className="card reminder-table-switch">
+          <div className="card-body">
+            <div className="btn-group" role="group" aria-label="Reminder table">
+              <a
+                className={`btn btn-default ${
+                  isAdvanced ? '' : 'reminder-table-active'
+                }`}
+                href="#/reminders/1"
+                aria-current={isAdvanced ? undefined : 'page'}
+              >
+                Classic Reminders
+              </a>
+              <a
+                className={`btn btn-default ${
+                  isAdvanced ? 'reminder-table-active' : ''
+                }`}
+                href="#/reminders/advanced/1"
+                aria-current={isAdvanced ? 'page' : undefined}
+              >
+                Advanced Reminders
+              </a>
             </div>
           </div>
-        </Panel>
+        </div>
+        {isAdvanced ? (
+          <Panel title="Advanced Reminders" subTitle={`Page ${this.props.page}`}>
+            <AdvancedReminderTable data={this.props.remindersData.reminders} />
+          </Panel>
+        ) : (
+          <Panel title="Classic Reminders" subTitle={`Page ${this.props.page}`}>
+            <ReminderTable data={this.props.remindersData.reminders} />
+          </Panel>
+        )}
+        {totalPages > 1 ? (
+          <div className="card">
+            <div className="card-body">
+              <div style={{ textAlign: 'center' }}>
+                {showFirst ? (
+                  <a
+                    className="btn btn-default bg-purple"
+                    href={this.getPageHref(1)}
+                  >
+                    <i className="fa fa-arrow-circle-left" /> First
+                  </a>
+                ) : null}
+                <span> </span>
+                {showPrevious ? (
+                  <a
+                    className="btn btn-default bg-purple"
+                    href={this.getPageHref(this.props.page - 1)}
+                  >
+                    <i className="fa fa-arrow-circle-left" /> Previous
+                  </a>
+                ) : null}
+                <span> </span>
+                {showNext ? (
+                  <a
+                    className="btn btn-default bg-purple"
+                    href={this.getPageHref(this.props.page + 1)}
+                  >
+                    Next <i className="fa fa-arrow-circle-right" />
+                  </a>
+                ) : null}
+                <span> </span>
+                {showLast ? (
+                  <a
+                    className="btn btn-default bg-purple"
+                    href={this.getPageHref(totalPages)}
+                  >
+                    Last <i className="fa fa-arrow-circle-right" />
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }
