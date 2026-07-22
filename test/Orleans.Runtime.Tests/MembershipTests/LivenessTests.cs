@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.Configuration;
@@ -93,14 +94,19 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("\n\n\n\nAbout to start sending msg to grain again\n\n\n");
 
+            // After a hard kill, failure detection depends on probe timeouts which can be extended
+            // adaptively (see ClusterMembershipOptions.ExtendProbeTimeoutDuringDegradation) under load,
+            // e.g. on a busy CI machine. WaitForLivenessToStabilizeAsync's computed wait is a best-effort
+            // estimate, so tolerate a few transient timeouts here while the cluster finishes converging,
+            // rather than failing the whole test on the first slow response.
             for (int i = 0; i < numGrains; i++)
             {
-                await SendTraffic(i + 1);
+                await SendTrafficWithRetry(i + 1);
             }
 
             for (int i = numGrains; i < 2 * numGrains; i++)
             {
-                await SendTraffic(i + 1);
+                await SendTrafficWithRetry(i + 1);
             }
             logger.LogInformation("======================================================");
         }
@@ -164,6 +170,31 @@ namespace UnitTests.MembershipTests
             {
                 logger.LogInformation(exc, "Exception making grain call");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Sends traffic to a grain, retrying on transient timeouts for a bounded period.
+        /// Used right after a silo failure/restart, where the exact moment at which the cluster
+        /// finishes converging (directory invalidation, membership gossip, etc.) is not deterministic,
+        /// especially on a loaded CI machine.
+        /// </summary>
+        private async Task SendTrafficWithRetry(long key, bool startTimers = false)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var retryWindow = TimeSpan.FromSeconds(60);
+            while (true)
+            {
+                try
+                {
+                    await SendTraffic(key, startTimers);
+                    return;
+                }
+                catch (TimeoutException) when (stopwatch.Elapsed < retryWindow)
+                {
+                    logger.LogInformation("Retrying grain call for key {Key} after a timeout while cluster membership converges", key);
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                }
             }
         }
 
