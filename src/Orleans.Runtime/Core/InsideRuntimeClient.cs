@@ -38,17 +38,17 @@ namespace Orleans.Runtime
         private readonly PeriodicTimer callbackTimer;
         private int _isStopping;
 
-        private GrainLocator? grainLocator;
-        private MessageCenter? messageCenter;
-        private List<IIncomingGrainCallFilter>? grainCallFilters;
+        private GrainLocator grainLocator = null!;
+        private MessageCenter messageCenter = null!;
+        private List<IIncomingGrainCallFilter> grainCallFilters = null!;
         private readonly DeepCopier _deepCopier;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager = null!;
-        private HostedClient? hostedClient;
+        private HostedClient hostedClient = null!;
 
         private HostedClient HostedClient => this.hostedClient;
         private readonly MessageFactory messageFactory;
-        private IGrainReferenceRuntime? grainReferenceRuntime;
+        private IGrainReferenceRuntime grainReferenceRuntime = null!;
         private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;

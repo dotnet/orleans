@@ -1,4 +1,5 @@
 #nullable enable
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Placement;
@@ -34,8 +35,9 @@ public sealed class GrainDirectoryShutdownMigrationTests
 
         var survivingSilo = cluster.Silos[0];
         var shuttingDownSilo = cluster.Silos[1];
-        var immediateGrain = cluster.Client.GetGrain<IShutdownMigrationGrain>(Guid.NewGuid());
-        var postHandoffGrain = cluster.Client.GetGrain<IShutdownMigrationGrain>(Guid.NewGuid());
+        var client = cluster.Client!; // DeployAsync initializes the client.
+        var immediateGrain = client.GetGrain<IShutdownMigrationGrain>(Guid.NewGuid());
+        var postHandoffGrain = client.GetGrain<IShutdownMigrationGrain>(Guid.NewGuid());
 
         RequestContext.Set(IPlacementDirector.PlacementHintKey, shuttingDownSilo.SiloAddress);
         try
@@ -223,7 +225,7 @@ internal sealed class DelayedMembershipManager(MembershipTableManager inner) : I
 
     public SiloStatus LocalSiloStatus => ((IMembershipManager)inner).LocalSiloStatus;
 
-    public bool CheckHealth(DateTime lastCheckTime, out string reason) =>
+    public bool CheckHealth(DateTime lastCheckTime, [NotNullWhen(false)] out string? reason) =>
         ((IHealthCheckable)inner).CheckHealth(lastCheckTime, out reason);
 
     public void Participate(ISiloLifecycle lifecycle) => ((ILifecycleParticipant<ISiloLifecycle>)inner).Participate(lifecycle);
