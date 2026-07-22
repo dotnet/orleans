@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
+using Orleans.Messaging;
 
 namespace Orleans.Hosting;
 

@@ -52,9 +52,9 @@ namespace Orleans.AdvancedReminders.Cron.Internal
                     return cronExpression;
                 }
 
-                ulong  second = default;
-                byte  nthDayOfWeek = default;
-                byte  lastMonthOffset = default;
+                ulong second = default;
+                byte nthDayOfWeek = default;
+                byte lastMonthOffset = default;
 
                 CronExpressionFlag flags = default;
 

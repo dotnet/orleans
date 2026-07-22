@@ -10,7 +10,7 @@ namespace Orleans.TestingHost
     /// Extension methods for test clusters.
     /// </summary>
     public static class TestClusterExtensions
-    {        
+    {
         /// <summary>
         /// Gets the configuration from the specified host builder.
         /// </summary>        

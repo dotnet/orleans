@@ -1,8 +1,8 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Clustering.Redis;
 using Orleans.Hosting;
 using Orleans.Messaging;
-using Orleans.Clustering.Redis;
 using StackExchange.Redis;
 
 namespace Microsoft.Extensions.Hosting

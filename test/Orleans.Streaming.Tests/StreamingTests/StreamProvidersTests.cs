@@ -1,16 +1,16 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Internal;
+using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using UnitTests.StorageTests;
 using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime;
-using UnitTests.StorageTests;
-using Orleans.Storage;
-using Orleans.Providers;
-using Orleans.Internal;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Streaming
 {
@@ -94,7 +94,7 @@ namespace UnitTests.Streaming
             }
 
             output.WriteLine("..... Silos restarted");
-            
+
             var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
             Assert.True(activeSilos.Length > 0);
 

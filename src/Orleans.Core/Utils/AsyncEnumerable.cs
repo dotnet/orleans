@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Utilities
         private readonly Func<T, T, bool> _updateValidator;
         private readonly Action<T> _onPublished;
         private Element _current;
-        
+
         public AsyncEnumerable(T initialValue, Func<T, T, bool> updateValidator, Action<T> onPublished)
         {
             _updateValidator = updateValidator;
@@ -34,7 +34,7 @@ namespace Orleans.Runtime.Utilities
         }
 
         public bool TryPublish(T value) => TryPublish(new Element(value)) == PublishResult.Success;
-        
+
         public void Publish(T value)
         {
             switch (TryPublish(new Element(value)))
@@ -51,7 +51,7 @@ namespace Orleans.Runtime.Utilities
         }
 
         public bool TryPublish<TState>(Func<T, TState, T> updateFunc, TState state) => TryPublishCore(updateFunc, state) == PublishResult.Success;
-        
+
         public void Publish<TState>(Func<T, TState, T> updateFunc, TState state)
         {
             switch (TryPublishCore(updateFunc, state))

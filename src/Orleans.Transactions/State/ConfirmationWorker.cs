@@ -136,7 +136,7 @@ namespace Orleans.Transactions.State
                 // wait for storage call, so we don't free spin
                 return await storeComplete.Task;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogWarnCollectingTransaction(transactionId, ex);
             }

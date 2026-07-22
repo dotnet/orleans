@@ -1,6 +1,6 @@
+using System.Text;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.AWSUtils.Tests;
 

@@ -14,7 +14,7 @@ namespace TestGrains
     public class ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain : Grain<StreamCheckpoint<int>>, IGeneratedEventCollectorGrain
     {
         public const string StreamNamespace = "NonTransientError_RecoverableStream";
-     
+
         // grain instance state
         private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
@@ -81,7 +81,7 @@ namespace TestGrains
             if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {
                 // every 10 events, checkpoint our grain state
-                if (State.Accumulator%10 != 0) return;
+                if (State.Accumulator % 10 != 0) return;
                 logger.LogInformation(
                     "Checkpointing: StreamGuid: {StreamGuid}, StreamNamespace: {StreamNamespace}, SequenceToken: {SequenceToken}, Accumulator: {Accumulator}",
                     State.StreamGuid,

@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
+#nullable disable
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class AlwaysInterleaveDiagnosticAnalyzer : DiagnosticAnalyzer
     {

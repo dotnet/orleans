@@ -47,7 +47,7 @@ namespace TestExtensions
         public IClusterClient Client => this.HostedCluster?.Client;
 
         public ILogger Logger { get; private set; }
-        
+
         public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
 
         public virtual async Task InitializeAsync()

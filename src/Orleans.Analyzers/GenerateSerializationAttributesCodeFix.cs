@@ -10,7 +10,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
+#nullable disable
     [ExportCodeFixProvider(LanguageNames.CSharp)]
     public class GenerateOrleansSerializationAttributesCodeFix : CodeFixProvider
     {

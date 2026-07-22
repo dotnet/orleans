@@ -18,9 +18,9 @@ using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.DurableJobs;
 using Orleans.Runtime;
 using Xunit;
+using AdvancedReminderException = Orleans.AdvancedReminders.Runtime.ReminderException;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
-using AdvancedReminderException = Orleans.AdvancedReminders.Runtime.ReminderException;
 
 namespace UnitTests.AdvancedReminders;
 

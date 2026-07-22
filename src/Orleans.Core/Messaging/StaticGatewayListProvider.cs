@@ -27,7 +27,7 @@ namespace Orleans.Messaging
 
         /// <inheritdoc />
         public Task InitializeGatewayListProvider() => Task.CompletedTask;
-        
+
         /// <inheritdoc />
         public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.options.Gateways);
 

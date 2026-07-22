@@ -1,7 +1,7 @@
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Streams.Core
 {

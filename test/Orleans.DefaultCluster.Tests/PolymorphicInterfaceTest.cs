@@ -64,7 +64,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("E1", await IERef.E1Method());
             Assert.Equal("E2", await IERef.E2Method());
             Assert.Equal("E3", await IERef.E3Method());
-            
+
         }
 
         /// <summary>

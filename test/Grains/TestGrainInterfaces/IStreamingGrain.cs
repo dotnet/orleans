@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 
 namespace UnitTests.GrainInterfaces
@@ -91,5 +91,5 @@ namespace UnitTests.GrainInterfaces
         Task<int> ItemsConsumed { get; }
         Task<int> ConsumerCount { get; }
         string ProviderName { get; }
-    }    
+    }
 }

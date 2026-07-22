@@ -1,7 +1,7 @@
+using Orleans.Runtime.Placement;
+using Orleans.TestingHost;
 using TestExtensions;
 using Xunit.Abstractions;
-using Orleans.TestingHost;
-using Orleans.Runtime.Placement;
 
 namespace UnitTests.ActivationRebalancingTests;
 

@@ -39,7 +39,7 @@ namespace NonSilo.Tests.Membership
                     Entry(silo, SiloStatus.Active),
                     Entry(Silo("127.0.0.1:200@1"), SiloStatus.Active))),
                 localSiloEntry);
-            
+
             Assert.Equal(localSiloEntry.Status, snapshot.GetSiloStatus(silo));
             Assert.Equal(silo, snapshot.Entries[silo].SiloAddress);
             Assert.Equal(localSiloEntry.Status, snapshot.Entries[silo].Status);

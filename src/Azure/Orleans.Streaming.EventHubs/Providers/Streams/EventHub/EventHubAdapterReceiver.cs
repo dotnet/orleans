@@ -6,14 +6,14 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Streams;
-using Orleans.Streaming.EventHubs.Testing;
-using Azure.Messaging.EventHubs;
 using Orleans.Statistics;
+using Orleans.Streaming.EventHubs.Testing;
+using Orleans.Streams;
 
 #nullable disable
 namespace Orleans.Streaming.EventHubs
@@ -110,7 +110,7 @@ namespace Orleans.Streaming.EventHubs
             try
             {
                 this.checkpointer = await this.checkpointerFactory(this.settings.Partition);
-                if(this.cache != null)
+                if (this.cache != null)
                 {
                     this.cache.Dispose();
                     this.cache = null;

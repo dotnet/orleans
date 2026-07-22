@@ -260,7 +260,7 @@ namespace NonSilo.Tests.Membership
             Assert.True(calls.Count >= 2);
             Assert.Equal(nameof(IMembershipTable.InitializeMembershipTable), calls[0].Method);
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
-            
+
             // During initialization, the table is read and predecessor entries are declared dead
             // before the table snapshot is published to other components.
             Assert.True(await membershipUpdates.MoveNextAsync());
@@ -860,7 +860,7 @@ namespace NonSilo.Tests.Membership
                 timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
-            
+
             // Test that retries occur after an exception.
             (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(1);
@@ -943,7 +943,7 @@ namespace NonSilo.Tests.Membership
 
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime)
         {
-            return new MembershipEntry { SiloAddress = address, Status = status, IAmAliveTime =  iAmAliveTime.UtcDateTime, StartTime = iAmAliveTime.UtcDateTime };
+            return new MembershipEntry { SiloAddress = address, Status = status, IAmAliveTime = iAmAliveTime.UtcDateTime, StartTime = iAmAliveTime.UtcDateTime };
         }
     }
 }

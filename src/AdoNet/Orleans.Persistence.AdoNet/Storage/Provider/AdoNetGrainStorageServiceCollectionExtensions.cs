@@ -66,5 +66,5 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator>(sp => new AdoNetGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>().Get(name), name));
             return services.AddGrainStorage(name, AdoNetGrainStorageFactory.Create);
         }
-    } 
+    }
 }

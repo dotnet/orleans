@@ -1,9 +1,9 @@
 using BenchmarkDotNet.Attributes;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
-using Orleans.Serialization.Serializers;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 
 namespace Benchmarks.Journaling;

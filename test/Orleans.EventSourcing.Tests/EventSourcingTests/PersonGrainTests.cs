@@ -1,4 +1,4 @@
-﻿using TestGrainInterfaces;
+using TestGrainInterfaces;
 using Xunit;
 using Assert = Xunit.Assert;
 

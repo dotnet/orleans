@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Orleans.Runtime;
 using Orleans;
+using Orleans.Runtime;
 
 namespace ActivationRebalancing.Frontend.Controllers;
 

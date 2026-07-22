@@ -1,6 +1,6 @@
 using System;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Reminders;
 using Orleans.Runtime;
 

@@ -1,4 +1,4 @@
-﻿namespace BenchmarkGrainInterfaces.Transaction
+namespace BenchmarkGrainInterfaces.Transaction
 {
     public interface ITransactionRootGrain : IGrainWithGuidKey
     {

@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
 
@@ -9,7 +9,7 @@ namespace Orleans.Transactions.Abstractions
     /// read/write locking
     /// </summary>
     /// <typeparam name="TState">The type of the state</typeparam>
-    public interface ITransactionalState<TState>  
+    public interface ITransactionalState<TState>
         where TState : class, new()
     {
         /// <summary>

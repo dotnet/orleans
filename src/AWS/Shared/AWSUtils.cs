@@ -1,5 +1,5 @@
-using Amazon;
 using System;
+using Amazon;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB

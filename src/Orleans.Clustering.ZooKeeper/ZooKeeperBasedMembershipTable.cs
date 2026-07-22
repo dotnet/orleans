@@ -4,11 +4,11 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using org.apache.zookeeper;
 using org.apache.zookeeper.data;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Host;
 
@@ -57,10 +57,10 @@ namespace Orleans.Runtime.Membership
         /// The root connection string. for eg. "192.168.1.1,192.168.1.2"
         /// </summary>
         private readonly string rootConnectionString;
-        
+
         public ZooKeeperBasedMembershipTable(
-            ILogger<ZooKeeperBasedMembershipTable> logger, 
-            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, 
+            ILogger<ZooKeeperBasedMembershipTable> logger,
+            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;

@@ -33,7 +33,7 @@ namespace UnitTests.GrainInterfaces
     {
         ValueTask<int> GetWorkerLimit();
     }
-    
+
     public interface IOtherStatelessWorkerPlacementTestGrain : IStatelessWorkerPlacementTestGrain
     {
     }

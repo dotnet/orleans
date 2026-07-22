@@ -42,7 +42,7 @@ namespace Orleans.Transactions
         // follow-up actions, to be executed after storing this batch
         private readonly List<Action> followUpActions;
         private readonly List<Func<Task<bool>>> storeConditions;
-        
+
         // counters for each type of event
         private int total = 0;
         private int prepare = 0;

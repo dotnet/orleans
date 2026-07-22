@@ -5,10 +5,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
-using Orleans.Runtime;
+using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Metrics;
 using Orleans.Dashboard.Model;
-using Orleans.Dashboard.Core;
+using Orleans.Runtime;
 
 #nullable disable
 namespace Orleans.Dashboard.Implementation;
@@ -56,7 +56,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         );
         try
         {
-            _timer = RegisterTimer(x => CollectStatistics((bool) x), true, updateInterval, updateInterval);
+            _timer = RegisterTimer(x => CollectStatistics((bool)x), true, updateInterval, updateInterval);
 
             await CollectStatistics(false);
         }

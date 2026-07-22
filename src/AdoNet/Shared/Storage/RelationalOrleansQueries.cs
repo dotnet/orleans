@@ -343,45 +343,45 @@ namespace Orleans.Tests.SqlUtils
         private static
             Orleans.AdvancedReminders.Runtime.ReminderPriority
             ParsePriority(int value) => value switch
-        {
-            (int)
-                Orleans.AdvancedReminders.Runtime.ReminderPriority
-                .High =>
-                Orleans.AdvancedReminders.Runtime.ReminderPriority
-                .High,
-            (int)
-                Orleans.AdvancedReminders.Runtime.ReminderPriority
-                .Normal =>
-                Orleans.AdvancedReminders.Runtime.ReminderPriority
-                .Normal,
-            _ =>
-                Orleans.AdvancedReminders.Runtime.ReminderPriority
-                .Normal,
-        };
+            {
+                (int)
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .High =>
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .High,
+                (int)
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .Normal =>
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .Normal,
+                _ =>
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .Normal,
+            };
 
         private static
             Orleans.AdvancedReminders.Runtime.MissedReminderAction
             ParseAction(int value) => value switch
-        {
-            (int)
-                Orleans.AdvancedReminders.Runtime.MissedReminderAction
-                .FireImmediately =>
-                Orleans.AdvancedReminders.Runtime.MissedReminderAction
-                .FireImmediately,
-            (int)
-                Orleans.AdvancedReminders.Runtime.MissedReminderAction
-                .Skip =>
-                Orleans.AdvancedReminders.Runtime.MissedReminderAction
-                .Skip,
-            (int)
-                Orleans.AdvancedReminders.Runtime.MissedReminderAction
-                .Notify =>
-                Orleans.AdvancedReminders.Runtime.MissedReminderAction
-                .Notify,
-            _ =>
-                Orleans.AdvancedReminders.Runtime.MissedReminderAction
-                .Skip,
-        };
+            {
+                (int)
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .FireImmediately =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .FireImmediately,
+                (int)
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Skip =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Skip,
+                (int)
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Notify =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Notify,
+                _ =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Skip,
+            };
 #endif
 
         /// <summary>

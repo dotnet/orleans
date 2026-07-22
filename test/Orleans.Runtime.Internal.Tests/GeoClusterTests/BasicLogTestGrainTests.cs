@@ -1,13 +1,12 @@
-using Microsoft.Extensions.Options;
-using Xunit;
-using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
-using TestExtensions;
-using Tester;
-
-using Orleans.Configuration;
 using Azure.Data.Tables;
 using Azure.Identity;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.TestingHost;
+using Tester;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace Tests.GeoClusterTests
 {
@@ -46,7 +45,7 @@ namespace Tests.GeoClusterTests
                         {
                             options.TableServiceClient = GetTableServiceClient();
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
 
                 private static TableServiceClient GetTableServiceClient()
@@ -57,7 +56,7 @@ namespace Tests.GeoClusterTests
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;

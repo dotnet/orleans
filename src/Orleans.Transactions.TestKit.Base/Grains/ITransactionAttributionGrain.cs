@@ -55,11 +55,11 @@ namespace Orleans.Transactions.TestKit
     {
         public static ITransactionAttributionGrain GetTransactionAttributionGrain(this IGrainFactory grainFactory, Guid id, TransactionOption? option = null)
         {
-            if(!option.HasValue)
+            if (!option.HasValue)
             {
                 return new NoAttributionGrain(grainFactory.GetGrain<INoAttributionGrain>(id));
             }
-            switch(option.Value)
+            switch (option.Value)
             {
                 case TransactionOption.Suppress:
                     return new SuppressAttributionGrain(grainFactory.GetGrain<ISuppressAttributionGrain>(id));

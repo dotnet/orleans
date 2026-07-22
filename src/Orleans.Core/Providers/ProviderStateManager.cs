@@ -31,7 +31,7 @@ namespace Orleans.Providers
                     throw new ProviderStateException("Provider state can not be set to none.");
 
                 case ProviderState.Initialized:
-                    switch(State)
+                    switch (State)
                     {
                         case ProviderState.None:
                             return true;
@@ -39,7 +39,7 @@ namespace Orleans.Providers
                     break;
 
                 case ProviderState.Started:
-                    switch(State)
+                    switch (State)
                     {
                         case ProviderState.None:
                             throw new ProviderStateException("Trying to start a provider that hasn't been initialized.");

@@ -1,9 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
 using Orleans.Dashboard.Metrics.History;
-using System.Collections;
 
 namespace Benchmarks.Dashboard
 {
@@ -54,7 +54,7 @@ namespace Benchmarks.Dashboard
                 History.Add(trace.Time, trace.Silo, trace.Traces);
             }
         }
-        
+
         [Benchmark]
         public ICollection Test_QueryAll_TraceHistory()
         {
@@ -78,7 +78,7 @@ namespace Benchmarks.Dashboard
         {
             return History.GroupByGrainAndSilo().ToList();
         }
-        
+
         [Benchmark]
         public ICollection Test_AggregateByGrainMethod_TraceHistory()
         {

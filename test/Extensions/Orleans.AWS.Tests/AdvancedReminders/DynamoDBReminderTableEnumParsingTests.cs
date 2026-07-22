@@ -4,8 +4,8 @@ using System.Reflection;
 using Amazon.DynamoDBv2.Model;
 using Orleans.AdvancedReminders.DynamoDB;
 using Xunit;
-using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
 using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
+using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
 
 namespace AWSUtils.Tests.AdvancedReminders;
 

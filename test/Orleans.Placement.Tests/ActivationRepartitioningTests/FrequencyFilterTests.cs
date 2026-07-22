@@ -43,7 +43,7 @@ public class FrequencyFilterTests
         Assert.NotEmpty(result);
     }
 
-    public readonly struct TestKey(ulong key) 
+    public readonly struct TestKey(ulong key)
     {
         private static ulong _nextKey;
         public static TestKey GetNext() => new(_nextKey++);

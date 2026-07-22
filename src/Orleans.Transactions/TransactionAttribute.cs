@@ -68,11 +68,11 @@ namespace Orleans
 
     public enum TransactionOptionAlias
     {
-        Suppress     = TransactionOption.Supported,
-        Required     = TransactionOption.CreateOrJoin,
-        RequiresNew  = TransactionOption.Create,
-        Mandatory    = TransactionOption.Join,
-        Never        = TransactionOption.NotAllowed,
+        Suppress = TransactionOption.Supported,
+        Required = TransactionOption.CreateOrJoin,
+        RequiresNew = TransactionOption.Create,
+        Mandatory = TransactionOption.Join,
+        Never = TransactionOption.NotAllowed,
     }
 
     [GenerateSerializer]
@@ -274,7 +274,7 @@ namespace Orleans
 
         public override void Dispose()
         {
-           TransactionInfo = null;
+            TransactionInfo = null;
         }
 
         void IOnDeserialized.OnDeserialized(DeserializationContext context)

@@ -1,9 +1,9 @@
+using System.IO.Pipelines;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
-using Microsoft.Extensions.DependencyInjection;
-using System.IO.Pipelines;
-using Xunit;
 using Orleans.Serialization.Serializers;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.Serialization.TestKit

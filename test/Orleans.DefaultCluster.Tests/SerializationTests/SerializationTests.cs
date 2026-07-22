@@ -17,11 +17,11 @@ namespace DefaultCluster.Tests
         public void Serialization_LargeTestData()
         {
             var data = new LargeTestData
-                           {
-                               Description =
+            {
+                Description =
                                    "This is a test. This is only a test. In the event of a real execution, this would contain actual data.",
-                               EnumValue = TestEnum.First
-                           };
+                EnumValue = TestEnum.First
+            };
             data.SetBit(13);
             data.SetEnemy(17, CampaignEnemyTestType.Enemy1);
 

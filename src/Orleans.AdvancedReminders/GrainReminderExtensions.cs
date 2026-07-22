@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 using Orleans.AdvancedReminders.Timers;
+using Orleans.Runtime;
 
 #nullable enable
 namespace Orleans.AdvancedReminders;

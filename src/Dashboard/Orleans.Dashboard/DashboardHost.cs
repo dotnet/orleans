@@ -2,13 +2,13 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
-using Orleans.Runtime;
-using Orleans.Dashboard.Implementation;
-using Microsoft.Extensions.Hosting;
 using Orleans.Dashboard.Core;
+using Orleans.Dashboard.Implementation;
+using Orleans.Runtime;
 
 #nullable disable
 namespace Orleans.Dashboard;

@@ -35,7 +35,7 @@ namespace Tester.EventSourcingTests
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("AzureStore")
                     .AddMemoryGrainStorage("MemoryStore")
-                    .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
+                    .AddFaultInjectionMemoryStorage("SlowMemoryStore", options => options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
             }
         }
     }

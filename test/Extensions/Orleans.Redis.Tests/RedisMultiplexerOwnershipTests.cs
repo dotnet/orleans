@@ -298,7 +298,8 @@ public sealed class RedisMultiplexerOwnershipTests
             ISiloLifecycleSubject lifecycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             storage.Participate(lifecycle);
             await lifecycle.OnStart(CancellationToken.None);
-        });
+        }
+        );
     }
 
     private static (RedisMembershipTable Provider, Func<Task> Initialize) CreateMembershipTable(

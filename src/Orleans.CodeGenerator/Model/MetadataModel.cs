@@ -1,7 +1,7 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Orleans.CodeGenerator
 {
@@ -23,7 +23,7 @@ namespace Orleans.CodeGenerator
         public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
         public List<(TypeSyntax Type, uint Id)> WellKnownTypeIds { get; } = new(1024);
         public HashSet<string> ApplicationParts { get; } = new();
-        internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new (SymbolEqualityComparer.Default);
+        internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new(SymbolEqualityComparer.Default);
     }
 
     /// <summary>

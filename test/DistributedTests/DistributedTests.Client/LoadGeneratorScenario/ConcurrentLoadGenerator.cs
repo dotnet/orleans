@@ -1,7 +1,7 @@
-using System.Threading.Channels;
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
+using System.Threading.Channels;
 using Microsoft.Crank.EventSources;
+using Microsoft.Extensions.Logging;
 
 namespace DistributedTests.Client
 {

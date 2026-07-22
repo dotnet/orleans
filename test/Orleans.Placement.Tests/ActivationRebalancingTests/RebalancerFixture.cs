@@ -1,7 +1,7 @@
-﻿using TestExtensions;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.TestingHost;
-using Microsoft.Extensions.DependencyInjection;
+using TestExtensions;
 
 namespace UnitTests.ActivationRebalancingTests;
 

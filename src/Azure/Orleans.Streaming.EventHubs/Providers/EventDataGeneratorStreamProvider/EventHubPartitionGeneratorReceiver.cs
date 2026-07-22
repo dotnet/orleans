@@ -1,9 +1,9 @@
-using Orleans.Runtime;
-using Azure.Messaging.EventHubs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Messaging.EventHubs;
+using Orleans.Runtime;
 
 namespace Orleans.Streaming.EventHubs.Testing
 {

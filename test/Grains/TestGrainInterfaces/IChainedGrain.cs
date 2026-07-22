@@ -16,7 +16,7 @@ namespace UnitTests.GrainInterfaces
         Task PassThisNested(ChainGrainHolder next);
         Task PassNullNested(ChainGrainHolder next);
     }
-    
+
     [GenerateSerializer]
     public class ChainGrainHolder
     {

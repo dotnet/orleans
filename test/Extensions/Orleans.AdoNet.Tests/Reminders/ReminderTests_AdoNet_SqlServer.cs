@@ -2,14 +2,14 @@
 
 //#define USE_SQL_SERVER
 
+using Orleans.Internal;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
+using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using UnitTests.GrainInterfaces;
 using UnitTests.TimerTests;
-using Orleans.Tests.SqlUtils;
-using Orleans.Internal;
 using Xunit;
 
 // ReSharper disable InconsistentNaming
@@ -71,7 +71,7 @@ namespace Tester.AdoNet.Reminders
             var controlProxy = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
         }
-        
+
         // Basic tests
 
         [SkippableFact]

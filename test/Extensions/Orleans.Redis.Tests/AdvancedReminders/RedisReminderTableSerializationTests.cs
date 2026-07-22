@@ -16,10 +16,10 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
 using Xunit;
+using AdvancedRedisReminderTableOptions = Orleans.AdvancedReminders.Redis.RedisReminderTableOptions;
+using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
-using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
-using AdvancedRedisReminderTableOptions = Orleans.AdvancedReminders.Redis.RedisReminderTableOptions;
 
 namespace Tester.Redis.AdvancedReminders;
 

@@ -1,6 +1,6 @@
-using Orleans.Storage;
 using System;
 using System.Runtime.Serialization;
+using Orleans.Storage;
 
 namespace Orleans.TestingHost
 {

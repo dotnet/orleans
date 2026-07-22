@@ -1,10 +1,10 @@
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using System.Runtime.InteropServices;
 using TestExtensions;
 using TestVersionGrainInterfaces;
 using TestVersionGrains;

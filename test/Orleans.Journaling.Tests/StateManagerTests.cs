@@ -1075,7 +1075,7 @@ public class StateManagerTests : JournalingTestBase
         var dictToKeep2 = CreateTestState(DictToKeepKey, sut2.Manager);
 
         await sut2.Lifecycle.OnStart();
-        
+
         // The manager should have recovered the state for dictToKeep,
         // and created a DurableNothing placeholder for dictToRetire (we cant test for it at this point). 
         Assert.Equal(1, dictToKeep2["a"]);

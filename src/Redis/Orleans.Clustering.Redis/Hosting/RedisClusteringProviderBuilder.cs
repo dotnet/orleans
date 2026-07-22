@@ -1,13 +1,13 @@
-using Orleans.Providers;
-using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
-using StackExchange.Redis;
-using Orleans.Clustering.Redis.Hosting;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans;
+using Orleans.Clustering.Redis.Hosting;
+using Orleans.Hosting;
+using Orleans.Providers;
+using StackExchange.Redis;
 
 #nullable disable
 [assembly: RegisterProvider("Redis", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]

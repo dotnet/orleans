@@ -1,5 +1,5 @@
-using System.Net;
 using System.Diagnostics;
+using System.Net;
 using Orleans.Reminders.Cosmos.Models;
 
 namespace Orleans.Reminders.Cosmos;

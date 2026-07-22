@@ -1,12 +1,12 @@
-using Orleans.Providers;
-using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
-using Orleans.AdvancedReminders.Redis;
-using StackExchange.Redis;
 using System;
-using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans;
+using Orleans.AdvancedReminders.Redis;
+using Orleans.Hosting;
+using Orleans.Providers;
+using StackExchange.Redis;
 
 [assembly: RegisterProvider("Redis", "AdvancedReminders", "Silo", typeof(AdvancedRedisRemindersProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "AdvancedReminders", "Silo", typeof(AdvancedRedisRemindersProviderBuilder))]

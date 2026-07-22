@@ -1,8 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime;
-using Orleans.Transactions.Abstractions;
 using Orleans.Transactions;
-using Microsoft.Extensions.DependencyInjection;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Hosting
 {

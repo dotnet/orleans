@@ -1,9 +1,9 @@
 using System;
-using Orleans.Providers;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
-using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers;
 
 #nullable disable
 [assembly: RegisterProvider("Consul", "Clustering", "Client", typeof(ConsulClusteringProviderBuilder))]

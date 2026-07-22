@@ -15,7 +15,7 @@ namespace Orleans.Transactions.TestKit
         {
             const int delta = 5;
             ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
-            Func<Task> task = ()=>grain.Set(delta);
+            Func<Task> task = () => grain.Set(delta);
             var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
         }
 

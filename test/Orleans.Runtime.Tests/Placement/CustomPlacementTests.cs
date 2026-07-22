@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Configuration;
 
 namespace Tester.CustomPlacementTests
 {
@@ -68,7 +68,7 @@ namespace Tester.CustomPlacementTests
             await Task.WhenAll(tasks);
 
             var silo = await tasks[0];
-            Assert.Equal(silos[silos.Length-2], silo);
+            Assert.Equal(silos[silos.Length - 2], silo);
 
             for (int i = 1; i < nGrains; i++)
             {
@@ -141,7 +141,7 @@ namespace Tester.CustomPlacementTests
 
             for (int i = 0; i < nGrains; i++)
             {
-                var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
+                var hash = (int)(grains[i].GetUniformHashCode() & 0x7fffffff);
                 Assert.Equal(siloAddresses[hash % silos.Length], await tasks[i]);
             }
         }

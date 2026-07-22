@@ -1,7 +1,7 @@
 
 using System;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streaming.EventHubs.Testing;
@@ -22,7 +22,7 @@ namespace Orleans.Hosting.Developer
             configurator.Configure(configureOptions);
         }
     }
-    
+
     public class EventDataGeneratorStreamConfigurator : SiloRecoverableStreamConfigurator, IEventDataGeneratorStreamConfigurator
     {
         public EventDataGeneratorStreamConfigurator(string name,

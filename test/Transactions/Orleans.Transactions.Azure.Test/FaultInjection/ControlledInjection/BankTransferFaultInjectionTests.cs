@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Orleans.Transactions.AzureStorage.Tests;
-using Orleans.Transactions.Tests;
 using Orleans.Transactions.TestKit;
+using Orleans.Transactions.Tests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;

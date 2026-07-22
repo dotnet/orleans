@@ -1,6 +1,6 @@
-using Orleans.Dashboard.Model;
 using System;
 using System.Collections.Generic;
+using Orleans.Dashboard.Model;
 
 namespace Benchmarks.Dashboard
 {

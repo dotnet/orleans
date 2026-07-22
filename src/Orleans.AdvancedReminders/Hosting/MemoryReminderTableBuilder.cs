@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.AdvancedReminders.Runtime.Hosting.ProviderConfiguration;
 using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.AdvancedReminders.Runtime.Hosting.ProviderConfiguration;
 
 [assembly: RegisterProvider("Memory", "AdvancedReminders", "Silo", typeof(AdvancedMemoryReminderTableBuilder))]
 

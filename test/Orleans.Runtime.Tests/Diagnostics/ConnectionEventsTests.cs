@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
 using Xunit;
-using Orleans.Core.Diagnostics;
 
 namespace Tester.Diagnostics;
 

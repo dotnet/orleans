@@ -403,13 +403,13 @@ public abstract class JournalBatchTests : IAsyncLifetime
     {
         public GrainReference GrainReference => throw new NotImplementedException();
         public GrainId GrainId => grainId;
-        public object? GrainInstance  => throw new NotImplementedException();
-        public ActivationId ActivationId  => throw new NotImplementedException();
-        public GrainAddress Address  => throw new NotImplementedException();
-        public IServiceProvider ActivationServices  => throw new NotImplementedException();
-        public IGrainLifecycle ObservableLifecycle  => throw new NotImplementedException();
-        public IWorkItemScheduler Scheduler  => throw new NotImplementedException();
-        public Task Deactivated  => throw new NotImplementedException();
+        public object? GrainInstance => throw new NotImplementedException();
+        public ActivationId ActivationId => throw new NotImplementedException();
+        public GrainAddress Address => throw new NotImplementedException();
+        public IServiceProvider ActivationServices => throw new NotImplementedException();
+        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
+        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+        public Task Deactivated => throw new NotImplementedException();
 
         public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();

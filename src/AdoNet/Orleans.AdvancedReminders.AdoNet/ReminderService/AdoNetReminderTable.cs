@@ -2,8 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.AdvancedReminders.AdoNet;
+using Orleans.Configuration;
 using Orleans.Reminders.AdoNet.Storage;
 
 namespace Orleans.AdvancedReminders.Runtime.ReminderService

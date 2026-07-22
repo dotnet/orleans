@@ -3,10 +3,10 @@ using NATS.Client.Core;
 using NATS.Client.JetStream;
 using Orleans.Streaming.NATS.Hosting;
 using Orleans.TestingHost;
-using UnitTests.StreamingTests;
-using Xunit;
 using TestExtensions;
 using UnitTests.Streaming;
+using UnitTests.StreamingTests;
+using Xunit;
 
 namespace NATS.Tests;
 

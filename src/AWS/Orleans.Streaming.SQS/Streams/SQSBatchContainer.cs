@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Amazon.SQS.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -5,9 +8,6 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 #nullable disable

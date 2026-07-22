@@ -1,5 +1,5 @@
-using Orleans.Serialization.Serializers;
 using System;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Codecs
 {

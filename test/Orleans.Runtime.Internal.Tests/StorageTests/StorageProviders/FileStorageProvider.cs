@@ -52,7 +52,7 @@ namespace Samples.StorageProviders
     /// <summary>
     /// Interfaces with the file system.
     /// </summary>
-    internal class GrainStateFileDataManager : IJSONStateDataManager 
+    internal class GrainStateFileDataManager : IJSONStateDataManager
     {
         /// <summary>
         /// Constructor

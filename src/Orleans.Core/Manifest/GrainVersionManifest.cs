@@ -333,7 +333,7 @@ namespace Orleans.Runtime.Versions
             }
 
             public MajorMinorVersion Version { get; }
-            public Dictionary<GrainInterfaceType, ushort[]> AvailableVersions { get; } 
+            public Dictionary<GrainInterfaceType, ushort[]> AvailableVersions { get; }
             public Dictionary<(GrainInterfaceType, ushort), SiloAddress[]> SupportedSilosByInterface { get; } = new Dictionary<(GrainInterfaceType, ushort), SiloAddress[]>();
             public Dictionary<GrainType, SiloAddress[]> SupportedSilosByGrainType { get; } = new Dictionary<GrainType, SiloAddress[]>();
         }

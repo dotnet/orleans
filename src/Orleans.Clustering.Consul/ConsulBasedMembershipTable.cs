@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Membership
 
         public ConsulBasedMembershipTable(
             ILogger<ConsulBasedMembershipTable> logger,
-            IOptions<ConsulClusteringOptions> membershipTableOptions, 
+            IOptions<ConsulClusteringOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.clusterId = clusterOptions.Value.ClusterId;

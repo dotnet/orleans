@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
 
 namespace TestGrains
@@ -16,7 +16,7 @@ namespace TestGrains
     {
         public Task<object> Receive(object message)
         {
-            return Task.FromResult((object) null);
+            return Task.FromResult((object)null);
         }
 
         public Task ReceiveVoid(object message)

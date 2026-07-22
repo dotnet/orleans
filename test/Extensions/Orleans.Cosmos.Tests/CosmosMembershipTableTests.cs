@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TestExtensions;
-using UnitTests.MembershipTests;
-using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
+using Orleans.Messaging;
+using TestExtensions;
 using UnitTests;
+using UnitTests.MembershipTests;
 
 namespace Tester.Cosmos.Clustering;
 

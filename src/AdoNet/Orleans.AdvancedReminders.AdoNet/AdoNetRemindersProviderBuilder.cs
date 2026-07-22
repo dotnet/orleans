@@ -3,9 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.AdvancedReminders.AdoNet;
 using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.AdvancedReminders.AdoNet;
 
 [assembly: RegisterProvider("AdoNet", "AdvancedReminders", "Silo", typeof(AdvancedAdoNetRemindersProviderBuilder))]
 

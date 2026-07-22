@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.AzureStorage;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
-using Orleans.AdvancedReminders.AzureStorage;
 
 namespace Orleans.AdvancedReminders.AzureStorage
 {

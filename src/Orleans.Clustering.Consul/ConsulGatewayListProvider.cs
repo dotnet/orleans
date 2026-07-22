@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Consul;
-using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 #nullable disable
 namespace Orleans.Runtime.Membership
@@ -21,9 +21,9 @@ namespace Orleans.Runtime.Membership
         private readonly string kvRootFolder;
 
         public ConsulGatewayListProvider(
-            ILogger<ConsulGatewayListProvider> logger, 
-            IOptions<ConsulClusteringOptions> options, 
-            IOptions<GatewayOptions> gatewayOptions, 
+            ILogger<ConsulGatewayListProvider> logger,
+            IOptions<ConsulClusteringOptions> options,
+            IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;

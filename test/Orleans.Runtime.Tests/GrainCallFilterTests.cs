@@ -1,14 +1,14 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
+using Orleans.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Providers;
-using System.Diagnostics;
 
 namespace UnitTests.General
 {
@@ -267,7 +267,7 @@ namespace UnitTests.General
         {
             this.fixture = fixture;
         }
-        
+
         /// <summary>
         /// Tests the complete outgoing filter pipeline with request/response manipulation.
         /// Verifies that:
@@ -309,7 +309,7 @@ namespace UnitTests.General
             Assert.NotNull(context);
             Assert.Equal("1234", context);
         }
-        
+
         /// <summary>
         /// Tests that grain call filters are properly invoked for streaming scenarios.
         /// When a grain receives stream events, the incoming filters should still execute,
@@ -333,7 +333,7 @@ namespace UnitTests.General
                 actual = await grain.GetLastStreamValue();
                 if (actual != 0) break;
             }
-            
+
             Assert.Equal(testValue * 2, actual);
         }
 
@@ -420,7 +420,7 @@ namespace UnitTests.General
             result = await grain.SayHello();
             Assert.Equal("Hello", result);
         }
-        
+
         /// <summary>
         /// Tests filters on grains which implement multiple of the same generic interface.
         /// </summary>
@@ -470,7 +470,7 @@ namespace UnitTests.General
         public async Task GrainCallFilter_Incoming_FilterThrows_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(Random.Shared.Next());
-            
+
             var exception = await Assert.ThrowsAsync<MethodInterceptionGrain.MyDomainSpecificException>(() => grain.FilterThrows());
             Assert.NotNull(exception);
             Assert.Equal("Filter THROW!", exception.Message);
@@ -507,7 +507,7 @@ namespace UnitTests.General
             Assert.Equal(-42, result);
 
             result = await ((IMyOtherInterface)extension).GetExtensionValue();
-            Assert.Equal(100-42, result);
+            Assert.Equal(100 - 42, result);
         }
 
         /// <summary>
@@ -693,7 +693,7 @@ namespace UnitTests.General
             result = await grain.SayHello();
             Assert.Equal("Hello", result);
         }
-        
+
         /// <summary>
         /// Tests filters on grains which implement multiple of the same generic interface.
         /// </summary>
@@ -741,7 +741,7 @@ namespace UnitTests.General
         {
             var observer = new MethodInterceptionGrainObserver();
             var grain = this.fixture.GrainFactory.CreateObjectReference<IMethodInterceptionGrainObserver>(observer);
-            
+
             var exception = await Assert.ThrowsAsync<MethodInterceptionGrainObserver.MyDomainSpecificException>(() => grain.FilterThrows());
             Assert.NotNull(exception);
             Assert.Equal("Filter THROW!", exception.Message);

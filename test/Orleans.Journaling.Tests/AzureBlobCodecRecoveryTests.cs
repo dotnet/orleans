@@ -5,10 +5,10 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Core;
 using Orleans.Journaling.Json;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
-using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 

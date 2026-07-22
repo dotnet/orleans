@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -6,8 +8,6 @@ using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -35,7 +35,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
@@ -47,7 +47,7 @@ namespace ServiceBus.Tests.StreamingTests
                                 options.PersistInterval = TimeSpan.FromSeconds(1);
                             }));
                             b.UseDynamicClusterConfigDeploymentBalancer();
-                            b.UseDataAdapter((s,n) => ActivatorUtilities.CreateInstance<StreamPerPartitionDataAdapter>(s));
+                            b.UseDataAdapter((s, n) => ActivatorUtilities.CreateInstance<StreamPerPartitionDataAdapter>(s));
                         });
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore");
@@ -59,7 +59,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
@@ -95,7 +95,7 @@ namespace ServiceBus.Tests.StreamingTests
 
             // subscribe to each partition
             List<Task> becomeConsumersTasks = consumers
-                .Select( (consumer, i) => consumer.BecomeConsumer(StreamPerPartitionDataAdapter.GetPartitionGuid(i.ToString()), null, StreamProviderName))
+                .Select((consumer, i) => consumer.BecomeConsumer(StreamPerPartitionDataAdapter.GetPartitionGuid(i.ToString()), null, StreamProviderName))
                 .ToList();
             await Task.WhenAll(becomeConsumersTasks);
 

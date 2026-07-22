@@ -1,8 +1,8 @@
-using Xunit;
-using Xunit.Abstractions;
 using Orleans.Runtime.Development;
 using TestExtensions;
 using TestExtensions.Runners;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests
 {

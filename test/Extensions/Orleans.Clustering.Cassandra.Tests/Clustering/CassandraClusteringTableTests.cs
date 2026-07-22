@@ -356,7 +356,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         ISession ttlSession = await CreateSession();
         await ttlSession.ExecuteAsync(new SimpleStatement("DROP TABLE IF EXISTS membership;"));
 
-        var (membershipTable, _) = await CreateNewMembershipTableAsync(cassandraTtl:cassandraTtl);
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(cassandraTtl: cassandraTtl);
 
         var tableData = await membershipTable.ReadAll();
 
@@ -371,7 +371,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         // Validate initial TTL values
         var initialTtlValues = new Dictionary<string, int>();
-        await ValidateTtlValues(initial:true);
+        await ValidateTtlValues(initial: true);
 
         var amAliveTime = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
 
@@ -406,11 +406,11 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Equal(originalMembershipEntry.StartTime, updatedMember.StartTime);
 
         // Validate the TTL values are greater than the initial values read after the delay
-        await ValidateTtlValues(initial:false);
+        await ValidateTtlValues(initial: false);
 
         // Validate data automatically expires when using Cassandra TTL, and is still present if not
         // The Cassandra TTL is set to 20 seconds for this testing
-        using var cts = new CancellationTokenSource(delay:TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(delay: TimeSpan.FromSeconds(30));
         if (cassandraTtl)
         {
             await ValidateDataIsDeleted(cts.Token);
@@ -671,7 +671,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         IMembershipTable membershipTable = services.GetRequiredService<CassandraClusteringTable>();
         await membershipTable.InitializeMembershipTable(true);
 
-        IGatewayListProvider gatewayProvider = services.GetRequiredService < CassandraGatewayListProvider>();
+        IGatewayListProvider gatewayProvider = services.GetRequiredService<CassandraGatewayListProvider>();
         await gatewayProvider.InitializeGatewayListProvider();
 
         return (membershipTable, gatewayProvider);

@@ -24,7 +24,7 @@ namespace UnitTests.General
         private class A { }
 
         private class B : A { }
-        
+
         public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;

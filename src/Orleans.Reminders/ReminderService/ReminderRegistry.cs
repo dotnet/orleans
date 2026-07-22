@@ -35,7 +35,7 @@ namespace Orleans.Runtime.ReminderService
 
             if (period.Ticks < 0)
                 throw new ArgumentOutOfRangeException(nameof(period), "Cannot use negative period to create a reminder");
-            
+
             var minReminderPeriod = options.MinimumReminderPeriod;
             if (period < minReminderPeriod)
                 throw new ArgumentException($"Cannot register reminder {reminderName} as requested period ({period}) is less than minimum allowed reminder period ({minReminderPeriod})");

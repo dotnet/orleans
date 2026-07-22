@@ -303,7 +303,7 @@ namespace Orleans.TestingHost.Tests
                 hostBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
-        
+
         public Task InitializeAsync()
         {
             return Task.CompletedTask;

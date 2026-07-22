@@ -334,7 +334,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
                 Assert.True(
                     exc.Message.Contains("Forwarding failed"),
                     "Did not get expected exception message returned: " + exc.Message);
-            }  
+            }
         }
 
         private async Task CheckNumActivateDeactivateCalls(
@@ -347,12 +347,12 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
                 expectedActivateCalls,
                 expectedDeactivateCalls,
                 new string[] { forActivation },
-                when )
+                when)
             ;
         }
 
         private async Task CheckNumActivateDeactivateCalls(
-            int expectedActivateCalls, 
+            int expectedActivateCalls,
             int expectedDeactivateCalls,
             string[] forActivations,
             string when = null)

@@ -1,15 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using Microsoft.Extensions.Logging.Abstractions;
 using TesterInternal;
+using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
-using TestExtensions.Runners;
 
 namespace AWSUtils.Tests.StorageTests
 {

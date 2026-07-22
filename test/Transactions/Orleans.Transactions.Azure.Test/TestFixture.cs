@@ -1,12 +1,12 @@
-using Orleans.Runtime;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;
-using TestExtensions;
 using Tester;
-using Microsoft.Extensions.Configuration;
 using Tester.AzureUtils;
+using TestExtensions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {

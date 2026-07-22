@@ -1,4 +1,4 @@
-﻿namespace DefaultCluster.Tests
+namespace DefaultCluster.Tests
 {
     /// <summary>
     /// Test grain implementation used for error handling tests.

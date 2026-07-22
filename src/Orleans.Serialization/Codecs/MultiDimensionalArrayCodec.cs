@@ -191,7 +191,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             result = Array.CreateInstance(elementType, lengths);
-            context.RecordCopy(original, result); 
+            context.RecordCopy(original, result);
 
             if (rank == 1)
             {

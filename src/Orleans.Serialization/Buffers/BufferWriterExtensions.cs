@@ -1,7 +1,7 @@
-using Orleans.Serialization.Session;
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Serialization.Buffers
 {

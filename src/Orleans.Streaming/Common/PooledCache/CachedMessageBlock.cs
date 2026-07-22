@@ -59,11 +59,13 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the number of messages in this block.
         /// </summary>
-        public int ItemCount { get
+        public int ItemCount
+        {
+            get
             {
                 int count = writeIndex - readIndex;
                 return count >= 0 ? count : 0;
-            }  
+            }
         }
 
         /// <summary>
@@ -162,7 +164,7 @@ namespace Orleans.Providers.Streams.Common
         {
             return GetSequenceToken(OldestMessageIndex, dataAdapter);
         }
-        
+
         /// <summary>
         /// Gets the index of the first message in this block that has a sequence token at or before the provided token
         /// </summary>

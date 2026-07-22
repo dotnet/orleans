@@ -1,12 +1,12 @@
-﻿using System.Collections.Generic;
-using Orleans.CodeGenerator.SyntaxGeneration;
+using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal static class ApplicationPartAttributeGenerator 
+    internal static class ApplicationPartAttributeGenerator
     {
         public static List<AttributeListSyntax> GenerateSyntax(LibraryTypes wellKnownTypes, MetadataModel model)
         {

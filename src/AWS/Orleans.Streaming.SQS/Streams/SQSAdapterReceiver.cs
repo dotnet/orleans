@@ -1,12 +1,12 @@
-using Orleans;
-using Orleans.Streams;
-using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Serialization;
+using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 #nullable disable

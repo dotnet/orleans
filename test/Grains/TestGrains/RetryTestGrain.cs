@@ -31,7 +31,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
     public Task ExecuteJobAsync(IJobRunContext ctx, CancellationToken cancellationToken)
     {
         var jobId = ctx.Job.Id;
-        
+
         // Initialize tracking if this is the first attempt
         if (!_jobExecutionAttempts.ContainsKey(jobId))
         {
@@ -62,7 +62,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
                         _jobExecutionAttempts[jobId],
                         ctx.DequeueCount,
                         failUntilAttempt);
-                    
+
                     throw new InvalidOperationException($"Simulated failure for job {jobId} on attempt {_jobExecutionAttempts[jobId]}");
                 }
             }
@@ -72,7 +72,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
         _logger.LogInformation("Job {JobId} succeeded on attempt {Attempt}", jobId, _jobExecutionAttempts[jobId]);
         _finalJobContexts[jobId] = ctx;
         _jobSuccessStatus[jobId].SetResult();
-        
+
         return Task.CompletedTask;
     }
 
@@ -86,9 +86,9 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
             Metadata = metadata
         };
         var job = await _localDurableJobManager.ScheduleJobAsync(request, CancellationToken.None);
-        
+
         _jobSuccessStatus[job.Id] = new TaskCompletionSource();
-        
+
         return job;
     }
 

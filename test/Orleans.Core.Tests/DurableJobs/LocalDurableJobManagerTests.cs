@@ -11,8 +11,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
 using NonSilo.Tests.Testing;
+using NSubstitute;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
@@ -926,7 +926,8 @@ public class LocalDurableJobManagerTests
         messagingProcessingInstruments: CreateMessagingProcessingInstruments());
 
     private static SchedulerInstruments CreateSchedulerInstruments()
-    {        var services = new ServiceCollection();
+    {
+        var services = new ServiceCollection();
         services.AddMetrics();
         services.AddSingleton<OrleansInstruments>();
         services.AddSingleton<SchedulerInstruments>();

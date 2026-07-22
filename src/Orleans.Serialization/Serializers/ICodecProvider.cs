@@ -1,5 +1,5 @@
-using Orleans.Serialization.Cloning;
 using System;
+using Orleans.Serialization.Cloning;
 
 namespace Orleans.Serialization.Serializers
 {

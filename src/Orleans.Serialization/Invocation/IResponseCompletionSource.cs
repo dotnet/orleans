@@ -14,6 +14,6 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Sets the result to the default value.
         /// </summary>
-        void Complete(); 
+        void Complete();
     }
 }

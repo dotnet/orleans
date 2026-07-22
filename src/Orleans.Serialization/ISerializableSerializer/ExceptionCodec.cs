@@ -290,7 +290,7 @@ namespace Orleans.Serialization
             writer.WriteStartObject(fieldIdDelta, expectedType, typeof(ExceptionCodec));
             SerializeException(ref writer, (Exception)value);
             writer.WriteEndObject();
-       }
+        }
 
         /// <inheritdoc />
         public Exception ReadValue<TInput>(ref Reader<TInput> reader, Field field)

@@ -1,6 +1,6 @@
-﻿using Xunit;
-using Xunit.Abstractions;
 using Orleans.LeaseProviders;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace TestExtensions.Runners
 {
@@ -31,7 +31,8 @@ namespace TestExtensions.Runners
                 Assert.Equal(ResponseCode.OK, result.StatusCode);
                 Assert.NotNull(result.AcquiredLease);
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
-            };
+            }
+            ;
         }
 
         [SkippableFact]
@@ -62,7 +63,8 @@ namespace TestExtensions.Runners
                 Assert.Equal(ResponseCode.OK, result.StatusCode);
                 Assert.NotNull(result.AcquiredLease);
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
-            };
+            }
+            ;
         }
 
         [SkippableFact]

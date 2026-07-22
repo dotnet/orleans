@@ -272,9 +272,9 @@ namespace Orleans
 
             if (null == keyExt)
             {
-                throw new ArgumentNullException(nameof(keyExt)); 
+                throw new ArgumentNullException(nameof(keyExt));
             }
-            
+
             throw new ArgumentException("Key extension is empty or white space.", nameof(keyExt));
         }
     }

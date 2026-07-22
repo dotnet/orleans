@@ -1,9 +1,9 @@
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime;
+using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Metrics.Details;
 using Orleans.Dashboard.Model;
-using Orleans.Dashboard.Core;
+using Orleans.Runtime;
 
 namespace Orleans.Dashboard.Implementation.Details;
 

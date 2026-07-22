@@ -2,15 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Storage;
-using Orleans.Statistics;
 using Orleans.Runtime.Messaging;
+using Orleans.Statistics;
+using Orleans.Storage;
 
 #nullable disable
 namespace Orleans.Runtime.TestHooks
@@ -73,9 +73,9 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<string> GetConsistentRingProviderDiagnosticInfo()
         {
-            return Task.FromResult(consistentRingProvider.ToString()); 
+            return Task.FromResult(consistentRingProvider.ToString());
         }
-        
+
         public Task<string> GetServiceId() => Task.FromResult(this.serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)

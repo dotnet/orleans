@@ -1,5 +1,5 @@
-using Orleans.Transactions.Abstractions;
 using BenchmarkGrainInterfaces.Transaction;
+using Orleans.Transactions.Abstractions;
 
 namespace BenchmarkGrains.Transaction
 {

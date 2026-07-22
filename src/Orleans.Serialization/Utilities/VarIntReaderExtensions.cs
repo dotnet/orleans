@@ -1,6 +1,6 @@
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Buffers
 {

@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.Diagnostics;
 using Orleans.Internal;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
 

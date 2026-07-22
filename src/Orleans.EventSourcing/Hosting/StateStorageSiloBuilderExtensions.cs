@@ -2,9 +2,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.EventSourcing;
+using Orleans.EventSourcing.StateStorage;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.EventSourcing.StateStorage;
 
 #nullable disable
 namespace Orleans.Hosting

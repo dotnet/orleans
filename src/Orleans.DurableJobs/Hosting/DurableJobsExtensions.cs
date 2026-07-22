@@ -4,12 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.Runtime;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
-using Orleans.Configuration;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting;
 

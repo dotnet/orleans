@@ -9,11 +9,11 @@ using Xunit;
 using AdvancedReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using AdvancedReminderTable = Orleans.AdvancedReminders.IReminderTable;
 using AdvancedReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
-using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
-using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
 using ClassicReminderEntry = Orleans.ReminderEntry;
 using ClassicReminderTable = Orleans.IReminderTable;
 using ClassicReminderTableData = Orleans.ReminderTableData;
+using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
+using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
 
 namespace Orleans.Dashboard.UnitTests;
 

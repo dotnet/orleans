@@ -1,8 +1,8 @@
+using Orleans.TestingHost;
+using Tester.StorageFacet.Implementations;
+using Tester.StorageFacet.Infrastructure;
 using TestExtensions;
 using Xunit;
-using Orleans.TestingHost;
-using Tester.StorageFacet.Infrastructure;
-using Tester.StorageFacet.Implementations;
 
 namespace Tester
 {

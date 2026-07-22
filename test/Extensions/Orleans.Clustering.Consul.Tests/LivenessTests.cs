@@ -1,5 +1,5 @@
-using Orleans.TestingHost;
 using Microsoft.Extensions.Configuration;
+using Orleans.TestingHost;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;

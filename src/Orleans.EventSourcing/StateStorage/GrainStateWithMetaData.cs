@@ -1,5 +1,5 @@
-using Orleans.EventSourcing.Common;
 using System;
+using Orleans.EventSourcing.Common;
 
 #nullable disable
 namespace Orleans.EventSourcing.StateStorage

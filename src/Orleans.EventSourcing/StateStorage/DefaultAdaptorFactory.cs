@@ -1,4 +1,4 @@
-﻿using Orleans.Storage;
+using Orleans.Storage;
 
 namespace Orleans.EventSourcing.StateStorage
 {
@@ -12,8 +12,8 @@ namespace Orleans.EventSourcing.StateStorage
             }
         }
 
-         public ILogViewAdaptor<T, E> MakeLogViewAdaptor<T, E>(ILogViewAdaptorHost<T, E> hostgrain, T initialstate, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
-            where T : class, new() where E : class
+        public ILogViewAdaptor<T, E> MakeLogViewAdaptor<T, E>(ILogViewAdaptorHost<T, E> hostgrain, T initialstate, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+           where T : class, new() where E : class
         {
             return new LogViewAdaptor<T, E>(hostgrain, initialstate, grainStorage, graintypename, services);
         }

@@ -4,12 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Storage;
+using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Diagnostics;
-using Orleans.Storage;
-using Orleans.Configuration;
-using Orleans.Timers.Internal;
 
 #nullable disable
 namespace Orleans.Transactions.State
@@ -115,12 +115,12 @@ namespace Orleans.Transactions.State
 
                             // optimization: can immediately proceed if dependency is implied
                             bool behindRemoteEntryBySameTM = false;
-                                /* disabled - jbragg - TODO - revisit
-                                commitQueue.Count >= 2
-                                && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
-                                && rce.Role == CommitRole.RemoteCommit
-                                && rce.TransactionManager.Equals(record.TransactionManager);
-                                */
+                            /* disabled - jbragg - TODO - revisit
+                            commitQueue.Count >= 2
+                            && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
+                            && rce.Role == CommitRole.RemoteCommit
+                            && rce.TransactionManager.Equals(record.TransactionManager);
+                            */
 
                             if (record.NumberWrites > 0)
                             {
@@ -271,7 +271,7 @@ namespace Orleans.Transactions.State
                                 .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
                                      .Cancel(p.Name, entry.TransactionId, entry.Timestamp, status)));
                         }
-                        catch(Exception ex)
+                        catch (Exception ex)
                         {
                             LogWarningFailedToNotifyAllTransactionParticipantsOfCancellation(entry.TransactionId, new(entry.Timestamp), status, ex);
                         }

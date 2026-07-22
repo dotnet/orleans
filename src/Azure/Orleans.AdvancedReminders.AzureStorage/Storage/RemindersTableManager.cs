@@ -14,21 +14,21 @@ namespace Orleans.AdvancedReminders.AzureStorage
 {
     internal sealed class ReminderTableEntry : ITableEntity
     {
-        public string GrainReference        { get; set; } = string.Empty;    // Part of RowKey
-        public string ReminderName          { get; set; } = string.Empty;    // Part of RowKey
-        public string ServiceId             { get; set; } = string.Empty;    // Part of PartitionKey
-        public string DeploymentId          { get; set; } = string.Empty;
-        public string StartAt               { get; set; } = string.Empty;
-        public string Period                { get; set; } = string.Empty;
-        public string CronExpression        { get; set; } = string.Empty;
-        public string CronTimeZoneId        { get; set; } = string.Empty;
-        public string NextDueUtc            { get; set; } = string.Empty;
-        public string LastFireUtc           { get; set; } = string.Empty;
-        public string ScheduleId            { get; set; } = string.Empty;
-        public string JobId                 { get; set; } = string.Empty;
-        public string JobShardId            { get; set; } = string.Empty;
-        public int Priority                 { get; set; } = (int)ReminderPriority.Normal;
-        public int Action                   { get; set; } = (int)MissedReminderAction.Skip;
+        public string GrainReference { get; set; } = string.Empty;    // Part of RowKey
+        public string ReminderName { get; set; } = string.Empty;    // Part of RowKey
+        public string ServiceId { get; set; } = string.Empty;    // Part of PartitionKey
+        public string DeploymentId { get; set; } = string.Empty;
+        public string StartAt { get; set; } = string.Empty;
+        public string Period { get; set; } = string.Empty;
+        public string CronExpression { get; set; } = string.Empty;
+        public string CronTimeZoneId { get; set; } = string.Empty;
+        public string NextDueUtc { get; set; } = string.Empty;
+        public string LastFireUtc { get; set; } = string.Empty;
+        public string ScheduleId { get; set; } = string.Empty;
+        public string JobId { get; set; } = string.Empty;
+        public string JobShardId { get; set; } = string.Empty;
+        public int Priority { get; set; } = (int)ReminderPriority.Normal;
+        public int Action { get; set; } = (int)MissedReminderAction.Skip;
         public string GrainRefConsistentHash { get; set; } = string.Empty;    // Part of PartitionKey
 
         public string PartitionKey { get; set; } = string.Empty;
@@ -154,7 +154,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
                     ? await CreateTableEntryAsync(reminderEntry)
                     : await UpdateTableEntryAsync(reminderEntry, reminderEntry.ETag);
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
                 {
@@ -173,7 +173,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
                 await DeleteTableEntryAsync(reminderEntry, eTag);
                 return true;
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
                 {

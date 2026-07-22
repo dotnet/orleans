@@ -108,7 +108,7 @@ namespace Orleans.Streaming.EventHubs
             string name,
             EventHubOptions ehOptions,
             EventHubReceiverOptions receiverOptions,
-            EventHubStreamCachePressureOptions cacheOptions, 
+            EventHubStreamCachePressureOptions cacheOptions,
             StreamCacheEvictionOptions cacheEvictionOptions,
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
@@ -120,9 +120,9 @@ namespace Orleans.Streaming.EventHubs
             this.cacheEvictionOptions = cacheEvictionOptions ?? throw new ArgumentNullException(nameof(cacheEvictionOptions));
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.ehOptions = ehOptions ?? throw new ArgumentNullException(nameof(ehOptions));
-            this.cacheOptions = cacheOptions?? throw new ArgumentNullException(nameof(cacheOptions));
+            this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
             this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
-            this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
+            this.receiverOptions = receiverOptions ?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.environmentStatisticsProvider = environmentStatisticsProvider;
@@ -263,7 +263,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
-           var eventHubPath = this.ehOptions.EventHubName;
+            var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
             return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions, this.orleansInstruments);
         }

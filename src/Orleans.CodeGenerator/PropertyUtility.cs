@@ -1,8 +1,8 @@
-using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator
 {
@@ -59,9 +59,9 @@ namespace Orleans.CodeGenerator
         {
             var backingFieldName = $"<{property.Name}>k__BackingField";
             var candidates = (from field in memberSymbols.OfType<IFieldSymbol>()
-                where SymbolEqualityComparer.Default.Equals(field.Type, property.Type)
-                where field.Name == backingFieldName || GetCanonicalName(field.Name) == GetCanonicalName(property.Name)
-                select field).ToArray();
+                              where SymbolEqualityComparer.Default.Equals(field.Type, property.Type)
+                              where field.Name == backingFieldName || GetCanonicalName(field.Name) == GetCanonicalName(property.Name)
+                              select field).ToArray();
             return candidates.Length == 1 ? candidates[0] : null;
         }
 

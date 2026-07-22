@@ -3,8 +3,8 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
-using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
+using Orleans.Serialization.Buffers;
 using Orleans.Storage;
 
 namespace Orleans.Journaling;

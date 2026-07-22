@@ -26,7 +26,7 @@ namespace UnitTests.Management
     /// - Building management dashboards
     /// - Implementing custom placement strategies based on current load
     /// </summary>
-    public class ManagementGrainTests :  OrleansTestingBase, IClassFixture<ManagementGrainTests.Fixture>
+    public class ManagementGrainTests : OrleansTestingBase, IClassFixture<ManagementGrainTests.Fixture>
     {
         private readonly Fixture fixture;
         private readonly ITestOutputHelper output;

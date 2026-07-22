@@ -55,7 +55,7 @@ namespace Orleans
         /// <param name="streamIdMapper">The name of the stream identity mapper.</param>
         public ImplicitStreamSubscriptionAttribute(Type predicateType, string streamIdMapper = null)
         {
-            Predicate = (IStreamNamespacePredicate) Activator.CreateInstance(predicateType);
+            Predicate = (IStreamNamespacePredicate)Activator.CreateInstance(predicateType);
             StreamIdMapper = streamIdMapper;
         }
 

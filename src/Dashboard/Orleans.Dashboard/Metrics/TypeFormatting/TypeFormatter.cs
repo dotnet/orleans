@@ -1,6 +1,6 @@
-using Orleans.Serialization.TypeSystem;
 using System.Collections.Concurrent;
 using System.Linq;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Dashboard.Metrics.TypeFormatting;
 

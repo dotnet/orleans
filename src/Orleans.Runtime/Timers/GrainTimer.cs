@@ -2,10 +2,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Invocation;
 using Orleans.Timers;
-using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime;
 

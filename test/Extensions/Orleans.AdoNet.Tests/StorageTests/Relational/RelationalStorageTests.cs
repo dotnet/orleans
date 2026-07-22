@@ -36,7 +36,7 @@ namespace UnitTests.StorageTests.Relational
         {
             Fixture = fixture;
             var persistenceStorage = fixture.GetStorageProvider(adoNetInvariant, deleteStateOnClear).GetAwaiter().GetResult();
-            if(persistenceStorage != null)
+            if (persistenceStorage != null)
             {
                 PersistenceStorageTests = new CommonStorageTests(persistenceStorage);
             }

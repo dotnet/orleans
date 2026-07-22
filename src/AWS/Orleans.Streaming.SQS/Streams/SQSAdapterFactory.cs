@@ -3,12 +3,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Providers.Streams.Common;
-using Orleans.Streams;
-using Orleans.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
+using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
+using Orleans.Streams;
 
 #nullable disable
 namespace OrleansAWSUtils.Streams
@@ -30,12 +30,12 @@ namespace OrleansAWSUtils.Streams
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
         public SQSAdapterFactory(
-            string name, 
+            string name,
             SqsOptions sqsOptions,
             HashRingStreamQueueMapperOptions queueMapperOptions,
             SimpleQueueCacheOptions cacheOptions,
-            IOptions<ClusterOptions> clusterOptions, 
-            Orleans.Serialization.Serializer serializer, 
+            IOptions<ClusterOptions> clusterOptions,
+            Orleans.Serialization.Serializer serializer,
             ILoggerFactory loggerFactory)
         {
             ArgumentNullException.ThrowIfNull(serializer);

@@ -22,7 +22,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="callTime">Time spent in read operation.</param>
         /// <param name="exception">The exception caught if read failed.</param>
         void TrackRead(bool success, TimeSpan callTime, Exception exception);
-        
+
         /// <summary>
         /// Tracks messages read and time taken per successful read.  Tracked per successful partition read operation.
         /// </summary>

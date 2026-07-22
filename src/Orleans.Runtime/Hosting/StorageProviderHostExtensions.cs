@@ -1,8 +1,8 @@
 using System;
-using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Providers;
+using Orleans.Storage;
 
 #nullable disable
 namespace Orleans.Runtime.Hosting

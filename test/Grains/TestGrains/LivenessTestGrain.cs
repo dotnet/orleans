@@ -48,7 +48,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("StartTimer.");
             this.RegisterGrainTimer(TimerTick, TimeSpan.Zero, TimeSpan.FromSeconds(10));
-            
+
             return Task.CompletedTask;
         }
 

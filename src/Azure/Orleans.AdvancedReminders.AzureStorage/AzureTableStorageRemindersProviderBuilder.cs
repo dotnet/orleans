@@ -6,10 +6,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.AdvancedReminders.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.AdvancedReminders.AzureStorage;
 
 [assembly: RegisterProvider("AzureTableStorage", "AdvancedReminders", "Silo", typeof(AdvancedAzureTableStorageRemindersProviderBuilder))]
 

@@ -1,15 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
-using Orleans.Configuration;
-using Orleans.Timers.Internal;
 
 #nullable disable
 namespace Orleans.Transactions
@@ -23,7 +23,7 @@ namespace Orleans.Transactions
         private readonly TransactionalStateConfiguration config;
         private readonly IGrainContext context;
         private readonly ITransactionDataCopier<TState> copier;
-        private readonly Dictionary<Type,object> copiers;
+        private readonly Dictionary<Type, object> copiers;
         private readonly IGrainRuntime grainRuntime;
         private readonly ILogger logger;
         private readonly ActivationLifetime activationLifetime;

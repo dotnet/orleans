@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.AdvancedReminders.Cosmos;
+using Orleans.Hosting;
 
 namespace Orleans.Hosting;
 

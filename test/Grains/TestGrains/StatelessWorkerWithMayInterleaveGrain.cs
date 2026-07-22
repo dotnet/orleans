@@ -15,7 +15,7 @@ public class StatelessWorkerWithMayInterleaveGrain : Grain, IStatelessWorkerWith
         await callback.WaitAsync();
     }
 
-    public async Task GoFast(ICallbackGrainObserver callback) 
+    public async Task GoFast(ICallbackGrainObserver callback)
     {
         await callback.WaitAsync();
     }

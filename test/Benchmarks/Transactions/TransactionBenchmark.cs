@@ -1,8 +1,8 @@
-using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Transaction;
-using TestExtensions;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.TestingHost;
 using Orleans.Transactions;
+using TestExtensions;
 
 namespace Benchmarks.Transactions;
 
@@ -93,16 +93,16 @@ public class TransactionBenchmark : IDisposable
     {
         Console.WriteLine($"Cold Run.");
         await FullRunAsync();
-        for(int i=0; i<runs; i++)
+        for (int i = 0; i < runs; i++)
         {
-            Console.WriteLine($"Warm Run {i+1}.");
+            Console.WriteLine($"Warm Run {i + 1}.");
             await FullRunAsync();
         }
     }
 
     private async Task FullRunAsync()
     {
-        int runners = Math.Max(1,(int)Math.Sqrt(concurrent));
+        int runners = Math.Max(1, (int)Math.Sqrt(concurrent));
         int transactionsPerRunner = Math.Max(1, this.transactionsPerRun / runners);
         Report[] reports = await Task.WhenAll(Enumerable.Range(0, runners).Select(i => RunAsync(i, transactionsPerRunner, runners)));
         Report finalReport = new Report();

@@ -1,4 +1,4 @@
-﻿using AwesomeAssertions;
+using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit
 {

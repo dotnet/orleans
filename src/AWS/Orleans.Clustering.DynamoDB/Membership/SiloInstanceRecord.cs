@@ -1,8 +1,8 @@
-using Amazon.DynamoDBv2.Model;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
+using Amazon.DynamoDBv2.Model;
 
 #nullable disable
 namespace Orleans.Runtime.MembershipService

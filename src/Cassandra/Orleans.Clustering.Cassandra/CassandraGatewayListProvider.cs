@@ -59,7 +59,7 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
 
         await _queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay, _ttlSeconds);
     }
-    
+
     async Task<IList<Uri>> IGatewayListProvider.GetGateways()
     {
         if (_cachedResult is not null && _cacheUntil > DateTime.UtcNow)

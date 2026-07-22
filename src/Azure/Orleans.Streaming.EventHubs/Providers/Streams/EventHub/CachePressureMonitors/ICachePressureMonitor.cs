@@ -1,5 +1,5 @@
-﻿using Orleans.Providers.Streams.Common;
 using System;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streaming.EventHubs
 {

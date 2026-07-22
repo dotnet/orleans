@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
+using Orleans.Runtime;
 
 namespace Orleans.AdvancedReminders.AdoNet
 {

@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
+using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -40,7 +40,7 @@ namespace UnitTests.MessageCenterTests
             new Uri("gwy.tcp://127.0.0.1:3/0"),
             new Uri("gwy.tcp://127.0.0.1:4/0")
         }.ToList();
-        
+
         public GatewaySelectionTest(ITestOutputHelper output)
         {
             this.output = output;

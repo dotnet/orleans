@@ -1,9 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
-using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {

@@ -39,7 +39,7 @@ namespace UnitTests.StorageTests.AdoNet
 
             //Stream in and steam out three binary streams in parallel.
             var streamChecks = new Task<bool>[countOfStreams];
-            for(int i = 0; i < countOfStreams; ++i)
+            for (int i = 0; i < countOfStreams; ++i)
             {
                 int streamId = i;
                 streamChecks[i] = Task.Run(async () =>
@@ -118,19 +118,19 @@ namespace UnitTests.StorageTests.AdoNet
                     //Here one second is added to the task timeout limit in order to account for the delays.
                     //The delays are mainly in the underlying ADO.NET libraries and database.
                     var task = sut.Storage.ReadAsync<int>(sut.CancellationTestQuery, tokenSource.Token);
-                    if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2))))
+                    if (!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2))))
                     {
                         Assert.Fail(string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     //There can be a DbException due to the operation being forcefully cancelled...
                     //... Unless this is a test for a provider which does not support for cancellation.
                     //The exception is wrapped into an AggregrateException due to the test arrangement of hard synchronous
                     //wait to force for actual cancellation check and remove "natural timeout" causes.
                     var innerException = ex?.InnerException;
-                    if(sut.Storage.SupportsCommandCancellation())
+                    if (sut.Storage.SupportsCommandCancellation())
                     {
                         //If the operation is cancelled already before database calls, a OperationCancelledException
                         //will be thrown in any case.

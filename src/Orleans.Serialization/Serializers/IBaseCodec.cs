@@ -1,6 +1,6 @@
-using Orleans.Serialization.Buffers;
 using System;
 using System.Buffers;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Serialization.Serializers
 {

@@ -29,7 +29,7 @@ namespace Orleans.Configuration
                     $"{nameof(GrainCollectionOptions.CollectionAge)} must be greater than {nameof(GrainCollectionOptions.CollectionQuantum)}, " +
                     $"which is set to {this.options.CollectionQuantum}");
             }
-            foreach(var classSpecificCollectionAge in this.options.ClassSpecificCollectionAge)
+            foreach (var classSpecificCollectionAge in this.options.ClassSpecificCollectionAge)
             {
                 if (classSpecificCollectionAge.Value <= this.options.CollectionQuantum)
                 {

@@ -105,7 +105,7 @@ namespace Orleans
                 }
                 LogInformationOptions(logger, formatter.Name, stringBuilder.ToString());
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogErrorOptions(logger, ex, formatter.Name);
                 throw;

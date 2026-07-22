@@ -3,8 +3,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using static Orleans.CodeGenerator.SerializerGenerator;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Orleans.CodeGenerator.SerializerGenerator;
 
 #nullable disable
 namespace Orleans.CodeGenerator
@@ -287,7 +287,7 @@ namespace Orleans.CodeGenerator
 
                 public INamedTypeSymbol ContainingType => _property.ContainingType;
 
-                public string FieldName => _property.Name + "@"; 
+                public string FieldName => _property.Name + "@";
 
                 /// <summary>
                 /// Gets the name of the setter field.
@@ -298,7 +298,7 @@ namespace Orleans.CodeGenerator
                 /// Gets syntax representing the type of this field.
                 /// </summary>
                 public TypeSyntax TypeSyntax => Type.TypeKind == TypeKind.Dynamic
-                    ? PredefinedType(Token(SyntaxKind.ObjectKeyword)) 
+                    ? PredefinedType(Token(SyntaxKind.ObjectKeyword))
                     : GetTypeSyntax(Type);
 
                 /// <summary>

@@ -1,13 +1,13 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers.Streams.Common;
-using Orleans.Streaming.EventHubs;
-using Orleans.Streams;
-using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Statistics;
+using Orleans.Streaming.EventHubs;
+using Orleans.Streaming.EventHubs.Testing;
+using Orleans.Streams;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {
@@ -49,7 +49,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         private class CacheFactoryForTesting : EventHubQueueCacheFactory
         {
-            private readonly ConcurrentBag<QueueCacheForTesting> caches; 
+            private readonly ConcurrentBag<QueueCacheForTesting> caches;
             private readonly string name;
 
             public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
@@ -136,7 +136,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, 
+            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions,
                 cacheOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;

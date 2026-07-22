@@ -1,5 +1,5 @@
-using Orleans.Runtime;
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Streaming.EventHubs.Testing
 {
@@ -39,7 +39,7 @@ namespace Orleans.Streaming.EventHubs.Testing
     /// data generator for a specific stream
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public interface IStreamDataGenerator<T>: IDataGenerator<T>
+    public interface IStreamDataGenerator<T> : IDataGenerator<T>
     {
         /// <summary>
         /// counter for sequence number

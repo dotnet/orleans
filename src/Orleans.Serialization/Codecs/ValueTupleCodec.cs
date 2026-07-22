@@ -535,7 +535,7 @@ namespace Orleans.Serialization.Codecs
         private readonly IFieldCodec<T3> _item3Codec;
         private readonly IFieldCodec<T4> _item4Codec;
         private readonly IFieldCodec<T5> _item5Codec;
-        
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCodec{T1, T2, T3, T4, T5}"/> class.
         /// </summary>
@@ -662,7 +662,7 @@ namespace Orleans.Serialization.Codecs
             if (_copier5 != null) input.Item5 = _copier5.DeepCopy(input.Item5, context);
             return input;
         }
-    } 
+    }
 
     /// <summary>
     /// Serializer for <see cref="ValueTuple{T1, T2, T3, T4, T5, T6}"/>.
@@ -768,7 +768,7 @@ namespace Orleans.Serialization.Codecs
             return res;
         }
     }
-    
+
     /// <summary>
     /// Copier for <see cref="ValueTuple{T1, T2, T3, T4, T5, T6}"/>.
     /// </summary>
@@ -828,7 +828,7 @@ namespace Orleans.Serialization.Codecs
             if (_copier6 != null) input.Item6 = _copier6.DeepCopy(input.Item6, context);
             return input;
         }
-    } 
+    }
 
     /// <summary>
     /// Serializer for <see cref="ValueTuple{T1, T2, T3, T4, T5, T6, T7}"/>.
@@ -1010,7 +1010,7 @@ namespace Orleans.Serialization.Codecs
             if (_copier7 != null) input.Item7 = _copier7.DeepCopy(input.Item7, context);
             return input;
         }
-    } 
+    }
 
     /// <summary>
     /// Serializer for <see cref="ValueTuple{T1, T2, T3, T4, T5, T6, T7, T8}"/>.
@@ -1205,5 +1205,5 @@ namespace Orleans.Serialization.Codecs
             if (_copier8 != null) input.Rest = _copier8.DeepCopy(input.Rest, context);
             return input;
         }
-    } 
+    }
 }

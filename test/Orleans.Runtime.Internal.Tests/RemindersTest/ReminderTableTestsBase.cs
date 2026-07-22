@@ -1,11 +1,11 @@
-using Orleans.Runtime;
-using TestExtensions;
-using UnitTests.MembershipTests;
-using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
+using UnitTests.MembershipTests;
+using Xunit;
 
 namespace UnitTests.RemindersTest
 {

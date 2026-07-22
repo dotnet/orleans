@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
+#nullable disable
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class AbstractPropertiesCannotBeSerializedAnalyzer : DiagnosticAnalyzer
     {

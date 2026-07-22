@@ -1,10 +1,10 @@
 using System.Net;
 using Microsoft.Extensions.Hosting;
-using Xunit;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
 using TestExtensions;
+using Xunit;
 
 namespace Tester.Redis.Persistence
 {
@@ -27,7 +27,8 @@ namespace Tester.Redis.Persistence
             var siloAddress = IPAddress.Loopback;
 
             var host = Host.CreateDefaultBuilder()
-                .UseOrleans((ctx, builder) => {
+                .UseOrleans((ctx, builder) =>
+                {
                     builder.Configure<ClusterOptions>(options => options.ClusterId = "TESTCLUSTER")
                         .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
                         .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)

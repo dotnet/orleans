@@ -1,7 +1,7 @@
+using Microsoft.Extensions.Logging;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Microsoft.Extensions.Logging;
 
 namespace UnitTests
 {

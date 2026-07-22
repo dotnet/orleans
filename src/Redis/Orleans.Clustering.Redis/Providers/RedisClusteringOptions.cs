@@ -1,10 +1,10 @@
-using Microsoft.Extensions.Options;
-using Orleans.Runtime;
-using StackExchange.Redis;
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime;
+using StackExchange.Redis;
 
 #nullable disable
 namespace Orleans.Clustering.Redis

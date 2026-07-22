@@ -35,7 +35,7 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
@@ -57,7 +57,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
-            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);            
+            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);
         }
 
         [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]

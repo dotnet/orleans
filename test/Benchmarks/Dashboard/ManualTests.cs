@@ -1,8 +1,8 @@
-using Orleans.Dashboard.Metrics.History;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Orleans.Dashboard.Metrics.History;
 
 namespace Benchmarks.Dashboard
 {

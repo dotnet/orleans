@@ -5,9 +5,9 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using Orleans.Concurrency;
-using Orleans.Runtime;
-using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Core;
+using Orleans.Dashboard.Model;
+using Orleans.Runtime;
 
 namespace Orleans.Dashboard.Implementation;
 

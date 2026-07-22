@@ -1,4 +1,4 @@
-﻿namespace Orleans.Runtime
+namespace Orleans.Runtime
 {
     internal static class StreamResourceTestControl
     {

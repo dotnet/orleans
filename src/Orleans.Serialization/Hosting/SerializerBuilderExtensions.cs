@@ -1,8 +1,8 @@
-using Orleans.Serialization.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Serialization.Configuration;
 
 namespace Orleans.Serialization
 {

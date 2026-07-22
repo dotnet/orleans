@@ -42,7 +42,7 @@ namespace Tester.AzureUtils.Lease
                         options.BlobContainerName = "cluster-" + cluster.Value.ClusterId + "-leases";
                     }))
                     .UseAzureStorageClustering(options => options.ConfigureTestDefaults())
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b =>
                     {
                         b.ConfigurePartitioning(totalQueueCount);
                         b.UseLeaseBasedQueueBalancer(ob => ob.Configure(options =>

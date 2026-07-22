@@ -49,7 +49,7 @@ namespace Orleans.Runtime.GrainDirectory
             };
 
             return worker.Unregister(address);
-            
+
             void EnsureInitialized()
             {
                 // Unfortunately, for now we need to perform this initialization lazily, since a SystemTarget does not become valid

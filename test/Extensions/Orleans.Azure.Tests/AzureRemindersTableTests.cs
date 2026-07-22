@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Reminders.AzureStorage;
 using Orleans.Runtime.ReminderService;
 using Tester;
+using Tester.AzureUtils;
 using TestExtensions;
 using Xunit;
-using Orleans.Reminders.AzureStorage;
-using Tester.AzureUtils;
 
 namespace UnitTests.RemindersTest
 {

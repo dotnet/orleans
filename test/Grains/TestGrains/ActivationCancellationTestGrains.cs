@@ -82,9 +82,9 @@ public class ActivationCancellation_ThrowsObjectDisposedGrain
         if (RequestContext.Get("delay_activation_ms") is int delayMs && delayMs > 0)
         {
             Logger.LogDebug("Setting up cancellation callback to throw ObjectDisposedException after {DelayMs}ms max", delayMs);
-            
+
             var tcs = new TaskCompletionSource<bool>();
-            
+
             // Register callback to throw ObjectDisposedException when cancellation is requested
             await using var registration = cancellationToken.Register(() =>
             {
@@ -170,9 +170,9 @@ public class ActivationCancellation_ThrowsTaskCancelledGrain
         if (RequestContext.Get("delay_activation_ms") is int delayMs && delayMs > 0)
         {
             Logger.LogDebug("Setting up cancellation callback to throw TaskCanceledException after {DelayMs}ms max", delayMs);
-            
+
             var tcs = new TaskCompletionSource<bool>();
-            
+
             // Register callback to throw TaskCanceledException when cancellation is requested
             /*await using var registration = cancellationToken.Register(() =>
             {
@@ -182,10 +182,10 @@ public class ActivationCancellation_ThrowsTaskCancelledGrain
 
             // Start the delay task (without cancellation token)
             var delayTask = Task.Delay(TimeSpan.FromMilliseconds(delayMs), TimeProvider, CancellationToken.None);
-            
+
             // Wait for either the delay to complete or the cancellation to trigger the exception
             var completedTask = await Task.WhenAny(delayTask, tcs.Task);
-            
+
             // If the TCS task completed, it has an exception - await it to propagate
             if (completedTask == tcs.Task)
             {

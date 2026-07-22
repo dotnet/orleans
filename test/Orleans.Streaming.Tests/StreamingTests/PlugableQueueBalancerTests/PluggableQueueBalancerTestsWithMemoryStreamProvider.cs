@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests
 {
@@ -36,15 +36,15 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
                             StreamProviderName,
-                            b=>
+                            b =>
                             {
                                 b.ConfigurePartitioning(totalQueueCount);
                                 b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n));
                             });
-                        
+
                 }
             }
-            
+
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)

@@ -58,6 +58,6 @@ namespace Orleans.Transactions.Abstractions
     }
 }
 
-  
-   
+
+
 

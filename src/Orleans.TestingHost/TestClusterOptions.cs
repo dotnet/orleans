@@ -29,7 +29,7 @@ namespace Orleans.TestingHost
         /// Gets or sets the base silo port, which is the port for the first silo. Other silos will use subsequent ports.
         /// </summary>
         /// <value>The base silo port.</value>
-        public int BaseSiloPort{ get; set; }
+        public int BaseSiloPort { get; set; }
 
         /// <summary>
         /// Gets or sets the base gateway port, which is the gateway port for the first silo. Other silos will use subsequent ports.
@@ -133,7 +133,7 @@ namespace Orleans.TestingHost
             }
 
             result["UseRealEnvironmentStatistics"] = UseRealEnvironmentStatistics ? "True" : "False";
-            
+
             if (this.SiloBuilderConfiguratorTypes != null)
             {
                 for (int i = 0; i < this.SiloBuilderConfiguratorTypes.Count; i++)

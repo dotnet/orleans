@@ -4,10 +4,10 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Serialization.Buffers;
-using Orleans.Hosting;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;

@@ -76,7 +76,7 @@ namespace Orleans.TestingHost.Utils
         /// <param name="timeout">The timeout value</param>
         /// <param name="delayOnFail">The time to delay next call upon failure</param>
         /// <returns>True if the predicate succeed, false otherwise</returns>
-        public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
+        public static async Task WaitUntilAsync(Func<bool, Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
         {
             delayOnFail = delayOnFail ?? TimeSpan.FromSeconds(1);
             var keepGoing = new[] { true };

@@ -422,7 +422,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         private static readonly SequenceSegment FinalSegmentSentinel = new();
         private readonly
 #if NET8_0_OR_GREATER
-            ref readonly 
+            ref readonly
 #endif
             PooledBuffer _buffer;
         private int _position;

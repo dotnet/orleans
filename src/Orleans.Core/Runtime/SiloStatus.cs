@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// This silo has just started, but not ready yet. It is attempting to join the cluster.
         /// </summary>
-        Joining = 2,         
+        Joining = 2,
 
         /// <summary>
         /// This silo is alive and functional.
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// This silo is shutting itself down.
         /// </summary>
-        ShuttingDown = 4,    
+        ShuttingDown = 4,
 
         /// <summary>
         /// This silo is stopping itself down.

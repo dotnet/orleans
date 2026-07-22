@@ -8,10 +8,10 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using AdvancedReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
-using AdvancedReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
 using AdvancedReminderTable = Orleans.AdvancedReminders.IReminderTable;
-using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
+using AdvancedReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
 using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
+using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
 
 namespace UnitTests.AdvancedRemindersTest;
 

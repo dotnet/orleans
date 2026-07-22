@@ -1,4 +1,4 @@
-﻿using Orleans.Streams;
+using Orleans.Streams;
 
 namespace TestGrains
 {

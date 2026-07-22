@@ -1,4 +1,4 @@
-﻿namespace Orleans.Storage
+namespace Orleans.Storage
 {
     /// <summary>
     /// An interface for all the hashing operations currently in Orleans Storage operations.

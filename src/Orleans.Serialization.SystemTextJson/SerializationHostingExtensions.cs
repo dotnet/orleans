@@ -1,10 +1,10 @@
+using System;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
-using System;
-using System.Text.Json;
 
 #nullable disable
 namespace Orleans.Serialization;
@@ -14,7 +14,7 @@ namespace Orleans.Serialization;
 /// </summary>
 public static class SerializationHostingExtensions
 {
-    private static readonly ServiceDescriptor ServiceDescriptor = new (typeof(JsonCodec), typeof(JsonCodec));
+    private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(JsonCodec), typeof(JsonCodec));
 
     /// <summary>
     /// Adds support for serializing and deserializing values using <see cref="JsonSerializer"/>.

@@ -20,7 +20,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        IEnumerable<Tuple<T,StreamSequenceToken>> GetEvents<T>();
+        IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>();
 
         /// <summary>
         /// Ges the stream sequence token for the start of this batch.

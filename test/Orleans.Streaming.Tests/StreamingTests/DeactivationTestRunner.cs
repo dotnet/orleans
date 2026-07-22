@@ -1,9 +1,9 @@
-using Orleans.Streams;
+using Orleans.Core.Internal;
 using Orleans.Internal;
+using Orleans.Runtime;
+using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Runtime;
-using Orleans.Core.Internal;
 
 namespace UnitTests.StreamingTests
 {

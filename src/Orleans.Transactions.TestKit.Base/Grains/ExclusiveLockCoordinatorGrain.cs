@@ -1,4 +1,4 @@
-﻿using Orleans.Concurrency;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions.TestKit
 {

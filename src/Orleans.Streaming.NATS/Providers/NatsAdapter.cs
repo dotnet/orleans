@@ -1,10 +1,10 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using Orleans.Streams;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.NATS;
 
@@ -31,7 +31,9 @@ internal sealed class NatsAdapter(
 
         await natsConnectionManager.EnqueueMessage(new NatsStreamMessage
         {
-            StreamId = streamId, Payload = raw, RequestContext = requestContext
+            StreamId = streamId,
+            Payload = raw,
+            RequestContext = requestContext
         });
     }
 }

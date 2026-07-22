@@ -351,7 +351,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
         public void SetCompleted() => _core.SetResult(0);
         public void SetException(Exception exception) => _core.SetException(exception);
-        public ValueTask AsValueTask() => new (this, _core.Version);
+        public ValueTask AsValueTask() => new(this, _core.Version);
 
         public void GetResult(short token)
         {

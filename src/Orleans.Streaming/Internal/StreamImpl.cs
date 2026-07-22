@@ -15,19 +15,19 @@ namespace Orleans.Streams
     internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, IOnDeserialized
     {
         [Id(0)]
-        private readonly QualifiedStreamId                        streamId;
+        private readonly QualifiedStreamId streamId;
 
         [Id(1)]
-        private readonly bool                                    isRewindable;
+        private readonly bool isRewindable;
 
         [NonSerialized]
-        private IInternalStreamProvider?                         provider;
+        private IInternalStreamProvider? provider;
 
         [NonSerialized]
-        private volatile IInternalAsyncBatchObserver<T>?         producerInterface;
+        private volatile IInternalAsyncBatchObserver<T>? producerInterface;
 
         [NonSerialized]
-        private volatile IInternalAsyncObservable<T>?            consumerInterface;
+        private volatile IInternalAsyncObservable<T>? consumerInterface;
 
 #if NET9_0_OR_GREATER
         [NonSerialized]
@@ -38,7 +38,7 @@ namespace Orleans.Streams
 #endif
 
         [NonSerialized]
-        private IRuntimeClient?                                  runtimeClient;
+        private IRuntimeClient? runtimeClient;
 
         internal QualifiedStreamId InternalStreamId { get { return streamId; } }
         public StreamId StreamId => streamId;
@@ -152,12 +152,12 @@ namespace Orleans.Streams
 
             lock (initLock)
             {
-                if (producerInterface != null) 
+                if (producerInterface != null)
                     return producerInterface;
 
                 if (provider == null)
                     provider = GetStreamProvider();
-                
+
                 producerInterface = provider!.GetProducerInterface(this);
             }
             return producerInterface;
@@ -173,7 +173,7 @@ namespace Orleans.Streams
                     {
                         if (provider == null)
                             provider = GetStreamProvider();
-                        
+
                         consumerInterface = provider!.GetConsumerInterface(this);
                     }
                 }
@@ -214,7 +214,7 @@ namespace Orleans.Streams
             return streamId.ToString();
         }
 
-        void IOnDeserialized.OnDeserialized(DeserializationContext  context)
+        void IOnDeserialized.OnDeserialized(DeserializationContext context)
         {
             this.runtimeClient = context?.RuntimeClient as IRuntimeClient;
         }

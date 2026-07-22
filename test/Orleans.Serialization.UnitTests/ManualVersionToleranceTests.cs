@@ -1,16 +1,16 @@
+using System;
+using System.Buffers;
+using System.IO.Pipelines;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Buffers;
-using System.IO.Pipelines;
-using System.Text;
 using Xunit;
 using Xunit.Abstractions;
-using System.Threading.Tasks;
 
 namespace Orleans.Serialization.UnitTests
 {

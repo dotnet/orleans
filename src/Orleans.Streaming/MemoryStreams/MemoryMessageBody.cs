@@ -71,7 +71,7 @@ namespace Orleans.Providers
     [Serializable]
     [GenerateSerializer]
     public sealed class MemoryMessageBody
-    {        
+    {
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryMessageBody"/> class.
         /// </summary>

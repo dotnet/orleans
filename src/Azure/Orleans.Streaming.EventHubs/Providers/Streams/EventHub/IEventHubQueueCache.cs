@@ -1,8 +1,8 @@
 using System;
-using Orleans.Streams;
 using System.Collections.Generic;
 using Azure.Messaging.EventHubs;
 using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs
 {

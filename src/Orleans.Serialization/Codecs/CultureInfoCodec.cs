@@ -1,6 +1,6 @@
+using System.Globalization;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
-using System.Globalization;
 
 namespace Orleans.Serialization.Codecs
 {

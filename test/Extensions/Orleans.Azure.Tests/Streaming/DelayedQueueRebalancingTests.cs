@@ -57,7 +57,7 @@ namespace Tester.AzureUtils.Streaming
                     })
                     .Configure<StaticClusterDeploymentOptions>(op =>
                     {
-                        op.SiloNames = new List<string>() {"Primary", "Secondary_1", "Secondary_2", "Secondary_3"};
+                        op.SiloNames = new List<string>() { "Primary", "Secondary_1", "Secondary_2", "Secondary_3" };
                     });
                 hostBuilder.AddMemoryGrainStorage("PubSubStore");
             }

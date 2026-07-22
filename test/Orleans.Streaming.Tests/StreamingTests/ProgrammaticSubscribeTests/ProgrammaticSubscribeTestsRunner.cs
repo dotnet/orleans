@@ -1,14 +1,14 @@
 #nullable enable
-using Orleans.Runtime;
-using Orleans.TestingHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Streams.Core;
-using TestExtensions;
-using Xunit;
-using UnitTests.GrainInterfaces;
+using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
 using UnitTests.Grains.ProgrammaticSubscribe;
+using Xunit;
 
 namespace Tester.StreamingTests;
 
@@ -29,7 +29,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var subGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
         Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
     }
-    
+
     [SkippableFact]
     public async Task Programmatic_Subscribe_CanUseNullNamespace()
     {
@@ -128,7 +128,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var subscriptionIds = subscriptions.Select(sub => sub.SubscriptionId).ToSet();
         Assert.True(expectedSubscriptionIds.SetEquals(subscriptionIds));
 
-         //remove one subscription
+        //remove one subscription
         await subscriptionManager.RemoveSubscription(streamId, expectedSubscriptions[0].SubscriptionId);
         expectedSubscriptions = expectedSubscriptions.GetRange(1, 1);
         subscriptions = await subscriptionManager.GetSubscriptions(streamId);

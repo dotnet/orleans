@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
-using Orleans.Runtime.GrainDirectory;
 using CsCheck;
+using Orleans.Runtime.GrainDirectory;
 using Xunit;
 
 namespace NonSilo.Tests.Directory;
@@ -73,7 +73,7 @@ public sealed class RingRangeCollectionTests
         ringWithUpdates.Sample((original, updated) =>
         {
             var additions = updated.Difference(original);
-            
+
             foreach (var addition in additions)
             {
                 Assert.True(updated.Intersects(addition));
@@ -81,7 +81,7 @@ public sealed class RingRangeCollectionTests
             }
 
             var removals = updated.Difference(original);
-            
+
             foreach (var removal in removals)
             {
                 Assert.False(updated.Intersects(removal));

@@ -1,11 +1,11 @@
-﻿using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.Common;
 
 namespace ServiceBus.Tests.MonitorTests
 {
     public class CacheMonitorForTesting : ICacheMonitor
     {
         public CacheMonitorCounters CallCounters { get; } = new CacheMonitorCounters();
-        
+
         public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
             double? flowControlThreshold)
         {

@@ -8,7 +8,7 @@ namespace Orleans.Transactions.TestKit.xUnit
     public abstract class ConsistencyTransactionTestRunnerxUnit : ConsistencyTransactionTestRunner
     {
         public ConsistencyTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
-            :base(grainFactory, output.WriteLine)
+            : base(grainFactory, output.WriteLine)
         {
         }
 

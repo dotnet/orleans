@@ -55,7 +55,7 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseDynamoDBClustering(ob => ob.Configure(gatewayOptions => 
+                clientBuilder.UseDynamoDBClustering(ob => ob.Configure(gatewayOptions =>
                 {
                     gatewayOptions.Service = AWSTestConstants.DynamoDbService;
                 }));

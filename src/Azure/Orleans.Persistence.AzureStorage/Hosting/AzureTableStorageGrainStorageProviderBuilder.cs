@@ -25,7 +25,7 @@ internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBu
                 var tableName = configurationSection["TableName"];
                 if (!string.IsNullOrEmpty(tableName))
                 {
-                    options.TableName = tableName; 
+                    options.TableName = tableName;
                 }
 
                 var serviceKey = configurationSection["ServiceKey"];

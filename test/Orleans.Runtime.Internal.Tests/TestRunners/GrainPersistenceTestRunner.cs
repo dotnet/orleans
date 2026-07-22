@@ -322,11 +322,11 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         val3 = await grain3.DoRead();
         Assert.Equal(expected3, val3);  // "Value after Re-Read - 3"
     }
-    
+
     [SkippableFact, TestCategory("Functional")]
     public async Task Grain_GrainStorage_SiloRestart()
     {
-        if (!IsDurableStorage) 
+        if (!IsDurableStorage)
         {
             throw new SkipException("This provider does not persist state, so cannot survive a silo restart.");
         }

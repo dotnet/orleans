@@ -1,4 +1,4 @@
-﻿
+
 namespace Orleans.Transactions.TestKit
 {
     public static class TransactionTestConstants

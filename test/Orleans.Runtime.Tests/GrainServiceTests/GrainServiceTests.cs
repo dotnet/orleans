@@ -1,7 +1,7 @@
-using Xunit;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace Tester
 {

@@ -1,11 +1,11 @@
 using System.Buffers;
 using System.Collections;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;

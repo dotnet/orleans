@@ -1,19 +1,18 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using System.Reflection;
-using TestExtensions;
-using Xunit;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-
-using Orleans.Serialization;
+using Orleans.Configuration;
+using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Streaming.EventHubs;
-using Microsoft.Extensions.Options;
-using Orleans.Serialization.Configuration;
-using Orleans.Metadata;
+using TestExtensions;
+using Xunit;
 
 namespace UnitTests.Serialization
 {
@@ -94,7 +93,7 @@ namespace UnitTests.Serialization
             var services = silo.Services;
             var serializer = services.GetRequiredService<Serializer>();
             var generatedGrainReferenceType = services.GetRequiredService<IOptions<TypeManifestOptions>>().Value
-                .InterfaceProxies.First(i => ! i.IsGenericType && i.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is null);
+                .InterfaceProxies.First(i => !i.IsGenericType && i.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is null);
             var codecProvider = services.GetRequiredService<CodecProvider>();
             foreach (var type in new[] { typeof(SiloAddress), typeof(GrainReference), typeof(EventHubBatchContainer), generatedGrainReferenceType })
             {
@@ -123,7 +122,7 @@ namespace UnitTests.Serialization
             var services = silo.Services;
             var serializer = services.GetRequiredService<Serializer>();
             var generatedGrainReferenceType = services.GetRequiredService<IOptions<TypeManifestOptions>>().Value
-                .InterfaceProxies.First(i => ! i.IsGenericType && i.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is null);
+                .InterfaceProxies.First(i => !i.IsGenericType && i.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is null);
             var codecProvider = services.GetRequiredService<CodecProvider>();
             foreach (var type in new[] { typeof(SiloAddress), typeof(GrainReference), typeof(EventHubBatchContainer), generatedGrainReferenceType })
             {
@@ -157,7 +156,7 @@ namespace UnitTests.Serialization
             var services = silo.Services;
             var serializer = services.GetRequiredService<Serializer>();
             var generatedGrainReferenceType = services.GetRequiredService<IOptions<TypeManifestOptions>>().Value
-                .InterfaceProxies.First(i => ! i.IsGenericType && i.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is null);
+                .InterfaceProxies.First(i => !i.IsGenericType && i.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is null);
             var codecProvider = services.GetRequiredService<CodecProvider>();
             foreach (var type in new[] { typeof(SiloAddress), typeof(GrainReference), typeof(EventHubBatchContainer), generatedGrainReferenceType })
             {

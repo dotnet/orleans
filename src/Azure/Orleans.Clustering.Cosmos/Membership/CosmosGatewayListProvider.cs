@@ -1,6 +1,6 @@
 using System.Net;
-using Orleans.Messaging;
 using Orleans.Clustering.Cosmos.Models;
+using Orleans.Messaging;
 
 namespace Orleans.Clustering.Cosmos;
 

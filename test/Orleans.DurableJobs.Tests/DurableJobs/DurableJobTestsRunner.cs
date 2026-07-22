@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.DurableJobs;
-using Xunit;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace Tester.DurableJobs;
 
@@ -169,7 +169,7 @@ public class DurableJobTestsRunner
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(10);
 
         var job = await grain.ScheduleJobAsync("RealJob", dueTime).WaitAsync(cancellationToken);
-        
+
         var fakeJob = new DurableJob
         {
             Id = "non-existent-id",

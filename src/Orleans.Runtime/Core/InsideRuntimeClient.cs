@@ -348,7 +348,7 @@ namespace Orleans.Runtime
                         ise.IsSourceActivation = false;
 
                         LogDeactivatingInconsistentState(this.invokeExceptionLogger, target, invocationException);
-                        
+
                         if (target is ActivationData ad && message.RequestContextData.TryGetActivityContext() is { } ac)
                         {
                             ad.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)), ac);

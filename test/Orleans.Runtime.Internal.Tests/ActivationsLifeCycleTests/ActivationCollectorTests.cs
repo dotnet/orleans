@@ -153,7 +153,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
-        }   
+        }
 
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivations()
@@ -175,7 +175,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = new bool[] { false };
             async Task busyWorker()
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
@@ -213,8 +213,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        }          
-        
+        }
+
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
@@ -236,7 +236,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = new bool[] { false };
             async Task busyWorker()
             {
                 logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
@@ -269,7 +269,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.Delay(shortIdleTimeout);
 
             TimeSpan everything = TimeSpan.FromMinutes(10);
-            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
+            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).", everything.TotalSeconds);
             IManagementGrain mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.ForceActivationCollection(everything);
 
@@ -286,8 +286,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        }    
-        
+        }
+
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration()
         {
@@ -317,7 +317,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
-        }   
+        }
 
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration()
@@ -341,7 +341,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = new bool[] { false };
             async Task busyWorker()
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
@@ -379,8 +379,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        } 
-  
+        }
+
         [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
         {

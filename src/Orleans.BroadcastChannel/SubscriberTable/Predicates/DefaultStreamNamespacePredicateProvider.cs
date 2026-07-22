@@ -8,7 +8,7 @@ namespace Orleans.BroadcastChannel
     /// Default implementation of <see cref="IChannelNamespacePredicateProvider"/> for internally supported stream predicates.
     /// </summary>
     public class DefaultChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
-    {  
+    {
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate)
         {

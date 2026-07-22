@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.AdvancedReminders.DynamoDB;
 using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.AdvancedReminders.DynamoDB;
 
 [assembly: RegisterProvider("DynamoDB", "AdvancedReminders", "Silo", typeof(AdvancedDynamoDBRemindersProviderBuilder))]
 

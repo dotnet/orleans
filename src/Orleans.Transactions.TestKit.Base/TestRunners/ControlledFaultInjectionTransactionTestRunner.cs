@@ -11,7 +11,7 @@ namespace Orleans.Transactions.TestKit
         public ControlledFaultInjectionTransactionTestRunner(IGrainFactory grainFactory, Action<string> output)
          : base(grainFactory, output)
         { }
-        
+
         public virtual async Task SingleGrainReadTransaction()
         {
             const int expected = 5;
@@ -24,7 +24,7 @@ namespace Orleans.Transactions.TestKit
             actual = await grain.Get();
             actual.Should().Be(expected);
         }
-        
+
         public virtual async Task SingleGrainWriteTransaction()
         {
             const int delta = 5;

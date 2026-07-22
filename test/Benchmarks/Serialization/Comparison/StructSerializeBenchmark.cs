@@ -1,17 +1,17 @@
-using BenchmarkDotNet.Attributes;
-using Orleans.Serialization;
-using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using System.Text;
 using System.Text.Json;
-using Xunit;
-using SerializerSession = Orleans.Serialization.Session.SerializerSession;
-using Utf8JsonNS = Utf8Json;
-using Hyperion;
-using ZeroFormatter;
+using BenchmarkDotNet.Attributes;
 using Benchmarks.Serialization.Models;
 using Benchmarks.Serialization.Utilities;
+using Hyperion;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using Orleans.Serialization;
+using Orleans.Serialization.Session;
+using Xunit;
+using ZeroFormatter;
+using SerializerSession = Orleans.Serialization.Session.SerializerSession;
+using Utf8JsonNS = Utf8Json;
 
 namespace Benchmarks.Serialization.Comparison;
 

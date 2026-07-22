@@ -1,7 +1,7 @@
-using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using TestExtensions;
 using UnitTests;
@@ -29,7 +29,7 @@ namespace Consul.Tests
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
         public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
-        { 
+        {
         }
 
         private static LoggerFilterOptions CreateFilters()
@@ -52,7 +52,7 @@ namespace Consul.Tests
             var address = new Uri(this.connectionString);
 
             options.ConfigureConsulClient(address);
-            
+
             return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this._clusterOptions);
         }
 
@@ -68,7 +68,7 @@ namespace Consul.Tests
             var address = new Uri(this.connectionString);
 
             options.ConfigureConsulClient(address);
-            
+
             return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this._gatewayOptions, this._clusterOptions);
         }
 

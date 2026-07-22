@@ -6,7 +6,7 @@ namespace BenchmarkGrains.MapReduce
     public class TransformGrain<TInput, TOutput> : DataflowGrain, ITransformGrain<TInput, TOutput>
     {
         private ITransformProcessor<TInput, TOutput> _processor;
-        private bool _processingStarted ;
+        private bool _processingStarted;
         private bool _proccessingStopped;
 
         private const bool ProcessOnThreadPool = true;
