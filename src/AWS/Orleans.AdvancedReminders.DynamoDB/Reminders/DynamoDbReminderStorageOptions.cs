@@ -1,5 +1,3 @@
-using Orleans.AdvancedReminders.DynamoDB;
-
 namespace Orleans.AdvancedReminders.DynamoDB
 {
     /// <summary>

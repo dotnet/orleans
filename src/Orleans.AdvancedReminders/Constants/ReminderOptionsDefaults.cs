@@ -1,5 +1,3 @@
-using Orleans.Hosting;
-
 namespace Orleans.AdvancedReminders;
 
 internal static class ReminderOptionsDefaults
