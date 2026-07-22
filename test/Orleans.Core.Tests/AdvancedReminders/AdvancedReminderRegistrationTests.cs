@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans;
 using Orleans.Configuration.Internal;
@@ -1726,6 +1727,119 @@ public class AdvancedReminderServiceTests
     }
 
     [Fact]
+    public async Task CronReminder_WithoutTimeZone_FiresInUtcAfterTimeProviderAdvancesAndReschedules()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 15, 8, 59, 50, TimeSpan.Zero));
+        var expectedFirstDueUtc = new DateTime(2026, 1, 15, 9, 0, 0, DateTimeKind.Utc);
+        var expectedNextDueUtc = new DateTime(2026, 1, 16, 9, 0, 0, DateTimeKind.Utc);
+        var grainId = GrainId.Create("test", "cron-utc-runtime");
+        var reminderTable = new MutableReminderTable(current: null);
+        var scheduledRequests = new List<ScheduleJobRequest>();
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.Arg<ScheduleJobRequest>();
+                scheduledRequests.Add(request);
+                return Task.FromResult(CreateDurableJob(request));
+            });
+
+        var remindable = new CallbackRemindable(() => Task.CompletedTask);
+        var dispatcher = CreateDispatcherGrain(GrainId.Create("sys", "cron-utc-dispatcher"));
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<AdvancedRemindable>(grainId).Returns(remindable);
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null).Returns(dispatcher);
+        var service = CreateService(
+            reminderTable,
+            jobManager: jobManager,
+            grainFactory: grainFactory,
+            timeProvider: timeProvider);
+
+        await service.RegisterOrUpdateReminder(
+            grainId,
+            "utc-daily",
+            ReminderSchedule.Cron("0 9 * * *"),
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip);
+
+        var initialEntry = await reminderTable.ReadRow(grainId, "utc-daily");
+        Assert.Equal(expectedFirstDueUtc, initialEntry.NextDueUtc);
+        Assert.Equal(string.Empty, initialEntry.CronTimeZoneId);
+        Assert.Equal(new DateTimeOffset(expectedFirstDueUtc), Assert.Single(scheduledRequests).DueTime);
+
+        await ExecuteScheduledReminderAfterAdvancingTimeAsync(service, timeProvider, scheduledRequests[0], remindable);
+
+        var status = Assert.Single(remindable.ReceivedStatuses);
+        Assert.Equal(expectedFirstDueUtc, status.FirstTickTime);
+        Assert.Equal(expectedFirstDueUtc, status.CurrentTickTime);
+        Assert.Equal(TimeSpan.Zero, status.Period);
+
+        var updatedEntry = await reminderTable.ReadRow(grainId, "utc-daily");
+        Assert.Equal(expectedFirstDueUtc, updatedEntry.LastFireUtc);
+        Assert.Equal(expectedNextDueUtc, updatedEntry.NextDueUtc);
+        Assert.Equal(string.Empty, updatedEntry.CronTimeZoneId);
+        Assert.Equal(new DateTimeOffset(expectedNextDueUtc), Assert.Single(scheduledRequests.Skip(1)).DueTime);
+    }
+
+    [Fact]
+    public async Task CronReminder_WithTimeZone_FiresAtLocalTimeAfterTimeProviderAdvancesAndReschedules()
+    {
+        var timeZone = AdvancedReminderTimeZoneTestHelper.GetParisTimeZone();
+        var timeZoneId = ReminderCronSchedule.NormalizeTimeZoneIdForStorage(timeZone) ?? timeZone.Id;
+        var expectedFirstDueUtc = AdvancedReminderTimeZoneTestHelper.ToUtc(timeZone, 2026, 1, 15, 9, 0, 0);
+        var expectedNextDueUtc = AdvancedReminderTimeZoneTestHelper.ToUtc(timeZone, 2026, 1, 16, 9, 0, 0);
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(expectedFirstDueUtc.AddSeconds(-10)));
+        var grainId = GrainId.Create("test", "cron-paris-runtime");
+        var reminderTable = new MutableReminderTable(current: null);
+        var scheduledRequests = new List<ScheduleJobRequest>();
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var request = callInfo.Arg<ScheduleJobRequest>();
+                scheduledRequests.Add(request);
+                return Task.FromResult(CreateDurableJob(request));
+            });
+
+        var remindable = new CallbackRemindable(() => Task.CompletedTask);
+        var dispatcher = CreateDispatcherGrain(GrainId.Create("sys", "cron-paris-dispatcher"));
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<AdvancedRemindable>(grainId).Returns(remindable);
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null).Returns(dispatcher);
+        var service = CreateService(
+            reminderTable,
+            jobManager: jobManager,
+            grainFactory: grainFactory,
+            timeProvider: timeProvider);
+
+        await service.RegisterOrUpdateReminder(
+            grainId,
+            "paris-daily",
+            ReminderSchedule.Cron("0 9 * * *", timeZone.Id),
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip);
+
+        var initialEntry = await reminderTable.ReadRow(grainId, "paris-daily");
+        Assert.Equal(new DateTime(2026, 1, 15, 8, 0, 0, DateTimeKind.Utc), expectedFirstDueUtc);
+        Assert.Equal(expectedFirstDueUtc, initialEntry.NextDueUtc);
+        Assert.Equal(timeZoneId, initialEntry.CronTimeZoneId);
+        Assert.Equal(new DateTimeOffset(expectedFirstDueUtc), Assert.Single(scheduledRequests).DueTime);
+
+        await ExecuteScheduledReminderAfterAdvancingTimeAsync(service, timeProvider, scheduledRequests[0], remindable);
+
+        var status = Assert.Single(remindable.ReceivedStatuses);
+        Assert.Equal(expectedFirstDueUtc, status.FirstTickTime);
+        Assert.Equal(expectedFirstDueUtc, status.CurrentTickTime);
+        Assert.Equal(TimeSpan.Zero, status.Period);
+
+        var updatedEntry = await reminderTable.ReadRow(grainId, "paris-daily");
+        Assert.Equal(expectedFirstDueUtc, updatedEntry.LastFireUtc);
+        Assert.Equal(expectedNextDueUtc, updatedEntry.NextDueUtc);
+        Assert.Equal(timeZoneId, updatedEntry.CronTimeZoneId);
+        Assert.Equal(new DateTimeOffset(expectedNextDueUtc), Assert.Single(scheduledRequests.Skip(1)).DueTime);
+    }
+
+    [Fact]
     public void TryGetReminderMetadata_ReturnsExpectedValues()
     {
         var grainId = GrainId.Create("test", "metadata");
@@ -1805,6 +1919,30 @@ public class AdvancedReminderServiceTests
 
     private static IAdvancedReminderDispatcherGrain CreateDispatcherGrain(GrainId grainId)
         => new TestAdvancedReminderDispatcherGrain(grainId);
+
+    private static async Task ExecuteScheduledReminderAfterAdvancingTimeAsync(
+        AdvancedReminderService service,
+        FakeTimeProvider timeProvider,
+        ScheduleJobRequest request,
+        CallbackRemindable remindable)
+    {
+        var queue = new InMemoryJobQueue(timeProvider);
+        queue.Enqueue(CreateDurableJob(request), dequeueCount: 0);
+        queue.MarkAsComplete();
+        await using var enumerator = queue.GetAsyncEnumerator();
+        var dequeueTask = enumerator.MoveNextAsync().AsTask();
+
+        Assert.False(dequeueTask.IsCompleted);
+        Assert.Empty(remindable.ReceivedStatuses);
+
+        var advanceBy = request.DueTime - timeProvider.GetUtcNow();
+        Assert.True(advanceBy > TimeSpan.Zero);
+        timeProvider.Advance(advanceBy);
+
+        Assert.True(await dequeueTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        var dispatcher = new AdvancedReminderDispatcherGrain(service);
+        await dispatcher.ExecuteJobAsync(enumerator.Current, CancellationToken.None);
+    }
 
     private static ReminderEntry Clone(
         ReminderEntry entry,
