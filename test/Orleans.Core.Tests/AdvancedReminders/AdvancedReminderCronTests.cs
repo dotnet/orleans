@@ -546,22 +546,25 @@ public class ReminderEntryConversionTests
         Assert.Equal(entry.Action, reminder.Action);
     }
 
-    [Fact]
-    public void ReminderEntry_ToIGrainReminder_NormalizesNullCronFields()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ReminderEntry_ToIGrainReminder_NormalizesMissingCronFields(string? cronValue)
     {
         var entry = new ReminderEntry
         {
             GrainId = GrainId.Create("test", "key"),
             ReminderName = "rem",
             ETag = "etag",
-            CronExpression = null!,
-            CronTimeZoneId = null!,
+            CronExpression = cronValue!,
+            CronTimeZoneId = cronValue!,
         };
 
         var reminder = entry.ToIGrainReminder();
 
-        Assert.Equal(string.Empty, reminder.CronExpression);
-        Assert.Equal(string.Empty, reminder.CronTimeZone);
+        Assert.Null(reminder.CronExpression);
+        Assert.Null(reminder.CronTimeZone);
     }
 }
 

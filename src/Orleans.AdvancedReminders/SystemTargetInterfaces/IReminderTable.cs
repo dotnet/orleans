@@ -248,30 +248,30 @@ namespace Orleans.AdvancedReminders
         [Id(2)]
         public readonly string ETag;
         [Id(3)]
-        public string CronExpression { get; }
+        public string? CronExpression { get; }
         [Id(4)]
         public Runtime.ReminderPriority Priority { get; }
         [Id(5)]
         public Runtime.MissedReminderAction Action { get; }
         [Id(6)]
-        public string CronTimeZone { get; }
+        public string? CronTimeZone { get; }
 
         internal ReminderData(
             GrainId grainId,
             string reminderName,
             string eTag,
-            string cronExpression = "",
+            string? cronExpression = null,
             Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal,
             Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip,
-            string cronTimeZoneId = "")
+            string? cronTimeZoneId = null)
         {
             GrainId = grainId;
             ReminderName = reminderName;
             ETag = eTag;
-            CronExpression = cronExpression ?? string.Empty;
+            CronExpression = string.IsNullOrWhiteSpace(cronExpression) ? null : cronExpression;
             Priority = priority;
             Action = action;
-            CronTimeZone = cronTimeZoneId ?? string.Empty;
+            CronTimeZone = string.IsNullOrWhiteSpace(cronTimeZoneId) ? null : cronTimeZoneId;
         }
 
         public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag} CronExpression={CronExpression} CronTimeZone={CronTimeZone} Priority={Priority} Action={Action}>";

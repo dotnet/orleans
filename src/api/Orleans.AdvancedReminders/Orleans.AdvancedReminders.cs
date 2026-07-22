@@ -98,9 +98,9 @@ namespace Orleans.AdvancedReminders
     {
         Runtime.MissedReminderAction Action { get; }
 
-        string CronExpression { get; }
+        string? CronExpression { get; }
 
-        string CronTimeZone { get; }
+        string? CronTimeZone { get; }
 
         Runtime.ReminderPriority Priority { get; }
 

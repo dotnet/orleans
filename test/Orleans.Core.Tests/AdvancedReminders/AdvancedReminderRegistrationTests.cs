@@ -1103,7 +1103,8 @@ public class AdvancedReminderServiceTests
             reminder =>
             {
                 Assert.Equal("interval", reminder.ReminderName);
-                Assert.Equal(string.Empty, reminder.CronExpression);
+                Assert.Null(reminder.CronExpression);
+                Assert.Null(reminder.CronTimeZone);
                 Assert.Equal(ReminderPriority.Normal, reminder.Priority);
                 Assert.Equal(MissedReminderAction.Skip, reminder.Action);
             },

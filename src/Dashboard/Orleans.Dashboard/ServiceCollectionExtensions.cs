@@ -344,11 +344,6 @@ public static class ServiceCollectionExtensions
         {
             return CreateUnavailableResult(true);
         }
-        catch
-        {
-            // If advanced reminders are not configured, return empty response
-            return Results.Json(new AdvancedReminderResponse { Reminders = [], Count = 0 }, jsonOptions);
-        }
     }
 
     private static async Task StreamTraceAsync(HttpContext context, DashboardLogger logger)

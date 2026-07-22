@@ -7,9 +7,15 @@ public interface IGrainReminder
 {
     string ReminderName { get; }
 
-    string CronExpression { get; }
+    /// <summary>
+    /// Gets the cron expression, or <see langword="null"/> for an interval reminder.
+    /// </summary>
+    string? CronExpression { get; }
 
-    string CronTimeZone { get; }
+    /// <summary>
+    /// Gets the cron time zone identifier, or <see langword="null"/> when the cron schedule uses UTC.
+    /// </summary>
+    string? CronTimeZone { get; }
 
     Runtime.ReminderPriority Priority { get; }
 
