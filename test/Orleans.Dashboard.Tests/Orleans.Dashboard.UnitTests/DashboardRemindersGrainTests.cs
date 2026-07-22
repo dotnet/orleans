@@ -169,7 +169,21 @@ public sealed class DashboardRemindersGrainTests
 
         Assert.Equal(1, advancedReminderTable.RangeReadCount);
         Assert.Equal(0u, advancedReminderTable.BeginHash);
-        Assert.Equal(uint.MaxValue, advancedReminderTable.EndHash);
+        Assert.Equal(0u, advancedReminderTable.EndHash);
+    }
+
+    [Fact]
+    public async Task GetReminders_ReadsFullHashRange()
+    {
+        var classicReminderTable = new ClassicReminderTableStub();
+        var serviceProvider = new ReminderServiceProvider(classicReminderTable, new AdvancedReminderTableStub());
+        var grain = new DashboardRemindersGrain(serviceProvider);
+
+        await grain.GetReminders(1, 50);
+
+        Assert.Equal(1, classicReminderTable.RangeReadCount);
+        Assert.Equal(0u, classicReminderTable.BeginHash);
+        Assert.Equal(0u, classicReminderTable.EndHash);
     }
 
     private sealed class ReminderServiceProvider(
@@ -186,8 +200,19 @@ public sealed class DashboardRemindersGrainTests
 
     private sealed class ClassicReminderTableStub(params ClassicReminderEntry[] reminders) : ClassicReminderTable
     {
+        public int RangeReadCount { get; private set; }
+
+        public uint BeginHash { get; private set; }
+
+        public uint EndHash { get; private set; }
+
         public Task<ClassicReminderTableData> ReadRows(uint begin, uint end)
-            => Task.FromResult(new ClassicReminderTableData(reminders));
+        {
+            RangeReadCount++;
+            BeginHash = begin;
+            EndHash = end;
+            return Task.FromResult(new ClassicReminderTableData(reminders));
+        }
 
         public Task<ClassicReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();
 

@@ -40,7 +40,7 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return EmptyReminders;
         }
 
-        var reminderData = await _classicReminderTable.ReadRows(0, 0xffffffff);
+        var reminderData = await _classicReminderTable.ReadRows(0, 0);
 
         if (!reminderData.Reminders.Any())
         {
@@ -68,7 +68,7 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return EmptyAdvancedReminders;
         }
 
-        var reminderData = await _advancedReminderTable.ReadRows(0, uint.MaxValue);
+        var reminderData = await _advancedReminderTable.ReadRows(0, 0);
 
         if (!reminderData.Reminders.Any())
         {
