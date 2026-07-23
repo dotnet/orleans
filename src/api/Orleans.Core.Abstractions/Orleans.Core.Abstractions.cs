@@ -2767,9 +2767,9 @@ namespace Orleans.Runtime
 
         public static bool operator <=(MembershipVersion left, MembershipVersion right) { throw null; }
 
-        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+        readonly string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
-        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
+        readonly bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public override readonly string ToString() { throw null; }
     }
@@ -2929,7 +2929,7 @@ namespace Orleans.Runtime
     [System.Text.Json.Serialization.JsonConverter(typeof(SiloAddressConverter))]
     [System.Diagnostics.DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
-    public sealed partial class SiloAddress : System.IEquatable<SiloAddress>, System.IComparable<SiloAddress>, System.ISpanFormattable, System.IFormattable
+    public sealed partial class SiloAddress : System.IEquatable<SiloAddress>, System.IComparable<SiloAddress>, System.ISpanFormattable, System.IFormattable, System.IParsable<SiloAddress>, System.IUtf8SpanParsable<SiloAddress>
     {
         internal SiloAddress() { }
 
@@ -2969,6 +2969,14 @@ namespace Orleans.Runtime
 
         public static SiloAddress New(System.Net.IPEndPoint ep, int gen) { throw null; }
 
+        static SiloAddress System.IUtf8SpanParsable<SiloAddress>.Parse(System.ReadOnlySpan<byte> utf8Text, System.IFormatProvider? provider) { throw null; }
+
+        public static SiloAddress Parse(System.ReadOnlySpan<byte> utf8Text) { throw null; }
+
+        static SiloAddress System.IParsable<SiloAddress>.Parse(string value, System.IFormatProvider? provider) { throw null; }
+
+        public static SiloAddress Parse(string value) { throw null; }
+
         string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
         bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
@@ -2978,6 +2986,14 @@ namespace Orleans.Runtime
         public override string ToString() { throw null; }
 
         public string ToStringWithHashCode() { throw null; }
+
+        public static bool TryParse(System.ReadOnlySpan<byte> utf8Text, out SiloAddress? result) { throw null; }
+
+        static bool System.IUtf8SpanParsable<SiloAddress>.TryParse(System.ReadOnlySpan<byte> utf8Text, System.IFormatProvider? provider, out SiloAddress? result) { throw null; }
+
+        public static bool TryParse(string? value, out SiloAddress? result) { throw null; }
+
+        static bool System.IParsable<SiloAddress>.TryParse(string? value, System.IFormatProvider? provider, out SiloAddress? result) { throw null; }
     }
 
     public sealed partial class SiloAddressConverter : System.Text.Json.Serialization.JsonConverter<SiloAddress>

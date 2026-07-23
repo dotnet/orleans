@@ -18,7 +18,6 @@ namespace Orleans.Providers.Streams.Common
         /// Protected for test purposes
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
-        private FixedSizeBuffer currentBuffer;
         private readonly ICacheMonitor cacheMonitor;
         private readonly PeriodicAction periodicMonitoring;
         private long cacheSizeInByte;
@@ -62,13 +61,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
-            if (this.PurgeObservable.IsEmpty && this.currentBuffer != null
-                && this.inUseBuffers.Contains(this.currentBuffer) && this.inUseBuffers.Count == 1)
-            {
-                this.inUseBuffers.Dequeue().Dispose();
-            }
             this.inUseBuffers.Enqueue(newBlock);
-            this.currentBuffer = newBlock;
             //report metrics
             this.cacheSizeInByte += newBlock.SizeInByte;
             this.cacheMonitor?.TrackMemoryAllocated(newBlock.SizeInByte);

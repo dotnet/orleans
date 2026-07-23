@@ -549,6 +549,11 @@ namespace Orleans.TestingHost
 
         public System.Collections.Generic.Dictionary<string, string> ToDictionary() { throw null; }
     }
+
+    public static partial class TimeProviderTestingExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseTimeProviderForBackgroundAreas(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.TimeProvider timeProvider) { throw null; }
+    }
 }
 
 namespace Orleans.TestingHost.Diagnostics

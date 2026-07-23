@@ -650,8 +650,9 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
-                this.lifecycle);
+                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                this.lifecycle,
+                timeProvider: TimeProvider.System);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
@@ -678,7 +679,8 @@ namespace NonSilo.Tests.Membership
                 this.timerFactory,
                 this.localSiloHealthMonitor,
                 manager,
-                this.localSiloDetails);
+                this.localSiloDetails,
+                TimeProvider.System);
 
             return new(
                 manager: manager,

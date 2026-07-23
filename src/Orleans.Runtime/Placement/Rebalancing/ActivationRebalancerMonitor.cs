@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
 using Orleans.Runtime.Scheduler;
+using Microsoft.Extensions.DependencyInjection;
 
 #nullable enable
 
@@ -28,7 +29,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
 
     public ActivationRebalancerMonitor(
-        TimeProvider timeProvider,
+        [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
         ActivationDirectory activationDirectory,
         ILoggerFactory loggerFactory,
         IGrainFactory grainFactory,
@@ -74,7 +75,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             _monitorTimer = RegisterGrainTimer(async ct =>
             {
                 var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
-                var shouldFetchReport = _latestReport.Host == SiloAddress.Zero ||
+                var shouldFetchReport = SiloAddress.Zero.Equals(_latestReport.Host) ||
                     elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
 
                 if (shouldFetchReport)

@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -71,7 +72,8 @@ namespace Orleans.Runtime.MembershipService
             ILogger<LocalSiloHealthMonitor> log,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IAsyncTimerFactory timerFactory,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             _healthCheckParticipants = healthCheckParticipants.ToList();
             _membershipManager = membershipManager;
@@ -81,7 +83,8 @@ namespace Orleans.Runtime.MembershipService
             _clusterMembershipOptions = clusterMembershipOptions.Value;
             _degradationCheckTimer = timerFactory.Create(
                 _clusterMembershipOptions.LocalHealthDegradationMonitoringPeriod,
-                nameof(LocalSiloHealthMonitor));
+                nameof(LocalSiloHealthMonitor),
+                timeProvider);
             _threadPoolMonitor = new ThreadPoolMonitor(loggerFactory.CreateLogger<ThreadPoolMonitor>());
         }
 

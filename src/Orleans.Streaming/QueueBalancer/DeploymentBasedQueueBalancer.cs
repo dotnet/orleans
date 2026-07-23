@@ -40,7 +40,7 @@ namespace Orleans.Streams
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
             this.options = options;
-            _timeProvider = services.GetService<TimeProvider>() ?? TimeProvider.System;
+            _timeProvider = services.GetKeyedService<TimeProvider>(StreamingTimeProviderNames.Streaming) ?? TimeProvider.System;
 
             isStarting = true;
 

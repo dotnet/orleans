@@ -120,6 +120,40 @@ namespace Orleans.Providers.Streams.Common
             return cursor;
         }
 
+        /// <summary>
+        /// Repositions an idle or unset cursor at the provided sequence token.
+        /// </summary>
+        /// <param name="cursorObj">The cursor to refresh.</param>
+        /// <param name="sequenceToken">The sequence token to position the cursor at.</param>
+        public void Refresh(object cursorObj, StreamSequenceToken sequenceToken)
+        {
+            ArgumentNullException.ThrowIfNull(cursorObj);
+
+            if (cursorObj is not Cursor cursor)
+            {
+                throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
+            }
+
+            // Only reposition idle or unset cursors. An active (Set) cursor is mid-enumeration and must not be moved.
+            // A null token has no reposition target, so leave the cursor untouched and let the normal idle wake-up
+            // path handle it, rather than repositioning to the newest event (which would skip data).
+            if (sequenceToken is null || cursor.State == CursorStates.Set)
+            {
+                return;
+            }
+
+            // Refresh only ever moves a cursor forward. If the cursor is already positioned at or ahead of the
+            // requested token (for example an unset cursor waiting on a future token), leave it in place so we do
+            // not rewind it and re-deliver events the consumer has already requested to start after.
+            if (cursor.SequenceToken is not null && cursor.SequenceToken.CompareTo(sequenceToken) >= 0)
+            {
+                return;
+            }
+
+            cursor.State = CursorStates.Unset;
+            SetCursor(cursor, sequenceToken);
+        }
+
         private void ReportCacheMessageStatistics()
         {
             if (this.IsEmpty)

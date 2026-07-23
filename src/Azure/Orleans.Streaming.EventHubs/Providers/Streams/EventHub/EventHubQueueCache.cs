@@ -137,6 +137,12 @@ namespace Orleans.Streaming.EventHubs
             return cache.GetCursor(streamId, sequenceToken);
         }
 
+        /// <inheritdoc />
+        public void Refresh(object cursor, StreamSequenceToken sequenceToken)
+        {
+            cache.Refresh(cursor, sequenceToken);
+        }
+
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.
         /// </summary>
@@ -209,14 +215,19 @@ namespace Orleans.Streaming.EventHubs
             if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
             {
                 // no block or block full, get new block and try again
-                currentBuffer = bufferPool.Allocate();
+                var newBuffer = bufferPool.Allocate();
+                // if this fails with a clean block, then requested size is too big; return the
+                // unused block to the pool and fail. Registering it with the eviction strategy
+                // before confirming the segment fits would leak it, because a batch that never
+                // commits is never reclaimed by the purge-time logic.
+                if (!newBuffer.TryGetSegment(size, out segment))
+                {
+                    newBuffer.Dispose();
+                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
+                }
+                currentBuffer = newBuffer;
                 //call EvictionStrategy's OnBlockAllocated method
                 this.evictionStrategy.OnBlockAllocated(currentBuffer);
-                // if this fails with clean block, then requested size is too big
-                if (!currentBuffer.TryGetSegment(size, out segment))
-                {
-                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is to big. MessageSize: {size}");
-                }
             }
             return segment;
         }

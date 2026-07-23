@@ -1,7 +1,6 @@
 #nullable enable
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -709,12 +708,12 @@ public class AsyncEnumerableGrainCallTests
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("MemoryStore");
 
-                siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_timeProvider));
+                siloBuilder.UseFakeTimeProviderForGrainTimers(_timeProvider);
             });
         }
 
         public void AdvanceTimeByResponseTimeout() =>
-            _timeProvider.Advance(HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
+            FakeTimeSilo.Advance(_timeProvider, HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
     }
 
     /// <summary>

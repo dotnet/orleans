@@ -365,6 +365,8 @@ namespace Orleans
         public const int ApplicationServices = 10000;
         public const int BecomeActive = 19999;
         public const int First = int.MinValue;
+        public const int GrainDeactivation = 19998;
+        public const int GrainDirectoryShutdown = 19997;
         public const int Last = int.MaxValue;
         public const int RuntimeGrainServices = 8000;
         public const int RuntimeInitialize = 2000;
@@ -1576,6 +1578,16 @@ namespace Orleans.Runtime
         public SiloAddress SiloAddress { get { throw null; } init { } }
 
         public override string ToString() { throw null; }
+    }
+
+    public static partial class TimeProviderNames
+    {
+        public const string ActivationManagement = "Orleans.ActivationManagement";
+        public const string GrainDirectory = "Orleans.GrainDirectory";
+        public const string Grains = "Orleans.Grains";
+        public const string Membership = "Orleans.Membership";
+        public const string Messaging = "Orleans.Messaging";
+        public const string SystemTimers = "Orleans.SystemTimers";
     }
 }
 

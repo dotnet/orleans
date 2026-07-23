@@ -1,9 +1,11 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Timers;
 
-internal class TimerRegistry(ILoggerFactory loggerFactory, TimeProvider timeProvider, MessageFactory messageFactory, ILocalSiloDetails localSiloDetails) : ITimerRegistry
+internal class TimerRegistry(ILoggerFactory loggerFactory, [FromKeyedServices(TimeProviderNames.Grains)] TimeProvider timeProvider, MessageFactory messageFactory, ILocalSiloDetails localSiloDetails) : ITimerRegistry
 {
     public ILogger TimerLogger { get; } = loggerFactory.CreateLogger<GrainTimer>();
     public TimeProvider TimeProvider { get; } = timeProvider;

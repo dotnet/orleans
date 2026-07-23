@@ -28,9 +28,10 @@ namespace Orleans.Runtime
             IAsyncTimerFactory asyncTimerFactory,
             IServiceProvider serviceProvider,
             MessageFactory messageFactory,
-            IOptionsMonitor<SiloMessagingOptions> siloMessagingOptions)
+            IOptionsMonitor<SiloMessagingOptions> siloMessagingOptions,
+            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
-            _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromSeconds(1), nameof(IncomingRequestMonitor));
+            _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromSeconds(1), nameof(IncomingRequestMonitor), timeProvider);
             _activationWorkingSet = activationWorkingSet;
             _serviceProvider = serviceProvider;
             _messageFactory = messageFactory;

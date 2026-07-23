@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
@@ -17,7 +18,7 @@ internal class GrainRuntime : IGrainRuntime
         IGrainFactory grainFactory,
         ITimerRegistry timerRegistry,
         IServiceProvider serviceProvider,
-        TimeProvider timeProvider)
+        [FromKeyedServices(TimeProviderNames.Grains)] TimeProvider timeProvider)
     {
         SiloAddress = localSiloDetails.SiloAddress;
         SiloIdentity = SiloAddress.ToString();

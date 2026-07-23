@@ -6,6 +6,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
@@ -46,7 +47,8 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloMessagingOptions> options,
             IAsyncTimerFactory timerFactory,
             OrleansInstruments orleansInstruments,
-            MessagingInstruments messagingInstruments)
+            MessagingInstruments messagingInstruments,
+            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
             this.messageCenter = messageCenter;
             _messagingInstruments = messagingInstruments;
@@ -58,7 +60,7 @@ namespace Orleans.Runtime.Messaging
             this.siloAddress = siloDetails.SiloAddress;
             this.gatewayAddress = siloDetails.GatewayAddress;
             this.GatewayInstruments = new(orleansInstruments);
-            this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance));
+            this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance), timeProvider);
             this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
         }
 

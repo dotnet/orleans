@@ -11,6 +11,6 @@ namespace NonSilo.Tests.Utilities
 
         public Func<TimeSpan, string, IAsyncTimer> CreateDelegate { get; set; }
 
-        public IAsyncTimer Create(TimeSpan period, string name) => this.CreateDelegate(period, name);
+        public IAsyncTimer Create(TimeSpan period, string name, TimeProvider timeProvider) => this.CreateDelegate(period, name);
     }
 }

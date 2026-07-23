@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Providers
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
             var filter = this.ServiceProvider.GetKeyedService<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
-            var timeProvider = this.ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+            var timeProvider = this.ServiceProvider.GetKeyedService<TimeProvider>(StreamingTimeProviderNames.Streaming) ?? TimeProvider.System;
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,

@@ -70,7 +70,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _options = options.Value;
         _journaledStateManagerOptions = journaledStateManagerOptions.Value;
-        _timeProvider = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+        _timeProvider = serviceProvider.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs) ?? TimeProvider.System;
     }
 
     private static SiloAddress GetSiloAddress(ILocalSiloDetails localSiloDetails)

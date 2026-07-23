@@ -651,19 +651,19 @@ namespace Orleans.Serialization.Serializers
             {
                 copierType = surrogateCodecType;
             }
-            else if (searchType.BaseType is { } baseType)
+            else if (searchType.BaseType is { } baseType
+                && CreateCopierInstance(
+                    fieldType.BaseType,
+                    baseType switch
+                    {
+                        { IsConstructedGenericType: true } => baseType.GetGenericTypeDefinition(),
+                        _ => baseType
+                    }) is IDerivedTypeCopier derivedTypeCopier)
             {
-                // Find copiers which generalize over all subtypes.
-                if (CreateCopierInstance(fieldType, baseType) is IDerivedTypeCopier baseCopier)
-                {
-                    return baseCopier;
-                }
-                else if (baseType.IsGenericType
-                    && baseType.IsConstructedGenericType
-                    && CreateCopierInstance(fieldType, baseType.GetGenericTypeDefinition()) is IDerivedTypeCopier genericBaseCopier)
-                {
-                    return genericBaseCopier;
-                }
+                // Find copiers which generalize over all subtypes. The field type and search type are advanced in
+                // lockstep so that the generic arguments used to construct the copier always match the arity of the
+                // copier's declared type, even when a subtype changes arity (e.g. the internal frozen collection types).
+                return derivedTypeCopier;
             }
 
             return copierType != null ? (IDeepCopier)GetServiceOrCreateInstance(copierType, constructorArguments) : null;

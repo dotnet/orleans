@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
@@ -15,7 +16,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
-
 namespace Orleans.DurableJobs;
 
 /// <inheritdoc/>
@@ -56,7 +56,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         IInternalGrainFactory grainFactory,
         IClusterMembershipService clusterMembership,
         IOverloadDetector overloadDetector,
-        TimeProvider timeProvider,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
         IOptions<DurableJobsOptions> options,
         SystemTargetShared shared,
         ILogger<LocalDurableJobManager> logger,
@@ -223,7 +223,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private async Task Stop(CancellationToken ct)
     {
-        LogStopping(_logger, _runningShards.Count);
+        var runningShards = _runningShards.Values.ToArray();
+        LogStopping(_logger, runningShards.Length);
 
         _cts.Cancel();
 
@@ -237,7 +238,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             await _periodicCheckTask.SuppressThrowing();
         }
 
-        await Task.WhenAll(_runningShards.Values.ToArray());
+        await Task.WhenAll(runningShards);
 
         LogStopped(_logger);
     }
@@ -532,12 +533,15 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 LogErrorUnregisteringShard(_logger, ex, shard.Id);
             }
         }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            // Cancellation initiated by Stop is expected.
+        }
         finally
         {
             // Clean up tracking and dispose the shard
             TryRemoveWritableShard(shard);
             _shardCache.TryRemove(shard.Id, out _);
-            _runningShards.TryRemove(shard.Id, out _);
 
             try
             {
@@ -547,6 +551,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             {
                 LogErrorDisposingShard(_logger, ex, shard.Id);
             }
+
+            _runningShards.TryRemove(shard.Id, out _);
         }
     }
 

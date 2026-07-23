@@ -62,7 +62,7 @@ namespace Orleans.Networking.Shared
             listenSocket.EnableFastPath();
 
             // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
-            if (EndPoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
+            if (EndPoint is IPEndPoint ip && Equals(ip.Address, IPAddress.IPv6Any))
             {
                 listenSocket.DualMode = true;
             }

@@ -91,7 +91,7 @@ namespace Orleans.Runtime.MembershipService
             foreach (var (key, (value, _)) in siloTable)
             {
                 if (value.Status != SiloStatus.Active
-                    && new DateTime(Math.Max(value.IAmAliveTime.Ticks, value.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                    && value.EffectiveUpdateTime < beforeDate)
                 {
                     removedEntries.Add(key);
                 }

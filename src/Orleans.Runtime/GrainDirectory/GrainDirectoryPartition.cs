@@ -23,6 +23,10 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 {
     private const float MaxActivationQueryRangePercent = 5f;
     private const int MaxActivationQueryRangeCount = 32;
+    private static readonly IBackoffProvider ClusterMemberRetryBackoff = new ExponentialBackoff(
+        TimeSpan.FromMilliseconds(100),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromMilliseconds(100));
 
     internal static SystemTargetGrainId CreateGrainId(SiloAddress siloAddress, int partitionIndex) => SystemTargetGrainId.Create(Constants.GrainDirectoryPartitionType, siloAddress, partitionIndex.ToString(CultureInfo.InvariantCulture));
     private readonly Dictionary<GrainId, GrainAddress> _directory = [];
@@ -755,10 +759,10 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private async Task<T> InvokeOnClusterMember<T>(SiloAddress siloAddress, Func<Task<T>> func, T defaultValue, string operationName)
     {
         GrainRuntime.CheckRuntimeContext(this);
-        var clusterMembershipSnapshot = _owner.ClusterMembershipSnapshot;
+        var attempt = 0;
         while (!ShutdownToken.IsCancellationRequested)
         {
-            if (clusterMembershipSnapshot.GetSiloStatus(siloAddress) is not (SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown))
+            if (!DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
             {
                 break;
             }
@@ -774,13 +778,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                     LogErrorErrorInvokingOperation(_logger, ex, operationName, siloAddress);
                 }
 
-                await _owner.RefreshViewAsync(default, CancellationToken.None);
-                if (_owner.ClusterMembershipSnapshot.Version == clusterMembershipSnapshot.Version)
+                await _owner.RefreshViewAsync(default, ShutdownToken);
+                if (!DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(100));
+                    break;
                 }
 
-                clusterMembershipSnapshot = _owner.ClusterMembershipSnapshot;
+                await Task.Delay(ClusterMemberRetryBackoff.Next(attempt++), ShutdownToken);
             }
         }
 

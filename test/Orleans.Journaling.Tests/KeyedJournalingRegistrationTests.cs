@@ -72,6 +72,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddLogging();
         services.AddOptions();
         services.AddSingleton(TimeProvider.System);
+        services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         services.AddScoped<IGrainContext>(_ => new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "keyed")));
         services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = CustomFormatKey);
@@ -103,6 +104,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         builder.Services.AddSerializer();
         builder.Services.AddLogging();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.AddJournalStorage();
         builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         builder.Services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));

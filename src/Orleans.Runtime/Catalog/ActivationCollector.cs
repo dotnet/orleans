@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -47,7 +48,7 @@ namespace Orleans.Runtime
         /// <param name="options">The options.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
             ILogger<ActivationCollector> logger,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,

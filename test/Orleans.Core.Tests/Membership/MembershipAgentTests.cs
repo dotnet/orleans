@@ -80,8 +80,9 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
-                this.lifecycle);
+                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                this.lifecycle,
+                timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
 
             this.optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
@@ -110,7 +111,8 @@ namespace NonSilo.Tests.Membership
                 this.clusterMembershipOptions,
                 this.loggerFactory.CreateLogger<MembershipAgent>(),
                 this.timerFactory,
-                this.remoteSiloProber);
+                this.remoteSiloProber,
+                timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)this.agent).Participate(this.lifecycle);
         }
 
@@ -153,7 +155,7 @@ namespace NonSilo.Tests.Membership
 
             await StopLifecycle();
 
-            Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.BecomeActive - 1]);
+            Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.GrainDeactivation]);
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
@@ -200,7 +202,7 @@ namespace NonSilo.Tests.Membership
             cancellation.Cancel();
             await StopLifecycle(cancellation.Token);
 
-            Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.BecomeActive - 1]);
+            Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.GrainDeactivation]);
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
@@ -283,7 +285,8 @@ namespace NonSilo.Tests.Membership
                 this.timerFactory,
                 this.localSiloHealthMonitor,
                 manager,
-                this.localSiloDetails);
+                this.localSiloDetails,
+                TimeProvider.System);
             var started = this.lifecycle.OnStart();
 
             await Until(() => remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length);
@@ -318,7 +321,8 @@ namespace NonSilo.Tests.Membership
                 this.timerFactory,
                 this.localSiloHealthMonitor,
                 manager,
-                this.localSiloDetails);
+                this.localSiloDetails,
+                TimeProvider.System);
 
             var started = this.lifecycle.OnStart();
             await Until(() => this.timerCalls.ContainsKey(nameof(SiloHealthMonitor)));
@@ -383,7 +387,8 @@ namespace NonSilo.Tests.Membership
                 this.timerFactory,
                 this.localSiloHealthMonitor,
                 manager,
-                this.localSiloDetails);
+                this.localSiloDetails,
+                TimeProvider.System);
             var started = this.lifecycle.OnStart();
 
             await Until(() => this.remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length);

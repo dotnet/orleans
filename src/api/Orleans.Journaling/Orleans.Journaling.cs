@@ -426,6 +426,11 @@ namespace Orleans.Journaling
         public override readonly string ToString() { throw null; }
     }
 
+    public static partial class JournalingTimeProviderNames
+    {
+        public const string Journaling = "Orleans.Journaling";
+    }
+
     public sealed partial class JournalMetadata : IJournalMetadata
     {
         public JournalMetadata(string? format, string? eTag = null, System.Collections.Generic.IReadOnlyDictionary<string, string>? properties = null) { }

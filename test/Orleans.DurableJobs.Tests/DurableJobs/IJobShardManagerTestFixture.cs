@@ -46,6 +46,7 @@ public sealed class VolatileJobShardManagerTestFixture : IJobShardManagerTestFix
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.Services.AddSingleton<VolatileJournalStorageProvider>();
         builder.Services.AddFromExisting<IJournalStorageProvider, VolatileJournalStorageProvider>();
         builder.Services.AddFromExisting<IJournalStorageCatalog, VolatileJournalStorageProvider>();
