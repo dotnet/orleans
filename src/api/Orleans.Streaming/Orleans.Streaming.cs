@@ -1799,12 +1799,15 @@ namespace Orleans.Streams
         public bool IsMatch(string streamNameSpace) { throw null; }
     }
 
+    [GenerateSerializer]
     public partial class SequentialItem<T>
     {
         public SequentialItem(T item, StreamSequenceToken token) { }
 
+        [Id(0)]
         public T Item { get { throw null; } }
 
+        [Id(1)]
         public StreamSequenceToken Token { get { throw null; } }
     }
 
