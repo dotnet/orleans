@@ -127,7 +127,7 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
     private readonly ILocalDurableJobManager _jobManager;
     private readonly IEmailService _emailService;
     private readonly ILogger<EmailGrain> _logger;
-    private IDurableJob? _durableEmailJob;
+    private DurableJob? _durableEmailJob;
 
     public EmailGrain(
         ILocalDurableJobManager jobManager,
@@ -171,7 +171,7 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
             return;
         }
 
-        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableEmailJob);
+        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableEmailJob, CancellationToken.None);
         if (canceled)
         {
             _logger.LogInformation("Email job {JobId} canceled successfully", _durableEmailJob.Id);
@@ -183,7 +183,7 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
         }
     }
 
-    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         var emailAddress = this.GetPrimaryKeyString();
         var subject = context.Job.Metadata?["Subject"];
@@ -289,7 +289,7 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         _logger.LogInformation("Order {OrderId} canceled", orderId);
     }
 
-    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         var step = context.Job.Metadata!["Step"];
         var orderId = this.GetPrimaryKey();
@@ -314,7 +314,7 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         }
     }
 
-    private async Task HandlePaymentReminder(IDurableJobContext context, CancellationToken ct)
+    private async Task HandlePaymentReminder(IJobRunContext context, CancellationToken ct)
     {
         var orderId = this.GetPrimaryKey();
         var order = await _orderService.GetOrderAsync(orderId, ct);

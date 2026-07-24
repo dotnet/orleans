@@ -139,7 +139,7 @@ namespace Orleans.AdvancedReminders
     {
         System.Threading.Tasks.Task<IGrainReminder?> GetReminder(Orleans.Runtime.GrainId grainId, string reminderName);
         System.Threading.Tasks.Task<System.Collections.Generic.List<IGrainReminder>> GetReminders(Orleans.Runtime.GrainId grainId);
-        System.Threading.Tasks.Task ProcessDueReminderAsync(Orleans.Runtime.GrainId grainId, string reminderName, string? expectedETag, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task ProcessDueReminderAsync(Orleans.Runtime.GrainId grainId, string reminderName, string? expectedScheduleId, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(Orleans.Runtime.GrainId grainId, string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action);
         System.Threading.Tasks.Task UnregisterReminder(IGrainReminder reminder);
     }

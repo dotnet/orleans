@@ -90,15 +90,65 @@ public sealed class JobShardTests
         Assert.Single(shard.PersistedJobs);
     }
 
+    [Fact]
+    public async Task TryScheduleJobAsync_SerializesConcurrentConflictingIdempotentRequests()
+    {
+        var start = DateTimeOffset.UtcNow;
+        await using var shard = new RecordingJobShard("shard", start, start.AddHours(1))
+        {
+            BlockFirstPersistence = true,
+        };
+        var target = GrainId.Create("test", "concurrent-conflicting-base-shard");
+        var request = new ScheduleJobRequest
+        {
+            IdempotencyKey = "generation-1",
+            Target = target,
+            JobName = "job",
+            DueTime = start.AddMinutes(5),
+        };
+
+        var first = shard.TryScheduleJobAsync(request, CancellationToken.None);
+        await shard.FirstPersistenceStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        var second = shard.TryScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                IdempotencyKey = request.IdempotencyKey,
+                Target = target,
+                JobName = request.JobName,
+                DueTime = request.DueTime,
+                Priority = 1,
+            },
+            CancellationToken.None);
+        shard.ReleaseFirstPersistence();
+
+        _ = Assert.IsType<DurableJob>(await first);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => second);
+        Assert.Contains("generation-1", exception.Message, StringComparison.Ordinal);
+        Assert.Single(shard.PersistedJobs);
+    }
+
     private sealed class RecordingJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime)
         : JobShard(id, startTime, endTime)
     {
+        private readonly TaskCompletionSource _firstPersistenceStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _releaseFirstPersistence = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public List<DurableJob> PersistedJobs { get; } = new();
 
-        protected override Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken)
+        public bool BlockFirstPersistence { get; init; }
+
+        public Task FirstPersistenceStarted => _firstPersistenceStarted.Task;
+
+        public void ReleaseFirstPersistence() => _releaseFirstPersistence.TrySetResult();
+
+        protected override async Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken)
         {
             PersistedJobs.Add(job);
-            return Task.CompletedTask;
+            if (BlockFirstPersistence && PersistedJobs.Count == 1)
+            {
+                _firstPersistenceStarted.TrySetResult();
+                await _releaseFirstPersistence.Task.WaitAsync(cancellationToken);
+            }
         }
 
         protected override Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken)

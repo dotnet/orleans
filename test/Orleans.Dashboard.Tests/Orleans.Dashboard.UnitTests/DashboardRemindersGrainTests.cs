@@ -162,6 +162,40 @@ public sealed class DashboardRemindersGrainTests
     }
 
     [Fact]
+    public async Task GetAdvancedReminders_FallbackMatchesManagementBucketOrder()
+    {
+        var grainIdsByBucket = new Dictionary<int, GrainId>();
+        for (var i = 0; i < 10_000 && grainIdsByBucket.Count < 3; i++)
+        {
+            var grainId = GrainId.Create("advanced-grain", $"bucketed-{i}");
+            grainIdsByBucket.TryAdd((int)(grainId.GetUniformHashCode() >> 24), grainId);
+        }
+
+        Assert.Equal(3, grainIdsByBucket.Count);
+        var due = new DateTime(2026, 7, 22, 10, 0, 0, DateTimeKind.Utc);
+        var reminders = grainIdsByBucket
+            .OrderBy(static pair => pair.Key)
+            .Select((pair, index) => new AdvancedReminderEntry
+            {
+                GrainId = pair.Value,
+                ReminderName = $"advanced-reminder-{index}",
+                StartAt = due,
+                NextDueUtc = due.AddMinutes(-index),
+            })
+            .ToArray();
+        var serviceProvider = new ReminderServiceProvider(
+            new ClassicReminderTableStub(),
+            new AdvancedReminderTableStub(reminders));
+        var grain = new DashboardRemindersGrain(serviceProvider);
+
+        var response = (await grain.GetAdvancedReminders(1, reminders.Length)).Value;
+
+        Assert.Equal(
+            reminders.Select(static reminder => reminder.ReminderName),
+            response.Reminders.Select(static reminder => reminder.Name));
+    }
+
+    [Fact]
     public async Task GetAdvancedReminders_UsesCursorPagingWithoutFullTableCount()
     {
         var advancedReminderTable = new AdvancedReminderTableStub();

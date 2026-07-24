@@ -72,6 +72,17 @@ namespace Orleans.AdvancedReminders.Redis
             }
             catch (Exception exception)
             {
+                try
+                {
+                    await DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception disposeException)
+                {
+                    _logger.LogWarning(
+                        disposeException,
+                        "Error disposing the Redis connection after advanced reminder table initialization failed.");
+                }
+
                 throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
             }
         }

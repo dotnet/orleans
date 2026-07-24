@@ -17,6 +17,7 @@ namespace Orleans.Dashboard.Implementation.Grains;
 internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
 {
     private const int MaxPageTokenReplayCount = 32;
+    private const int AdvancedReminderScanBucketShift = 24;
     private static readonly Immutable<ReminderResponse> EmptyReminders = new ReminderResponse
     {
         Reminders = []
@@ -136,7 +137,10 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
                 ? []
                 : reminderData
                 .Reminders
-                .OrderBy(x => x.NextDueUtc ?? x.StartAt)
+                .OrderBy(GetAdvancedReminderScanBucket)
+                .ThenBy(x => x.NextDueUtc ?? x.StartAt)
+                .ThenBy(x => x.GrainId)
+                .ThenBy(x => x.ReminderName, StringComparer.Ordinal)
                 .Skip(skip.Value)
                 .Take(pageSize)
                 .Select(ToAdvancedReminderInfo)
@@ -146,6 +150,9 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             HasMore = skip is not null && skip.Value + pageSize < reminderData.Reminders.Count,
         }.AsImmutable();
     }
+
+    private static int GetAdvancedReminderScanBucket(AdvancedReminderEntry entry)
+        => (int)(entry.GrainId.GetUniformHashCode() >> AdvancedReminderScanBucketShift);
 
     private async Task<string> GetAdvancedPageToken(int pageNumber, int pageSize)
     {

@@ -27,6 +27,6 @@ public interface IReminderService
     Task ProcessDueReminderAsync(
         GrainId grainId,
         string reminderName,
-        string? expectedETag,
+        string? expectedScheduleId,
         CancellationToken cancellationToken);
 }

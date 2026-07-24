@@ -12,6 +12,16 @@ public sealed class AdvancedReminderInMemoryTests(AdvancedReminderInMemoryTests.
     : IClassFixture<AdvancedReminderInMemoryTests.Fixture>
 {
     [Fact, TestCategory("BVT"), TestCategory("Reminders")]
+    public async Task ManagementGrain_ActivatesThroughTheCluster()
+    {
+        var managementGrain = fixture.Cluster.GrainFactory.GetReminderManagementGrain();
+
+        var page = await managementGrain.ListAllAsync(pageSize: 1);
+
+        Assert.InRange(page.Reminders.Count, 0, 1);
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Reminders")]
     public async Task InMemoryProvider_ProxyImplementsCrudRangesAndCompareExchange()
     {
         var grain = fixture.Cluster.GrainFactory.GetGrain<IAdvancedReminderTestGrain>(Random.Shared.NextInt64());

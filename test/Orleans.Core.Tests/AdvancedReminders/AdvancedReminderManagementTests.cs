@@ -270,34 +270,29 @@ public class ReminderManagementGrainExtensionsTests
 public class ReminderManagementGrainTests
 {
     [Fact]
-    public async Task ListAllAsync_ReturnsSortedPagesWithContinuationToken()
+    public async Task ListAllAsync_ReturnsStableBucketOrderedPagesWithContinuationToken()
     {
         var due = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
-        var table = new InMemoryManagementReminderTable(
-            new ReminderEntry
+        var grainIdsByBucket = new Dictionary<int, GrainId>();
+        for (var i = 0; i < 10_000 && grainIdsByBucket.Count < 4; i++)
+        {
+            var grainId = GrainId.Create("test", $"bucketed-{i}");
+            grainIdsByBucket.TryAdd((int)(grainId.GetUniformHashCode() >> 24), grainId);
+        }
+
+        Assert.Equal(4, grainIdsByBucket.Count);
+        var entries = grainIdsByBucket
+            .OrderBy(static pair => pair.Key)
+            .Select((pair, index) => new ReminderEntry
             {
-                GrainId = GrainId.Create("test", "g2"),
-                ReminderName = "r2",
+                GrainId = pair.Value,
+                ReminderName = $"r{index}",
                 StartAt = due,
-                NextDueUtc = due,
+                NextDueUtc = due.AddMinutes(-index),
                 Period = TimeSpan.FromMinutes(1),
-            },
-            new ReminderEntry
-            {
-                GrainId = GrainId.Create("test", "g1"),
-                ReminderName = "rB",
-                StartAt = due,
-                NextDueUtc = due,
-                Period = TimeSpan.FromMinutes(1),
-            },
-            new ReminderEntry
-            {
-                GrainId = GrainId.Create("test", "g1"),
-                ReminderName = "rA",
-                StartAt = due,
-                NextDueUtc = due,
-                Period = TimeSpan.FromMinutes(1),
-            });
+            })
+            .ToArray();
+        var table = new InMemoryManagementReminderTable(entries);
 
         var grain = new ReminderManagementGrain(table);
 
@@ -306,11 +301,11 @@ public class ReminderManagementGrainTests
         Assert.False(string.IsNullOrWhiteSpace(first.ContinuationToken));
 
         var second = await grain.ListAllAsync(pageSize: 2, continuationToken: first.ContinuationToken);
-        Assert.Single(second.Reminders);
+        Assert.Equal(2, second.Reminders.Count);
         Assert.Null(second.ContinuationToken);
         Assert.Equal(
-            ["r2", "rA", "rB"],
-            first.Reminders.Concat(second.Reminders).Select(reminder => reminder.ReminderName).Order().ToArray());
+            entries.Select(static reminder => reminder.ReminderName),
+            first.Reminders.Concat(second.Reminders).Select(static reminder => reminder.ReminderName));
     }
 
     [Fact]
@@ -417,9 +412,9 @@ public class ReminderManagementGrainTests
         var overdue = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Overdue, OverdueBy = TimeSpan.FromMinutes(5) }, pageSize: 10);
         var missed = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Missed, MissedBy = TimeSpan.FromMinutes(5) }, pageSize: 10);
 
-        Assert.Equal(["missed", "overdue", "due"], due.Reminders.Select(x => x.ReminderName).ToArray());
+        Assert.Equal(["due", "missed", "overdue"], due.Reminders.Select(x => x.ReminderName).Order().ToArray());
         Assert.Equal(["upcoming"], upcoming.Reminders.Select(x => x.ReminderName).ToArray());
-        Assert.Equal(["missed", "overdue"], overdue.Reminders.Select(x => x.ReminderName).ToArray());
+        Assert.Equal(["missed", "overdue"], overdue.Reminders.Select(x => x.ReminderName).Order().ToArray());
         Assert.Equal(["missed"], missed.Reminders.Select(x => x.ReminderName).ToArray());
     }
 
@@ -529,7 +524,7 @@ public class ReminderManagementGrainTests
 
         var page = await grain.ListDueInRangeAsync(lower, upper, pageSize: 10);
 
-        Assert.Equal(["lower", "middle", "upper"], page.Reminders.Select(x => x.ReminderName).ToArray());
+        Assert.Equal(["lower", "middle", "upper"], page.Reminders.Select(x => x.ReminderName).Order().ToArray());
     }
 
     [Fact]

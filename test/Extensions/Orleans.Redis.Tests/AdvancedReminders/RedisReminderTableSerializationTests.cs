@@ -63,6 +63,32 @@ public class RedisReminderTableSerializationTests
     }
 
     [Fact]
+    public async Task StartAsync_WhenInitializationFailsAfterCreatingConnection_DisposesOwnedMultiplexer()
+    {
+        var multiplexer = Substitute.For<IConnectionMultiplexer>();
+        multiplexer.GetDatabase().Returns(_ => throw new InvalidOperationException("database unavailable"));
+        var options = Options.Create(new AdvancedRedisReminderTableOptions
+        {
+            CreateMultiplexer = _ => Task.FromResult((multiplexer, IsShared: false)),
+        });
+        var clusterOptions = Options.Create(new ClusterOptions
+        {
+            ServiceId = "test-service",
+            ClusterId = "test-cluster",
+        });
+        var table = new RedisReminderTable(
+            NullLogger<RedisReminderTable>.Instance,
+            clusterOptions,
+            options);
+
+        var exception = await Assert.ThrowsAsync<RedisRemindersException>(
+            () => table.StartAsync(CancellationToken.None));
+
+        Assert.Contains("database unavailable", exception.Message, StringComparison.Ordinal);
+        await multiplexer.Received(1).DisposeAsync();
+    }
+
+    [Fact]
     public void ConvertFromEntry_WritesPriorityAndActionAsNumbers()
     {
         var entry = new ReminderEntry

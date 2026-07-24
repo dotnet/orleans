@@ -14,6 +14,7 @@ namespace Orleans.AdvancedReminders;
 /// <summary>
 /// Administrative management API for advanced reminders.
 /// </summary>
+[method: ActivatorUtilitiesConstructor]
 public sealed class ReminderManagementGrain(
     IReminderTable reminderTable,
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider) : Grain, IReminderManagementGrain
@@ -189,7 +190,6 @@ public sealed class ReminderManagementGrain(
     {
         var result = new List<BucketedReminder>(take);
         var startBucket = cursor?.Bucket ?? 0;
-        var exhausted = true;
         for (var bucket = startBucket; bucket < ScanBucketCount && result.Count < take; bucket++)
         {
             var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
@@ -211,15 +211,9 @@ public sealed class ReminderManagementGrain(
                 result.Add(new BucketedReminder(bucket, reminder));
                 if (result.Count == take)
                 {
-                    exhausted = false;
                     break;
                 }
             }
-        }
-
-        if (exhausted)
-        {
-            result.Sort(static (left, right) => ReminderEntryComparer.Instance.Compare(left.Entry, right.Entry));
         }
 
         return result;
