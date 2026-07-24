@@ -249,7 +249,7 @@ h3 {
 }
 
 .advanced-reminder-table {
-  min-width: 1545px;
+  min-width: 1635px;
   table-layout: fixed;
 }
 
@@ -268,6 +268,17 @@ h3 {
   white-space: nowrap;
 }
 
+.advanced-reminder-value {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-reminder-name-value {
+  font-weight: 600;
+}
+
 .advanced-reminder-table .form-control {
   min-width: 0;
   width: 100%;
@@ -282,7 +293,7 @@ h3 {
 }
 
 .advanced-reminder-name-column {
-  width: 150px;
+  width: 240px;
 }
 
 .advanced-reminder-schedule-column {

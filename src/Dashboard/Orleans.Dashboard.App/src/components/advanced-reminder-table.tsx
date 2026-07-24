@@ -85,21 +85,40 @@ export default class AdvancedReminderTable extends React.Component<AdvancedRemin
     return !filter || (value || '').toLocaleLowerCase().includes(filter.toLocaleLowerCase());
   }
 
+  renderValue(value: string, className?: string) {
+    return (
+      <span
+        className={`advanced-reminder-value${className ? ` ${className}` : ''}`}
+        title={value}
+        aria-label={value}
+      >
+        {value}
+      </span>
+    );
+  }
+
   renderReminder(reminder: AdvancedReminderData, index: number) {
     const schedule = this.getSchedule(reminder);
+    const startAt = this.formatDate(reminder.startAt);
+    const nextDue = this.formatDate(reminder.nextDueUtc);
+    const lastFired = this.formatDate(reminder.lastFireUtc);
+    const priority = reminder.priority || '—';
+    const missedAction = reminder.missedAction || '—';
     return (
       <tr key={`${reminder.grainReference}-${reminder.name}-${index}`}>
-        <td title={reminder.grainReference}>{reminder.grainReference}</td>
-        <td title={reminder.primaryKey}>{reminder.primaryKey}</td>
-        <td title={reminder.name}>{reminder.name}</td>
-        <td title={schedule}>
-          {reminder.cronExpression ? <code>{schedule}</code> : schedule}
+        <td>{this.renderValue(reminder.grainReference)}</td>
+        <td>{this.renderValue(reminder.primaryKey)}</td>
+        <td>{this.renderValue(reminder.name, 'advanced-reminder-name-value')}</td>
+        <td>
+          {reminder.cronExpression
+            ? <code>{this.renderValue(schedule)}</code>
+            : this.renderValue(schedule)}
         </td>
-        <td>{this.formatDate(reminder.startAt)}</td>
-        <td>{this.formatDate(reminder.nextDueUtc)}</td>
-        <td>{this.formatDate(reminder.lastFireUtc)}</td>
-        <td>{reminder.priority || '—'}</td>
-        <td>{reminder.missedAction || '—'}</td>
+        <td>{this.renderValue(startAt)}</td>
+        <td>{this.renderValue(nextDue)}</td>
+        <td>{this.renderValue(lastFired)}</td>
+        <td>{this.renderValue(priority)}</td>
+        <td>{this.renderValue(missedAction)}</td>
       </tr>
     );
   }

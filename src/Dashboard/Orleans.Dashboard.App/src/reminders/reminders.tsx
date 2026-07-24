@@ -37,17 +37,15 @@ export default class Reminders extends React.Component<RemindersProps> {
       : totalPages > this.props.page;
     return (
       <div>
-        {!isAdvanced ? (
-          <div className="row">
-            <div className="col-md-12">
-              <CounterWidget
-                icon="calendar"
-                counter={this.props.remindersData.count}
-                title="Classic Reminders Count"
-              />
-            </div>
+        <div className="row">
+          <div className="col-md-12">
+            <CounterWidget
+              icon="calendar"
+              counter={this.props.remindersData.count}
+              title={`${isAdvanced ? 'Advanced' : 'Classic'} Reminders Count`}
+            />
           </div>
-        ) : null}
+        </div>
         <div className="card reminder-table-switch">
           <div className="card-body">
             <div className="btn-group" role="group" aria-label="Reminder table">

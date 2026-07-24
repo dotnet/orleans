@@ -99,13 +99,14 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return await GetAdvancedRemindersFromTable(pageNumber, pageSize);
         }
 
+        var count = await _advancedReminderManagement.CountAllAsync();
         var token = await GetAdvancedPageToken(pageNumber, pageSize);
         if (pageNumber > 1 && token is null)
         {
             return new AdvancedReminderResponse
             {
                 Reminders = [],
-                Count = 0,
+                Count = count,
                 HasMore = false,
             }.AsImmutable();
         }
@@ -116,7 +117,7 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
         return new AdvancedReminderResponse
         {
             Reminders = page.Reminders.Select(ToAdvancedReminderInfo).ToArray(),
-            Count = 0,
+            Count = count,
             HasMore = page.ContinuationToken is not null,
         }.AsImmutable();
     }
