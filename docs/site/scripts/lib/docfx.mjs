@@ -532,6 +532,60 @@ function convertCallouts(source, sourcePath) {
   return output.join('\n');
 }
 
+function convertLearnBlocks(source, sourcePath) {
+  const lines = source.split('\n');
+  const output = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const video = /^(\s*)>\s*\[!VIDEO\s+(\S+)\]\s*$/.exec(lines[index]);
+    if (video) {
+      const [, indent, videoUrl] = video;
+      let parsedUrl;
+      try {
+        parsedUrl = new URL(videoUrl);
+      } catch {
+        throw new Error(`Invalid VIDEO URL '${videoUrl}' in ${sourcePath}.`);
+      }
+      if (parsedUrl.protocol !== 'https:') {
+        throw new Error(`VIDEO URL '${videoUrl}' in ${sourcePath} must use HTTPS.`);
+      }
+      output.push(
+        `${indent}<div class="video-embed">`,
+        `${indent}  <iframe src="${escapeHtml(videoUrl)}" title="Orleans video" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />`,
+        `${indent}</div>`,
+      );
+      continue;
+    }
+
+    const container = /^(\s*)>\s*\[!div\s+class=["“]([^"”]+)["”]\]\s*$/.exec(lines[index]);
+    if (!container) {
+      output.push(lines[index]);
+      continue;
+    }
+
+    const [, indent, className] = container;
+    const body = [];
+    while (index + 1 < lines.length) {
+      const content = new RegExp(`^${escapeRegExp(indent)}> ?(.*)$`).exec(lines[index + 1]);
+      if (!content) {
+        break;
+      }
+      body.push(content[1]);
+      index += 1;
+    }
+
+    if (className === 'nextstepaction') {
+      output.push(`${indent}:::tip[Next step]`, ...body.map((line) => `${indent}${line}`), `${indent}:::`);
+    } else if (className === 'checklist') {
+      output.push(...body.map((line) => `${indent}${line}`));
+    } else {
+      throw new Error(`Unsupported Learn div class '${className}' in ${sourcePath}.`);
+    }
+  }
+
+  return output.join('\n');
+}
+
 function convertImages(source, sourcePath) {
   return source
     .split('\n')
@@ -820,7 +874,7 @@ function convertHtmlCommentsForMdx(source) {
 
 function escapeMdxAngles(source) {
   const htmlTags =
-    'a|abbr|b|blockquote|br|code|dd|details|div|dl|dt|em|hr|i|img|input|kbd|li|ol|p|pre|source|span|strong|sub|summary|sup|table|tbody|td|th|thead|tr|ul';
+    'a|abbr|b|blockquote|br|code|dd|details|div|dl|dt|em|hr|i|iframe|img|input|kbd|li|ol|p|pre|source|span|strong|sub|summary|sup|table|tbody|td|th|thead|tr|ul';
   const pattern = new RegExp(
     `<(?!\\/?(?:${htmlTags})\\b|https?:\\/\\/|mailto:)(?=[A-Za-z\\d=/])`,
     'gi',
@@ -855,6 +909,8 @@ function removeDuplicateTitle(body, title) {
 function assertNoUnconvertedConstructs(body, sourcePath) {
   const checks = [
     [/\[!INCLUDE/, 'INCLUDE'],
+    [/\[!VIDEO\b/, 'VIDEO block'],
+    [/\[!div\b/, 'Learn div block'],
     [/:::code\b/, 'code directive'],
     [/:::image\b/, 'image directive'],
     [/:::zone(?:-end)?\b/, 'version zone'],
@@ -879,6 +935,7 @@ export async function convertDocfxMarkdown({
   let body = await expandIncludes(originalBody, sourcePath);
   body = await convertCodeDirectives(body, sourcePath);
   body = convertImages(body, sourcePath);
+  body = convertLearnBlocks(body, sourcePath);
   body = convertCallouts(body, sourcePath);
   body = convertZones(body, sourcePath);
   body = body.replace(/^#{1,6}\s+\[([^\]]+)\]\(#tab\/[^)]+\)\s*$/gm, '### $1');

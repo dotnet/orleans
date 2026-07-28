@@ -72,6 +72,16 @@ describe('DocFX conversion', () => {
       '',
       '<xref:System.Func`8>',
       '',
+      '> [!VIDEO https://aka.ms/docs/player?show=reactor&ep=orleans]',
+      '',
+      '> [!div class="nextstepaction"]',
+      '> [Continue learning](next.md)',
+      '',
+      '> [!div class="checklist"]',
+      '>',
+      '> - First task',
+      '> - Second task',
+      '',
       '[ObserverManager\\<IChat>](<xref:Orleans.Utilities.ObserverManager`1>)',
       '',
       '[`[assembly: GenerateSerializer(Type)]`](xref:Orleans.CodeGeneration.GenerateSerializerAttribute)',
@@ -118,6 +128,14 @@ describe('DocFX conversion', () => {
     expect(converted).toContain(
       '[Func&lt;T, U, V, W, X, Y, Z, T8&gt;](https://learn.microsoft.com/dotnet/api/system.func-8)',
     );
+    expect(converted).toContain('<div class="video-embed">');
+    expect(converted).toContain(
+      'src="https://aka.ms/docs/player?show=reactor&amp;ep=orleans"',
+    );
+    expect(converted).toContain(':::tip[Next step]\n[Continue learning](/orleans/docs/next/)');
+    expect(converted).toContain('- First task\n- Second task');
+    expect(converted).not.toContain('[!VIDEO');
+    expect(converted).not.toContain('[!div');
     expect(converted).toContain('### Visual Studio');
     expect(converted).toContain('<span id="named-section"></span>');
     expect(converted).toContain('[Repository](https://github.com/dotnet/orleans)');
