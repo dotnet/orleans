@@ -1,0 +1,21 @@
+---
+import { Code } from '@astrojs/starlight/components';
+import { buildTypeSignature } from '../../lib/api/packages';
+import type { ApiType } from '../../lib/api/types';
+
+interface Props {
+  type: ApiType;
+}
+
+const { type } = Astro.props;
+---
+
+<div class="api-signature">
+  <Code code={buildTypeSignature(type)} lang="csharp" />
+</div>
+
+<style>
+  .api-signature {
+    margin-block: 1rem 1.5rem;
+  }
+</style>

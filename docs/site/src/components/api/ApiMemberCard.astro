@@ -1,0 +1,226 @@
+---
+import { Code } from '@astrojs/starlight/components';
+import {
+  buildMemberSignature,
+  memberDisplayName,
+  memberSlug,
+  shortTypeName,
+  sourceHref,
+} from '../../lib/api/packages';
+import type { ApiMember, ApiPackageMetadata, ApiType } from '../../lib/api/types';
+import ApiDocContent from './ApiDocContent.astro';
+
+interface Props {
+  member: ApiMember;
+  type: ApiType;
+  packageMetadata: ApiPackageMetadata;
+  allTypes: ApiType[];
+}
+
+const { member, type, packageMetadata, allTypes } = Astro.props;
+const source = sourceHref(packageMetadata, member.sourceFile, member.sourceLines);
+const badges = [
+  member.isStatic ? 'static' : undefined,
+  member.isAbstract ? 'abstract' : undefined,
+  member.isVirtual ? 'virtual' : undefined,
+  member.isOverride ? 'override' : undefined,
+  member.isAsync ? 'async' : undefined,
+  member.isExtension ? 'extension' : undefined,
+  member.isConst ? 'const' : undefined,
+  member.isReadOnly ? 'readonly' : undefined,
+].filter(Boolean);
+---
+
+<article class="api-member-card">
+  <header>
+    <h2 id={memberSlug(member)}>{memberDisplayName(member, type)}</h2>
+    <div class="api-member-badges">
+      {badges.map((badge) => <span>{badge}</span>)}
+      {member.hasGet && <span>get</span>}
+      {member.hasSet && <span>{member.isInitOnly ? 'init' : 'set'}</span>}
+    </div>
+  </header>
+  {source && <a class="api-member-source" href={source}>View source</a>}
+  <Code code={buildMemberSignature(member)} lang="csharp" />
+  {
+    member.docs?.summary && (
+      <div class="api-member-description">
+        <ApiDocContent
+          content={member.docs.summary}
+          allTypes={allTypes}
+          packageName={packageMetadata.name}
+          tag="div"
+        />
+      </div>
+    )
+  }
+  {
+    member.parameters?.length && (
+      <section>
+        <h3>Parameters</h3>
+        <dl>
+          {member.parameters.map((parameter) => (
+            <div>
+              <dt>
+                <code>{parameter.name}</code>
+                <span>{shortTypeName(parameter.type)}</span>
+              </dt>
+              <dd>
+                <ApiDocContent
+                  content={member.docs?.parameters?.[parameter.name]}
+                  allTypes={allTypes}
+                  packageName={packageMetadata.name}
+                  tag="span"
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    )
+  }
+  {
+    member.docs?.returns && (
+      <section>
+        <h3>Returns</h3>
+        <ApiDocContent
+          content={member.docs.returns}
+          allTypes={allTypes}
+          packageName={packageMetadata.name}
+          tag="div"
+        />
+      </section>
+    )
+  }
+  {
+    member.docs?.value && (
+      <section>
+        <h3>Property value</h3>
+        <ApiDocContent
+          content={member.docs.value}
+          allTypes={allTypes}
+          packageName={packageMetadata.name}
+          tag="div"
+        />
+      </section>
+    )
+  }
+  {
+    member.docs?.exceptions?.length && (
+      <section>
+        <h3>Exceptions</h3>
+        <dl>
+          {member.docs.exceptions.map((exception) => (
+            <div>
+              <dt>
+                <code>{exception.type.replace(/^[A-Z]:/, '')}</code>
+              </dt>
+              <dd>
+                <ApiDocContent
+                  content={exception.description}
+                  allTypes={allTypes}
+                  packageName={packageMetadata.name}
+                  tag="span"
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    )
+  }
+  {
+    member.docs?.examples?.length && (
+      <section>
+        <h3>Examples</h3>
+        {member.docs.examples.map((example) => (
+          <>
+            <ApiDocContent
+              content={example.description}
+              allTypes={allTypes}
+              packageName={packageMetadata.name}
+              tag="div"
+            />
+            <Code code={example.code} lang={example.language ?? 'csharp'} />
+          </>
+        ))}
+      </section>
+    )
+  }
+</article>
+
+<style>
+  .api-member-card {
+    margin-block: 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem;
+    background: var(--sl-color-bg-nav);
+  }
+
+  .api-member-card header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: start;
+    justify-content: space-between;
+  }
+
+  .api-member-card h2 {
+    margin-block-start: 0;
+    font-size: 1.2rem;
+  }
+
+  .api-member-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .api-member-badges span {
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    color: var(--sl-color-accent-high);
+    font-size: 0.75rem;
+    background: var(--sl-color-accent-low);
+  }
+
+  .api-member-source {
+    display: inline-block;
+    margin-block-end: 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .api-member-description {
+    margin-block: 1rem;
+  }
+
+  .api-member-card section {
+    margin-block-start: 1.25rem;
+  }
+
+  .api-member-card h3 {
+    font-size: 1rem;
+  }
+
+  .api-member-card dl {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .api-member-card dl div {
+    display: grid;
+    grid-template-columns: minmax(10rem, 0.4fr) 1fr;
+    gap: 1rem;
+  }
+
+  .api-member-card dt span {
+    display: block;
+    color: var(--sl-color-gray-2);
+    font-size: 0.8rem;
+  }
+
+  .api-member-card dd {
+    margin: 0;
+  }
+</style>

@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "1",
+  "package": {
+    "name": "Microsoft.Orleans.Core",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "types": [
+    {
+      "name": "Grain",
+      "fullName": "Orleans.Grain",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TState",
+          "constraints": [
+            "class"
+          ]
+        }
+      ],
+      "baseType": "Orleans.Grain",
+      "interfaces": [
+        "Orleans.IGrainBase"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Base class for stateful grains."
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "note",
+            "value": "important",
+            "children": [
+              {
+                "kind": "text",
+                "text": "Use dependency injection for services."
+              }
+            ]
+          }
+        ],
+        "seeAlso": [
+          "T:Orleans.GrainStatus"
+        ]
+      },
+      "sourceFile": "src/Orleans.Core.Abstractions/Runtime/Grain.cs",
+      "sourceLines": "10-80",
+      "members": [
+        {
+          "name": "GetPrimaryKey",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public System.Guid Grain.GetPrimaryKey(string keyExtension)",
+          "returnType": "System.Guid",
+          "parameters": [
+            {
+              "name": "keyExtension",
+              "type": "System.String"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Returns the primary key."
+              }
+            ],
+            "parameters": {
+              "keyExtension": [
+                {
+                  "kind": "text",
+                  "text": "Receives the key extension."
+                }
+              ]
+            },
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The grain identifier."
+              }
+            ],
+            "exceptions": [
+              {
+                "type": "T:System.InvalidOperationException",
+                "description": [
+                  {
+                    "kind": "text",
+                    "text": "The key is unavailable."
+                  }
+                ]
+              }
+            ],
+            "examples": [
+              {
+                "language": "csharp",
+                "code": "var id = grain.GetPrimaryKey(out var extension);"
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Core.Abstractions/Runtime/Grain.cs",
+          "sourceLines": "42-48"
+        },
+        {
+          "name": "IdentityString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string Grain.IdentityString { get; }",
+          "returnType": "System.String",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Gets the grain identity."
+              }
+            ],
+            "value": [
+              {
+                "kind": "text",
+                "text": "The printable identity."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Core.Abstractions/Runtime/Grain.cs",
+          "sourceLines": "30"
+        }
+      ]
+    },
+    {
+      "name": "GrainStatus",
+      "fullName": "Orleans.GrainStatus",
+      "namespace": "Orleans",
+      "kind": "enum",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Describes grain activation status."
+          }
+        ]
+      },
+      "enumMembers": [
+        {
+          "name": "Active",
+          "value": 1,
+          "description": "The grain is active."
+        }
+      ],
+      "members": []
+    }
+  ]
+}

@@ -8,7 +8,12 @@ import { createSidebar } from './scripts/lib/docfx.mjs';
 import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
-sidebar.splice(2, 0, { label: 'Samples gallery', link: '/samples/' });
+sidebar.splice(
+  2,
+  0,
+  { label: 'Samples gallery', link: '/samples/' },
+  { label: 'API reference', link: '/api/' },
+);
 
 export default defineConfig({
   site: 'https://dotnet.github.io/orleans/',
