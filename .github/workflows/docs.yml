@@ -2,6 +2,8 @@ name: Documentation
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * *"
   push:
     branches:
       - main
@@ -74,11 +76,11 @@ jobs:
           compression-level: 6
 
       - name: Configure GitHub Pages
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
       - name: Upload GitHub Pages artifact
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
           path: docs/site/dist
@@ -119,7 +121,7 @@ jobs:
 
   deploy:
     name: Deploy GitHub Pages
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     needs:
       - site
       - snippets
