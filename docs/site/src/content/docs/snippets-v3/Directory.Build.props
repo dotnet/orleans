@@ -1,0 +1,24 @@
+<Project>
+  <!-- Centralized build properties for Orleans 3.x snippet projects -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Disable SourceLink for git worktree compatibility -->
+    <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+    <!-- Suppress warnings for unused code and obsolete APIs in snippets -->
+    <NoWarn>$(NoWarn);CS0168;CS0219;CS8618;CS0618</NoWarn>
+  </PropertyGroup>
+  
+  <!-- Centralized package versions for Orleans 3.x -->
+  <ItemGroup>
+    <PackageReference Update="Microsoft.Orleans.Server" Version="3.7.2" />
+    <PackageReference Update="Microsoft.Orleans.Client" Version="3.7.2" />
+    <PackageReference Update="Microsoft.Orleans.CodeGenerator.MSBuild" Version="3.7.2" />
+    <PackageReference Update="Microsoft.Orleans.OrleansCodeGenerator" Version="3.7.2" />
+    <PackageReference Update="Microsoft.Extensions.Hosting" Version="6.0.0" />
+    <PackageReference Update="Microsoft.Extensions.Logging.Abstractions" Version="6.0.0" />
+    <PackageReference Update="Microsoft.Extensions.Logging.Console" Version="6.0.0" />
+  </ItemGroup>
+</Project>

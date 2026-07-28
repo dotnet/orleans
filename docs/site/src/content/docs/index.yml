@@ -1,0 +1,243 @@
+### YamlMime:Hub
+
+title: Microsoft Orleans documentation
+summary: Learn to use the Orleans SDK for .NET. Browse API reference, sample code, tutorials, quickstarts, conceptual articles and more.
+brand: dotnet
+
+metadata:
+    title: Microsoft Orleans documentation
+    description: Samples, tutorials, and education for .NET Orleans. Microsoft's cloud native and distributed systems platform.
+    ms.topic: hub-page
+    ms.service: dotnet-orleans
+    ms.date: 07/03/2024
+
+highlightedContent:
+    # itemType: architecture | concept | deploy | download | get-started | how-to-guide | learn | overview | quickstart | reference | tutorial | whats-new
+    items:
+        - itemType: overview
+          title: Introduction to Orleans
+          url: overview.md
+        - itemType: deploy
+          title: Deploy Orleans apps
+          url: deployment/index.md
+        - itemType: whats-new
+          title: "Migrate from Orleans 3.x to 7.0"
+          url: migration-guide.md
+        - itemType: concept
+          title: Why Orleans?
+          url: benefits.md
+        - itemType: get-started
+          title: Develop a grain
+          url: grains/index.md
+        - itemType: overview
+          title: Orleans transactions
+          url: grains/transactions.md
+
+conceptualContent:
+    title: Featured content
+    summary: Learn to develop cloud native .NET Orleans apps.
+    # itemType: architecture | concept | deploy | download | get-started | how-to-guide | learn | overview | quickstart | reference | tutorial | video | whats-new
+    items:
+        - title: Get started with Orleans
+          links:
+              - itemType: overview
+                text: Grain lifecycle
+                url: grains/grain-lifecycle.md
+              - itemType: overview
+                text: Grain identity
+                url: grains/grain-identity.md
+              - itemType: overview
+                text: Grain placement
+                url: grains/grain-placement.md
+              - itemType: how-to-guide
+                text: Code generation
+                url: grains/code-generation.md
+              - itemType: how-to-guide
+                text: Stateless worker grains
+                url: grains/stateless-worker-grains.md
+        - title: Work with grains
+          links:
+              - itemType: overview
+                text: Grain persistence
+                url: grains/grain-persistence/index.md
+              - itemType: overview
+                text: Grain event sourcing
+                url: grains/event-sourcing/index.md
+              - itemType: overview
+                text: Grain versioning
+                url: grains/grain-versioning/grain-versioning.md
+              - itemType: get-started
+                text: Grain services
+                url: grains/grainservices.md
+              - itemType: overview
+                text: Grain observers
+                url: grains/observers.md
+              - itemType: overview
+                text: Grain interceptors
+                url: grains/interceptors.md
+        - title: Deploy Orleans apps
+          links:
+              - itemType: concept
+                text: Kubernetes deployment
+                url: deployment/kubernetes.md
+              - itemType: concept
+                text: Service Fabric deployment
+                url: deployment/service-fabric.md
+              - itemType: concept
+                text: Consul deployment
+                url: deployment/consul-deployment.md
+              - itemType: concept
+                text: Azure App Service
+                url: deployment/deploy-to-azure-app-service.md
+              - itemType: concept
+                text: Azure Container Apps
+                url: deployment/deploy-to-azure-container-apps.md
+        - title: Host Orleans apps
+          links:
+              - itemType: get-started
+                text: Host configuration
+                url: host/configuration-guide/index.md
+              - itemType: get-started
+                text: Observability
+                url: host/monitoring/index.md
+              - itemType: how-to-guide
+                text: Orleans clients
+                url: host/client.md
+              - itemType: how-to-guide
+                text: Use the grain directory
+                url: host/grain-directory.md
+              - itemType: architecture
+                text: Heterogeneous silos
+                url: host/heterogeneous-silos.md
+              - itemType: architecture
+                text: Silo lifecycle
+                url: host/silo-lifecycle.md
+        - title: Orleans architecture
+          links:
+              - itemType: architecture
+                text: Implementation details overview
+                url: implementation/index.md
+              - itemType: architecture
+                text: Load balancing
+                url: implementation/load-balancing.md
+              - itemType: architecture
+                text: Orleans lifecycles
+                url: implementation/orleans-lifecycle.md
+              - itemType: architecture
+                text: Cluster management
+                url: implementation/cluster-management.md
+              - itemType: architecture
+                text: Message delivery guarantees
+                url: implementation/messaging-delivery-guarantees.md
+              - itemType: architecture
+                text: Streaming queues
+                url: implementation/streams-implementation/index.md
+        - title: Video content
+          links:
+            - itemType: video
+              text: An introduction to Orleans
+              url: /shows/reactor/an-introduction-to-orleans
+            - itemType: video
+              text: Building real applications with Orleans
+              url: /shows/on-net/building-real-applications-with-orleans
+            - itemType: video
+              text: Building distributed applications with Orleans
+              url: /shows/on-net/orleans-onnet
+            - itemType: video
+              text: Deploying Orleans Apps to Kubernetes
+              url: /shows/on-net/deploying-orleans-apps-to-kubernetes
+            - itemType: video
+              text: Clustering in Orleans
+              url: /shows/on-net/clustering-in-orleans
+            - itemType: video
+              text: Setting up Observability in Orleans
+              url: /shows/on-net/setting-up-observability-in-orleans
+
+additionalContent:
+    sections:
+        - title: .NET community resources
+          items:
+              - title: .NET
+                links:
+                    - text: .NET documentation
+                      url: /dotnet
+                    - text: ASP.NET documentation
+                      url: /aspnet
+                    - text: Azure documentation
+                      url: /azure
+                    - text: C# documentation
+                      url: /dotnet/csharp
+              - title: Webcasts and shows
+                links:
+                    - text: Azure Friday
+                      url: /shows/azure-friday/
+                    - text: The Cloud Native Show
+                      url: /shows/The-Cloud-Native-Show
+                    - text: On .NET
+                      url: /shows/On-NET
+                    - text: .NET Community Standup
+                      url: https://dotnet.microsoft.com/platform/community/standup
+                    - text: On .NET Live
+                      url: https://dotnet.microsoft.com/live/on-dotnet-live
+              - title: Open source
+                links:
+                    - text: Orleans on GitHub
+                      url: https://github.com/dotnet/orleans
+                    - text: Orleans samples on GitHub
+                      url: https://github.com/dotnet/samples/tree/main/orleans
+                    - text: .NET samples
+                      url: https://github.com/dotnet/samples
+                    - text: .NET Platform
+                      url: https://github.com/dotnet
+              - title: Interact
+                links:
+                    - text: Chat on Discord
+                      url: https://aka.ms/orleans-discord
+                    - text: Follow @msftorleans on Twitter
+                      url: https://twitter.com/intent/follow?screen_name=msftorleans
+                    - text: Participate in discussions
+                      url: https://github.com/dotnet/orleans/discussions
+                    - text: Post an issue (or propose a feature)
+                      url: https://github.com/dotnet/orleans/issues/new
+                    - text: Comment on pull requests
+                      url: https://github.com/dotnet/orleans/pulls
+
+        - title: API and language reference # < 60 chars (optional)
+          summary: Search the .NET API and language reference documentation. # < 160 chars (optional)
+          items:
+
+          - title: ".NET Orleans core API reference"
+            summary: API reference documentation for .NET Orleans.Core
+            url: /dotnet/api/orleans.core
+
+          - title: ".NET Orleans runtime API reference"
+            summary: API reference documentation for .NET Orleans.Runtime
+            url: /dotnet/api/orleans.runtime
+
+          - title: ".NET Orleans streams API reference"
+            summary: API reference documentation for .NET Orleans.Streams
+            url: /dotnet/api/orleans.streams
+
+          - title: ".NET Orleans providers API reference"
+            summary: API reference documentation for .NET Orleans.Providers
+            url: /dotnet/api/orleans.providers
+
+          - title: ".NET Orleans storage API reference"
+            summary: API reference documentation for .NET Orleans.Storage
+            url: /dotnet/api/orleans.storage
+
+          - title: ".NET Orleans Azure Storage API reference"
+            summary: API reference documentation for .NET Orleans.Clustering.AzureStorage
+            url: /dotnet/api/orleans.clustering.azurestorage
+
+          - title: ".NET Orleans services API reference"
+            summary: API reference documentation for .NET Orleans.Services
+            url: /dotnet/api/orleans.services
+
+          - title: ".NET Orleans transactions API reference"
+            summary: API reference documentation for .NET Orleans.Transactions
+            url: /dotnet/api/orleans.transactions
+
+
+    # footer (optional)
+    footer: "Are you interested in contributing to the .NET docs? For more information, see our [contributor guide](/contribute/dotnet/dotnet-contribute)."

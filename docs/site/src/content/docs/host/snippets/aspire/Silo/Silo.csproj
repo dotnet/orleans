@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <!-- <silo_packages> -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
+  </ItemGroup>
+  <!-- </silo_packages> -->
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

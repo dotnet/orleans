@@ -1,0 +1,56 @@
+---
+import type { GallerySample } from '../types/gallery';
+
+interface Props {
+  sample: GallerySample;
+}
+const { sample } = Astro.props;
+const repository = /^[^/]+\/[^/]+$/.test(sample.sourceRepository)
+  ? `https://github.com/${sample.sourceRepository}`
+  : sample.sourceRepository.replace(/\/$/, '');
+const sourceUrl =
+  sample.path && /^https?:\/\//.test(repository) && !repository.includes('/tree/')
+    ? `${repository}/tree/main/${sample.path.replace(/^\/+/, '')}`
+    : repository;
+---
+
+<article class:list={['sample-card', { 'sample-card--featured': sample.featured }]}>
+  {
+    sample.image && (
+      <img
+        class="sample-card__image"
+        src={sample.image.startsWith('http') ? sample.image : `${import.meta.env.BASE_URL}${sample.image}`}
+        alt={`${sample.title} sample preview`}
+        loading="lazy"
+      />
+    )
+  }
+  <div class="sample-card__body">
+    <div class="sample-card__heading">
+      <h2>{sample.title}</h2>
+      {sample.featured && <span class="sample-card__featured">Featured</span>}
+    </div>
+    <p>{sample.description}</p>
+    <dl class="sample-card__metadata">
+      <div>
+        <dt>Languages</dt>
+        <dd>{sample.languages.join(', ') || 'Not specified'}</dd>
+      </div>
+      <div>
+        <dt>Topics</dt>
+        <dd>{sample.tags.join(', ') || 'Not specified'}</dd>
+      </div>
+    </dl>
+    {
+      sourceUrl ? (
+        <a class="sample-card__link" href={sourceUrl}>
+          View source <span aria-hidden="true">→</span>
+        </a>
+      ) : (
+        <p class="sample-card__path">
+          <code>{sample.path}</code>
+        </p>
+      )
+    }
+  </div>
+</article>

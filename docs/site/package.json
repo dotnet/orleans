@@ -1,0 +1,34 @@
+{
+  "name": "@dotnet/orleans-docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "npm run prepare:docs && astro dev",
+    "prepare:docs": "node scripts/prepare-docs.mjs",
+    "test": "vitest run",
+    "check": "npm run prepare:docs && astro check",
+    "build": "npm run prepare:docs && astro build",
+    "validate": "npm run prepare:docs && vitest run && astro check && astro build"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "7.2.1",
+    "@astrojs/starlight": "0.41.3",
+    "astro": "7.1.3",
+    "pagefind": "1.5.2",
+    "remark-directive": "4.0.0",
+    "sharp": "0.35.3",
+    "starlight-links-validator": "0.25.2",
+    "starlight-llms-txt": "0.11.0",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.9",
+    "@types/node": "26.1.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
