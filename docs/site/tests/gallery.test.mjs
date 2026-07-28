@@ -31,7 +31,7 @@ describe('sample gallery', () => {
           slug: 'hello-world',
           title: 'Hello World',
           description: 'A minimal Orleans app.',
-          path: 'samples/hello',
+          path: 'hello',
           sourceRepository: 'dotnet/orleans',
           image: 'preview.png',
           languages: ['C#'],
@@ -67,6 +67,36 @@ describe('sample gallery', () => {
 
     expect(result).toEqual({ missing: true, items: [] });
     expect(JSON.parse(await readFile(outputFile, 'utf8'))).toEqual({ missing: true, items: [] });
+  });
+
+  test('accepts samples without preview images', async () => {
+    const repositoryRoot = await temporaryDirectory();
+    await mkdir(path.join(repositoryRoot, 'samples', 'hello'), { recursive: true });
+    await writeFile(
+      path.join(repositoryRoot, 'samples', 'gallery.json'),
+      JSON.stringify([
+        {
+          slug: 'hello-world',
+          title: 'Hello World',
+          description: 'A minimal Orleans app.',
+          path: 'hello',
+          sourceRepository: 'https://github.com/dotnet/orleans',
+          image: null,
+          languages: ['C#'],
+          tags: ['Getting started'],
+          featured: true,
+        },
+      ]),
+    );
+
+    const gallery = await prepareGallery({
+      repositoryRoot,
+      outputFile: path.join(repositoryRoot, 'site', '.generated', 'gallery.json'),
+      publicImageDirectory: path.join(repositoryRoot, 'site', 'public', 'sample-images'),
+      allowMissing: false,
+    });
+
+    expect(gallery.items[0].image).toBeNull();
   });
 
   test('rejects malformed entries and path traversal', () => {

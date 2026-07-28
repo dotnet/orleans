@@ -202,6 +202,17 @@
   font-weight: 700;
 }
 
+.sample-card__links {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sample-card__origin {
+  font-size: 0.875rem;
+}
+
 @media (max-width: 40rem) {
   .sample-filters {
     grid-template-columns: 1fr;

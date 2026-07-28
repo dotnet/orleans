@@ -8,6 +8,10 @@ function assertString(value, field, index) {
   return value;
 }
 
+function assertNullableString(value, field, index) {
+  return value === null ? null : assertString(value, field, index);
+}
+
 function assertStringArray(value, field, index) {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     throw new Error(`samples/gallery.json entry ${index} must contain a string array '${field}'.`);
@@ -63,13 +67,20 @@ export function validateGallery(value) {
       throw new Error(`samples/gallery.json entry ${index} has unsafe path '${samplePath}'.`);
     }
 
+    const image = assertNullableString(entry.image, 'image', index)?.replaceAll('\\', '/') ?? null;
+    if (image && !/^https?:\/\//.test(image)) {
+      if (path.posix.isAbsolute(image) || image.split('/').includes('..')) {
+        throw new Error(`samples/gallery.json entry ${index} has unsafe image path '${image}'.`);
+      }
+    }
+
     return {
       slug,
       title: assertString(entry.title, 'title', index),
       description: assertString(entry.description, 'description', index),
       path: samplePath,
       sourceRepository: assertString(entry.sourceRepository, 'sourceRepository', index),
-      image: assertString(entry.image, 'image', index),
+      image,
       languages: assertStringArray(entry.languages, 'languages', index),
       tags: assertStringArray(entry.tags, 'tags', index),
       featured: entry.featured,
@@ -107,7 +118,8 @@ async function resolveLocalImage(sample, repositoryRoot) {
 
   const candidates = [
     path.resolve(repositoryRoot, sample.image),
-    path.resolve(repositoryRoot, sample.path, sample.image),
+    path.resolve(repositoryRoot, 'samples', sample.image),
+    path.resolve(repositoryRoot, 'samples', sample.path, sample.image),
   ];
   for (const candidate of candidates) {
     const relative = path.relative(repositoryRoot, candidate);

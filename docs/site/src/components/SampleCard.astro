@@ -5,13 +5,12 @@ interface Props {
   sample: GallerySample;
 }
 const { sample } = Astro.props;
-const repository = /^[^/]+\/[^/]+$/.test(sample.sourceRepository)
+const originalRepository = /^[^/]+\/[^/]+$/.test(sample.sourceRepository)
   ? `https://github.com/${sample.sourceRepository}`
   : sample.sourceRepository.replace(/\/$/, '');
-const sourceUrl =
-  sample.path && /^https?:\/\//.test(repository) && !repository.includes('/tree/')
-    ? `${repository}/tree/main/${sample.path.replace(/^\/+/, '')}`
-    : repository;
+const sourceUrl = `https://github.com/dotnet/orleans/tree/main/samples/${sample.path.replace(/^\/+/, '')}`;
+const showOriginalSource =
+  /^https?:\/\//.test(originalRepository) && originalRepository !== 'https://github.com/dotnet/orleans';
 ---
 
 <article class:list={['sample-card', { 'sample-card--featured': sample.featured }]}>
@@ -41,16 +40,17 @@ const sourceUrl =
         <dd>{sample.tags.join(', ') || 'Not specified'}</dd>
       </div>
     </dl>
-    {
-      sourceUrl ? (
-        <a class="sample-card__link" href={sourceUrl}>
-          View source <span aria-hidden="true">→</span>
-        </a>
-      ) : (
-        <p class="sample-card__path">
-          <code>{sample.path}</code>
-        </p>
-      )
-    }
+    <div class="sample-card__links">
+      <a class="sample-card__link" href={sourceUrl}>
+        View source <span aria-hidden="true">→</span>
+      </a>
+      {
+        showOriginalSource && (
+          <a class="sample-card__origin" href={originalRepository}>
+            Original repository
+          </a>
+        )
+      }
+    </div>
   </div>
 </article>
