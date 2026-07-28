@@ -12,6 +12,8 @@ npm install
 npm run dev
 ```
 
+After a production build, serve the exact static artifact with `npm run preview`.
+
 Run the focused conversion tests, Astro type checks, strict snippet expansion,
 Starlight link validation, Pagefind indexing, and production build with:
 

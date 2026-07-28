@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "npm run prepare:docs && astro dev",
+    "preview": "astro preview",
     "prepare:docs": "node scripts/prepare-docs.mjs",
     "test": "vitest run",
     "check": "npm run prepare:docs && astro check",
