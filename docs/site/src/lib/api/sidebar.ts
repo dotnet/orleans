@@ -1,12 +1,11 @@
 import {
   apiRoot,
-  genericArity,
   groupTypesByNamespace,
   memberKindLabels,
   memberKindOrder,
   memberKindPath,
   packagePath,
-  slugify,
+  typeSlug,
   typeDisplayName,
   typePath,
 } from './packages';
@@ -28,6 +27,7 @@ export type SidebarItem = SidebarLink | SidebarGroup;
 export function buildApiSidebar(
   packages: PackageApiDocument[],
   currentPackageName?: string,
+  currentType?: ApiType,
 ): SidebarItem[] {
   const root: SidebarLink = { label: 'API packages', link: `${apiRoot}/` };
   const sorted = [...packages].sort((left, right) =>
@@ -35,6 +35,19 @@ export function buildApiSidebar(
   );
   if (currentPackageName) {
     const current = sorted.find((pkg) => pkg.package.name === currentPackageName);
+    if (current && currentType) {
+      return [
+        root,
+        {
+          label: current.package.name,
+          collapsed: false,
+          items: [
+            { label: 'Package overview', link: packagePath(current.package.name) },
+            typeSidebar(current.package.name, currentType),
+          ],
+        },
+      ];
+    }
     return current ? [root, packageSidebar(current, false)] : [root];
   }
   return [root, ...sorted.map((pkg) => packageSidebar(pkg, true))];
@@ -80,7 +93,7 @@ function typeSidebar(packageName: string, type: ApiType): SidebarItem {
     items: [
       {
         label: 'Overview',
-        link: `${packagePath(packageName)}${slugify(type.name, genericArity(type))}/`,
+        link: `${packagePath(packageName)}${typeSlug(type)}/`,
       },
       ...memberItems,
     ],

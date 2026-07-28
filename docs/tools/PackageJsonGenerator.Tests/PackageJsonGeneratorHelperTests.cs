@@ -52,8 +52,7 @@ public sealed class PackageJsonGeneratorHelperTests
             "https://github.com/dotnet/orleans",
             "abc123");
 
-        Assert.Equal(
-            """
+        var expected = """
             {
               "package": {
                 "name": "Sample.Package",
@@ -86,9 +85,14 @@ public sealed class PackageJsonGeneratorHelperTests
                 }
               ]
             }
-            """,
-            schema.Replace("\r\n", "\n", StringComparison.Ordinal));
+            """;
+
+        Assert.Equal(NormalizeLineEndings(expected), NormalizeLineEndings(schema));
     }
+
+    private static string NormalizeLineEndings(string value) =>
+        value.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal);
 
     [Fact]
     public void BuildRawGitHubUrl_StripsGitSuffix()

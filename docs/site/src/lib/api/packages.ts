@@ -2,6 +2,7 @@ import type {
   ApiGenericParameter,
   ApiMember,
   ApiPackageMetadata,
+  ApiParameter,
   ApiType,
   MemberKind,
   PackageApiDocument,
@@ -44,8 +45,20 @@ export function typeDisplayName(type: Pick<ApiType, 'name' | 'isGeneric' | 'gene
 }
 
 export function slugify(name: string, arity = 0): string {
-  const slug = name.toLowerCase();
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, '-')
+    .replace(/^-|-$/g, '');
   return arity > 0 ? `${slug}-${arity}` : slug;
+}
+
+export function typeSlug(type: ApiType): string {
+  let identity =
+    type.fullName ?? (type.namespace ? `${type.namespace}.${type.name}` : type.name);
+  while (/<[^<>]*>/.test(identity)) {
+    identity = identity.replace(/<[^<>]*>/g, '');
+  }
+  return slugify(identity, genericArity(type));
 }
 
 export function packageSlug(name: string): string {
@@ -57,7 +70,7 @@ export function packagePath(packageName: string): string {
 }
 
 export function typePath(packageName: string, type: ApiType): string {
-  return `${packagePath(packageName)}${slugify(type.name, genericArity(type))}/`;
+  return `${packagePath(packageName)}${typeSlug(type)}/`;
 }
 
 export function memberKindPath(packageName: string, type: ApiType, kind: MemberKind): string {
@@ -161,15 +174,43 @@ export function shortTypeName(fullName: string): string {
 
 export function memberSlug(member: ApiMember): string {
   let name = member.name === '.ctor' ? 'constructor' : member.name;
+  const genericArity = member.genericParameters?.length ?? 0;
+  if (genericArity > 0) {
+    name = `${name}-${genericArity}`;
+  }
   if (member.kind === 'indexer' && member.parameters?.length) {
-    name = `this[${member.parameters.map((parameter) => shortTypeName(parameter.type)).join(', ')}]`;
+    name = `this[${member.parameters.map(memberParameterSlug).join(', ')}]`;
   } else if (
     (member.kind === 'method' || member.kind === 'constructor') &&
     member.parameters
   ) {
-    name = `${name}(${member.parameters.map((parameter) => shortTypeName(parameter.type)).join(', ')})`;
+    name = `${name}(${member.parameters.map(memberParameterSlug).join(', ')})`;
   }
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const readable = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/g, '');
+  return `${readable}-${stableRouteHash(member.signature)}`;
+}
+
+function memberParameterSlug(parameter: ApiParameter): string {
+  const type = parameter.type
+    .replace(/\[([,]*)\]/g, (_match, commas: string) => ` array-${commas.length + 1} `)
+    .replace(/\?/g, ' nullable ')
+    .replace(/\*/g, ' pointer ')
+    .replace(/&/g, ' byref ');
+  return `${parameter.modifier ? `${parameter.modifier} ` : ''}${type}`;
+}
+
+function stableRouteHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 export function memberDisplayName(member: ApiMember, declaringType?: ApiType): string {
@@ -294,19 +335,19 @@ export function assertUniqueApiRoutes(packages: PackageApiDocument[]): void {
       if (!type.name) {
         continue;
       }
-      const typeSlug = slugify(type.name, genericArity(type));
-      if (typeSlugs.has(typeSlug)) {
+      const routeSlug = typeSlug(type);
+      if (typeSlugs.has(routeSlug)) {
         throw new Error(
-          `Duplicate API type route '${pkgSlug}/${typeSlug}' in package '${pkg.package.name}'.`,
+          `Duplicate API type route '${pkgSlug}/${routeSlug}' in package '${pkg.package.name}'.`,
         );
       }
-      typeSlugs.add(typeSlug);
+      typeSlugs.add(routeSlug);
       const memberSlugs = new Set<string>();
       for (const member of type.members ?? []) {
         const route = `${memberKindSlugs[member.kind]}/${memberSlug(member)}`;
         if (memberSlugs.has(route)) {
           throw new Error(
-            `Duplicate API member route '${pkgSlug}/${typeSlug}/${route}' in package '${pkg.package.name}'.`,
+            `Duplicate API member route '${pkgSlug}/${routeSlug}/${route}' in package '${pkg.package.name}'.`,
           );
         }
         memberSlugs.add(route);

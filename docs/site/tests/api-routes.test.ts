@@ -19,39 +19,41 @@ const pkg = fixture as PackageApiDocument;
 
 describe('native API routes', () => {
   test('builds package, generic type, and existing member-kind paths', () => {
+    const memberRoutes = buildMemberRoutes([pkg]);
+    const identitySlug = memberRoutes[0].memberSlug;
+    const getPrimaryKeySlug = memberRoutes[1].memberSlug;
+
     expect(buildPackageRoutes([pkg]).map((route) => route.packageSlug)).toEqual([
       'microsoft.orleans.core',
     ]);
     expect(buildTypeRoutes([pkg]).map((route) => route.typeSlug)).toEqual([
-      'grain-1',
-      'grainstatus',
+      'orleans.grain-1',
+      'orleans.grainstatus',
     ]);
     expect(
       buildMemberKindRoutes([pkg]).map((route) => route.memberKindSlug),
     ).toEqual(['properties', 'methods']);
     expect(typePath(pkg.package.name, pkg.types[0])).toBe(
-      '/docs/api/csharp/microsoft.orleans.core/grain-1/',
+      '/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/',
     );
     expect(memberKindPath(pkg.package.name, pkg.types[0], 'method')).toBe(
-      '/docs/api/csharp/microsoft.orleans.core/grain-1/methods/',
+      '/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/methods/',
     );
-    expect(buildMemberRoutes([pkg]).map((route) => route.memberSlug)).toEqual([
-      'identitystring',
-      'getprimarykey-string',
-    ]);
-    expect(buildMemberRoutes([pkg])[1]).toMatchObject({
+    expect(identitySlug).toMatch(/^identitystring-[0-9a-f]{8}$/);
+    expect(getPrimaryKeySlug).toMatch(/^getprimarykey-system-string-[0-9a-f]{8}$/);
+    expect(memberRoutes[1]).toMatchObject({
       packageSlug: 'microsoft.orleans.core',
-      typeSlug: 'grain-1',
+      typeSlug: 'orleans.grain-1',
       memberKindSlug: 'methods',
-      memberSlug: 'getprimarykey-string',
+      memberSlug: getPrimaryKeySlug,
     });
     expect(
       buildMemberRoutes([pkg])[1].member.name,
     ).toBe('GetPrimaryKey');
     expect(
-      `${memberKindPath(pkg.package.name, pkg.types[0], 'method')}getprimarykey-string/`,
+      `${memberKindPath(pkg.package.name, pkg.types[0], 'method')}${getPrimaryKeySlug}/`,
     ).toBe(
-      '/docs/api/csharp/microsoft.orleans.core/grain-1/methods/getprimarykey-string/',
+      `/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/methods/${getPrimaryKeySlug}/`,
     );
   });
 
@@ -60,11 +62,17 @@ describe('native API routes', () => {
     expect(sidebar).toHaveLength(2);
     expect(sidebar[0]).toEqual({ label: 'API packages', link: '/docs/api/csharp/' });
     expect(JSON.stringify(sidebar)).toContain(
-      '/docs/api/csharp/microsoft.orleans.core/grain-1/methods/',
+      '/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/methods/',
     );
+
+    const contextual = buildApiSidebar([pkg], pkg.package.name, pkg.types[0]);
+    expect(contextual).toHaveLength(2);
+    expect(JSON.stringify(contextual)).toContain('Package overview');
+    expect(JSON.stringify(contextual)).not.toContain('GrainStatus');
   });
 
   test('fails deterministic generation on route collisions', () => {
+    const duplicateMemberSlug = buildMemberRoutes([pkg])[1].memberSlug;
     expect(() => assertUniqueApiRoutes([pkg, pkg])).toThrow(
       "Duplicate API package route 'microsoft.orleans.core'",
     );
@@ -75,7 +83,7 @@ describe('native API routes', () => {
           types: [pkg.types[0], { ...pkg.types[0] }],
         },
       ]),
-    ).toThrow("Duplicate API type route 'microsoft.orleans.core/grain-1'");
+    ).toThrow("Duplicate API type route 'microsoft.orleans.core/orleans.grain-1'");
 
     expect(() =>
       assertUniqueApiRoutes([
@@ -93,8 +101,38 @@ describe('native API routes', () => {
         },
       ]),
     ).toThrow(
-      "Duplicate API member route 'microsoft.orleans.core/grain-1/methods/getprimarykey-string'",
+      `Duplicate API member route 'microsoft.orleans.core/orleans.grain-1/methods/${duplicateMemberSlug}'`,
     );
+  });
+
+  test('disambiguates generic overloads with identical parameter types', () => {
+    const method = pkg.types[0].members![0];
+    const overloaded = {
+      ...pkg,
+      types: [
+        {
+          ...pkg.types[0],
+          members: [
+            {
+              ...method,
+              name: 'ConfigureFormatter',
+              genericParameters: [{ name: 'TOptions' }],
+            },
+            {
+              ...method,
+              name: 'ConfigureFormatter',
+              genericParameters: [{ name: 'TOptions' }, { name: 'TFormatter' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const slugs = buildMemberRoutes([overloaded]).map((route) => route.memberSlug);
+    expect(slugs[0]).toMatch(/^configureformatter-1-system-string-[0-9a-f]{8}$/);
+    expect(slugs[1]).toMatch(/^configureformatter-2-system-string-[0-9a-f]{8}$/);
+    expect(slugs[0]).not.toBe(slugs[1]);
+    expect(() => assertUniqueApiRoutes([overloaded])).not.toThrow();
   });
 
   test('resolves XML doc IDs using generic arity', () => {

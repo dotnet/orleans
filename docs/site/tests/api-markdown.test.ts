@@ -11,11 +11,13 @@ import {
 import {
   buildMemberSignature,
   buildTypeSignature,
+  memberSlug,
 } from '../src/lib/api/packages';
 import type { PackageApiDocument } from '../src/lib/api/types';
 
 const pkg = fixture as PackageApiDocument;
 const grain = pkg.types[0];
+const primaryKeySlug = memberSlug(grain.members![0]);
 
 describe('native API Markdown companions', () => {
   test('renders package and type navigation with source and NuGet links', () => {
@@ -27,7 +29,7 @@ describe('native API Markdown companions', () => {
       '[Microsoft.Orleans.Core](/orleans/docs/api/csharp/microsoft.orleans.core/)',
     );
     expect(packageMarkdown).toContain(
-      '[Grain&lt;TState&gt;](/orleans/docs/api/csharp/microsoft.orleans.core/grain-1/)',
+      '[Grain&lt;TState&gt;](/orleans/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/)',
     );
     expect(typeMarkdown).toContain('# Grain&lt;TState&gt;');
     expect(typeMarkdown).toContain(
@@ -40,14 +42,14 @@ describe('native API Markdown companions', () => {
       'public abstract class Grain<TState> : Grain, IGrainBase',
     );
     expect(typeMarkdown).toContain(
-      '/orleans/docs/api/csharp/microsoft.orleans.core/grain-1/methods/getprimarykey-string/',
+      `/orleans/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/methods/${primaryKeySlug}/`,
     );
   });
 
   test('renders member documentation, parameters, returns, exceptions, and examples', () => {
     const markdown = renderMemberKindMarkdown(pkg, grain, 'method', '/orleans/');
 
-    expect(markdown).toContain('## GetPrimaryKey(String) {#getprimarykey-string}');
+    expect(markdown).toContain(`## GetPrimaryKey(String) {#${primaryKeySlug}}`);
     expect(markdown).toContain('### Parameters');
     expect(markdown).toContain('Receives the key extension.');
     expect(markdown).toContain('### Returns');
@@ -58,7 +60,7 @@ describe('native API Markdown companions', () => {
     expect(markdown).toContain('var id = grain.GetPrimaryKey');
     expect(markdown).toContain('#L42-L48');
     expect(markdown).toContain(
-      '[Dedicated page](/orleans/docs/api/csharp/microsoft.orleans.core/grain-1/methods/getprimarykey-string/)',
+      `[Dedicated page](/orleans/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/methods/${primaryKeySlug}/)`,
     );
   });
 
@@ -74,7 +76,7 @@ describe('native API Markdown companions', () => {
       '# Grain&lt;TState&gt;.GetPrimaryKey(String)',
     );
     expect(markdown).toContain(
-      '[Methods](/orleans/docs/api/csharp/microsoft.orleans.core/grain-1/methods/)',
+      '[Methods](/orleans/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/methods/)',
     );
     expect(markdown).not.toContain('[Dedicated page]');
     expect(markdown).toContain('Receives the key extension.');

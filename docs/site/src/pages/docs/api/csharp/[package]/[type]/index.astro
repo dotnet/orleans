@@ -39,7 +39,7 @@ interface Props {
 
 const { pkg, type, allPackages }: Props = Astro.props;
 const base = import.meta.env.BASE_URL;
-const sidebar = buildApiSidebar(allPackages, pkg.package.name);
+const sidebar = buildApiSidebar(allPackages, pkg.package.name, type);
 const displayName = typeDisplayName(type);
 const memberGroups = groupMembersByKind(type.members);
 const source = sourceHref(pkg.package, type.sourceFile, type.sourceLines);

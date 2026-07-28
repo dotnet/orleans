@@ -1,9 +1,9 @@
 # Orleans documentation site
 
-This Astro + Starlight site imports the conceptual Orleans documentation from
-`dotnet/docs`. The upstream DocFX sources are preserved under
-`src/content/docs`; `npm run prepare:docs` emits ignored `.mdx` siblings in the
-same tree so Starlight and its link validator retain canonical route paths.
+This Astro + Starlight site is the maintained home for Orleans documentation.
+The conceptual Markdown sources live under `src/content/docs`;
+`npm run prepare:docs` emits ignored `.mdx` siblings under `/docs/` so Starlight
+can render the imported Microsoft Learn syntax.
 
 Use Node.js 24 or later:
 
@@ -31,3 +31,14 @@ render package, type, member-kind, and individual member routes with matching
 `.md` companions.
 The expected JSON shape is the output of Aspire's Roslyn/XML/PDB
 `PackageJsonGenerator`, adapted by the Orleans API generator workstream.
+
+Regenerate committed API data after changing the public source surface:
+
+```powershell
+pwsh ../scripts/Generate-ApiData.ps1 -Parallelism 4
+```
+
+GitHub Actions validates generated API freshness, compiles documentation snippets
+and samples, builds the complete site, and deploys `dist` to GitHub Pages from
+`main`. Pull requests receive a downloadable site artifact but never receive
+deployment permissions.

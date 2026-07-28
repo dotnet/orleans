@@ -8,6 +8,7 @@ import { createSidebar } from './scripts/lib/docfx.mjs';
 import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
+const buildConcurrency = Number(process.env.ORLEANS_DOCS_BUILD_CONCURRENCY) || 4;
 sidebar.unshift({ label: 'Documentation', link: '/docs/' });
 sidebar.push({
   label: 'Reference',
@@ -67,5 +68,8 @@ export default defineConfig({
     processor: unified({
       remarkPlugins: [remarkDirective, remarkVersionZones],
     }),
+  },
+  build: {
+    concurrency: buildConcurrency,
   },
 });

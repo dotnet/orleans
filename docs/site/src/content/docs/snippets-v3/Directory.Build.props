@@ -2,6 +2,7 @@
   <!-- Centralized build properties for Orleans 3.x snippet projects -->
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- Disable SourceLink for git worktree compatibility -->

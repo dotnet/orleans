@@ -1,10 +1,9 @@
 import {
-  genericArity,
   memberSlug,
   memberKindOrder,
   memberKindSlugs,
   packageSlug,
-  slugify,
+  typeSlug,
 } from './packages';
 import type { ApiMember, ApiType, MemberKind, PackageApiDocument } from './types';
 
@@ -41,7 +40,7 @@ export function buildTypeRoutes(packages: PackageApiDocument[]): ApiTypeRoute[] 
       .filter((type) => type.name.length > 0)
       .map((type) => ({
         ...packageRoute,
-        typeSlug: slugify(type.name, genericArity(type)),
+        typeSlug: typeSlug(type),
         type,
       })),
   );

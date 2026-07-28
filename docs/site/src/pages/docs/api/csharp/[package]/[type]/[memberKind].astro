@@ -51,7 +51,7 @@ interface Props {
 
 const { pkg, type, kind, allPackages }: Props = Astro.props;
 const base = import.meta.env.BASE_URL;
-const sidebar = buildApiSidebar(allPackages, pkg.package.name);
+const sidebar = buildApiSidebar(allPackages, pkg.package.name, type);
 const members = (type.members ?? []).filter((member) => member.kind === kind);
 const displayName = typeDisplayName(type);
 const kindLabel = memberKindLabels[kind];
