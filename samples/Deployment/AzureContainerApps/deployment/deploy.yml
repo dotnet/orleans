@@ -1,0 +1,219 @@
+name: Build and deploy .NET application to Container App silo
+
+on:
+  push:
+    branches:
+    - deploy
+
+env:
+  SAMPLE_PATH: samples/Deployment/AzureContainerApps
+
+  # alphanumeric string under 14 characters
+  RESOURCE_GROUP_NAME: orleans-cluster-on-container-apps
+
+  # specify your preferred region
+  REGION: eastus
+
+  SILO_DOCKER_FILE_PATH: samples/Deployment/AzureContainerApps/Silo/Dockerfile
+  SILO_IMAGE_NAME: silo
+
+  DASHBOARD_DOCKER_FILE_PATH: samples/Deployment/AzureContainerApps/Dashboard/Dockerfile
+  DASHBOARD_IMAGE_NAME: dashboard
+
+  MINIMAL_CLIENT_DOCKER_FILE_PATH: samples/Deployment/AzureContainerApps/Clients.MinimalApi/Dockerfile
+  MINIMAL_CLIENT_IMAGE_NAME: minimalapiclient
+
+  WORKERSERVICE_CLIENT_DOCKER_FILE_PATH: samples/Deployment/AzureContainerApps/Clients.WorkerService/Dockerfile
+  WORKERSERVICE_CLIENT_IMAGE_NAME: workerserviceclient
+
+  SCALER_DOCKER_FILE_PATH: samples/Deployment/AzureContainerApps/Scaler/Dockerfile
+  SCALER_IMAGE_NAME: scaler
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout to the branch
+      uses: actions/checkout@v2
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AzureSPN }}
+
+    - name: Create resource group
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Creating resource group in Azure"
+          echo "Executing 'az group create -l ${{ env.REGION }} -n ${{ env.RESOURCE_GROUP_NAME }}'"
+
+          az group create -l ${{ env.REGION }} -n ${{ env.RESOURCE_GROUP_NAME }}
+
+    - name: Creating resources
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Creating resources"
+          echo "Executing az deployment group create --resource-group ${{ env.RESOURCE_GROUP_NAME }} --template-file '/github/workspace/${{ env.SAMPLE_PATH }}/Azure/main.bicep' --debug"
+
+          az deployment group create --resource-group ${{ env.RESOURCE_GROUP_NAME }} --template-file '/github/workspace/${{ env.SAMPLE_PATH }}/Azure/main.bicep' --debug
+
+  build:
+    runs-on: ubuntu-latest
+    needs: provision
+
+    steps:
+
+    - name: Checkout to the branch
+      uses: actions/checkout@v2
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AzureSPN }}
+
+    - name: Get ACR Login Server
+      run: |
+        # Retrieve ACR Login Server value from deployment output
+        ACR_LOGIN_SERVER=$(az deployment group show -g ${{ env.RESOURCE_GROUP_NAME }} -n main --query properties.outputs.acrLoginServer.value | tr -d '"')
+        echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER" >> $GITHUB_ENV
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Login to ACR
+      run: |
+        set -euo pipefail
+        # see https://cloudarchitected.com/2021/09/logging-into-acr-in-github-actions/
+        # see https://github.com/Azure/acr/blob/main/docs/AAD-OAuth.md#calling-post-oauth2exchange-to-get-an-acr-refresh-token
+        access_token=$(az account get-access-token --query accessToken -o tsv)
+        refresh_token=$(curl https://${{ env.ACR_LOGIN_SERVER }}/oauth2/exchange -v -d "grant_type=access_token&service=${{ env.ACR_LOGIN_SERVER }}&access_token=$access_token" | jq -r .refresh_token)
+        # The null GUID 0000... tells the container registry that this is an ACR refresh token during the login flow
+        docker login -u 00000000-0000-0000-0000-000000000000 --password-stdin ${{ env.ACR_LOGIN_SERVER }} <<< "$refresh_token"
+
+    - name: Build and push Silo image to registry
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ env.ACR_LOGIN_SERVER }}/${{ env.SILO_IMAGE_NAME }}:${{ github.sha }}
+        file: ${{ env.SILO_DOCKER_FILE_PATH }}
+
+    - name: Build and push Dashboard image to registry
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ env.ACR_LOGIN_SERVER }}/${{ env.DASHBOARD_IMAGE_NAME }}:${{ github.sha }}
+        file: ${{ env.DASHBOARD_DOCKER_FILE_PATH }}
+
+    - name: Build and push Minimal Client image to registry
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ env.ACR_LOGIN_SERVER }}/${{ env.MINIMAL_CLIENT_IMAGE_NAME }}:${{ github.sha }}
+        file: ${{ env.MINIMAL_CLIENT_DOCKER_FILE_PATH }}
+
+    - name: Build and push Worker Service Client image to registry
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKERSERVICE_CLIENT_IMAGE_NAME }}:${{ github.sha }}
+        file: ${{ env.WORKERSERVICE_CLIENT_DOCKER_FILE_PATH }}
+
+    - name: Build and push Scaler image to registry
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ env.ACR_LOGIN_SERVER }}/${{ env.SCALER_IMAGE_NAME }}:${{ github.sha }}
+        file: ${{ env.SCALER_DOCKER_FILE_PATH }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+
+    - name: Checkout to the branch
+      uses: actions/checkout@v2
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AzureSPN }}
+
+    - name: Installing Container Apps extension
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Installing containerapp extension"
+
+          az config set extension.use_dynamic_install=yes_without_prompt
+
+          az extension add --name containerapp --yes
+
+    - name: Get ACR Login Server
+      run: |
+        # Retrieve ACR Login Server value from deployment output
+        ACR_LOGIN_SERVER=$(az deployment group show -g ${{ env.RESOURCE_GROUP_NAME }} -n main --query properties.outputs.acrLoginServer.value | tr -d '"')
+        echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER" >> $GITHUB_ENV
+
+    - name: Deploy Silo
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Deploying Silo"
+
+          az containerapp registry set -n silo -g ${{ env.RESOURCE_GROUP_NAME }} --server ${{ env.ACR_LOGIN_SERVER }}
+
+          az containerapp update -n silo -g ${{ env.RESOURCE_GROUP_NAME }} -i ${{ env.ACR_LOGIN_SERVER }}/${{ env.SILO_IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Deploy Dashboard
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Deploying Dashboard"
+
+          az containerapp registry set -n dashboard -g ${{ env.RESOURCE_GROUP_NAME }} --server ${{ env.ACR_LOGIN_SERVER }}
+
+          az containerapp update -n dashboard -g ${{ env.RESOURCE_GROUP_NAME }} -i ${{ env.ACR_LOGIN_SERVER }}/${{ env.DASHBOARD_IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Deploy Minimal API Client
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Deploying Minimal API Client"
+
+          az containerapp registry set -n minimalapiclient -g ${{ env.RESOURCE_GROUP_NAME }} --server ${{ env.ACR_LOGIN_SERVER }}
+
+          az containerapp update -n minimalapiclient -g ${{ env.RESOURCE_GROUP_NAME }} -i ${{ env.ACR_LOGIN_SERVER }}/${{ env.MINIMAL_CLIENT_IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Deploy Worker Service Client
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Deploying Worker Service Client"
+
+          az containerapp registry set -n workerserviceclient -g ${{ env.RESOURCE_GROUP_NAME }} --server ${{ env.ACR_LOGIN_SERVER }}
+
+          az containerapp update -n workerserviceclient -g ${{ env.RESOURCE_GROUP_NAME }} -i ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKERSERVICE_CLIENT_IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Deploy Scaler
+      uses: azure/CLI@v1
+      with:
+        inlineScript: >
+          echo "Deploying Scaler"
+
+          az containerapp registry set -n scaler -g ${{ env.RESOURCE_GROUP_NAME }} --server ${{ env.ACR_LOGIN_SERVER }}
+
+          az containerapp update -n scaler -g ${{ env.RESOURCE_GROUP_NAME }} -i ${{ env.ACR_LOGIN_SERVER }}/${{ env.SCALER_IMAGE_NAME }}:${{ github.sha }}
+
+    - name: logout
+      run: >
+        az logout

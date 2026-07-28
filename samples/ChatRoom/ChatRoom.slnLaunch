@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Run client and service",
+    "Projects": [
+      {
+        "Path": "ChatRoom.Client\\ChatRoom.Client.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ChatRoom.Service\\ChatRoom.Service.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

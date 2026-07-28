@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+  </ItemGroup>
+
+</Project>

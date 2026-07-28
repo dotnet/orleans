@@ -1,0 +1,53 @@
+<MudDivider/>
+<MudStack Row="true" Spacing="6">
+    <MudImage Src="@CartItem.Product.ImageUrl" Width="192" Height="192" Class="rounded"/>
+    <MudGrid>
+        <MudItem xs="6">
+            <MudText Typo="Typo.subtitle1"><b>@CartItem.Product.Name</b></MudText>
+            <MudText Typo="Typo.body2">@CartItem.Product.Description</MudText>
+        </MudItem>
+        <MudItem xs="2">
+            <MudNumericField Variant=Variant.Outlined Margin="Margin.Dense"
+                    Min="1" Max="@CartItem.Product.Quantity" T="int" Value="_desiredQuantity" ValueChanged="SaveOnUpdateAsync" />
+        </MudItem>
+        <MudItem xs="4">
+            <MudStack AlignItems="AlignItems.End" Justify="Justify.SpaceBetween" Class="mud-height-full">
+                <MudText Typo="Typo.subtitle1">
+                    <b>@CartItem.TotalPrice.ToString("C2")</b>
+                </MudText>
+                <MudButton OnClick=OnRemoveAsync Color="Color.Primary" Size="Size.Small">Remove</MudButton>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudStack>
+
+@code {
+    int _desiredQuantity;
+    string Title => $"Update {CartItem.Product.Name} quantity in cart";
+
+    [Parameter, EditorRequired]
+    public CartItem CartItem { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public EventCallback<ProductDetails> OnRemoved { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<(int Quantity, ProductDetails Product)> OnUpdated { get; set; }
+
+    protected override void OnParametersSet() => _desiredQuantity = CartItem.Quantity;
+
+    Task SaveOnUpdateAsync(int value)
+    {
+        _desiredQuantity = value;
+        return TryInvokeDelegate(OnUpdated, (_desiredQuantity, CartItem.Product));
+    }
+
+    Task OnRemoveAsync() => TryInvokeDelegate(OnRemoved, CartItem.Product);
+
+    Task OnUpdateAsync() => TryInvokeDelegate(OnUpdated, (_desiredQuantity, CartItem.Product));
+
+    Task TryInvokeDelegate<TArg>(EventCallback<TArg> callback, TArg args) =>
+        callback.HasDelegate
+            ? callback.InvokeAsync(args)
+            : Task.CompletedTask;
+}

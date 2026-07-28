@@ -1,0 +1,87 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32324.85
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Abstractions", "Abstractions\Abstractions.csproj", "{BB0E25A1-AEF0-4420-8C7C-1711B67A54F2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grains", "Grains\Grains.csproj", "{6E80BDEB-9652-49A6-AD28-F996BA5182B3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Silo", "Silo\Silo.csproj", "{6E7B724F-190B-443F-9151-084DC19B1A52}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dashboard", "Dashboard\Dashboard.csproj", "{950FDD3F-2961-4C83-A316-12C278B53A9D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clients.MinimalApi", "Clients.MinimalApi\Clients.MinimalApi.csproj", "{EF77CBA3-8A20-4228-ABE3-A8C98FE44B3C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clients.WorkerService", "Clients.WorkerService\Clients.WorkerService.csproj", "{413507C5-A2C3-4ADD-B0BB-63DD97AE041C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5D6267A9-46FB-457D-8BFE-FBEC0CE869A3}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\deploy.yml = .github\workflows\deploy.yml
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Scaler", "Scaler\Scaler.csproj", "{F2B10436-72B9-40EF-8E8E-80DDBFCB1207}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Infrastructure", "Infrastructure\Infrastructure.csproj", "{46FE3569-9F01-4883-9A47-FFA7F17C7835}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bicep", "Bicep", "{FB9AF459-6C74-4A6F-95F6-ADC65F1B00D5}"
+	ProjectSection(SolutionItems) = preProject
+		Azure\dashboard.bicep = Azure\dashboard.bicep
+		Azure\environment.bicep = Azure\environment.bicep
+		Azure\main.bicep = Azure\main.bicep
+		Azure\minimalapiclient.bicep = Azure\minimalapiclient.bicep
+		Azure\scaler.bicep = Azure\scaler.bicep
+		Azure\silo.bicep = Azure\silo.bicep
+		Azure\storage.bicep = Azure\storage.bicep
+		Azure\workerserviceclient.bicep = Azure\workerserviceclient.bicep
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BB0E25A1-AEF0-4420-8C7C-1711B67A54F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB0E25A1-AEF0-4420-8C7C-1711B67A54F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB0E25A1-AEF0-4420-8C7C-1711B67A54F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB0E25A1-AEF0-4420-8C7C-1711B67A54F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E80BDEB-9652-49A6-AD28-F996BA5182B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E80BDEB-9652-49A6-AD28-F996BA5182B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E80BDEB-9652-49A6-AD28-F996BA5182B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E80BDEB-9652-49A6-AD28-F996BA5182B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E7B724F-190B-443F-9151-084DC19B1A52}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E7B724F-190B-443F-9151-084DC19B1A52}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E7B724F-190B-443F-9151-084DC19B1A52}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E7B724F-190B-443F-9151-084DC19B1A52}.Release|Any CPU.Build.0 = Release|Any CPU
+		{950FDD3F-2961-4C83-A316-12C278B53A9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{950FDD3F-2961-4C83-A316-12C278B53A9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{950FDD3F-2961-4C83-A316-12C278B53A9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{950FDD3F-2961-4C83-A316-12C278B53A9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF77CBA3-8A20-4228-ABE3-A8C98FE44B3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF77CBA3-8A20-4228-ABE3-A8C98FE44B3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF77CBA3-8A20-4228-ABE3-A8C98FE44B3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF77CBA3-8A20-4228-ABE3-A8C98FE44B3C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{413507C5-A2C3-4ADD-B0BB-63DD97AE041C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{413507C5-A2C3-4ADD-B0BB-63DD97AE041C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{413507C5-A2C3-4ADD-B0BB-63DD97AE041C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{413507C5-A2C3-4ADD-B0BB-63DD97AE041C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2B10436-72B9-40EF-8E8E-80DDBFCB1207}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2B10436-72B9-40EF-8E8E-80DDBFCB1207}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2B10436-72B9-40EF-8E8E-80DDBFCB1207}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2B10436-72B9-40EF-8E8E-80DDBFCB1207}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46FE3569-9F01-4883-9A47-FFA7F17C7835}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46FE3569-9F01-4883-9A47-FFA7F17C7835}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46FE3569-9F01-4883-9A47-FFA7F17C7835}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46FE3569-9F01-4883-9A47-FFA7F17C7835}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FB9AF459-6C74-4A6F-95F6-ADC65F1B00D5} = {5D6267A9-46FB-457D-8BFE-FBEC0CE869A3}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7EAD99FB-C478-4BB6-B652-0075D55BF04E}
+	EndGlobalSection
+EndGlobal

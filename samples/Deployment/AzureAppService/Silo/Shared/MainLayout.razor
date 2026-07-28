@@ -1,0 +1,42 @@
+@inherits LayoutComponentBase
+
+@inject ILocalStorageService LocalStorage
+
+<MudThemeProvider
+    @bind-IsDarkMode="@_isDarkTheme"
+    Theme="_theme" />
+<MudDialogProvider
+    FullWidth="true"
+    MaxWidth="MaxWidth.Medium"
+    CloseButton="true"
+    BackdropClick="true"
+    Position="DialogPosition.Center"
+    CloseOnEscapeKey="true" />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudSpacer />
+        <MudToggleIconButton Toggled="@_isDarkTheme" ToggledChanged=@OnToggledChangedAsync
+            Icon=@Icons.Material.Outlined.DarkMode Color=@Color.Inherit
+            title="@(_isDarkTheme ? "Switch to Light Theme" : "Switch to Dark Theme")"
+            ToggledIcon=@Icons.Material.Filled.WbSunny
+            ToggledColor=@Color.Default />
+        <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Color="Color.Inherit"
+            Href="https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-App-Service"
+            Target="_blank" />
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h5" Color=Color.Surface>Shopping Cart</MudText>
+        </MudDrawerHeader>
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent Class="mt-3">
+        <MudContainer MaxWidth="MaxWidth.False">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>

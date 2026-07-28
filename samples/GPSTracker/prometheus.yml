@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 1s
+
+scrape_configs:
+  - job_name: 'web'
+    static_configs:
+      - targets: ['host.docker.internal:5001']

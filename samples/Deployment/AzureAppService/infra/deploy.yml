@@ -1,0 +1,54 @@
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches:
+    - main
+
+env:
+  UNIQUE_APP_NAME: net7cart
+  AZURE_RESOURCE_GROUP_NAME: orleanscartrg
+  AZURE_RESOURCE_GROUP_LOCATION: westus
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET 8.0
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0.x
+
+    - name: .NET publish shopping cart app
+      run: dotnet publish ./samples/Deployment/AzureAppService/Silo/Orleans.ShoppingCart.Silo.csproj --configuration Release
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Flex bicep
+      run: |
+        az deployment group create \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP_NAME }} \
+          --template-file 'samples/Deployment/AzureAppService/infra/flex/main.bicep' \
+          --parameters location=${{ env.AZURE_RESOURCE_GROUP_LOCATION }} \
+            appName=${{ env.UNIQUE_APP_NAME }} \
+          --debug
+
+    - name: Webapp deploy
+      run: |
+        az webapp deploy --name ${{ env.UNIQUE_APP_NAME }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP_NAME  }} \
+          --clean true --restart true \
+          --type zip --src-path samples/Deployment/AzureAppService/silo.zip --debug
+
+    - name: Staging deploy
+      run: |
+        az webapp deploy --name ${{ env.UNIQUE_APP_NAME }} \
+          --slot ${{ env.UNIQUE_APP_NAME }}stg \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP_NAME  }} \
+          --clean true --restart true \
+          --type zip --src-path samples/Deployment/AzureAppService/silo.zip --debug

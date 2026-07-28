@@ -1,0 +1,177 @@
+@page "/todo"
+@inject TodoService TodoService
+@implements IAsyncDisposable
+
+<h1>Todo (@todos.Count(todo => !todo.IsDone))</h1>
+@foreach (var todo in todos.OrderBy(x => x.Timestamp))
+{
+    <div class="input-group mb-3">
+        <div class="input-group-text">
+            <input class="form-check-input mt-0"
+                   type="checkbox"
+                   checked="@todo.IsDone"
+                   @onchange="@(() => HandleTodoDoneAsync(todo, !todo.IsDone))"
+                   aria-label="Toggle task status">
+        </div>
+        <button class="btn btn-outline-danger" type="button" @onclick="@(() => HandleDeleteTodoAsync(todo))">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
+                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
+            </svg>
+        </button>
+        <InputText class="form-control"
+                   aria-label="Task"
+                   Value="@todo.Title"
+                   ValueChanged="@(title => HandleTodoTitleChangeAsync(todo, title))"
+                   ValueExpression="() => todo.Title" />
+    </div>
+}
+
+<form @onsubmit="@AddTodoAsync">
+    <div class="input-group mb-3">
+        <input type="text" @bind="@newTodo" class="form-control" placeholder="Something todo" aria-label="Something todo" aria-describedby="button-add">
+        <button class="btn btn-outline-secondary" type="submit" id="button-add">Add Todo</button>
+    </div>
+</form>
+
+@code {
+
+    private Guid ownerKey = Guid.Empty;
+    private TodoKeyedCollection todos = new();
+    private string? newTodo;
+    private StreamSubscriptionHandle<TodoNotification>? subscription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // subscribe to updates for the current list
+        // note that the blazor task scheduler is reentrant
+        // therefore notifications can and will come
+        // // through when the code is stuck at an await
+        subscription = await TodoService.SubscribeAsync(
+            ownerKey,
+            notification => InvokeAsync(
+                () => HandleNotificationAsync(notification)));
+
+        // get all items from the cluster
+        foreach (var item in await TodoService.GetAllAsync(ownerKey))
+        {
+            todos.Add(item);
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (subscription is not null)
+            {
+                // unsubscribe from the orleans stream - best effort
+                await subscription.UnsubscribeAsync();
+            }
+        }
+        catch
+        {
+            // noop
+        }
+    }
+
+    private async Task AddTodoAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(newTodo))
+        {
+            // create a new todo
+            var todo = new TodoItem(Guid.NewGuid(), newTodo, false, ownerKey, DateTime.UtcNow);
+
+            // add it to the cluster
+            await TodoService.SetAsync(todo);
+
+            // the above this will generate a stream notification that may or may not have come through while we were awaiting the call
+            // therefore only add it to the interface if it is not there yet
+            if (todos.TryGetValue(todo.Key, out var current))
+            {
+                // latest one wins
+                if (todo.Timestamp > current.Timestamp)
+                {
+                    todos[todos.IndexOf(current)] = todo;
+                }
+            }
+            else
+            {
+                todos.Add(todo);
+            }
+
+            // reset the text box
+            newTodo = null;
+        }
+    }
+
+    private Task HandleNotificationAsync(TodoNotification notification)
+    {
+        // was the item removed
+        if (notification.Item is null)
+        {
+            // attempt to remove it from the user interface
+            if (todos.Remove(notification.ItemKey))
+            {
+                StateHasChanged();
+            }
+            return Task.CompletedTask;
+        }
+
+        if (todos.TryGetValue(notification.Item.Key, out var current))
+        {
+            // latest one wins
+            if (notification.Item.Timestamp > current.Timestamp)
+            {
+                todos[todos.IndexOf(current)] = notification.Item;
+                StateHasChanged();
+            }
+            return Task.CompletedTask;
+        }
+
+        todos.Add(notification.Item);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void TryUpdateCollection(TodoItem item)
+    {
+        // we need to cater for reentrancy allowing a stream notification during the previous await
+        // the notification may have even have deleted the item - if so then deletion wins
+        if (todos.TryGetValue(item.Key, out var current))
+        {
+            // latest one wins
+            if (item.Timestamp > current.Timestamp)
+            {
+                todos[todos.IndexOf(current)] = item;
+            }
+        }
+    }
+
+    private async Task HandleTodoDoneAsync(TodoItem item, bool isDone)
+    {
+        var updated = item with { IsDone = isDone };
+        await TodoService.SetAsync(updated);
+        TryUpdateCollection(updated);
+    }
+
+    private async Task HandleTodoTitleChangeAsync(TodoItem item, string title)
+    {
+        var updated = item with { Title = title };
+        await TodoService.SetAsync(updated);
+        TryUpdateCollection(updated);
+    }
+
+    private async Task HandleDeleteTodoAsync(TodoItem item)
+    {
+        await TodoService.DeleteAsync(item.Key);
+        todos.Remove(item.Key);
+    }
+
+    private class TodoKeyedCollection : KeyedCollection<Guid, TodoItem>
+    {
+        protected override Guid GetKeyForItem(TodoItem item) => item.Key;
+    }
+}
