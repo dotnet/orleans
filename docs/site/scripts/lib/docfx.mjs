@@ -864,6 +864,7 @@ export async function convertDocfxMarkdown({
   sourcePath,
   sourceRoot = path.dirname(sourcePath),
   uidMap = new Map(),
+  editUrl,
 }) {
   const { metadata, body: originalBody } = splitFrontmatter(source);
   const title = typeof metadata.title === 'string' ? metadata.title : inferTitle(sourcePath);
@@ -883,7 +884,9 @@ export async function convertDocfxMarkdown({
   body = convertHtmlCommentsForMdx(body);
   body = removeDuplicateTitle(body, title).trim();
   assertNoUnconvertedConstructs(body, sourcePath);
-  return `${serializeFrontmatter(metadata, sourcePath)}${body}\n`;
+  return `${serializeFrontmatter(metadata, sourcePath, {
+    frontmatter: typeof editUrl === 'string' ? { editUrl } : undefined,
+  })}${body}\n`;
 }
 
 export function routeFromSourcePath(sourcePath, sourceRoot) {

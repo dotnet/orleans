@@ -29,7 +29,7 @@ export default defineConfig({
       favicon: '/favicon.svg',
       customCss: ['./src/styles/custom.css'],
       editLink: {
-        baseUrl: 'https://github.com/dotnet/docs/edit/main/docs/orleans/',
+        baseUrl: 'https://github.com/dotnet/orleans/edit/main/docs/site/',
       },
       head: [
         {

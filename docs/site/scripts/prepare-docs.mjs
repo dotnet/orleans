@@ -59,6 +59,7 @@ for (const sourcePath of sourceFiles) {
       sourcePath,
       sourceRoot,
       uidMap,
+      editUrl: `https://github.com/dotnet/orleans/edit/main/${path.relative(repositoryRoot, sourcePath).replaceAll('\\', '/')}`,
     });
     await mkdir(path.dirname(outputPath), { recursive: true });
     await writeFile(outputPath, converted, 'utf8');
