@@ -15,9 +15,10 @@ interface Props {
   type: ApiType;
   packageMetadata: ApiPackageMetadata;
   allTypes: ApiType[];
+  href?: string;
 }
 
-const { member, type, packageMetadata, allTypes } = Astro.props;
+const { member, type, packageMetadata, allTypes, href } = Astro.props;
 const source = sourceHref(packageMetadata, member.sourceFile, member.sourceLines);
 const badges = [
   member.isStatic ? 'static' : undefined,
@@ -33,7 +34,9 @@ const badges = [
 
 <article class="api-member-card">
   <header>
-    <h2 id={memberSlug(member)}>{memberDisplayName(member, type)}</h2>
+    <h2 id={memberSlug(member)}>
+      {href ? <a href={href}>{memberDisplayName(member, type)}</a> : memberDisplayName(member, type)}
+    </h2>
     <div class="api-member-badges">
       {badges.map((badge) => <span>{badge}</span>)}
       {member.hasGet && <span>get</span>}

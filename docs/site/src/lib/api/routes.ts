@@ -1,11 +1,12 @@
 import {
   genericArity,
+  memberSlug,
   memberKindOrder,
   memberKindSlugs,
   packageSlug,
   slugify,
 } from './packages';
-import type { ApiType, MemberKind, PackageApiDocument } from './types';
+import type { ApiMember, ApiType, MemberKind, PackageApiDocument } from './types';
 
 export interface ApiPackageRoute {
   packageSlug: string;
@@ -20,6 +21,11 @@ export interface ApiTypeRoute extends ApiPackageRoute {
 export interface ApiMemberKindRoute extends ApiTypeRoute {
   memberKindSlug: string;
   kind: MemberKind;
+}
+
+export interface ApiMemberRoute extends ApiMemberKindRoute {
+  memberSlug: string;
+  member: ApiMember;
 }
 
 export function buildPackageRoutes(packages: PackageApiDocument[]): ApiPackageRoute[] {
@@ -52,4 +58,16 @@ export function buildMemberKindRoutes(packages: PackageApiDocument[]): ApiMember
         memberKindSlug: memberKindSlugs[kind],
       }));
   });
+}
+
+export function buildMemberRoutes(packages: PackageApiDocument[]): ApiMemberRoute[] {
+  return buildMemberKindRoutes(packages).flatMap((kindRoute) =>
+    (kindRoute.type.members ?? [])
+      .filter((member) => member.kind === kindRoute.kind)
+      .map((member) => ({
+        ...kindRoute,
+        member,
+        memberSlug: memberSlug(member),
+      })),
+  );
 }

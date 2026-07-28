@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { getPackages } from '../lib/api/collection';
-import { renderApiIndexMarkdown, markdownResponse } from '../lib/api/markdown';
+import { getPackages } from '../../lib/api/collection';
+import { renderApiIndexMarkdown, markdownResponse } from '../../lib/api/markdown';
 
 export const prerender = true;
 

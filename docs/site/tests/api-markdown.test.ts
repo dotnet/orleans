@@ -3,6 +3,7 @@ import fixture from './fixtures/package-api.json';
 import {
   markdownResponse,
   renderApiIndexMarkdown,
+  renderMemberMarkdown,
   renderMemberKindMarkdown,
   renderPackageMarkdown,
   renderTypeMarkdown,
@@ -23,10 +24,10 @@ describe('native API Markdown companions', () => {
     const typeMarkdown = renderTypeMarkdown(pkg, grain, '/orleans/');
 
     expect(index).toContain(
-      '[Microsoft.Orleans.Core](/orleans/api/microsoft.orleans.core/)',
+      '[Microsoft.Orleans.Core](/orleans/api/csharp/microsoft.orleans.core/)',
     );
     expect(packageMarkdown).toContain(
-      '[Grain&lt;TState&gt;](/orleans/api/microsoft.orleans.core/grain-1/)',
+      '[Grain&lt;TState&gt;](/orleans/api/csharp/microsoft.orleans.core/grain-1/)',
     );
     expect(typeMarkdown).toContain('# Grain&lt;TState&gt;');
     expect(typeMarkdown).toContain(
@@ -39,7 +40,7 @@ describe('native API Markdown companions', () => {
       'public abstract class Grain<TState> : Grain, IGrainBase',
     );
     expect(typeMarkdown).toContain(
-      '/orleans/api/microsoft.orleans.core/grain-1/methods/#getprimarykey-string',
+      '/orleans/api/csharp/microsoft.orleans.core/grain-1/methods/getprimarykey-string/',
     );
   });
 
@@ -56,6 +57,27 @@ describe('native API Markdown companions', () => {
     expect(markdown).toContain('### Examples');
     expect(markdown).toContain('var id = grain.GetPrimaryKey');
     expect(markdown).toContain('#L42-L48');
+    expect(markdown).toContain(
+      '[Dedicated page](/orleans/api/csharp/microsoft.orleans.core/grain-1/methods/getprimarykey-string/)',
+    );
+  });
+
+  test('renders individual member Markdown companions', () => {
+    const markdown = renderMemberMarkdown(
+      pkg,
+      grain,
+      grain.members![0],
+      '/orleans/',
+    );
+
+    expect(markdown).toContain(
+      '# Grain&lt;TState&gt;.GetPrimaryKey(String)',
+    );
+    expect(markdown).toContain(
+      '[Methods](/orleans/api/csharp/microsoft.orleans.core/grain-1/methods/)',
+    );
+    expect(markdown).not.toContain('[Dedicated page]');
+    expect(markdown).toContain('Receives the key extension.');
   });
 
   test('serves Markdown with an explicit content type', () => {

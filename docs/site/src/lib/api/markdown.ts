@@ -7,6 +7,7 @@ import {
   memberDisplayName,
   memberKindLabels,
   memberKindPath,
+  memberPath,
   memberSlug,
   nugetHref,
   packagePath,
@@ -90,7 +91,7 @@ export function renderTypeMarkdown(
       members
         .map(
           (member) =>
-            `- [${markdownText(memberDisplayName(member, type))}](${withBase(base, memberKindPath(pkg.package.name, type, kind))}#${memberSlug(member)})`,
+            `- [${markdownText(memberDisplayName(member, type))}](${withBase(base, memberPath(pkg.package.name, type, member))})`,
         )
         .join('\n'),
     ),
@@ -128,7 +129,23 @@ export function renderMemberKindMarkdown(
   return finalizeMarkdown([
     `# ${markdownText(typeDisplayName(type))} ${memberKindLabels[kind]}`,
     `[Type overview](${withBase(base, typePath(pkg.package.name, type))})`,
-    ...members.map((member) => renderMemberMarkdown(pkg, type, member, context)),
+    ...members.map((member) =>
+      renderMemberSectionMarkdown(pkg, type, member, context),
+    ),
+  ]);
+}
+
+export function renderMemberMarkdown(
+  pkg: PackageApiDocument,
+  type: ApiType,
+  member: ApiMember,
+  base = '/',
+): string {
+  const context = { allTypes: pkg.types, packageName: pkg.package.name, base };
+  return finalizeMarkdown([
+    `# ${markdownText(typeDisplayName(type))}.${markdownText(memberDisplayName(member, type))}`,
+    `[Type overview](${withBase(base, typePath(pkg.package.name, type))}) | [${memberKindLabels[member.kind]}](${withBase(base, memberKindPath(pkg.package.name, type, member.kind))})`,
+    renderMemberSectionMarkdown(pkg, type, member, context, false),
   ]);
 }
 
@@ -224,11 +241,12 @@ function renderDocumentation(
   ]);
 }
 
-function renderMemberMarkdown(
+function renderMemberSectionMarkdown(
   pkg: PackageApiDocument,
   type: ApiType,
   member: ApiMember,
   context: MarkdownContext,
+  includeHeading = true,
 ): string {
   const source = sourceHref(pkg.package, member.sourceFile, member.sourceLines);
   const parameters = member.parameters?.length
@@ -259,7 +277,12 @@ function renderMemberMarkdown(
       )
     : '';
   return finalizeMarkdown([
-    `## ${markdownText(memberDisplayName(member, type))} {#${memberSlug(member)}}`,
+    includeHeading
+      ? `## ${markdownText(memberDisplayName(member, type))} {#${memberSlug(member)}}`
+      : '',
+    includeHeading
+      ? `[Dedicated page](${withBase(context.base, memberPath(pkg.package.name, type, member))})`
+      : '',
     source ? `[Source](${source})` : '',
     codeBlock(buildMemberSignature(member), 'csharp'),
     renderDocNodes(member.docs?.summary, context),

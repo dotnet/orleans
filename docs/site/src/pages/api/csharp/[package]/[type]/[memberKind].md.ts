@@ -1,12 +1,12 @@
 import type { APIRoute } from 'astro';
-import { getPackages } from '../../../../lib/api/collection';
-import { renderMemberKindMarkdown, markdownResponse } from '../../../../lib/api/markdown';
-import { buildMemberKindRoutes } from '../../../../lib/api/routes';
+import { getPackages } from '../../../../../lib/api/collection';
+import { renderMemberKindMarkdown, markdownResponse } from '../../../../../lib/api/markdown';
+import { buildMemberKindRoutes } from '../../../../../lib/api/routes';
 import type {
   ApiType,
   MemberKind,
   PackageApiDocument,
-} from '../../../../lib/api/types';
+} from '../../../../../lib/api/types';
 
 export const prerender = true;
 

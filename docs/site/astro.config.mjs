@@ -12,7 +12,7 @@ sidebar.splice(
   2,
   0,
   { label: 'Samples gallery', link: '/samples/' },
-  { label: 'API reference', link: '/api/' },
+  { label: 'API reference', link: '/api/csharp/' },
 );
 
 export default defineConfig({

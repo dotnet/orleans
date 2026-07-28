@@ -18,7 +18,7 @@ export const collections = {
   packages: defineCollection({
     loader: glob({
       base: './src/data/pkgs',
-      pattern: '**/*.json',
+      pattern: '*.json',
     }),
     schema: z
       .object({

@@ -1,0 +1,101 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import ApiBreadcrumbs from '../../../../../../components/api/ApiBreadcrumbs.astro';
+import ApiLinks from '../../../../../../components/api/ApiLinks.astro';
+import ApiMemberCard from '../../../../../../components/api/ApiMemberCard.astro';
+import { getPackages } from '../../../../../../lib/api/collection';
+import {
+  markdownCompanionPath,
+  memberDisplayName,
+  memberKindLabels,
+  memberKindPath,
+  memberPath,
+  memberSlug,
+  packagePath,
+  typeDisplayName,
+  typePath,
+  withBase,
+} from '../../../../../../lib/api/packages';
+import { buildMemberRoutes } from '../../../../../../lib/api/routes';
+import { buildApiSidebar } from '../../../../../../lib/api/sidebar';
+import type {
+  ApiMember,
+  ApiType,
+  PackageApiDocument,
+} from '../../../../../../lib/api/types';
+
+export async function getStaticPaths() {
+  const packages = (await getPackages()).map((entry) => entry.data);
+  return buildMemberRoutes(packages).map((route) => ({
+    params: {
+      package: route.packageSlug,
+      type: route.typeSlug,
+      memberKind: route.memberKindSlug,
+      member: route.memberSlug,
+    },
+    props: {
+      pkg: route.pkg,
+      type: route.type,
+      member: route.member,
+      allPackages: packages,
+    },
+  }));
+}
+
+interface Props {
+  pkg: PackageApiDocument;
+  type: ApiType;
+  member: ApiMember;
+  allPackages: PackageApiDocument[];
+}
+
+const { pkg, type, member, allPackages }: Props = Astro.props;
+const base = import.meta.env.BASE_URL;
+const sidebar = buildApiSidebar(allPackages, pkg.package.name);
+const typeName = typeDisplayName(type);
+const memberName = memberDisplayName(member, type);
+const kindLabel = memberKindLabels[member.kind];
+const route = memberPath(pkg.package.name, type, member);
+const headings = [
+  {
+    depth: 2 as const,
+    slug: memberSlug(member),
+    text: memberName,
+  },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: `${typeName}.${memberName}`,
+    description: `${memberName} ${member.kind} on ${typeName} in ${pkg.package.name}.`,
+    editUrl: false,
+    prev: false,
+    next: false,
+    tableOfContents: false,
+    pagefind: true,
+  }}
+  sidebar={sidebar}
+  headings={headings}
+>
+  <ApiBreadcrumbs
+    items={[
+      { label: 'Documentation', href: withBase(base, '/') },
+      { label: 'API reference', href: withBase(base, '/api/csharp/') },
+      { label: pkg.package.name, href: withBase(base, packagePath(pkg.package.name)) },
+      { label: typeName, href: withBase(base, typePath(pkg.package.name, type)) },
+      {
+        label: kindLabel,
+        href: withBase(base, memberKindPath(pkg.package.name, type, member.kind)),
+      },
+      { label: memberName },
+    ]}
+  />
+  <ApiLinks markdown={withBase(base, markdownCompanionPath(route))} />
+  <ApiMemberCard
+    member={member}
+    type={type}
+    packageMetadata={pkg.package}
+    allTypes={pkg.types}
+  />
+</StarlightPage>

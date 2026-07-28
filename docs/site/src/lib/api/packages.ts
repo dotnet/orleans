@@ -7,7 +7,7 @@ import type {
   PackageApiDocument,
 } from './types';
 
-export const apiRoot = '/api';
+export const apiRoot = '/api/csharp';
 export const memberKindOrder: MemberKind[] = [
   'constructor',
   'property',
@@ -62,6 +62,14 @@ export function typePath(packageName: string, type: ApiType): string {
 
 export function memberKindPath(packageName: string, type: ApiType, kind: MemberKind): string {
   return `${typePath(packageName, type)}${memberKindSlugs[kind]}/`;
+}
+
+export function memberPath(
+  packageName: string,
+  type: ApiType,
+  member: ApiMember,
+): string {
+  return `${memberKindPath(packageName, type, member.kind)}${memberSlug(member)}/`;
 }
 
 export function withBase(base: string, route: string): string {
@@ -293,6 +301,16 @@ export function assertUniqueApiRoutes(packages: PackageApiDocument[]): void {
         );
       }
       typeSlugs.add(typeSlug);
+      const memberSlugs = new Set<string>();
+      for (const member of type.members ?? []) {
+        const route = `${memberKindSlugs[member.kind]}/${memberSlug(member)}`;
+        if (memberSlugs.has(route)) {
+          throw new Error(
+            `Duplicate API member route '${pkgSlug}/${typeSlug}/${route}' in package '${pkg.package.name}'.`,
+          );
+        }
+        memberSlugs.add(route);
+      }
     }
   }
 }

@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
-import { getPackages } from '../../../lib/api/collection';
-import { renderTypeMarkdown, markdownResponse } from '../../../lib/api/markdown';
-import { buildTypeRoutes } from '../../../lib/api/routes';
-import type { ApiType, PackageApiDocument } from '../../../lib/api/types';
+import { getPackages } from '../../../../lib/api/collection';
+import { renderTypeMarkdown, markdownResponse } from '../../../../lib/api/markdown';
+import { buildTypeRoutes } from '../../../../lib/api/routes';
+import type { ApiType, PackageApiDocument } from '../../../../lib/api/types';
 
 export const prerender = true;
 
