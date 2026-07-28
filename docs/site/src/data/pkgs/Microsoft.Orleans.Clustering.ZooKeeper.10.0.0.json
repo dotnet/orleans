@@ -1,0 +1,799 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Clustering.ZooKeeper",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "ZooKeeperClusteringSiloOptions",
+      "fullName": "Orleans.Configuration.ZooKeeperClusteringSiloOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Option to configure ZooKeeperMembership "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Clustering.ZooKeeper/Options/ZooKeeperClusteringSiloOptions.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ZooKeeperClusteringSiloOptions.ZooKeeperClusteringSiloOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string ZooKeeperClusteringSiloOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Connection string for ZooKeeper Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/Options/ZooKeeperClusteringSiloOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "ZooKeeperGatewayListProviderOptions",
+      "fullName": "Orleans.Configuration.ZooKeeperGatewayListProviderOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Clustering.ZooKeeper/Options/ZooKeeperGatewayListProviderOptions.cs",
+      "sourceLines": "4-4",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ZooKeeperGatewayListProviderOptions.ZooKeeperGatewayListProviderOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string ZooKeeperGatewayListProviderOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Connection string for ZooKeeper storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/Options/ZooKeeperGatewayListProviderOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "ZooKeeperHostingExtensions",
+      "fullName": "Orleans.Hosting.ZooKeeperHostingExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperHostingExtensions.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": "UseZooKeeperClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ZooKeeperHostingExtensions.UseZooKeeperClustering(this IClientBuilder builder, Action<OptionsBuilder<ZooKeeperGatewayListProviderOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.ZooKeeperGatewayListProviderOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure the client to use ZooKeeper for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperHostingExtensions.cs"
+        },
+        {
+          "name": "UseZooKeeperClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ZooKeeperHostingExtensions.UseZooKeeperClustering(this IClientBuilder builder, Action<ZooKeeperGatewayListProviderOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.ZooKeeperGatewayListProviderOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure the client to use ZooKeeper for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperHostingExtensions.cs"
+        },
+        {
+          "name": "UseZooKeeperClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder ZooKeeperHostingExtensions.UseZooKeeperClustering(this ISiloBuilder builder, Action<OptionsBuilder<ZooKeeperClusteringSiloOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.ZooKeeperClusteringSiloOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the silo to use ZooKeeper for cluster membership. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperHostingExtensions.cs"
+        },
+        {
+          "name": "UseZooKeeperClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder ZooKeeperHostingExtensions.UseZooKeeperClustering(this ISiloBuilder builder, Action<ZooKeeperClusteringSiloOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.ZooKeeperClusteringSiloOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the silo to use ZooKeeper for cluster membership. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperHostingExtensions.cs"
+        }
+      ]
+    },
+    {
+      "name": "ZooKeeperBasedMembershipTable",
+      "fullName": "Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable",
+      "namespace": "Orleans.Runtime.Membership",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IMembershipTable"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " A Membership Table implementation using Apache Zookeeper 3.4.6 https://zookeeper.apache.org/doc/r3.4.6/ "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " A brief overview of ZK features used: The data is represented by a tree of nodes (similar to a file system). Every node is addressed by a path and can hold data as a byte array and has a version. When a node is created, its version is 0. Upon updates, the version is atomically incremented. An update can also be conditional on an expected current version. A transaction can hold several operations, which succeed or fail atomically. when creating a zookeeper client, one can set a base path where all operations are relative to. In this implementation: Every Orleans deployment has a node /UniqueDeploymentId Every Silo's state is saved in /UniqueDeploymentId/IP:Port@Gen Every Silo's IAmAlive is saved in /UniqueDeploymentId/IP:Port@Gen/IAmAlive IAmAlive is saved in a separate node because its updates are unconditional. a node's ZK version is its ETag: the table version is the version of /UniqueDeploymentId the silo entry version is the version of /UniqueDeploymentId/IP:Port@Gen "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+      "sourceLines": "38-38",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ZooKeeperBasedMembershipTable.ZooKeeperBasedMembershipTable(ILogger<ZooKeeperBasedMembershipTable> logger, IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, IOptions<ClusterOptions> clusterOptions)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable>"
+            },
+            {
+              "name": "membershipTableOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ZooKeeperClusteringSiloOptions>"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "61-72"
+        },
+        {
+          "name": "CleanupDefunctSiloEntries",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task ZooKeeperBasedMembershipTable.CleanupDefunctSiloEntries(DateTimeOffset beforeDate)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "beforeDate",
+              "type": "System.DateTimeOffset"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Delete all dead silo entries older than "
+              },
+              {
+                "kind": "paramref",
+                "value": "beforeDate"
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "339-355"
+        },
+        {
+          "name": "DeleteMembershipTableEntries",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task ZooKeeperBasedMembershipTable.DeleteMembershipTableEntries(string clusterId)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "clusterId",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Deletes all table entries of the given clusterId "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "249-254"
+        },
+        {
+          "name": "InitializeMembershipTable",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task ZooKeeperBasedMembershipTable.InitializeMembershipTable(bool tryInitPath)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "tryInitPath",
+              "type": "bool"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes the ZooKeeper based membership table. "
+              }
+            ],
+            "parameters": {
+              "tryInitPath": [
+                {
+                  "kind": "text",
+                  "text": "if set to true, we'll try to create a node named \"/ClusterId\""
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "85-99"
+        },
+        {
+          "name": "InsertRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<bool> ZooKeeperBasedMembershipTable.InsertRow(MembershipEntry entry, TableVersion tableVersion)",
+          "returnType": "System.Threading.Tasks.Task<bool>",
+          "parameters": [
+            {
+              "name": "entry",
+              "type": "Orleans.MembershipEntry"
+            },
+            {
+              "name": "tableVersion",
+              "type": "Orleans.TableVersion"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion. If operation succeeds, the following changes would be made to the table: 1) New MembershipEntry will be added to the table. 2) The newly added MembershipEntry will also be added with the new unique automatically generated eTag. 3) TableVersion.Version in the table will be updated to the new TableVersion.Version. 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag. All those changes to the table, insert of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects. The operation should fail in each of the following conditions: 1) A MembershipEntry for a given silo already exist in the table 2) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "True if the insert operation succeeded and false otherwise."
+              }
+            ],
+            "parameters": {
+              "entry": [
+                {
+                  "kind": "text",
+                  "text": "MembershipEntry to be inserted."
+                }
+              ],
+              "tableVersion": [
+                {
+                  "kind": "text",
+                  "text": "The new TableVersion for this table, along with its etag."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "178-188"
+        },
+        {
+          "name": "ReadAll",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<MembershipTableData> ZooKeeperBasedMembershipTable.ReadAll()",
+          "returnType": "System.Threading.Tasks.Task<Orleans.MembershipTableData>",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically reads the full content of the Membership Table. The returned MembershipTableData includes all MembershipEntry entry for all silos in the table and the TableVersion for this table. The MembershipEntries and the TableVersion have to be read atomically. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and TableVersion, all read atomically."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "141-141"
+        },
+        {
+          "name": "ReadRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<MembershipTableData> ZooKeeperBasedMembershipTable.ReadRow(SiloAddress siloAddress)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.MembershipTableData>",
+          "parameters": [
+            {
+              "name": "siloAddress",
+              "type": "Orleans.Runtime.SiloAddress"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically reads the Membership Table information about a given silo. The returned MembershipTableData includes one MembershipEntry entry for a given silo and the TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and TableVersion, read atomically."
+              }
+            ],
+            "parameters": {
+              "siloAddress": [
+                {
+                  "kind": "text",
+                  "text": "The address of the silo whose membership information needs to be read."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "111-129"
+        },
+        {
+          "name": "UpdateIAmAlive",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task ZooKeeperBasedMembershipTable.UpdateIAmAlive(MembershipEntry entry)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "entry",
+              "type": "Orleans.MembershipEntry"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Updates the IAmAlive part (column) of the MembershipEntry for this silo. This operation should only update the IAmAlive column and not change other columns. This operation is a \"dirty write\" or \"in place update\" and is performed without etag validation. With regards to eTags update: This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed (\"dirty write\"). With regards to TableVersion: this operation should not change the TableVersion of the table. It should leave it untouched. There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Task representing the successful execution of this operation. "
+              }
+            ],
+            "parameters": {
+              "entry": [
+                {
+                  "kind": "text",
+                  "text": "The target MembershipEntry tp update"
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "238-241"
+        },
+        {
+          "name": "UpdateRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<bool> ZooKeeperBasedMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)",
+          "returnType": "System.Threading.Tasks.Task<bool>",
+          "parameters": [
+            {
+              "name": "entry",
+              "type": "Orleans.MembershipEntry"
+            },
+            {
+              "name": "etag",
+              "type": "string"
+            },
+            {
+              "name": "tableVersion",
+              "type": "Orleans.TableVersion"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically tries to update the MembershipEntry for one silo and also update the TableVersion. If operation succeeds, the following changes would be made to the table: 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substituted by the new entry) 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag. 3) TableVersion.Version in the table will be updated to the new TableVersion.Version. 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag. All those changes to the table, update of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects. The operation should fail in each of the following conditions: 1) A MembershipEntry for a given silo does not exist in the table 2) A MembershipEntry for a given silo exist in the table but its etag in the table does not match the provided etag. 3) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "True if the update operation succeeded and false otherwise."
+              }
+            ],
+            "parameters": {
+              "entry": [
+                {
+                  "kind": "text",
+                  "text": "MembershipEntry to be updated."
+                }
+              ],
+              "etag": [
+                {
+                  "kind": "text",
+                  "text": "The etag for the given MembershipEntry."
+                }
+              ],
+              "tableVersion": [
+                {
+                  "kind": "text",
+                  "text": "The new TableVersion for this table, along with its etag."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperBasedMembershipTable.cs",
+          "sourceLines": "210-221"
+        }
+      ]
+    },
+    {
+      "name": "ZooKeeperGatewayListProvider",
+      "fullName": "Orleans.Runtime.Membership.ZooKeeperGatewayListProvider",
+      "namespace": "Orleans.Runtime.Membership",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Messaging.IGatewayListProvider"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperGatewayListProvider.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ZooKeeperGatewayListProvider.ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger, IOptions<ZooKeeperGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions, IOptions<ClusterOptions> clusterOptions)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.ZooKeeperGatewayListProvider>"
+            },
+            {
+              "name": "options",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ZooKeeperGatewayListProviderOptions>"
+            },
+            {
+              "name": "gatewayOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GatewayOptions>"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperGatewayListProvider.cs",
+          "sourceLines": "27-37"
+        },
+        {
+          "name": "GetGateways",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<IList<Uri>> ZooKeeperGatewayListProvider.GetGateways()",
+          "returnType": "System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>>",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster. The Uri is in the form of: \"gwy.tcp://IP:port/Generation\". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperGatewayListProvider.cs",
+          "sourceLines": "50-58"
+        },
+        {
+          "name": "InitializeGatewayListProvider",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task ZooKeeperGatewayListProvider.InitializeGatewayListProvider()",
+          "returnType": "System.Threading.Tasks.Task",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes the ZooKeeper based gateway provider "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperGatewayListProvider.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "IsUpdatable",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool ZooKeeperGatewayListProvider.IsUpdatable",
+          "returnType": "bool",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list. (currently only the static config based StaticGatewayListProvider is not updatable. All others are.) "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperGatewayListProvider.cs",
+          "sourceLines": "69-69"
+        },
+        {
+          "name": "MaxStaleness",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan ZooKeeperGatewayListProvider.MaxStaleness",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Clustering.ZooKeeper/ZooKeeperGatewayListProvider.cs",
+          "sourceLines": "63-63"
+        }
+      ]
+    }
+  ]
+}

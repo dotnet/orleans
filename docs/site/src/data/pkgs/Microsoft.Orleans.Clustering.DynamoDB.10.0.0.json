@@ -1,0 +1,777 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Clustering.DynamoDB",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "DynamoDBClientOptions",
+      "fullName": "Orleans.Clustering.DynamoDB.DynamoDBClientOptions",
+      "namespace": "Orleans.Clustering.DynamoDB",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBClientOptions.DynamoDBClientOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "AccessKey",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.AccessKey",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " AccessKey string for DynamoDB Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "ProfileName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.ProfileName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " AWS profile name. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "SecretKey",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.SecretKey",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Secret key for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "Service",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.Service",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " DynamoDB region name, such as \"us-west-2\" "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "Token",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.Token",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Token for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBGatewayListProviderHelper",
+      "fullName": "Orleans.Clustering.DynamoDB.DynamoDBGatewayListProviderHelper",
+      "namespace": "Orleans.Clustering.DynamoDB",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Membership/DynamoDBGatewayListProviderHelper.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBGatewayListProviderHelper.DynamoDBGatewayListProviderHelper()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBMembershipHelper",
+      "fullName": "Orleans.Clustering.DynamoDB.DynamoDBMembershipHelper",
+      "namespace": "Orleans.Clustering.DynamoDB",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Membership/DynamoDBMembershipHelper.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBMembershipHelper.DynamoDBMembershipHelper()",
+          "returnType": "void"
+        },
+        {
+          "name": "ParseDataConnectionString",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static void DynamoDBMembershipHelper.ParseDataConnectionString(string dataConnectionString, DynamoDBClusteringOptions options)",
+          "returnType": "void",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "dataConnectionString",
+              "type": "string"
+            },
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.DynamoDBClusteringOptions"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Parse data connection string to fill in fields in "
+              },
+              {
+                "kind": "paramref",
+                "value": "options"
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Membership/DynamoDBMembershipHelper.cs",
+          "sourceLines": "24-73"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBClusteringOptions",
+      "fullName": "Orleans.Configuration.DynamoDBClusteringOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Clustering.DynamoDB.DynamoDBClientOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs",
+      "sourceLines": "5-5",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBClusteringOptions.DynamoDBClusteringOptions()",
+          "returnType": "void",
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs",
+          "sourceLines": "10-36"
+        },
+        {
+          "name": "CreateIfNotExists",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBClusteringOptions.CreateIfNotExists",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Create the table if it doesn't exist "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs"
+        },
+        {
+          "name": "ReadCapacityUnits",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DynamoDBClusteringOptions.ReadCapacityUnits",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Read capacity unit for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClusteringOptions.TableName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " DynamoDB table name. Defaults to 'OrleansSilos'. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs"
+        },
+        {
+          "name": "UpdateIfExists",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBClusteringOptions.UpdateIfExists",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Update the table if it exists "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs"
+        },
+        {
+          "name": "UseProvisionedThroughput",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBClusteringOptions.UseProvisionedThroughput",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Use Provisioned Throughput for tables "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs"
+        },
+        {
+          "name": "WriteCapacityUnits",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DynamoDBClusteringOptions.WriteCapacityUnits",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Write capacity unit for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBClusteringSiloOptions",
+      "fullName": "Orleans.Configuration.DynamoDBClusteringSiloOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringSiloOptions.cs",
+      "sourceLines": "4-4",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBClusteringSiloOptions.DynamoDBClusteringSiloOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClusteringSiloOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Connection string for DynamoDB Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBClusteringSiloOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBGatewayOptions",
+      "fullName": "Orleans.Configuration.DynamoDBGatewayOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Clustering.DynamoDB.DynamoDBClientOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs",
+      "sourceLines": "5-5",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBGatewayOptions.DynamoDBGatewayOptions()",
+          "returnType": "void",
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs",
+          "sourceLines": "10-36"
+        },
+        {
+          "name": "CreateIfNotExists",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBGatewayOptions.CreateIfNotExists",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Create the table if it doesn't exist "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs"
+        },
+        {
+          "name": "ReadCapacityUnits",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DynamoDBGatewayOptions.ReadCapacityUnits",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Read capacity unit for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBGatewayOptions.TableName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " DynamoDB table name. Defaults to 'OrleansSilos'. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs"
+        },
+        {
+          "name": "UpdateIfExists",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBGatewayOptions.UpdateIfExists",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Update the table if it exists "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs"
+        },
+        {
+          "name": "UseProvisionedThroughput",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBGatewayOptions.UseProvisionedThroughput",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Use Provisioned Throughput for tables "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs"
+        },
+        {
+          "name": "WriteCapacityUnits",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DynamoDBGatewayOptions.WriteCapacityUnits",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Write capacity unit for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/Options/DynamoDBGatewayOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AwsUtilsHostingExtensions",
+      "fullName": "Orleans.Hosting.AwsUtilsHostingExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/AWSUtilsHostingExtensions.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": "UseDynamoDBClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder AwsUtilsHostingExtensions.UseDynamoDBClustering(this IClientBuilder builder, Action<DynamoDBGatewayOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.DynamoDBGatewayOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the client to use DynamoDB for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/AWSUtilsHostingExtensions.cs"
+        },
+        {
+          "name": "UseDynamoDBClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder AwsUtilsHostingExtensions.UseDynamoDBClustering(this IClientBuilder builder, Action<OptionsBuilder<DynamoDBGatewayOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBGatewayOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the client to use DynamoDB for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/AWSUtilsHostingExtensions.cs"
+        },
+        {
+          "name": "UseDynamoDBClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AwsUtilsHostingExtensions.UseDynamoDBClustering(this ISiloBuilder builder, Action<DynamoDBClusteringOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.DynamoDBClusteringOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the silo to use DynamoDB for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/AWSUtilsHostingExtensions.cs"
+        },
+        {
+          "name": "UseDynamoDBClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AwsUtilsHostingExtensions.UseDynamoDBClustering(this ISiloBuilder builder, Action<OptionsBuilder<DynamoDBClusteringOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBClusteringOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the silo to use DynamoDB for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AWS/Orleans.Clustering.DynamoDB/AWSUtilsHostingExtensions.cs"
+        }
+      ]
+    }
+  ]
+}

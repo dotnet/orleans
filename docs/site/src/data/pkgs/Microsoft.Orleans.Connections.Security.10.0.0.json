@@ -1,0 +1,1853 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Connections.Security",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "TlsConnectionBuilderExtensions",
+      "fullName": "Orleans.TlsConnectionBuilderExtensions",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": "UseClientTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static void TlsConnectionBuilderExtensions.UseClientTls(this IConnectionBuilder builder, TlsOptions options)",
+          "returnType": "void",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Microsoft.AspNetCore.Connections.IConnectionBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "options",
+              "type": "Orleans.Connections.Security.TlsOptions"
+            }
+          ],
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.cs",
+          "sourceLines": "33-44"
+        },
+        {
+          "name": "UseServerTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static void TlsConnectionBuilderExtensions.UseServerTls(this IConnectionBuilder builder, TlsOptions options)",
+          "returnType": "void",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Microsoft.AspNetCore.Connections.IConnectionBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "options",
+              "type": "Orleans.Connections.Security.TlsOptions"
+            }
+          ],
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.cs",
+          "sourceLines": "16-27"
+        }
+      ]
+    },
+    {
+      "name": "CertificateLoader",
+      "fullName": "Orleans.Connections.Security.CertificateLoader",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Connections.Security/Security/CertificateLoader.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": "LoadFromStoreCert",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static X509Certificate2 CertificateLoader.LoadFromStoreCert(string subject, string storeName, StoreLocation storeLocation, bool allowInvalid, bool server)",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509Certificate2",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "subject",
+              "type": "string"
+            },
+            {
+              "name": "storeName",
+              "type": "string"
+            },
+            {
+              "name": "storeLocation",
+              "type": "System.Security.Cryptography.X509Certificates.StoreLocation"
+            },
+            {
+              "name": "allowInvalid",
+              "type": "bool"
+            },
+            {
+              "name": "server",
+              "type": "bool"
+            }
+          ],
+          "sourceFile": "src/Orleans.Connections.Security/Security/CertificateLoader.cs",
+          "sourceLines": "20-49"
+        }
+      ]
+    },
+    {
+      "name": "ClientCertificateSelectionCallback",
+      "fullName": "Orleans.Connections.Security.ClientCertificateSelectionCallback",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "delegate",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.MulticastDelegate",
+      "delegateReturnType": "System.Security.Cryptography.X509Certificates.X509Certificate",
+      "delegateParameters": [
+        {
+          "name": "sender",
+          "type": "object"
+        },
+        {
+          "name": "targetHost",
+          "type": "string"
+        },
+        {
+          "name": "localCertificates",
+          "type": "System.Security.Cryptography.X509Certificates.X509CertificateCollection"
+        },
+        {
+          "name": "remoteCertificate",
+          "type": "System.Security.Cryptography.X509Certificates.X509Certificate"
+        },
+        {
+          "name": "acceptableIssuers",
+          "type": "string[]"
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Represents a multicast delegate; that is, a delegate that can have more than one element in its invocation list."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ClientCertificateSelectionCallback.ClientCertificateSelectionCallback(object @object, nint method)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "object",
+              "type": "object"
+            },
+            {
+              "name": "method",
+              "type": "nint"
+            }
+          ]
+        },
+        {
+          "name": "BeginInvoke",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual IAsyncResult ClientCertificateSelectionCallback.BeginInvoke(object sender, string targetHost, X509CertificateCollection localCertificates, X509Certificate remoteCertificate, string[] acceptableIssuers, AsyncCallback callback, object @object)",
+          "returnType": "System.IAsyncResult",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "sender",
+              "type": "object"
+            },
+            {
+              "name": "targetHost",
+              "type": "string"
+            },
+            {
+              "name": "localCertificates",
+              "type": "System.Security.Cryptography.X509Certificates.X509CertificateCollection"
+            },
+            {
+              "name": "remoteCertificate",
+              "type": "System.Security.Cryptography.X509Certificates.X509Certificate"
+            },
+            {
+              "name": "acceptableIssuers",
+              "type": "string[]"
+            },
+            {
+              "name": "callback",
+              "type": "System.AsyncCallback"
+            },
+            {
+              "name": "object",
+              "type": "object"
+            }
+          ]
+        },
+        {
+          "name": "EndInvoke",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual X509Certificate ClientCertificateSelectionCallback.EndInvoke(IAsyncResult result)",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509Certificate",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "result",
+              "type": "System.IAsyncResult"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ITlsApplicationProtocolFeature",
+      "fullName": "Orleans.Connections.Security.ITlsApplicationProtocolFeature",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "interface",
+      "accessibility": "public",
+      "sourceFile": "src/Orleans.Connections.Security/Security/ITlsApplicationProtocolFeature.cs",
+      "sourceLines": "5-5",
+      "members": [
+        {
+          "name": "ApplicationProtocol",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract ReadOnlyMemory<byte> ITlsApplicationProtocolFeature.ApplicationProtocol",
+          "returnType": "System.ReadOnlyMemory<byte>",
+          "isAbstract": true,
+          "hasGet": true
+        }
+      ]
+    },
+    {
+      "name": "ITlsConnectionFeature",
+      "fullName": "Orleans.Connections.Security.ITlsConnectionFeature",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "interface",
+      "accessibility": "public",
+      "sourceFile": "src/Orleans.Connections.Security/Security/ITlsConnectionFeature.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "GetRemoteCertificateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract Task<X509Certificate2> ITlsConnectionFeature.GetRemoteCertificateAsync(CancellationToken cancellationToken)",
+          "returnType": "System.Threading.Tasks.Task<System.Security.Cryptography.X509Certificates.X509Certificate2>",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "cancellationToken",
+              "type": "System.Threading.CancellationToken"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Asynchronously retrieves the remote endpoint's certificate, if any. "
+              }
+            ]
+          }
+        },
+        {
+          "name": "RemoteCertificate",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract X509Certificate2 ITlsConnectionFeature.RemoteCertificate",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509Certificate2",
+          "isAbstract": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Synchronously retrieves the remote endpoint's certificate, if any. "
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "ITlsHandshakeFeature",
+      "fullName": "Orleans.Connections.Security.ITlsHandshakeFeature",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "interface",
+      "accessibility": "public",
+      "sourceFile": "src/Orleans.Connections.Security/Security/ITlsHandshakeFeature.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "CipherAlgorithm",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract CipherAlgorithmType ITlsHandshakeFeature.CipherAlgorithm",
+          "returnType": "System.Security.Authentication.CipherAlgorithmType",
+          "isAbstract": true,
+          "hasGet": true,
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "KeyExchangeAlgorithm, KeyExchangeStrength, CipherAlgorithm, CipherStrength, HashAlgorithm and HashStrength properties are obsolete. Use NegotiatedCipherSuite instead."
+              ],
+              "arguments": {
+                "DiagnosticId": "SYSLIB0058",
+                "UrlFormat": "https://aka.ms/dotnet-warnings/{0}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CipherStrength",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract int ITlsHandshakeFeature.CipherStrength",
+          "returnType": "int",
+          "isAbstract": true,
+          "hasGet": true,
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "KeyExchangeAlgorithm, KeyExchangeStrength, CipherAlgorithm, CipherStrength, HashAlgorithm and HashStrength properties are obsolete. Use NegotiatedCipherSuite instead."
+              ],
+              "arguments": {
+                "DiagnosticId": "SYSLIB0058",
+                "UrlFormat": "https://aka.ms/dotnet-warnings/{0}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "HashAlgorithm",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract HashAlgorithmType ITlsHandshakeFeature.HashAlgorithm",
+          "returnType": "System.Security.Authentication.HashAlgorithmType",
+          "isAbstract": true,
+          "hasGet": true,
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "KeyExchangeAlgorithm, KeyExchangeStrength, CipherAlgorithm, CipherStrength, HashAlgorithm and HashStrength properties are obsolete. Use NegotiatedCipherSuite instead."
+              ],
+              "arguments": {
+                "DiagnosticId": "SYSLIB0058",
+                "UrlFormat": "https://aka.ms/dotnet-warnings/{0}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "HashStrength",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract int ITlsHandshakeFeature.HashStrength",
+          "returnType": "int",
+          "isAbstract": true,
+          "hasGet": true,
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "KeyExchangeAlgorithm, KeyExchangeStrength, CipherAlgorithm, CipherStrength, HashAlgorithm and HashStrength properties are obsolete. Use NegotiatedCipherSuite instead."
+              ],
+              "arguments": {
+                "DiagnosticId": "SYSLIB0058",
+                "UrlFormat": "https://aka.ms/dotnet-warnings/{0}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "HostName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public virtual string ITlsHandshakeFeature.HostName",
+          "returnType": "string",
+          "isVirtual": true,
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the host name from the \"server_name\" (SNI) extension of the client hello if present. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/ITlsHandshakeFeature.cs",
+          "sourceLines": "19-19"
+        },
+        {
+          "name": "KeyExchangeAlgorithm",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract ExchangeAlgorithmType ITlsHandshakeFeature.KeyExchangeAlgorithm",
+          "returnType": "System.Security.Authentication.ExchangeAlgorithmType",
+          "isAbstract": true,
+          "hasGet": true,
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "KeyExchangeAlgorithm, KeyExchangeStrength, CipherAlgorithm, CipherStrength, HashAlgorithm and HashStrength properties are obsolete. Use NegotiatedCipherSuite instead."
+              ],
+              "arguments": {
+                "DiagnosticId": "SYSLIB0058",
+                "UrlFormat": "https://aka.ms/dotnet-warnings/{0}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "KeyExchangeStrength",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract int ITlsHandshakeFeature.KeyExchangeStrength",
+          "returnType": "int",
+          "isAbstract": true,
+          "hasGet": true,
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "KeyExchangeAlgorithm, KeyExchangeStrength, CipherAlgorithm, CipherStrength, HashAlgorithm and HashStrength properties are obsolete. Use NegotiatedCipherSuite instead."
+              ],
+              "arguments": {
+                "DiagnosticId": "SYSLIB0058",
+                "UrlFormat": "https://aka.ms/dotnet-warnings/{0}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "NegotiatedCipherSuite",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public virtual TlsCipherSuite? ITlsHandshakeFeature.NegotiatedCipherSuite",
+          "returnType": "System.Net.Security.TlsCipherSuite?",
+          "isReturnNullable": true,
+          "isVirtual": true,
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Net.Security.TlsCipherSuite"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/ITlsHandshakeFeature.cs",
+          "sourceLines": "14-14"
+        },
+        {
+          "name": "Protocol",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public abstract SslProtocols ITlsHandshakeFeature.Protocol",
+          "returnType": "System.Security.Authentication.SslProtocols",
+          "isAbstract": true,
+          "hasGet": true
+        }
+      ]
+    },
+    {
+      "name": "RemoteCertificateMode",
+      "fullName": "Orleans.Connections.Security.RemoteCertificateMode",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "enum",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Describes the remote certificate requirements for a TLS connection. "
+          }
+        ]
+      },
+      "enumMembers": [
+        {
+          "name": "NoCertificate",
+          "value": 0,
+          "description": "A remote certificate is not required and will not be requested from remote endpoints."
+        },
+        {
+          "name": "AllowCertificate",
+          "value": 1,
+          "description": "A remote certificate will be requested; however, authentication will not fail if a certificate is not provided by the remote endpoint."
+        },
+        {
+          "name": "RequireCertificate",
+          "value": 2,
+          "description": "A remote certificate will be requested, and the remote endpoint must provide a valid certificate for authentication."
+        }
+      ],
+      "sourceFile": "src/Orleans.Connections.Security/Security/RemoteCertificateMode.cs",
+      "sourceLines": "6-6",
+      "members": []
+    },
+    {
+      "name": "RemoteCertificateValidator",
+      "fullName": "Orleans.Connections.Security.RemoteCertificateValidator",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "delegate",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.MulticastDelegate",
+      "delegateReturnType": "bool",
+      "delegateParameters": [
+        {
+          "name": "certificate",
+          "type": "System.Security.Cryptography.X509Certificates.X509Certificate2"
+        },
+        {
+          "name": "chain",
+          "type": "System.Security.Cryptography.X509Certificates.X509Chain"
+        },
+        {
+          "name": "policyErrors",
+          "type": "System.Net.Security.SslPolicyErrors"
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Represents a multicast delegate; that is, a delegate that can have more than one element in its invocation list."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RemoteCertificateValidator.RemoteCertificateValidator(object @object, nint method)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "object",
+              "type": "object"
+            },
+            {
+              "name": "method",
+              "type": "nint"
+            }
+          ]
+        },
+        {
+          "name": "BeginInvoke",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual IAsyncResult RemoteCertificateValidator.BeginInvoke(X509Certificate2 certificate, X509Chain chain, SslPolicyErrors policyErrors, AsyncCallback callback, object @object)",
+          "returnType": "System.IAsyncResult",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "certificate",
+              "type": "System.Security.Cryptography.X509Certificates.X509Certificate2"
+            },
+            {
+              "name": "chain",
+              "type": "System.Security.Cryptography.X509Certificates.X509Chain"
+            },
+            {
+              "name": "policyErrors",
+              "type": "System.Net.Security.SslPolicyErrors"
+            },
+            {
+              "name": "callback",
+              "type": "System.AsyncCallback"
+            },
+            {
+              "name": "object",
+              "type": "object"
+            }
+          ]
+        },
+        {
+          "name": "EndInvoke",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual bool RemoteCertificateValidator.EndInvoke(IAsyncResult result)",
+          "returnType": "bool",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "result",
+              "type": "System.IAsyncResult"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ServerCertificateSelectionCallback",
+      "fullName": "Orleans.Connections.Security.ServerCertificateSelectionCallback",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "delegate",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.MulticastDelegate",
+      "delegateReturnType": "System.Security.Cryptography.X509Certificates.X509Certificate",
+      "delegateParameters": [
+        {
+          "name": "sender",
+          "type": "object"
+        },
+        {
+          "name": "hostName",
+          "type": "string"
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Represents a multicast delegate; that is, a delegate that can have more than one element in its invocation list."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ServerCertificateSelectionCallback.ServerCertificateSelectionCallback(object @object, nint method)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "object",
+              "type": "object"
+            },
+            {
+              "name": "method",
+              "type": "nint"
+            }
+          ]
+        },
+        {
+          "name": "BeginInvoke",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual IAsyncResult ServerCertificateSelectionCallback.BeginInvoke(object sender, string hostName, AsyncCallback callback, object @object)",
+          "returnType": "System.IAsyncResult",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "sender",
+              "type": "object"
+            },
+            {
+              "name": "hostName",
+              "type": "string"
+            },
+            {
+              "name": "callback",
+              "type": "System.AsyncCallback"
+            },
+            {
+              "name": "object",
+              "type": "object"
+            }
+          ]
+        },
+        {
+          "name": "EndInvoke",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual X509Certificate ServerCertificateSelectionCallback.EndInvoke(IAsyncResult result)",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509Certificate",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "result",
+              "type": "System.IAsyncResult"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TlsClientAuthenticationOptions",
+      "fullName": "Orleans.Connections.Security.TlsClientAuthenticationOptions",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public TlsClientAuthenticationOptions.TlsClientAuthenticationOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs",
+          "sourceLines": "13-19"
+        },
+        {
+          "name": "CertificateRevocationCheckMode",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public X509RevocationMode TlsClientAuthenticationOptions.CertificateRevocationCheckMode",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509RevocationMode",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs"
+        },
+        {
+          "name": "ClientCertificates",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public X509CertificateCollection TlsClientAuthenticationOptions.ClientCertificates",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509CertificateCollection",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs"
+        },
+        {
+          "name": "EnabledSslProtocols",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public SslProtocols TlsClientAuthenticationOptions.EnabledSslProtocols",
+          "returnType": "System.Security.Authentication.SslProtocols",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs"
+        },
+        {
+          "name": "LocalCertificateSelectionCallback",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public ClientCertificateSelectionCallback TlsClientAuthenticationOptions.LocalCertificateSelectionCallback",
+          "returnType": "Orleans.Connections.Security.ClientCertificateSelectionCallback",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs"
+        },
+        {
+          "name": "SslClientAuthenticationOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public object TlsClientAuthenticationOptions.SslClientAuthenticationOptions",
+          "returnType": "object",
+          "hasGet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs",
+          "sourceLines": "51-51"
+        },
+        {
+          "name": "TargetHost",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string TlsClientAuthenticationOptions.TargetHost",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsClientAuthenticationOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "TlsOptions",
+      "fullName": "Orleans.Connections.Security.TlsOptions",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Settings for how TLS connections are handled. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs",
+      "sourceLines": "16-16",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public TlsOptions.TlsOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs",
+          "sourceLines": "18-73"
+        },
+        {
+          "name": "AllowAnyRemoteCertificate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void TlsOptions.AllowAnyRemoteCertificate()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Overrides the current "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Connections.Security.TlsOptions.RemoteCertificateValidation"
+              },
+              {
+                "kind": "text",
+                "text": " callback and allows any client certificate. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs",
+          "sourceLines": "85-86"
+        },
+        {
+          "name": "CheckCertificateRevocation",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool TlsOptions.CheckCertificateRevocation",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies whether the certificate revocation list is checked during authentication. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "ClientCertificateMode",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public RemoteCertificateMode TlsOptions.ClientCertificateMode",
+          "returnType": "Orleans.Connections.Security.RemoteCertificateMode",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies the client authentication certificate requirements for a TLS connection to Silo. Defaults to "
+              },
+              {
+                "kind": "cref",
+                "value": "F:Orleans.Connections.Security.RemoteCertificateMode.AllowCertificate"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "HandshakeTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan TlsOptions.HandshakeTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies the maximum amount of time allowed for the TLS/SSL handshake. This must be positive and finite. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "LocalCertificate",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public X509Certificate2 TlsOptions.LocalCertificate",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509Certificate2",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "para",
+                "children": [
+                  {
+                    "kind": "text",
+                    "text": " Specifies the local certificate used to authenticate TLS connections. This is ignored on server if LocalCertificateSelector is set. "
+                  }
+                ]
+              },
+              {
+                "kind": "para",
+                "children": [
+                  {
+                    "kind": "text",
+                    "text": " To omit client authentication set to "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "null"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on client and set "
+                  },
+                  {
+                    "kind": "cref",
+                    "value": "P:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to "
+                  },
+                  {
+                    "kind": "cref",
+                    "value": "F:Orleans.Connections.Security.RemoteCertificateMode.AllowCertificate"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "cref",
+                    "value": "F:Orleans.Connections.Security.RemoteCertificateMode.NoCertificate"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on server. "
+                  }
+                ]
+              },
+              {
+                "kind": "para",
+                "children": [
+                  {
+                    "kind": "text",
+                    "text": " If the certificate has an Extended Key Usage extension, the usages must include Server Authentication (OID 1.3.6.1.5.5.7.3.1) for server and Client Authentication (OID 1.3.6.1.5.5.7.3.2) for client. "
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "LocalClientCertificateSelector",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<object, string, X509CertificateCollection, X509Certificate, string[], X509Certificate2> TlsOptions.LocalClientCertificateSelector",
+          "returnType": "System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate, string[], System.Security.Cryptography.X509Certificates.X509Certificate2>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "para",
+                "children": [
+                  {
+                    "kind": "text",
+                    "text": " A callback that will be invoked to dynamically select a local client certificate. This is higher priority than LocalCertificate. "
+                  }
+                ]
+              },
+              {
+                "kind": "para",
+                "children": [
+                  {
+                    "kind": "text",
+                    "text": " If the certificate has an Extended Key Usage extension, the usages must include Client Authentication (OID 1.3.6.1.5.5.7.3.2). "
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "LocalServerCertificateSelector",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<ConnectionContext, string, X509Certificate2> TlsOptions.LocalServerCertificateSelector",
+          "returnType": "System.Func<Microsoft.AspNetCore.Connections.ConnectionContext, string, System.Security.Cryptography.X509Certificates.X509Certificate2>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "para",
+                "children": [
+                  {
+                    "kind": "text",
+                    "text": " A callback that will be invoked to dynamically select a local server certificate. This is higher priority than LocalCertificate. If SNI is not available then the name parameter will be null. "
+                  }
+                ]
+              },
+              {
+                "kind": "para",
+                "children": [
+                  {
+                    "kind": "text",
+                    "text": " If the certificate has an Extended Key Usage extension, the usages must include Server Authentication (OID 1.3.6.1.5.5.7.3.1). "
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "OnAuthenticateAsClient",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Action<ConnectionContext, TlsClientAuthenticationOptions> TlsOptions.OnAuthenticateAsClient",
+          "returnType": "System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, Orleans.Connections.Security.TlsClientAuthenticationOptions>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Provides direct configuration of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Connections.Security.TlsClientAuthenticationOptions"
+              },
+              {
+                "kind": "text",
+                "text": " on a per-connection basis. This is called after all of the other settings have already been applied. Use this to set the target host name for SNI (Server Name Indication) via "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Connections.Security.TlsClientAuthenticationOptions.TargetHost"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "OnAuthenticateAsServer",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Action<ConnectionContext, TlsServerAuthenticationOptions> TlsOptions.OnAuthenticateAsServer",
+          "returnType": "System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, Orleans.Connections.Security.TlsServerAuthenticationOptions>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Provides direct configuration of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Connections.Security.TlsServerAuthenticationOptions"
+              },
+              {
+                "kind": "text",
+                "text": " on a per-connection basis. This is called after all of the other settings have already been applied. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "RemoteCertificateMode",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public RemoteCertificateMode TlsOptions.RemoteCertificateMode",
+          "returnType": "Orleans.Connections.Security.RemoteCertificateMode",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies the remote endpoint certificate requirements for a TLS connection. Defaults to "
+              },
+              {
+                "kind": "cref",
+                "value": "F:Orleans.Connections.Security.RemoteCertificateMode.RequireCertificate"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "RemoteCertificateValidation",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public RemoteCertificateValidator TlsOptions.RemoteCertificateValidation",
+          "returnType": "Orleans.Connections.Security.RemoteCertificateValidator",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies a callback for additional remote certificate validation that will be invoked during authentication. This will be ignored if "
+              },
+              {
+                "kind": "cref",
+                "value": "M:Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate"
+              },
+              {
+                "kind": "text",
+                "text": " is called after this callback is set. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        },
+        {
+          "name": "SslProtocols",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public SslProtocols TlsOptions.SslProtocols",
+          "returnType": "System.Security.Authentication.SslProtocols",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies allowable SSL protocols. Defaults to "
+              },
+              {
+                "kind": "cref",
+                "value": "F:System.Security.Authentication.SslProtocols.Tls13"
+              },
+              {
+                "kind": "text",
+                "text": " and "
+              },
+              {
+                "kind": "cref",
+                "value": "F:System.Security.Authentication.SslProtocols.Tls12"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "TlsServerAuthenticationOptions",
+      "fullName": "Orleans.Connections.Security.TlsServerAuthenticationOptions",
+      "namespace": "Orleans.Connections.Security",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public TlsServerAuthenticationOptions.TlsServerAuthenticationOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs",
+          "sourceLines": "13-19"
+        },
+        {
+          "name": "CertificateRevocationCheckMode",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public X509RevocationMode TlsServerAuthenticationOptions.CertificateRevocationCheckMode",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509RevocationMode",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs"
+        },
+        {
+          "name": "ClientCertificateRequired",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool TlsServerAuthenticationOptions.ClientCertificateRequired",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs"
+        },
+        {
+          "name": "EnabledSslProtocols",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public SslProtocols TlsServerAuthenticationOptions.EnabledSslProtocols",
+          "returnType": "System.Security.Authentication.SslProtocols",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs"
+        },
+        {
+          "name": "ServerCertificate",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public X509Certificate TlsServerAuthenticationOptions.ServerCertificate",
+          "returnType": "System.Security.Cryptography.X509Certificates.X509Certificate",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs"
+        },
+        {
+          "name": "ServerCertificateSelectionCallback",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public ServerCertificateSelectionCallback TlsServerAuthenticationOptions.ServerCertificateSelectionCallback",
+          "returnType": "Orleans.Connections.Security.ServerCertificateSelectionCallback",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs"
+        },
+        {
+          "name": "SslServerAuthenticationOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public object TlsServerAuthenticationOptions.SslServerAuthenticationOptions",
+          "returnType": "object",
+          "hasGet": true,
+          "sourceFile": "src/Orleans.Connections.Security/Security/TlsServerAuthenticationOptions.cs",
+          "sourceLines": "51-51"
+        }
+      ]
+    },
+    {
+      "name": "OrleansConnectionSecurityHostingExtensions",
+      "fullName": "Orleans.Hosting.OrleansConnectionSecurityHostingExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this IClientBuilder builder, Action<TlsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Connections.Security.TlsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "An Action to configure the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Connections.Security.TlsOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        },
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this IClientBuilder builder, StoreName storeName, string subject, bool allowInvalid, StoreLocation location, Action<TlsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "storeName",
+              "type": "System.Security.Cryptography.X509Certificates.StoreName"
+            },
+            {
+              "name": "subject",
+              "type": "string"
+            },
+            {
+              "name": "allowInvalid",
+              "type": "bool"
+            },
+            {
+              "name": "location",
+              "type": "System.Security.Cryptography.X509Certificates.StoreLocation"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Connections.Security.TlsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "allowInvalid": [
+                {
+                  "kind": "text",
+                  "text": "Indicates if invalid certificates should be considered, such as self-signed certificates."
+                }
+              ],
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "An Action to configure the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Connections.Security.TlsOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ],
+              "location": [
+                {
+                  "kind": "text",
+                  "text": "The store location to load the certificate from."
+                }
+              ],
+              "storeName": [
+                {
+                  "kind": "text",
+                  "text": "The certificate store to load the certificate from."
+                }
+              ],
+              "subject": [
+                {
+                  "kind": "text",
+                  "text": "The subject name for the certificate to load."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        },
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this IClientBuilder builder, X509Certificate2 certificate)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "certificate",
+              "type": "System.Security.Cryptography.X509Certificates.X509Certificate2"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "certificate": [
+                {
+                  "kind": "text",
+                  "text": "The server certificate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        },
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this IClientBuilder builder, X509Certificate2 certificate, Action<TlsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "certificate",
+              "type": "System.Security.Cryptography.X509Certificates.X509Certificate2"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Connections.Security.TlsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "certificate": [
+                {
+                  "kind": "text",
+                  "text": "The server certificate."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "An Action to configure the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Connections.Security.TlsOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        },
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this ISiloBuilder builder, Action<TlsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Connections.Security.TlsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "An Action to configure the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Connections.Security.TlsOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        },
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this ISiloBuilder builder, StoreName storeName, string subject, bool allowInvalid, StoreLocation location, Action<TlsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "storeName",
+              "type": "System.Security.Cryptography.X509Certificates.StoreName"
+            },
+            {
+              "name": "subject",
+              "type": "string"
+            },
+            {
+              "name": "allowInvalid",
+              "type": "bool"
+            },
+            {
+              "name": "location",
+              "type": "System.Security.Cryptography.X509Certificates.StoreLocation"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Connections.Security.TlsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "allowInvalid": [
+                {
+                  "kind": "text",
+                  "text": "Indicates if invalid certificates should be considered, such as self-signed certificates."
+                }
+              ],
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "An Action to configure the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Connections.Security.TlsOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ],
+              "location": [
+                {
+                  "kind": "text",
+                  "text": "The store location to load the certificate from."
+                }
+              ],
+              "storeName": [
+                {
+                  "kind": "text",
+                  "text": "The certificate store to load the certificate from."
+                }
+              ],
+              "subject": [
+                {
+                  "kind": "text",
+                  "text": "The subject name for the certificate to load."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        },
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this ISiloBuilder builder, X509Certificate2 certificate)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "certificate",
+              "type": "System.Security.Cryptography.X509Certificates.X509Certificate2"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "certificate": [
+                {
+                  "kind": "text",
+                  "text": "The server certificate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        },
+        {
+          "name": "UseTls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder OrleansConnectionSecurityHostingExtensions.UseTls(this ISiloBuilder builder, X509Certificate2 certificate, Action<TlsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "certificate",
+              "type": "System.Security.Cryptography.X509Certificates.X509Certificate2"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Connections.Security.TlsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures TLS. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder to configure."
+                }
+              ],
+              "certificate": [
+                {
+                  "kind": "text",
+                  "text": "The server certificate."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "An Action to configure the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Connections.Security.TlsOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Connections.Security/Hosting/HostingExtensions.IClientBuilder.cs"
+        }
+      ]
+    }
+  ]
+}

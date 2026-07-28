@@ -1,0 +1,625 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Streaming.SQS",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "SqsOptions",
+      "fullName": "Orleans.Configuration.SqsOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SqsStreamOptions.cs",
+      "sourceLines": "5-5",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SqsOptions.SqsOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string SqsOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SqsStreamOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "ClientBuilderExtensions",
+      "fullName": "Orleans.Hosting.ClientBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Streaming.SQS/Hosting/ClientBuilderExtensions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": "AddSqsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ClientBuilderExtensions.AddSqsStreams(this IClientBuilder builder, string name, Action<ClusterClientSqsStreamConfigurator> configure)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Hosting.ClusterClientSqsStreamConfigurator>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure cluster client to use SQS persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Hosting/ClientBuilderExtensions.cs",
+          "sourceLines": "22-24"
+        },
+        {
+          "name": "AddSqsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ClientBuilderExtensions.AddSqsStreams(this IClientBuilder builder, string name, Action<SqsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.SqsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure cluster client to use SQS persistent streams with default settings "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Hosting/ClientBuilderExtensions.cs",
+          "sourceLines": "12-14"
+        }
+      ]
+    },
+    {
+      "name": "ClusterClientSqsStreamConfigurator",
+      "fullName": "Orleans.Hosting.ClusterClientSqsStreamConfigurator",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Hosting.ClusterClientPersistentStreamConfigurator",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Client-side configuration provider for persistent streams. "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+      "sourceLines": "41-41",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ClusterClientSqsStreamConfigurator.ClusterClientSqsStreamConfigurator(string name, IClientBuilder builder)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+          "sourceLines": "44-52"
+        },
+        {
+          "name": "ConfigurePartitioning",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ClusterClientSqsStreamConfigurator ClusterClientSqsStreamConfigurator.ConfigurePartitioning(int numOfparitions = 8)",
+          "returnType": "Orleans.Hosting.ClusterClientSqsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "numOfparitions",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "8"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+          "sourceLines": "63-64"
+        },
+        {
+          "name": "ConfigureSqs",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ClusterClientSqsStreamConfigurator ClusterClientSqsStreamConfigurator.ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ClusterClientSqsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.SqsOptions>>"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+          "sourceLines": "56-57"
+        }
+      ]
+    },
+    {
+      "name": "SiloBuilderExtensions",
+      "fullName": "Orleans.Hosting.SiloBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Streaming.SQS/Hosting/SiloBuilderExtensions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": "AddSqsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderExtensions.AddSqsStreams(this ISiloBuilder builder, string name, Action<SiloSqsStreamConfigurator> configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Hosting.SiloSqsStreamConfigurator>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use SQS persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Hosting/SiloBuilderExtensions.cs",
+          "sourceLines": "23-26"
+        },
+        {
+          "name": "AddSqsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderExtensions.AddSqsStreams(this ISiloBuilder builder, string name, Action<SqsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.SqsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use SQS persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Hosting/SiloBuilderExtensions.cs",
+          "sourceLines": "13-15"
+        }
+      ]
+    },
+    {
+      "name": "SiloSqsStreamConfigurator",
+      "fullName": "Orleans.Hosting.SiloSqsStreamConfigurator",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Hosting.SiloPersistentStreamConfigurator",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configures persistent streams. "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+      "sourceLines": "9-9",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SiloSqsStreamConfigurator.SiloSqsStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureServicesDelegate",
+              "type": "System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>>"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+          "sourceLines": "12-20"
+        },
+        {
+          "name": "ConfigureCache",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloSqsStreamConfigurator SiloSqsStreamConfigurator.ConfigureCache(int cacheSize = 4096)",
+          "returnType": "Orleans.Hosting.SiloSqsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "cacheSize",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "4096"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+          "sourceLines": "30-31"
+        },
+        {
+          "name": "ConfigurePartitioning",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloSqsStreamConfigurator SiloSqsStreamConfigurator.ConfigurePartitioning(int numOfparitions = 8)",
+          "returnType": "Orleans.Hosting.SiloSqsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "numOfparitions",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "8"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+          "sourceLines": "36-37"
+        },
+        {
+          "name": "ConfigureSqs",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloSqsStreamConfigurator SiloSqsStreamConfigurator.ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.SiloSqsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.SqsOptions>>"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamBuilder.cs",
+          "sourceLines": "24-25"
+        }
+      ]
+    },
+    {
+      "name": "SQSAdapterFactory",
+      "fullName": "OrleansAWSUtils.Streams.SQSAdapterFactory",
+      "namespace": "OrleansAWSUtils.Streams",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Streams.IQueueAdapterFactory"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Factory class for Azure Queue based stream provider."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+      "sourceLines": "17-17",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SQSAdapterFactory.SQSAdapterFactory(string name, SqsOptions sqsOptions, HashRingStreamQueueMapperOptions queueMapperOptions, SimpleQueueCacheOptions cacheOptions, IOptions<ClusterOptions> clusterOptions, Serializer serializer, ILoggerFactory loggerFactory)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "sqsOptions",
+              "type": "Orleans.Configuration.SqsOptions"
+            },
+            {
+              "name": "queueMapperOptions",
+              "type": "Orleans.Configuration.HashRingStreamQueueMapperOptions"
+            },
+            {
+              "name": "cacheOptions",
+              "type": "Orleans.Configuration.SimpleQueueCacheOptions"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            },
+            {
+              "name": "serializer",
+              "type": "Orleans.Serialization.Serializer"
+            },
+            {
+              "name": "loggerFactory",
+              "type": "Microsoft.Extensions.Logging.ILoggerFactory"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+          "sourceLines": "32-50"
+        },
+        {
+          "name": "Create",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static SQSAdapterFactory SQSAdapterFactory.Create(IServiceProvider services, string name)",
+          "returnType": "OrleansAWSUtils.Streams.SQSAdapterFactory",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "System.IServiceProvider"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+          "sourceLines": "94-100"
+        },
+        {
+          "name": "CreateAdapter",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual Task<IQueueAdapter> SQSAdapterFactory.CreateAdapter()",
+          "returnType": "System.Threading.Tasks.Task<Orleans.Streams.IQueueAdapter>",
+          "isVirtual": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Creates the Azure Queue based adapter."
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+          "sourceLines": "66-67"
+        },
+        {
+          "name": "GetDeliveryFailureHandler",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<IStreamFailureHandler> SQSAdapterFactory.GetDeliveryFailureHandler(QueueId queueId)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>",
+          "parameters": [
+            {
+              "name": "queueId",
+              "type": "Orleans.Streams.QueueId"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a delivery failure handler for the specified queue. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+          "sourceLines": "89-89"
+        },
+        {
+          "name": "GetQueueAdapterCache",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual IQueueAdapterCache SQSAdapterFactory.GetQueueAdapterCache()",
+          "returnType": "Orleans.Streams.IQueueAdapterCache",
+          "isVirtual": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Creates the adapter cache."
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+          "sourceLines": "73-73"
+        },
+        {
+          "name": "GetStreamQueueMapper",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public IStreamQueueMapper SQSAdapterFactory.GetStreamQueueMapper()",
+          "returnType": "Orleans.Streams.IStreamQueueMapper",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Creates the factory stream queue mapper."
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+          "sourceLines": "79-79"
+        },
+        {
+          "name": "Init",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual void SQSAdapterFactory.Init()",
+          "returnType": "void",
+          "isVirtual": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Init the factory."
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSAdapterFactory.cs",
+          "sourceLines": "56-61"
+        }
+      ]
+    },
+    {
+      "name": "SQSStreamProviderUtils",
+      "fullName": "OrleansAWSUtils.Streams.SQSStreamProviderUtils",
+      "namespace": "OrleansAWSUtils.Streams",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " SQS utility functions "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamProviderUtils.cs",
+      "sourceLines": "14-14",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SQSStreamProviderUtils.SQSStreamProviderUtils()",
+          "returnType": "void"
+        },
+        {
+          "name": "DeleteAllUsedQueues",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static Task SQSStreamProviderUtils.DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "providerName",
+              "type": "string"
+            },
+            {
+              "name": "clusterId",
+              "type": "string"
+            },
+            {
+              "name": "storageConnectionString",
+              "type": "string"
+            },
+            {
+              "name": "loggerFactory",
+              "type": "Microsoft.Extensions.Logging.ILoggerFactory"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Async method to delete all used queues, for specific provider and clusterId "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " Task object for this async method "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Streaming.SQS/Streams/SQSStreamProviderUtils.cs",
+          "sourceLines": "22-37"
+        }
+      ]
+    }
+  ]
+}

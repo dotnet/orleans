@@ -1,0 +1,393 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Reminders.AdoNet",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "AdoNetReminderTableOptions",
+      "fullName": "Orleans.Configuration.AdoNetReminderTableOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for ADO.NET reminder storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/ReminderService/AdoNetReminderTableOptions.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetReminderTableOptions.AdoNetReminderTableOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetReminderTableOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/ReminderService/AdoNetReminderTableOptions.cs"
+        },
+        {
+          "name": "Invariant",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetReminderTableOptions.Invariant",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the ADO.NET invariant. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/ReminderService/AdoNetReminderTableOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetReminderTableOptionsValidator",
+      "fullName": "Orleans.Configuration.AdoNetReminderTableOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Validates "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Configuration.AdoNetReminderTableOptions"
+          },
+          {
+            "kind": "text",
+            "text": " configuration. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/ReminderService/AdoNetReminderTableOptionsValidator.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetReminderTableOptionsValidator.AdoNetReminderTableOptionsValidator(IOptions<AdoNetReminderTableOptions> options)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetReminderTableOptions>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/ReminderService/AdoNetReminderTableOptionsValidator.cs",
+          "sourceLines": "14-17"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AdoNetReminderTableOptionsValidator.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/ReminderService/AdoNetReminderTableOptionsValidator.cs",
+          "sourceLines": "22-31"
+        }
+      ]
+    },
+    {
+      "name": "SiloBuilderReminderExtensions",
+      "fullName": "Orleans.Hosting.SiloBuilderReminderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Silo host builder extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/SiloBuilderReminderExtensions.cs",
+      "sourceLines": "14-14",
+      "members": [
+        {
+          "name": "UseAdoNetReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection SiloBuilderReminderExtensions.UseAdoNetReminderService(this IServiceCollection services, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetReminderTableOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Adds reminder storage using ADO.NET. Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining."
+              }
+            ],
+            "parameters": {
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "Configuration delegate."
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": "The service collection."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/SiloBuilderReminderExtensions.cs",
+          "sourceLines": "53-58"
+        },
+        {
+          "name": "UseAdoNetReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderReminderExtensions.UseAdoNetReminderService(this ISiloBuilder builder, Action<AdoNetReminderTableOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AdoNetReminderTableOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Adds reminder storage using ADO.NET. Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "Configuration delegate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/SiloBuilderReminderExtensions.cs"
+        },
+        {
+          "name": "UseAdoNetReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderReminderExtensions.UseAdoNetReminderService(this ISiloBuilder builder, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetReminderTableOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Adds reminder storage using ADO.NET. Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "Configuration delegate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Reminders.AdoNet/SiloBuilderReminderExtensions.cs"
+        }
+      ]
+    }
+  ]
+}

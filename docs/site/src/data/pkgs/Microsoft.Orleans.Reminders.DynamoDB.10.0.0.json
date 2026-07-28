@@ -1,0 +1,518 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Reminders.DynamoDB",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "DynamoDBReminderStorageOptions",
+      "fullName": "Orleans.Configuration.DynamoDBReminderStorageOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Reminders.DynamoDB.DynamoDBClientOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration for Amazon DynamoDB reminder storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBReminderStorageOptions.DynamoDBReminderStorageOptions()",
+          "returnType": "void",
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs",
+          "sourceLines": "13-39"
+        },
+        {
+          "name": "CreateIfNotExists",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBReminderStorageOptions.CreateIfNotExists",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Create the table if it doesn't exist "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs"
+        },
+        {
+          "name": "ReadCapacityUnits",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DynamoDBReminderStorageOptions.ReadCapacityUnits",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Read capacity unit for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBReminderStorageOptions.TableName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " DynamoDB table name. Defaults to 'OrleansReminders'. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs"
+        },
+        {
+          "name": "UpdateIfExists",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBReminderStorageOptions.UpdateIfExists",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Update the table if it exists "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs"
+        },
+        {
+          "name": "UseProvisionedThroughput",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DynamoDBReminderStorageOptions.UseProvisionedThroughput",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Use Provisioned Throughput for tables "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs"
+        },
+        {
+          "name": "WriteCapacityUnits",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DynamoDBReminderStorageOptions.WriteCapacityUnits",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Write capacity unit for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBReminderStorageOptionsExtensions",
+      "fullName": "Orleans.Configuration.DynamoDBReminderStorageOptionsExtensions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration for Amazon DynamoDB reminder storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptionsExtensions.cs",
+      "sourceLines": "9-9",
+      "members": [
+        {
+          "name": "ParseConnectionString",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static void DynamoDBReminderStorageOptionsExtensions.ParseConnectionString(this DynamoDBReminderStorageOptions options, string connectionString)",
+          "returnType": "void",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.DynamoDBReminderStorageOptions",
+              "modifier": "this"
+            },
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures this instance using the provided connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderStorageOptionsExtensions.cs",
+          "sourceLines": "25-90"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBReminderTableOptions",
+      "fullName": "Orleans.Configuration.DynamoDBReminderTableOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration for Amazon DynamoDB reminder storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderServiceOptions.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBReminderTableOptions.DynamoDBReminderTableOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBReminderTableOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/Reminders/DynamoDbReminderServiceOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBServiceCollectionReminderExtensions",
+      "fullName": "Orleans.Hosting.DynamoDBServiceCollectionReminderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+          },
+          {
+            "kind": "text",
+            "text": " extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/DynamoDBServiceCollectionReminderExtensions.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": "UseDynamoDBReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection DynamoDBServiceCollectionReminderExtensions.UseDynamoDBReminderService(this IServiceCollection services, Action<DynamoDBReminderStorageOptions> configure)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Configuration.DynamoDBReminderStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Amazon DynamoDB. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": " The service collection. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/DynamoDBServiceCollectionReminderExtensions.cs",
+          "sourceLines": "27-31"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBSiloBuilderReminderExtensions",
+      "fullName": "Orleans.Hosting.DynamoDBSiloBuilderReminderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Silo host builder extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/DynamoDBSiloBuilderReminderExtensions.cs",
+      "sourceLines": "9-9",
+      "members": [
+        {
+          "name": "UseDynamoDBReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder DynamoDBSiloBuilderReminderExtensions.UseDynamoDBReminderService(this ISiloBuilder builder, Action<DynamoDBReminderStorageOptions> configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Configuration.DynamoDBReminderStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Amazon DynamoDB. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AWS/Orleans.Reminders.DynamoDB/DynamoDBSiloBuilderReminderExtensions.cs",
+          "sourceLines": "25-26"
+        }
+      ]
+    },
+    {
+      "name": "DynamoDBClientOptions",
+      "fullName": "Orleans.Reminders.DynamoDB.DynamoDBClientOptions",
+      "namespace": "Orleans.Reminders.DynamoDB",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DynamoDBClientOptions.DynamoDBClientOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "AccessKey",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.AccessKey",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " AccessKey string for DynamoDB Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "ProfileName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.ProfileName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " AWS profile name. "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "SecretKey",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.SecretKey",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Secret key for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "Service",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.Service",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " DynamoDB region name, such as \"us-west-2\" "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        },
+        {
+          "name": "Token",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DynamoDBClientOptions.Token",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Token for DynamoDB storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AWS/Shared/Storage/DynamoDBClientOptions.cs"
+        }
+      ]
+    }
+  ]
+}

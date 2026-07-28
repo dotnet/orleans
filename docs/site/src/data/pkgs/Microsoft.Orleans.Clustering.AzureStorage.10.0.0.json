@@ -1,0 +1,1119 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Clustering.AzureStorage",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "AzureStorageClusteringOptions",
+      "fullName": "Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions",
+      "namespace": "Orleans.Clustering.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Clustering.AzureStorage.AzureStorageOperationOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Specify options used for AzureTableBasedMembership "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageClusteringOptions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageClusteringOptions.AzureStorageClusteringOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageClusteringOptions.cs",
+          "sourceLines": "8-8"
+        },
+        {
+          "name": "DEFAULT_TABLE_NAME",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string AzureStorageClusteringOptions.DEFAULT_TABLE_NAME",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageClusteringOptions.cs"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public override string AzureStorageClusteringOptions.TableName",
+          "returnType": "string",
+          "isOverride": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageClusteringOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageClusteringOptionsValidator",
+      "fullName": "Orleans.Clustering.AzureStorage.AzureStorageClusteringOptionsValidator",
+      "namespace": "Orleans.Clustering.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration validator for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageClusteringOptions.cs",
+      "sourceLines": "15-15",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageClusteringOptionsValidator.AzureStorageClusteringOptionsValidator(AzureStorageClusteringOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Clustering.AzureStorage.AzureStorageClusteringOptionsValidator"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The option name to be validated."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The option to be validated."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageClusteringOptions.cs",
+          "sourceLines": "22-24"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageGatewayOptions",
+      "fullName": "Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions",
+      "namespace": "Orleans.Clustering.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Clustering.AzureStorage.AzureStorageOperationOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageGatewayOptions.cs",
+      "sourceLines": "3-3",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageGatewayOptions.AzureStorageGatewayOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageGatewayOptions.cs",
+          "sourceLines": "5-5"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public override string AzureStorageGatewayOptions.TableName",
+          "returnType": "string",
+          "isOverride": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageGatewayOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageGatewayOptionsValidator",
+      "fullName": "Orleans.Clustering.AzureStorage.AzureStorageGatewayOptionsValidator",
+      "namespace": "Orleans.Clustering.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration validator for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageGatewayOptions.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageGatewayOptionsValidator.AzureStorageGatewayOptionsValidator(AzureStorageGatewayOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Clustering.AzureStorage.AzureStorageGatewayOptionsValidator"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The option name to be validated."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The option to be validated."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/Options/AzureStorageGatewayOptions.cs",
+          "sourceLines": "18-20"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptions",
+      "fullName": "Orleans.Clustering.AzureStorage.AzureStorageOperationOptions",
+      "namespace": "Orleans.Clustering.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "30-30",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptions.AzureStorageOperationOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "createClientCallback",
+              "type": "System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>>"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using the provided callback. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "91-92"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "82-83"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "azureSasCredential",
+              "type": "Azure.AzureSasCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.AzureSasCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "109-110"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "sharedKeyCredential",
+              "type": "Azure.Data.Tables.TableSharedKeyCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Data.Tables.TableSharedKeyCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "118-119"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "tokenCredential",
+              "type": "Azure.Core.TokenCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Core.TokenCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "100-101"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using a connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "73-74"
+        },
+        {
+          "name": "ClientOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableClientOptions AzureStorageOperationOptions.ClientOptions",
+          "returnType": "Azure.Data.Tables.TableClientOptions",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Options to be used when configuring the table storage client, or "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": " to use the default options. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "StoragePolicyOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions AzureStorageOperationOptions.StoragePolicyOptions",
+          "returnType": "Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Azure Storage Policy Options "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public virtual string AzureStorageOperationOptions.TableName",
+          "returnType": "string",
+          "isVirtual": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "TableServiceClient",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableServiceClient AzureStorageOperationOptions.TableServiceClient",
+          "returnType": "Azure.Data.Tables.TableServiceClient",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the client used to access the Azure Table Service. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptionsValidator",
+      "fullName": "Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>",
+      "namespace": "Orleans.Clustering.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TOptions",
+          "constraints": [
+            "Orleans.Clustering.AzureStorage.AzureStorageOperationOptions"
+          ]
+        }
+      ],
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "204-204",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "TOptions"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "isOptional": true
+            }
+          ],
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "206-210"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual void AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration()",
+          "returnType": "void",
+          "isVirtual": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "217-218"
+        },
+        {
+          "name": "Name",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AzureStorageOperationOptionsValidator<TOptions>.Name",
+          "returnType": "string",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "213-213"
+        },
+        {
+          "name": "Options",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TOptions AzureStorageOperationOptionsValidator<TOptions>.Options",
+          "returnType": "TOptions",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "212-212"
+        }
+      ]
+    },
+    {
+      "name": "AzureStoragePolicyOptions",
+      "fullName": "Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions",
+      "namespace": "Orleans.Clustering.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+      "sourceLines": "24-24",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions.AzureStoragePolicyOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+          "sourceLines": "30-44"
+        },
+        {
+          "name": "CreationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.CreationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxBulkUpdateRows",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxBulkUpdateRows",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxCreationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxOperationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum number of operation retry attempts. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxPauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.MaxPauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "OperationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.OperationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenCreationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The base delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableClusteringExtensions",
+      "fullName": "Orleans.Hosting.AzureTableClusteringExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/AzureTableClusteringExtensions.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": "UseAzureStorageClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder AzureTableClusteringExtensions.UseAzureStorageClustering(this IClientBuilder builder, Action<AzureStorageGatewayOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the client to use Azure Storage for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The client builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/AzureTableClusteringExtensions.cs"
+        },
+        {
+          "name": "UseAzureStorageClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder AzureTableClusteringExtensions.UseAzureStorageClustering(this IClientBuilder builder, Action<OptionsBuilder<AzureStorageGatewayOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the client to use Azure Storage for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The client builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/AzureTableClusteringExtensions.cs"
+        },
+        {
+          "name": "UseAzureStorageClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableClusteringExtensions.UseAzureStorageClustering(this ISiloBuilder builder, Action<AzureStorageClusteringOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the silo to use Azure Storage for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The silo builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/AzureTableClusteringExtensions.cs"
+        },
+        {
+          "name": "UseAzureStorageClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableClusteringExtensions.UseAzureStorageClustering(this ISiloBuilder builder, Action<OptionsBuilder<AzureStorageClusteringOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the silo to use Azure Storage for clustering. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The silo builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Clustering.AzureStorage/AzureTableClusteringExtensions.cs"
+        }
+      ]
+    }
+  ]
+}

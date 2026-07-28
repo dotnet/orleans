@@ -1,0 +1,1301 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Serialization.Protobuf",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "ByteStringCodec",
+      "fullName": "Orleans.Serialization.ByteStringCodec",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Google.Protobuf.ByteString>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Serializer for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Google.Protobuf.ByteString"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/ByteStringCodec.cs",
+      "sourceLines": "13-13",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ByteStringCodec.ByteStringCodec()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "ByteStringCopier",
+      "fullName": "Orleans.Serialization.ByteStringCopier",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Google.Protobuf.ByteString>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Copier for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Google.Protobuf.ByteString"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/ByteStringCopier.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ByteStringCopier.ByteStringCopier()",
+          "returnType": "void"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ByteString ByteStringCopier.DeepCopy(ByteString input, CopyContext context)",
+          "returnType": "Google.Protobuf.ByteString",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Google.Protobuf.ByteString"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/ByteStringCopier.cs",
+          "sourceLines": "16-23"
+        }
+      ]
+    },
+    {
+      "name": "MapFieldCodec",
+      "fullName": "Orleans.Serialization.MapFieldCodec<TKey, TValue>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TKey"
+        },
+        {
+          "name": "TValue"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Google.Protobuf.Collections.MapField<TKey, TValue>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Serializer for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Google.Protobuf.Collections.MapField`2"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "TKey": [
+            {
+              "kind": "text",
+              "text": "The key type."
+            }
+          ],
+          "TValue": [
+            {
+              "kind": "text",
+              "text": "The value type."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCodec.cs",
+      "sourceLines": "19-19",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public MapFieldCodec<TKey, TValue>.MapFieldCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "keyCodec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<TKey>"
+            },
+            {
+              "name": "valueCodec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<TValue>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.MapFieldCodec`2"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "keyCodec": [
+                {
+                  "kind": "text",
+                  "text": "The key codec."
+                }
+              ],
+              "valueCodec": [
+                {
+                  "kind": "text",
+                  "text": "The value codec."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCodec.cs",
+          "sourceLines": "21-38"
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public MapField<TKey, TValue> MapFieldCodec<TKey, TValue>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)",
+          "returnType": "Google.Protobuf.Collections.MapField<TKey, TValue>",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCodec.cs",
+          "sourceLines": "68-122"
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void MapFieldCodec<TKey, TValue>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, MapField<TKey, TValue> value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Google.Protobuf.Collections.MapField<TKey, TValue>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCodec.cs",
+          "sourceLines": "43-63"
+        }
+      ]
+    },
+    {
+      "name": "MapFieldCopier",
+      "fullName": "Orleans.Serialization.MapFieldCopier<TKey, TValue>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TKey"
+        },
+        {
+          "name": "TValue"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IBaseCopier",
+        "Orleans.Serialization.Cloning.IBaseCopier<Google.Protobuf.Collections.MapField<TKey, TValue>>",
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Google.Protobuf.Collections.MapField<TKey, TValue>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Copier for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Google.Protobuf.Collections.MapField`2"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "TKey": [
+            {
+              "kind": "text",
+              "text": "The type of the t key."
+            }
+          ],
+          "TValue": [
+            {
+              "kind": "text",
+              "text": "The type of the t value."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCopier.cs",
+      "sourceLines": "13-13",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public MapFieldCopier<TKey, TValue>.MapFieldCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "keyCopier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<TKey>"
+            },
+            {
+              "name": "valueCopier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<TValue>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.MapFieldCopier`2"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "keyCopier": [
+                {
+                  "kind": "text",
+                  "text": "The key copier."
+                }
+              ],
+              "valueCopier": [
+                {
+                  "kind": "text",
+                  "text": "The value copier."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCopier.cs",
+          "sourceLines": "23-27"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public MapField<TKey, TValue> MapFieldCopier<TKey, TValue>.DeepCopy(MapField<TKey, TValue> input, CopyContext context)",
+          "returnType": "Google.Protobuf.Collections.MapField<TKey, TValue>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Google.Protobuf.Collections.MapField<TKey, TValue>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCopier.cs",
+          "sourceLines": "32-49"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void MapFieldCopier<TKey, TValue>.DeepCopy(MapField<TKey, TValue> input, MapField<TKey, TValue> output, CopyContext context)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Google.Protobuf.Collections.MapField<TKey, TValue>"
+            },
+            {
+              "name": "output",
+              "type": "Google.Protobuf.Collections.MapField<TKey, TValue>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Clones members from "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": " and copies them to "
+              },
+              {
+                "kind": "paramref",
+                "value": "output"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ],
+              "output": [
+                {
+                  "kind": "text",
+                  "text": "The output."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/MapFieldCopier.cs",
+          "sourceLines": "55-59"
+        }
+      ]
+    },
+    {
+      "name": "ProtobufCodec",
+      "fullName": "Orleans.Serialization.ProtobufCodec",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IGeneralizedCopier",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.ITypeFilter",
+        "Orleans.Serialization.Serializers.IGeneralizedCodec"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "attributes": [
+        {
+          "name": "Orleans.AliasAttribute",
+          "constructorArguments": [
+            "protobuf"
+          ]
+        }
+      ],
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/ProtobufCodec.cs",
+      "sourceLines": "18-18",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ProtobufCodec.ProtobufCodec(IEnumerable<ICodecSelector> serializableTypeSelectors, IEnumerable<ICopierSelector> copyableTypeSelectors)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serializableTypeSelectors",
+              "type": "System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICodecSelector>"
+            },
+            {
+              "name": "copyableTypeSelectors",
+              "type": "System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICopierSelector>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.ProtobufCodec"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "copyableTypeSelectors": [
+                {
+                  "kind": "text",
+                  "text": "Filters used to indicate which types should be copied by this codec."
+                }
+              ],
+              "serializableTypeSelectors": [
+                {
+                  "kind": "text",
+                  "text": "Filters used to indicate which types should be serialized by this codec."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/ProtobufCodec.cs",
+          "sourceLines": "35-41"
+        },
+        {
+          "name": "WellKnownAlias",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string ProtobufCodec.WellKnownAlias",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/ProtobufCodec.cs"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public object ProtobufCodec.DeepCopy(object input, CopyContext context)",
+          "returnType": "object",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "object"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided untyped input. The type must still match the copier instance! "
+              }
+            ]
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/ProtobufCodec.cs",
+          "sourceLines": "46-63"
+        }
+      ]
+    },
+    {
+      "name": "RepeatedFieldCodec",
+      "fullName": "Orleans.Serialization.RepeatedFieldCodec<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Google.Protobuf.Collections.RepeatedField<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Serializer for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Google.Protobuf.Collections.RepeatedField`1"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The element type."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCodec.cs",
+      "sourceLines": "18-18",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RepeatedFieldCodec<T>.RepeatedFieldCodec(IFieldCodec<T> fieldCodec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "fieldCodec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.RepeatedFieldCodec`1"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "fieldCodec": [
+                {
+                  "kind": "text",
+                  "text": "The field codec."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCodec.cs",
+          "sourceLines": "20-31"
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public RepeatedField<T> RepeatedFieldCodec<T>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)",
+          "returnType": "Google.Protobuf.Collections.RepeatedField<T>",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCodec.cs",
+          "sourceLines": "61-112"
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void RepeatedFieldCodec<T>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, RepeatedField<T> value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Google.Protobuf.Collections.RepeatedField<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCodec.cs",
+          "sourceLines": "37-56"
+        }
+      ]
+    },
+    {
+      "name": "RepeatedFieldCopier",
+      "fullName": "Orleans.Serialization.RepeatedFieldCopier<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IBaseCopier",
+        "Orleans.Serialization.Cloning.IBaseCopier<Google.Protobuf.Collections.RepeatedField<T>>",
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Google.Protobuf.Collections.RepeatedField<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Copier for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Google.Protobuf.Collections.RepeatedField`1"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The element type."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCopier.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RepeatedFieldCopier<T>.RepeatedFieldCopier(IDeepCopier<T> valueCopier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "valueCopier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.RepeatedFieldCopier`1"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "valueCopier": [
+                {
+                  "kind": "text",
+                  "text": "The value copier."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCopier.cs",
+          "sourceLines": "20-23"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public RepeatedField<T> RepeatedFieldCopier<T>.DeepCopy(RepeatedField<T> input, CopyContext context)",
+          "returnType": "Google.Protobuf.Collections.RepeatedField<T>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Google.Protobuf.Collections.RepeatedField<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCopier.cs",
+          "sourceLines": "28-45"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void RepeatedFieldCopier<T>.DeepCopy(RepeatedField<T> input, RepeatedField<T> output, CopyContext context)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Google.Protobuf.Collections.RepeatedField<T>"
+            },
+            {
+              "name": "output",
+              "type": "Google.Protobuf.Collections.RepeatedField<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Clones members from "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": " and copies them to "
+              },
+              {
+                "kind": "paramref",
+                "value": "output"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ],
+              "output": [
+                {
+                  "kind": "text",
+                  "text": "The output."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/RepeatedFieldCopier.cs",
+          "sourceLines": "51-55"
+        }
+      ]
+    },
+    {
+      "name": "SerializationHostingExtensions",
+      "fullName": "Orleans.Serialization.SerializationHostingExtensions",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extension method for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Serialization.ISerializerBuilder"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/SerializationHostingExtensions.cs",
+      "sourceLines": "13-13",
+      "members": [
+        {
+          "name": "AddProtobufSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISerializerBuilder SerializationHostingExtensions.AddProtobufSerializer(this ISerializerBuilder serializerBuilder)",
+          "returnType": "Orleans.Serialization.ISerializerBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "serializerBuilder",
+              "type": "Orleans.Serialization.ISerializerBuilder",
+              "modifier": "this"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds support for serializing and deserializing Protobuf IMessage types using "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Google.Protobuf.MessageParser"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "serializerBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The serializer builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/SerializationHostingExtensions.cs",
+          "sourceLines": "23-25"
+        },
+        {
+          "name": "AddProtobufSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISerializerBuilder SerializationHostingExtensions.AddProtobufSerializer(this ISerializerBuilder serializerBuilder, Func<Type, bool> isSerializable, Func<Type, bool> isCopyable)",
+          "returnType": "Orleans.Serialization.ISerializerBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "serializerBuilder",
+              "type": "Orleans.Serialization.ISerializerBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "isSerializable",
+              "type": "System.Func<System.Type, bool>"
+            },
+            {
+              "name": "isCopyable",
+              "type": "System.Func<System.Type, bool>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds support for serializing and deserializing Protobuf IMessage types using "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Google.Protobuf.MessageParser"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "isCopyable": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to indicate which types should be copied by this codec."
+                }
+              ],
+              "isSerializable": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to indicate which types should be serialized by this codec."
+                }
+              ],
+              "serializerBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The serializer builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Serializers/Orleans.Serialization.Protobuf/SerializationHostingExtensions.cs",
+          "sourceLines": "38-68"
+        }
+      ]
+    }
+  ]
+}

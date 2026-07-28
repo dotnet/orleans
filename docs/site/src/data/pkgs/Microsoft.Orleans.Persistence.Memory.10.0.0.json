@@ -1,0 +1,1194 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Persistence.Memory",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "MemoryGrainStorageOptions",
+      "fullName": "Orleans.Configuration.MemoryGrainStorageOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Storage.IStorageProviderSerializerOptions"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for MemoryGrainStorage "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public MemoryGrainStorageOptions.MemoryGrainStorageOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs",
+          "sourceLines": "20-25"
+        },
+        {
+          "name": "DEFAULT_INIT_STAGE",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static int MemoryGrainStorageOptions.DEFAULT_INIT_STAGE",
+          "returnType": "int",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Default init stage "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs"
+        },
+        {
+          "name": "NumStorageGrainsDefaultValue",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static int MemoryGrainStorageOptions.NumStorageGrainsDefaultValue",
+          "returnType": "int",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Default number of queue storage grains. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs"
+        },
+        {
+          "name": "GrainStorageSerializer",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public IGrainStorageSerializer MemoryGrainStorageOptions.GrainStorageSerializer",
+          "returnType": "Orleans.Storage.IGrainStorageSerializer",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the serializer to use for this storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs"
+        },
+        {
+          "name": "InitStage",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int MemoryGrainStorageOptions.InitStage",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the stage of silo lifecycle where storage should be initialized. Storage must be initialized prior to use. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs"
+        },
+        {
+          "name": "NumStorageGrains",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int MemoryGrainStorageOptions.NumStorageGrains",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the number of store grains to use. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "MemoryGrainStorageOptionsValidator",
+      "fullName": "Orleans.Configuration.MemoryGrainStorageOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Validates "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Configuration.MemoryGrainStorageOptions"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs",
+      "sourceLines": "39-39",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public MemoryGrainStorageOptionsValidator.MemoryGrainStorageOptionsValidator(MemoryGrainStorageOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.MemoryGrainStorageOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Configuration.MemoryGrainStorageOptionsValidator"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The name."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The options."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs",
+          "sourceLines": "49-53"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void MemoryGrainStorageOptionsValidator.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Options/MemoryGrainStorageOptions.cs",
+          "sourceLines": "58-65"
+        }
+      ]
+    },
+    {
+      "name": "MemoryGrainStorageSiloBuilderExtensions",
+      "fullName": "Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Silo host builder extensions "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Persistence.Memory/Hosting/MemoryGrainStorageSiloBuilderExtensions.cs",
+      "sourceLines": "17-17",
+      "members": [
+        {
+          "name": "AddMemoryGrainStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<MemoryGrainStorageOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.MemoryGrainStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use memory grain storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "The configuration delegate."
+                }
+              ],
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The name of the storage provider. This must match with the "
+                },
+                {
+                  "kind": "code",
+                  "text": "StorageName"
+                },
+                {
+                  "kind": "text",
+                  "text": " property specified when injecting state into a grain."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Hosting/MemoryGrainStorageSiloBuilderExtensions.cs"
+        },
+        {
+          "name": "AddMemoryGrainStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.MemoryGrainStorageOptions>>",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use memory grain storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "The configuration delegate."
+                }
+              ],
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The name of the storage provider. This must match with the "
+                },
+                {
+                  "kind": "code",
+                  "text": "StorageName"
+                },
+                {
+                  "kind": "text",
+                  "text": " property specified when injecting state into a grain."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Hosting/MemoryGrainStorageSiloBuilderExtensions.cs"
+        },
+        {
+          "name": "AddMemoryGrainStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<MemoryGrainStorageOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.MemoryGrainStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use memory grain storage as the default grain storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "The configuration delegate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Hosting/MemoryGrainStorageSiloBuilderExtensions.cs"
+        },
+        {
+          "name": "AddMemoryGrainStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.MemoryGrainStorageOptions>>",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use memory grain storage as the default grain storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "The configuration delegate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Hosting/MemoryGrainStorageSiloBuilderExtensions.cs"
+        }
+      ]
+    },
+    {
+      "name": "MemoryGrainStorage",
+      "fullName": "Orleans.Storage.MemoryGrainStorage",
+      "namespace": "Orleans.Storage",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Storage.IGrainStorage",
+        "System.IDisposable"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " This is a simple in-memory grain implementation of a storage provider. "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " This storage provider is ONLY intended for simple in-memory Development / Unit Test scenarios. This class should NOT be used in Production environment, because [by-design] it does not provide any resilience or long-term persistence capabilities. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+      "sourceLines": "25-25",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public MemoryGrainStorage.MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory, IGrainStorageSerializer defaultGrainStorageSerializer, IActivatorProvider activatorProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.MemoryGrainStorageOptions"
+            },
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Storage.MemoryGrainStorage>"
+            },
+            {
+              "name": "grainFactory",
+              "type": "Orleans.IGrainFactory"
+            },
+            {
+              "name": "defaultGrainStorageSerializer",
+              "type": "Orleans.Storage.IGrainStorageSerializer"
+            },
+            {
+              "name": "activatorProvider",
+              "type": "Orleans.Serialization.Serializers.IActivatorProvider"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Storage.MemoryGrainStorage"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "defaultGrainStorageSerializer": [
+                {
+                  "kind": "text",
+                  "text": "The default grain storage serializer."
+                }
+              ],
+              "grainFactory": [
+                {
+                  "kind": "text",
+                  "text": "The grain factory."
+                }
+              ],
+              "logger": [
+                {
+                  "kind": "text",
+                  "text": "The logger."
+                }
+              ],
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The name."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The options."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+          "sourceLines": "43-63"
+        },
+        {
+          "name": "ClearStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual Task MemoryGrainStorage.ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Delete / Clear data function for this storage instance."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Completion promise for the Delete operation on the specified grain."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "Grain ID"
+                }
+              ],
+              "grainState": [
+                {
+                  "kind": "text",
+                  "text": "Copy of last-known state data object for this grain."
+                }
+              ],
+              "grainType": [
+                {
+                  "kind": "text",
+                  "text": "Name of the state for this grain"
+                }
+              ]
+            },
+            "typeParameters": {
+              "T": [
+                {
+                  "kind": "text",
+                  "text": "The grain state type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+          "sourceLines": "113-127"
+        },
+        {
+          "name": "Dispose",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void MemoryGrainStorage.Dispose()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+          "sourceLines": "138-138"
+        },
+        {
+          "name": "ReadStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual Task MemoryGrainStorage.ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Read data function for this storage instance."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Completion promise for the Read operation on the specified grain."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "Grain ID"
+                }
+              ],
+              "grainState": [
+                {
+                  "kind": "text",
+                  "text": "State data object to be populated for this grain."
+                }
+              ],
+              "grainType": [
+                {
+                  "kind": "text",
+                  "text": "Name of the state for this grain"
+                }
+              ]
+            },
+            "typeParameters": {
+              "T": [
+                {
+                  "kind": "text",
+                  "text": "The grain state type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+          "sourceLines": "68-86"
+        },
+        {
+          "name": "WriteStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual Task MemoryGrainStorage.WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isVirtual": true,
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Write data function for this storage instance."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Completion promise for the Write operation on the specified grain."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "Grain ID"
+                }
+              ],
+              "grainState": [
+                {
+                  "kind": "text",
+                  "text": "State data object to be written for this grain."
+                }
+              ],
+              "grainType": [
+                {
+                  "kind": "text",
+                  "text": "Name of the state for this grain"
+                }
+              ]
+            },
+            "typeParameters": {
+              "T": [
+                {
+                  "kind": "text",
+                  "text": "The grain state type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+          "sourceLines": "91-108"
+        }
+      ]
+    },
+    {
+      "name": "MemoryGrainStorageFactory",
+      "fullName": "Orleans.Storage.MemoryGrainStorageFactory",
+      "namespace": "Orleans.Storage",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Factory for creating MemoryGrainStorage "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+      "sourceLines": "221-221",
+      "members": [
+        {
+          "name": "Create",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static MemoryGrainStorage MemoryGrainStorageFactory.Create(IServiceProvider services, string name)",
+          "returnType": "Orleans.Storage.MemoryGrainStorage",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "System.IServiceProvider"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a new "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Storage.MemoryGrainStorage"
+              },
+              {
+                "kind": "text",
+                "text": " instance. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The storage."
+              }
+            ],
+            "parameters": {
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The name."
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": "The services."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorage.cs",
+          "sourceLines": "231-232"
+        }
+      ]
+    },
+    {
+      "name": "MemoryGrainStorageWithLatency",
+      "fullName": "Orleans.Storage.MemoryGrainStorageWithLatency",
+      "namespace": "Orleans.Storage",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Storage.IGrainStorage"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " This is a simple in-memory implementation of a storage provider which presents fixed latency of storage calls. This class is useful for system testing and investigation of the effects of storage latency. "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " This storage provider is ONLY intended for simple in-memory Test scenarios. This class should NOT be used in Production environment, because [by-design] it does not provide any resilience or long-term persistence capabilities. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs",
+      "sourceLines": "47-47",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public MemoryGrainStorageWithLatency.MemoryGrainStorageWithLatency(string name, MemoryStorageWithLatencyOptions options, ILoggerFactory loggerFactory, IGrainFactory grainFactory, IActivatorProvider activatorProvider, IGrainStorageSerializer defaultGrainStorageSerializer)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "options",
+              "type": "Orleans.Storage.MemoryStorageWithLatencyOptions"
+            },
+            {
+              "name": "loggerFactory",
+              "type": "Microsoft.Extensions.Logging.ILoggerFactory"
+            },
+            {
+              "name": "grainFactory",
+              "type": "Orleans.IGrainFactory"
+            },
+            {
+              "name": "activatorProvider",
+              "type": "Orleans.Serialization.Serializers.IActivatorProvider"
+            },
+            {
+              "name": "defaultGrainStorageSerializer",
+              "type": "Orleans.Storage.IGrainStorageSerializer"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Default constructor. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs",
+          "sourceLines": "52-68"
+        },
+        {
+          "name": "ClearStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task MemoryGrainStorageWithLatency.ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Delete / Clear state data function for this storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs",
+          "sourceLines": "88-88"
+        },
+        {
+          "name": "ReadStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task MemoryGrainStorageWithLatency.ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Read state data function for this storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs",
+          "sourceLines": "74-74"
+        },
+        {
+          "name": "WriteStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task MemoryGrainStorageWithLatency.WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Write state data function for this storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs",
+          "sourceLines": "81-81"
+        }
+      ]
+    },
+    {
+      "name": "MemoryStorageWithLatencyOptions",
+      "fullName": "Orleans.Storage.MemoryStorageWithLatencyOptions",
+      "namespace": "Orleans.Storage",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Configuration.MemoryGrainStorageOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for the "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Storage.MemoryGrainStorageWithLatency"
+          },
+          {
+            "kind": "text",
+            "text": " storage provider. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs",
+      "sourceLines": "16-16",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public MemoryStorageWithLatencyOptions.MemoryStorageWithLatencyOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs",
+          "sourceLines": "27-27"
+        },
+        {
+          "name": "DefaultLatency",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public static readonly TimeSpan MemoryStorageWithLatencyOptions.DefaultLatency",
+          "returnType": "System.TimeSpan",
+          "isStatic": true,
+          "isReadOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The default latency. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs"
+        },
+        {
+          "name": "Latency",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan MemoryStorageWithLatencyOptions.Latency",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the latency. "
+              }
+            ],
+            "value": [
+              {
+                "kind": "text",
+                "text": "The latency."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs"
+        },
+        {
+          "name": "MockCallsOnly",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool MemoryStorageWithLatencyOptions.MockCallsOnly",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets a value indicating whether to mock calls instead of issuing real storage calls. "
+              }
+            ],
+            "value": [
+              {
+                "kind": "langword",
+                "value": "true"
+              },
+              {
+                "kind": "text",
+                "text": " if the provider should mock calls; otherwise, "
+              },
+              {
+                "kind": "langword",
+                "value": "false"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Persistence.Memory/Storage/MemoryStorageWithLatency.cs"
+        }
+      ]
+    }
+  ]
+}

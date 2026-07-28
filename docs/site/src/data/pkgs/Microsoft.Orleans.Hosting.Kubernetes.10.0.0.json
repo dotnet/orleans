@@ -1,0 +1,516 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Hosting.Kubernetes",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "KubernetesHostingExtensions",
+      "fullName": "Orleans.Hosting.KubernetesHostingExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extensions for hosting a silo in Kubernetes. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingExtensions.cs",
+      "sourceLines": "14-14",
+      "members": [
+        {
+          "name": "UseKubernetesHosting",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection KubernetesHostingExtensions.UseKubernetesHosting(this IServiceCollection services)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds Kubernetes hosting support. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingExtensions.cs",
+          "sourceLines": "35-35"
+        },
+        {
+          "name": "UseKubernetesHosting",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection KubernetesHostingExtensions.UseKubernetesHosting(this IServiceCollection services, Action<OptionsBuilder<KubernetesHostingOptions>> configureOptions)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Hosting.Kubernetes.KubernetesHostingOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds Kubernetes hosting support. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingExtensions.cs",
+          "sourceLines": "42-53"
+        },
+        {
+          "name": "UseKubernetesHosting",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder KubernetesHostingExtensions.UseKubernetesHosting(this ISiloBuilder siloBuilder)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "siloBuilder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds Kubernetes hosting support. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingExtensions.cs",
+          "sourceLines": "21-21"
+        },
+        {
+          "name": "UseKubernetesHosting",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder KubernetesHostingExtensions.UseKubernetesHosting(this ISiloBuilder siloBuilder, Action<OptionsBuilder<KubernetesHostingOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "siloBuilder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Hosting.Kubernetes.KubernetesHostingOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds Kubernetes hosting support. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingExtensions.cs",
+          "sourceLines": "29-29"
+        }
+      ]
+    },
+    {
+      "name": "KubernetesClusterAgent",
+      "fullName": "Orleans.Hosting.Kubernetes.KubernetesClusterAgent",
+      "namespace": "Orleans.Hosting.Kubernetes",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.ILifecycleParticipant<Orleans.Runtime.ISiloLifecycle>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Reflects cluster configuration changes between Orleans and Kubernetes. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesClusterAgent.cs",
+      "sourceLines": "21-21",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public KubernetesClusterAgent.KubernetesClusterAgent(IClusterMembershipService clusterMembershipService, ILogger<KubernetesClusterAgent> logger, IOptionsMonitor<KubernetesHostingOptions> options, IOptions<ClusterOptions> clusterOptions, ILocalSiloDetails localSiloDetails)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "clusterMembershipService",
+              "type": "Orleans.Runtime.IClusterMembershipService"
+            },
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Hosting.Kubernetes.KubernetesClusterAgent>"
+            },
+            {
+              "name": "options",
+              "type": "Microsoft.Extensions.Options.IOptionsMonitor<Orleans.Hosting.Kubernetes.KubernetesHostingOptions>"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            },
+            {
+              "name": "localSiloDetails",
+              "type": "Orleans.Runtime.ILocalSiloDetails"
+            }
+          ],
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesClusterAgent.cs",
+          "sourceLines": "59-81"
+        },
+        {
+          "name": "OnStop",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task KubernetesClusterAgent.OnStop(CancellationToken cancellationToken)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "cancellationToken",
+              "type": "System.Threading.CancellationToken"
+            }
+          ],
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesClusterAgent.cs",
+          "sourceLines": "202-210"
+        },
+        {
+          "name": "Participate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void KubernetesClusterAgent.Participate(ISiloLifecycle lifecycle)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "lifecycle",
+              "type": "Orleans.Runtime.ISiloLifecycle"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds the provided observer as a participant in the lifecycle. "
+              }
+            ],
+            "parameters": {
+              "lifecycle": [
+                {
+                  "kind": "text",
+                  "text": " The observer. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesClusterAgent.cs",
+          "sourceLines": "85-90"
+        }
+      ]
+    },
+    {
+      "name": "KubernetesHostingOptions",
+      "fullName": "Orleans.Hosting.Kubernetes.KubernetesHostingOptions",
+      "namespace": "Orleans.Hosting.Kubernetes",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for hosting in Kubernetes. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public KubernetesHostingOptions.KubernetesHostingOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs",
+          "sourceLines": "49-75"
+        },
+        {
+          "name": "ClusterIdEnvironmentVariable",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string KubernetesHostingOptions.ClusterIdEnvironmentVariable",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The environment variable for specifying "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Configuration.ClusterOptions.ClusterId"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "ClusterIdLabel",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string KubernetesHostingOptions.ClusterIdLabel",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The name of the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Configuration.ClusterOptions.ClusterId"
+              },
+              {
+                "kind": "text",
+                "text": " label on the pod. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "PodIPEnvironmentVariable",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string KubernetesHostingOptions.PodIPEnvironmentVariable",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The environment variable for specifying the IP address of this pod. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "PodNameEnvironmentVariable",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string KubernetesHostingOptions.PodNameEnvironmentVariable",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The environment variable for specifying the name of the Kubernetes pod which this silo is executing in. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "PodNamespaceEnvironmentVariable",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string KubernetesHostingOptions.PodNamespaceEnvironmentVariable",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The environment variable for specifying the Kubernetes namespace which all silos in this cluster belong to. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "ServiceIdEnvironmentVariable",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string KubernetesHostingOptions.ServiceIdEnvironmentVariable",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The environment variable for specifying "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Configuration.ClusterOptions.ServiceId"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "ServiceIdLabel",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const static string KubernetesHostingOptions.ServiceIdLabel",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The name of the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Configuration.ClusterOptions.ServiceId"
+              },
+              {
+                "kind": "text",
+                "text": " label on the pod. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "DeleteDefunctSiloPods",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool KubernetesHostingOptions.DeleteDefunctSiloPods",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Whether or not to delete pods which correspond to silos which have become defunct since this silo became active. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "GetClientConfiguration",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<KubernetesClientConfiguration> KubernetesHostingOptions.GetClientConfiguration",
+          "returnType": "System.Func<k8s.KubernetesClientConfiguration>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The delegate used to get an instance of "
+              },
+              {
+                "kind": "cref",
+                "value": "T:k8s.KubernetesClientConfiguration"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "MaxAgents",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int KubernetesHostingOptions.MaxAgents",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The number of silos in the cluster which should monitor Kubernetes. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Setting this to a small number can reduce the load on the Kubernetes API server. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        },
+        {
+          "name": "MaxKubernetesApiRetryAttempts",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int KubernetesHostingOptions.MaxKubernetesApiRetryAttempts",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the maximum number of attempts to retry Kubernetes API calls. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Hosting.Kubernetes/KubernetesHostingOptions.cs"
+        }
+      ]
+    }
+  ]
+}

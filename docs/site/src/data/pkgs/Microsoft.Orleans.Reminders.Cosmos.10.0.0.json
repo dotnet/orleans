@@ -1,0 +1,934 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Reminders.Cosmos",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "HostingExtensions",
+      "fullName": "Orleans.Hosting.HostingExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extension methods for configuring the Azure Cosmos DB reminder table provider. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Reminders.Cosmos/HostingExtensions.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": "UseCosmosReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection HostingExtensions.UseCosmosReminderService(this IServiceCollection services, Action<CosmosReminderTableOptions> configure)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Reminders.Cosmos.CosmosReminderTableOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Cosmos DB. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": " The service collection. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.Cosmos/HostingExtensions.cs"
+        },
+        {
+          "name": "UseCosmosReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection HostingExtensions.UseCosmosReminderService(this IServiceCollection services, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Reminders.Cosmos.CosmosReminderTableOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Cosmos DB. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": " The service collection. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.Cosmos/HostingExtensions.cs"
+        },
+        {
+          "name": "UseCosmosReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder HostingExtensions.UseCosmosReminderService(this ISiloBuilder builder, Action<CosmosReminderTableOptions> configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Reminders.Cosmos.CosmosReminderTableOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Cosmos DB. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.Cosmos/HostingExtensions.cs"
+        },
+        {
+          "name": "UseCosmosReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder HostingExtensions.UseCosmosReminderService(this ISiloBuilder builder, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Reminders.Cosmos.CosmosReminderTableOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Cosmos DB. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.Cosmos/HostingExtensions.cs"
+        }
+      ]
+    },
+    {
+      "name": "CosmosOptions",
+      "fullName": "Orleans.Reminders.Cosmos.CosmosOptions",
+      "namespace": "Orleans.Reminders.Cosmos",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for Azure Cosmos DB storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs",
+      "sourceLines": "22-22",
+      "members": [
+        {
+          "name": "ConfigureCosmosClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CosmosOptions.ConfigureCosmosClient(Func<IServiceProvider, ValueTask<CosmosClient>> createClient)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "createClient",
+              "type": "System.Func<System.IServiceProvider, System.Threading.Tasks.ValueTask<Microsoft.Azure.Cosmos.CosmosClient>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the Cosmos DB client. "
+              }
+            ],
+            "parameters": {
+              "createClient": [
+                {
+                  "kind": "text",
+                  "text": "The delegate used to create the Cosmos DB client."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs",
+          "sourceLines": "116-117"
+        },
+        {
+          "name": "ConfigureCosmosClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CosmosOptions.ConfigureCosmosClient(string accountEndpoint, AzureKeyCredential authKeyOrResourceTokenCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "accountEndpoint",
+              "type": "string"
+            },
+            {
+              "name": "authKeyOrResourceTokenCredential",
+              "type": "Azure.AzureKeyCredential"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the Cosmos DB client. "
+              }
+            ],
+            "parameters": {
+              "accountEndpoint": [
+                {
+                  "kind": "text",
+                  "text": "The account endpoint. In the form of "
+                },
+                {
+                  "kind": "codeblock",
+                  "text": "https://{databaseaccount}.documents.azure.com:443/",
+                  "language": "csharp"
+                },
+                {
+                  "kind": "text",
+                  "text": ", "
+                },
+                {
+                  "kind": "href",
+                  "value": "https://learn.microsoft.com/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"
+                }
+              ],
+              "authKeyOrResourceTokenCredential": [
+                {
+                  "kind": "cref",
+                  "value": "T:Azure.AzureKeyCredential"
+                },
+                {
+                  "kind": "text",
+                  "text": " with master-key or resource token."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs",
+          "sourceLines": "85-86"
+        },
+        {
+          "name": "ConfigureCosmosClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CosmosOptions.ConfigureCosmosClient(string accountEndpoint, TokenCredential tokenCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "accountEndpoint",
+              "type": "string"
+            },
+            {
+              "name": "tokenCredential",
+              "type": "Azure.Core.TokenCredential"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the Cosmos DB client. "
+              }
+            ],
+            "parameters": {
+              "accountEndpoint": [
+                {
+                  "kind": "text",
+                  "text": "The account endpoint. In the form of "
+                },
+                {
+                  "kind": "codeblock",
+                  "text": "https://{databaseaccount}.documents.azure.com:443/",
+                  "language": "csharp"
+                },
+                {
+                  "kind": "text",
+                  "text": ", "
+                },
+                {
+                  "kind": "href",
+                  "value": "https://learn.microsoft.com/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"
+                }
+              ],
+              "tokenCredential": [
+                {
+                  "kind": "text",
+                  "text": "The token to provide AAD for authorization."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs",
+          "sourceLines": "96-97"
+        },
+        {
+          "name": "ConfigureCosmosClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CosmosOptions.ConfigureCosmosClient(string accountEndpoint, string authKeyOrResourceToken)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "accountEndpoint",
+              "type": "string"
+            },
+            {
+              "name": "authKeyOrResourceToken",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the Cosmos DB client. "
+              }
+            ],
+            "parameters": {
+              "accountEndpoint": [
+                {
+                  "kind": "text",
+                  "text": "The account endpoint. In the form of "
+                },
+                {
+                  "kind": "codeblock",
+                  "text": "https://{databaseaccount}.documents.azure.com:443/",
+                  "language": "csharp"
+                },
+                {
+                  "kind": "text",
+                  "text": ", "
+                },
+                {
+                  "kind": "href",
+                  "value": "https://learn.microsoft.com/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"
+                }
+              ],
+              "authKeyOrResourceToken": [
+                {
+                  "kind": "text",
+                  "text": "The Cosmos account key or resource token to use to create the client."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs",
+          "sourceLines": "107-108"
+        },
+        {
+          "name": "ConfigureCosmosClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CosmosOptions.ConfigureCosmosClient(string connectionString)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the Cosmos DB client. "
+              }
+            ],
+            "parameters": {
+              "connectionString": [
+                {
+                  "kind": "text",
+                  "text": "The connection string."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs",
+          "sourceLines": "74-75"
+        },
+        {
+          "name": "CleanResourcesOnInitialization",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool CosmosOptions.CleanResourcesOnInitialization",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Delete the database on initialization. Intended only for testing scenarios. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": "This is only intended for use in testing scenarios."
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        },
+        {
+          "name": "ClientOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public CosmosClientOptions CosmosOptions.ClientOptions",
+          "returnType": "Microsoft.Azure.Cosmos.CosmosClientOptions",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The options passed to the Cosmos DB client. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        },
+        {
+          "name": "ContainerName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string CosmosOptions.ContainerName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The name of the container to use to store clustering information. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        },
+        {
+          "name": "ContainerThroughputProperties",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public ThroughputProperties? CosmosOptions.ContainerThroughputProperties",
+          "returnType": "Microsoft.Azure.Cosmos.ThroughputProperties?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Throughput properties for containers. The default value is "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": ", which indicates that the serverless throughput mode will be used. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        },
+        {
+          "name": "DatabaseName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string CosmosOptions.DatabaseName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The name of the database to use for clustering information. Defaults to "
+              },
+              {
+                "kind": "code",
+                "text": "Orleans"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        },
+        {
+          "name": "DatabaseThroughput",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int? CosmosOptions.DatabaseThroughput",
+          "returnType": "int?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Database configured throughput. If set to "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": ", which is the default value, it will not be configured. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        },
+        {
+          "name": "IsResourceCreationEnabled",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool CosmosOptions.IsResourceCreationEnabled",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Tries to create the database and container used for clustering if it does not exist. Defaults to "
+              },
+              {
+                "kind": "langword",
+                "value": "false"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        },
+        {
+          "name": "OperationExecutor",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public ICosmosOperationExecutor CosmosOptions.OperationExecutor",
+          "returnType": "Orleans.Reminders.Cosmos.ICosmosOperationExecutor",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The operation executor used to execute operations using the Cosmos DB client. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "CosmosOptionsValidator",
+      "fullName": "Orleans.Reminders.Cosmos.CosmosOptionsValidator<TOptions>",
+      "namespace": "Orleans.Reminders.Cosmos",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TOptions",
+          "constraints": [
+            "Orleans.Reminders.Cosmos.CosmosOptions"
+          ]
+        }
+      ],
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Validates instances of "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Reminders.Cosmos.CosmosOptions"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "TOptions": [
+            {
+              "kind": "text",
+              "text": "The options type."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptionsValidator.cs",
+      "sourceLines": "19-19",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public CosmosOptionsValidator<TOptions>.CosmosOptionsValidator(TOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "TOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Reminders.Cosmos.CosmosOptionsValidator`1"
+              },
+              {
+                "kind": "text",
+                "text": " type. "
+              }
+            ],
+            "parameters": {
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The option name to be validated."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The instance to be validated."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptionsValidator.cs",
+          "sourceLines": "29-33"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CosmosOptionsValidator<TOptions>.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Cosmos/CosmosOptionsValidator.cs",
+          "sourceLines": "38-51"
+        }
+      ]
+    },
+    {
+      "name": "CosmosReminderTableOptions",
+      "fullName": "Orleans.Reminders.Cosmos.CosmosReminderTableOptions",
+      "namespace": "Orleans.Reminders.Cosmos",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Reminders.Cosmos.CosmosOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for Azure Cosmos DB Reminder Storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Reminders.Cosmos/CosmosReminderTableOptions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public CosmosReminderTableOptions.CosmosReminderTableOptions()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Reminders.Cosmos.CosmosReminderTableOptions"
+              },
+              {
+                "kind": "text",
+                "text": " instance. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.Cosmos/CosmosReminderTableOptions.cs",
+          "sourceLines": "13-16"
+        }
+      ]
+    },
+    {
+      "name": "ICosmosOperationExecutor",
+      "fullName": "Orleans.Reminders.Cosmos.ICosmosOperationExecutor",
+      "namespace": "Orleans.Reminders.Cosmos",
+      "kind": "interface",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Functionality for executing operations using the Cosmos DB client. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": "ExecuteOperation",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract Task<TResult> ICosmosOperationExecutor.ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg)",
+          "returnType": "System.Threading.Tasks.Task<TResult>",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "func",
+              "type": "System.Func<TArg, System.Threading.Tasks.Task<TResult>>"
+            },
+            {
+              "name": "arg",
+              "type": "TArg"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TArg"
+            },
+            {
+              "name": "TResult"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Executes the provided Cosmos DB operation. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The result of invoking the delegate."
+              }
+            ],
+            "parameters": {
+              "arg": [
+                {
+                  "kind": "text",
+                  "text": "The argument to pass to delegate invocations."
+                }
+              ],
+              "func": [
+                {
+                  "kind": "text",
+                  "text": "The delegate to execute."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TArg": [
+                {
+                  "kind": "text",
+                  "text": "The function argument."
+                }
+              ],
+              "TResult": [
+                {
+                  "kind": "text",
+                  "text": "The result value."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

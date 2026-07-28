@@ -1,0 +1,1061 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Clustering.AdoNet",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "35e53810f1e8cc70c6996d5933504acc052544c3"
+  },
+  "types": [
+    {
+      "name": "AdoNetClusteringClientOptions",
+      "fullName": "Orleans.Configuration.AdoNetClusteringClientOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringClientOptions.cs",
+      "sourceLines": "4-4",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetClusteringClientOptions.AdoNetClusteringClientOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetClusteringClientOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Connection string for Sql "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringClientOptions.cs"
+        },
+        {
+          "name": "Invariant",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetClusteringClientOptions.Invariant",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The invariant name of the connector for gatewayProvider's database. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringClientOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetClusteringClientOptionsValidator",
+      "fullName": "Orleans.Configuration.AdoNetClusteringClientOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Validates "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Configuration.AdoNetClusteringClientOptions"
+          },
+          {
+            "kind": "text",
+            "text": " configuration. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringClientOptionsValidator.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetClusteringClientOptionsValidator.AdoNetClusteringClientOptionsValidator(IOptions<AdoNetClusteringClientOptions> options)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringClientOptions>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringClientOptionsValidator.cs",
+          "sourceLines": "14-17"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AdoNetClusteringClientOptionsValidator.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringClientOptionsValidator.cs",
+          "sourceLines": "22-31"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetClusteringSiloOptions",
+      "fullName": "Orleans.Configuration.AdoNetClusteringSiloOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for ADO.NET clustering "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringSiloOptions.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetClusteringSiloOptions.AdoNetClusteringSiloOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetClusteringSiloOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Connection string for AdoNet Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringSiloOptions.cs"
+        },
+        {
+          "name": "Invariant",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetClusteringSiloOptions.Invariant",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The invariant name of the connector for membership's database. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetClusteringSiloOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetClusteringSiloOptionsValidator",
+      "fullName": "Orleans.Configuration.AdoNetClusteringSiloOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Validates "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Configuration.AdoNetClusteringSiloOptions"
+          },
+          {
+            "kind": "text",
+            "text": " configuration. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetReminderTableOptionsValidator.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetClusteringSiloOptionsValidator.AdoNetClusteringSiloOptionsValidator(IOptions<AdoNetClusteringSiloOptions> options)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringSiloOptions>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetReminderTableOptionsValidator.cs",
+          "sourceLines": "14-17"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AdoNetClusteringSiloOptionsValidator.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Options/AdoNetReminderTableOptionsValidator.cs",
+          "sourceLines": "22-31"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetHostingExtensions",
+      "fullName": "Orleans.Hosting.AdoNetHostingExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extensions for configuring ADO.NET for clustering. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/AdoNetHostingExtensions.cs",
+      "sourceLines": "14-14",
+      "members": [
+        {
+          "name": "UseAdoNetClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder AdoNetHostingExtensions.UseAdoNetClustering(this IClientBuilder builder, Action<AdoNetClusteringClientOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AdoNetClusteringClientOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures this client to use ADO.NET for clustering. Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/AdoNetHostingExtensions.cs"
+        },
+        {
+          "name": "UseAdoNetClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder AdoNetHostingExtensions.UseAdoNetClustering(this IClientBuilder builder, Action<OptionsBuilder<AdoNetClusteringClientOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetClusteringClientOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures this client to use ADO.NET for clustering. Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.IClientBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/AdoNetHostingExtensions.cs"
+        },
+        {
+          "name": "UseAdoNetClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AdoNetHostingExtensions.UseAdoNetClustering(this ISiloBuilder builder, Action<AdoNetClusteringSiloOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AdoNetClusteringSiloOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/AdoNetHostingExtensions.cs"
+        },
+        {
+          "name": "UseAdoNetClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AdoNetHostingExtensions.UseAdoNetClustering(this ISiloBuilder builder, Action<OptionsBuilder<AdoNetClusteringSiloOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetClusteringSiloOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Instructions on configuring your database are available at "
+              },
+              {
+                "kind": "href",
+                "value": "http://aka.ms/orleans-sql-scripts"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/AdoNetHostingExtensions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetGatewayListProvider",
+      "fullName": "Orleans.Runtime.Membership.AdoNetGatewayListProvider",
+      "namespace": "Orleans.Runtime.Membership",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Messaging.IGatewayListProvider"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetGatewayListProvider.cs",
+      "sourceLines": "13-13",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetGatewayListProvider.AdoNetGatewayListProvider(ILogger<AdoNetGatewayListProvider> logger, IServiceProvider serviceProvider, IOptions<AdoNetClusteringClientOptions> options, IOptions<GatewayOptions> gatewayOptions, IOptions<ClusterOptions> clusterOptions)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.AdoNetGatewayListProvider>"
+            },
+            {
+              "name": "serviceProvider",
+              "type": "System.IServiceProvider"
+            },
+            {
+              "name": "options",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringClientOptions>"
+            },
+            {
+              "name": "gatewayOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GatewayOptions>"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetGatewayListProvider.cs",
+          "sourceLines": "22-34"
+        },
+        {
+          "name": "GetGateways",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<IList<Uri>> AdoNetGatewayListProvider.GetGateways()",
+          "returnType": "System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>>",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster. The Uri is in the form of: \"gwy.tcp://IP:port/Generation\". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The list of gateway endpoints."
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetGatewayListProvider.cs",
+          "sourceLines": "54-64"
+        },
+        {
+          "name": "InitializeGatewayListProvider",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AdoNetGatewayListProvider.InitializeGatewayListProvider()",
+          "returnType": "System.Threading.Tasks.Task",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes the provider, will be called before all other methods. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Threading.Tasks.Task"
+              },
+              {
+                "kind": "text",
+                "text": " representing the work performed."
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetGatewayListProvider.cs",
+          "sourceLines": "48-50"
+        },
+        {
+          "name": "IsUpdatable",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool AdoNetGatewayListProvider.IsUpdatable",
+          "returnType": "bool",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets a value indicating whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gateway list. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetGatewayListProvider.cs",
+          "sourceLines": "43-43"
+        },
+        {
+          "name": "MaxStaleness",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AdoNetGatewayListProvider.MaxStaleness",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the period of time between refreshes. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetGatewayListProvider.cs",
+          "sourceLines": "38-38"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetClusteringTable",
+      "fullName": "Orleans.Runtime.MembershipService.AdoNetClusteringTable",
+      "namespace": "Orleans.Runtime.MembershipService",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IMembershipTable"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetClusteringTable.AdoNetClusteringTable(IServiceProvider serviceProvider, IOptions<ClusterOptions> clusterOptions, IOptions<AdoNetClusteringSiloOptions> clusteringOptions, ILogger<AdoNetClusteringTable> logger)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceProvider",
+              "type": "System.IServiceProvider"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            },
+            {
+              "name": "clusteringOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringSiloOptions>"
+            },
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.MembershipService.AdoNetClusteringTable>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "19-29"
+        },
+        {
+          "name": "CleanupDefunctSiloEntries",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AdoNetClusteringTable.CleanupDefunctSiloEntries(DateTimeOffset beforeDate)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "beforeDate",
+              "type": "System.DateTimeOffset"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Delete all dead silo entries older than "
+              },
+              {
+                "kind": "paramref",
+                "value": "beforeDate"
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "179-189"
+        },
+        {
+          "name": "DeleteMembershipTableEntries",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AdoNetClusteringTable.DeleteMembershipTableEntries(string clusterId)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "clusterId",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Deletes all table entries of the given clusterId "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "165-175"
+        },
+        {
+          "name": "InitializeMembershipTable",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AdoNetClusteringTable.InitializeMembershipTable(bool tryInitTableVersion)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "tryInitTableVersion",
+              "type": "bool"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes the membership table, will be called before all other methods "
+              }
+            ],
+            "parameters": {
+              "tryInitTableVersion": [
+                {
+                  "kind": "text",
+                  "text": "whether an attempt will be made to init the underlying table"
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "33-52"
+        },
+        {
+          "name": "InsertRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<bool> AdoNetClusteringTable.InsertRow(MembershipEntry entry, TableVersion tableVersion)",
+          "returnType": "System.Threading.Tasks.Task<bool>",
+          "parameters": [
+            {
+              "name": "entry",
+              "type": "Orleans.MembershipEntry"
+            },
+            {
+              "name": "tableVersion",
+              "type": "Orleans.TableVersion"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion. If operation succeeds, the following changes would be made to the table: 1) New MembershipEntry will be added to the table. 2) The newly added MembershipEntry will also be added with the new unique automatically generated eTag. 3) TableVersion.Version in the table will be updated to the new TableVersion.Version. 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag. All those changes to the table, insert of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects. The operation should fail in each of the following conditions: 1) A MembershipEntry for a given silo already exist in the table 2) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "True if the insert operation succeeded and false otherwise."
+              }
+            ],
+            "parameters": {
+              "entry": [
+                {
+                  "kind": "text",
+                  "text": "MembershipEntry to be inserted."
+                }
+              ],
+              "tableVersion": [
+                {
+                  "kind": "text",
+                  "text": "The new TableVersion for this table, along with its etag."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "84-111"
+        },
+        {
+          "name": "ReadAll",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<MembershipTableData> AdoNetClusteringTable.ReadAll()",
+          "returnType": "System.Threading.Tasks.Task<Orleans.MembershipTableData>",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically reads the full content of the Membership Table. The returned MembershipTableData includes all MembershipEntry entry for all silos in the table and the TableVersion for this table. The MembershipEntries and the TableVersion have to be read atomically. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and TableVersion, all read atomically."
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "70-80"
+        },
+        {
+          "name": "ReadRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<MembershipTableData> AdoNetClusteringTable.ReadRow(SiloAddress key)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.MembershipTableData>",
+          "parameters": [
+            {
+              "name": "key",
+              "type": "Orleans.Runtime.SiloAddress"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically reads the Membership Table information about a given silo. The returned MembershipTableData includes one MembershipEntry entry for a given silo and the TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and TableVersion, read atomically."
+              }
+            ],
+            "parameters": {
+              "key": [
+                {
+                  "kind": "text",
+                  "text": "The address of the silo whose membership information needs to be read."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "56-66"
+        },
+        {
+          "name": "UpdateIAmAlive",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AdoNetClusteringTable.UpdateIAmAlive(MembershipEntry entry)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "entry",
+              "type": "Orleans.MembershipEntry"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Updates the IAmAlive part (column) of the MembershipEntry for this silo. This operation should only update the IAmAlive column and not change other columns. This operation is a \"dirty write\" or \"in place update\" and is performed without etag validation. With regards to eTags update: This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed (\"dirty write\"). With regards to TableVersion: this operation should not change the TableVersion of the table. It should leave it untouched. There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Task representing the successful execution of this operation. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "146-161"
+        },
+        {
+          "name": "UpdateRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<bool> AdoNetClusteringTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)",
+          "returnType": "System.Threading.Tasks.Task<bool>",
+          "parameters": [
+            {
+              "name": "entry",
+              "type": "Orleans.MembershipEntry"
+            },
+            {
+              "name": "etag",
+              "type": "string"
+            },
+            {
+              "name": "tableVersion",
+              "type": "Orleans.TableVersion"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Atomically tries to update the MembershipEntry for one silo and also update the TableVersion. If operation succeeds, the following changes would be made to the table: 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substituted by the new entry) 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag. 3) TableVersion.Version in the table will be updated to the new TableVersion.Version. 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag. All those changes to the table, update of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects. The operation should fail in each of the following conditions: 1) A MembershipEntry for a given silo does not exist in the table 2) A MembershipEntry for a given silo exist in the table but its etag in the table does not match the provided etag. 3) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "True if the update operation succeeded and false otherwise."
+              }
+            ],
+            "parameters": {
+              "entry": [
+                {
+                  "kind": "text",
+                  "text": "MembershipEntry to be updated."
+                }
+              ],
+              "etag": [
+                {
+                  "kind": "text",
+                  "text": "The etag for the given MembershipEntry."
+                }
+              ],
+              "tableVersion": [
+                {
+                  "kind": "text",
+                  "text": "The new TableVersion for this table, along with its etag."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/AdoNet/Orleans.Clustering.AdoNet/Messaging/AdoNetClusteringTable.cs",
+          "sourceLines": "115-142"
+        }
+      ]
+    }
+  ]
+}
