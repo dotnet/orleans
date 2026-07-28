@@ -7,7 +7,7 @@ import type {
   PackageApiDocument,
 } from './types';
 
-export const apiRoot = '/api/csharp';
+export const apiRoot = '/docs/api/csharp';
 export const memberKindOrder: MemberKind[] = [
   'constructor',
   'property',

@@ -6,7 +6,9 @@ import YAML from 'yaml';
 const markdownExtensions = new Set(['.md', '.markdown', '.mdown', '.mkdn', '.mkd', '.mdwn']);
 const directiveAttributePattern = /([\w-]+)="([^"]*)"/g;
 const learnDocsPrefix = '/dotnet/orleans';
-const siteBase = '/orleans';
+const contentRoot = '/docs';
+const deploymentBase = '/orleans';
+const siteBase = `${deploymentBase}${contentRoot}`;
 
 function toPath(value) {
   return value instanceof URL ? fileURLToPath(value) : path.resolve(value);
@@ -884,8 +886,14 @@ export async function convertDocfxMarkdown({
   body = convertHtmlCommentsForMdx(body);
   body = removeDuplicateTitle(body, title).trim();
   assertNoUnconvertedConstructs(body, sourcePath);
+  const slug = routeFromSourcePath(sourcePath, sourceRoot)
+    .replace(/^\/orleans\//, '')
+    .replace(/\/$/, '');
   return `${serializeFrontmatter(metadata, sourcePath, {
-    frontmatter: typeof editUrl === 'string' ? { editUrl } : undefined,
+    frontmatter: {
+      slug,
+      ...(typeof editUrl === 'string' ? { editUrl } : {}),
+    },
   })}${body}\n`;
 }
 
@@ -923,7 +931,7 @@ function sidebarLink(href) {
     target = path.posix.dirname(target);
   }
   target = target === '.' ? '' : target.replace(/^\/+|\/+$/g, '');
-  return `/${target}${target ? '/' : ''}`;
+  return `${contentRoot}/${target}${target ? '/' : ''}`;
 }
 
 async function sidebarItem(item, rootDirectory) {
@@ -967,7 +975,7 @@ function hubUrl(url) {
   if (url.startsWith('/')) {
     return `https://learn.microsoft.com${url}`;
   }
-  return `${siteBase}${sidebarLink(url)}`;
+  return `${deploymentBase}${sidebarLink(url)}`;
 }
 
 function renderHubCards(items, { summaryKey = 'summary', textKey = 'title' } = {}) {

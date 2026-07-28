@@ -24,7 +24,7 @@ catalog is absent, development builds render an explanatory empty state.
 
 ## Native API reference
 
-The `/api/csharp/` route tree uses the same native rendering architecture as
+The `/docs/api/csharp/` route tree uses the same native rendering architecture as
 [`microsoft/aspire.dev`](https://github.com/microsoft/aspire.dev): an Astro
 `packages` content collection reads `src/data/pkgs/*.json`, and Starlight pages
 render package, type, member-kind, and individual member routes with matching

@@ -1,9 +1,9 @@
 ---
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-import ApiBreadcrumbs from '../../../../../../components/api/ApiBreadcrumbs.astro';
-import ApiLinks from '../../../../../../components/api/ApiLinks.astro';
-import ApiMemberCard from '../../../../../../components/api/ApiMemberCard.astro';
-import { getPackages } from '../../../../../../lib/api/collection';
+import ApiBreadcrumbs from '../../../../../../../components/api/ApiBreadcrumbs.astro';
+import ApiLinks from '../../../../../../../components/api/ApiLinks.astro';
+import ApiMemberCard from '../../../../../../../components/api/ApiMemberCard.astro';
+import { getPackages } from '../../../../../../../lib/api/collection';
 import {
   markdownCompanionPath,
   memberDisplayName,
@@ -15,14 +15,14 @@ import {
   typeDisplayName,
   typePath,
   withBase,
-} from '../../../../../../lib/api/packages';
-import { buildMemberRoutes } from '../../../../../../lib/api/routes';
-import { buildApiSidebar } from '../../../../../../lib/api/sidebar';
+} from '../../../../../../../lib/api/packages';
+import { buildMemberRoutes } from '../../../../../../../lib/api/routes';
+import { buildApiSidebar } from '../../../../../../../lib/api/sidebar';
 import type {
   ApiMember,
   ApiType,
   PackageApiDocument,
-} from '../../../../../../lib/api/types';
+} from '../../../../../../../lib/api/types';
 
 export async function getStaticPaths() {
   const packages = (await getPackages()).map((entry) => entry.data);
@@ -81,7 +81,7 @@ const headings = [
   <ApiBreadcrumbs
     items={[
       { label: 'Documentation', href: withBase(base, '/') },
-      { label: 'API reference', href: withBase(base, '/api/csharp/') },
+      { label: 'API reference', href: withBase(base, '/docs/api/csharp/') },
       { label: pkg.package.name, href: withBase(base, packagePath(pkg.package.name)) },
       { label: typeName, href: withBase(base, typePath(pkg.package.name, type)) },
       {

@@ -1,10 +1,10 @@
 ---
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-import ApiBreadcrumbs from '../../../../../components/api/ApiBreadcrumbs.astro';
-import ApiDocContent from '../../../../../components/api/ApiDocContent.astro';
-import ApiLinks from '../../../../../components/api/ApiLinks.astro';
-import ApiTypeSignature from '../../../../../components/api/ApiTypeSignature.astro';
-import { getPackages } from '../../../../../lib/api/collection';
+import ApiBreadcrumbs from '../../../../../../components/api/ApiBreadcrumbs.astro';
+import ApiDocContent from '../../../../../../components/api/ApiDocContent.astro';
+import ApiLinks from '../../../../../../components/api/ApiLinks.astro';
+import ApiTypeSignature from '../../../../../../components/api/ApiTypeSignature.astro';
+import { getPackages } from '../../../../../../lib/api/collection';
 import {
   groupMembersByKind,
   markdownCompanionPath,
@@ -18,10 +18,10 @@ import {
   typeDisplayName,
   typePath,
   withBase,
-} from '../../../../../lib/api/packages';
-import { buildTypeRoutes } from '../../../../../lib/api/routes';
-import { buildApiSidebar } from '../../../../../lib/api/sidebar';
-import type { ApiType, PackageApiDocument } from '../../../../../lib/api/types';
+} from '../../../../../../lib/api/packages';
+import { buildTypeRoutes } from '../../../../../../lib/api/routes';
+import { buildApiSidebar } from '../../../../../../lib/api/sidebar';
+import type { ApiType, PackageApiDocument } from '../../../../../../lib/api/types';
 
 export async function getStaticPaths() {
   const packages = (await getPackages()).map((entry) => entry.data);
@@ -70,7 +70,7 @@ const headings = [
   <ApiBreadcrumbs
     items={[
       { label: 'Documentation', href: withBase(base, '/') },
-      { label: 'API reference', href: withBase(base, '/api/csharp/') },
+      { label: 'API reference', href: withBase(base, '/docs/api/csharp/') },
       { label: pkg.package.name, href: withBase(base, packagePath(pkg.package.name)) },
       { label: displayName },
     ]}

@@ -88,7 +88,7 @@ public class ThermostatGrain : Grain, IThermostat, IThermostatControl
 }
 ```
 
-The `Grain` class above does not persist its state. A more thorough example demonstrating state persistence is available in the docs, for more information see [Microsoft Orleans: Grain Persistence](https://dotnet.github.io/orleans/grains/grain-persistence/).
+The `Grain` class above does not persist its state. A more thorough example demonstrating state persistence is available in the docs, for more information see [Microsoft Orleans: Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/).
 
 ## Orleans runtime
 
@@ -106,11 +106,11 @@ Orleans is a feature-rich framework. It provides a set of services that enable t
 
 ### Persistence
 
-Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent data objects, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency. For more information see [Microsoft Orleans: Grain Persistence](https://dotnet.github.io/orleans/grains/grain-persistence/).
+Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent data objects, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency. For more information see [Microsoft Orleans: Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/).
 
 ### Distributed ACID transactions
 
-In addition to the simple persistence model described above, grains can have *transactional state*. Multiple grains can participate in [ACID](https://en.wikipedia.org/wiki/ACID) transactions together regardless of where their state is ultimately stored. Transactions in Orleans are distributed and decentralized (there is no central transaction manager or transaction coordinator) and have [serializable isolation](https://en.wikipedia.org/wiki/Isolation_(database_systems)#Isolation_levels). For more information, see the [Microsoft Orleans: Transactions](https://dotnet.github.io/orleans/grains/transactions/).
+In addition to the simple persistence model described above, grains can have *transactional state*. Multiple grains can participate in [ACID](https://en.wikipedia.org/wiki/ACID) transactions together regardless of where their state is ultimately stored. Transactions in Orleans are distributed and decentralized (there is no central transaction manager or transaction coordinator) and have [serializable isolation](https://en.wikipedia.org/wiki/Isolation_(database_systems)#Isolation_levels). For more information, see the [Microsoft Orleans: Transactions](https://dotnet.github.io/orleans/docs/grains/transactions/).
 
 ### Streams
 
@@ -121,7 +121,7 @@ Streams are backed by queueing services such as Azure Event Hubs, Amazon Kinesis
 
 ### Timers &amp; reminders
 
-Reminders are a durable scheduling mechanism for grains. They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time. Timers are the non-durable counterpart and can be used for high-frequency events which do not require reliability. For more information, see [Microsoft Orleans: Timers and reminders](https://dotnet.github.io/orleans/grains/timers-and-reminders/).
+Reminders are a durable scheduling mechanism for grains. They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time. Timers are the non-durable counterpart and can be used for high-frequency events which do not require reliability. For more information, see [Microsoft Orleans: Timers and reminders](https://dotnet.github.io/orleans/docs/grains/timers-and-reminders/).
 
 ### Flexible grain placement
 
@@ -129,7 +129,7 @@ When a grain is activated in Orleans, the runtime decides which server (silo) to
 
 ### Grain versioning &amp; heterogeneous clusters
 
-Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see [Microsoft Orleans: Grain interface versioning](https://dotnet.github.io/orleans/grains/grain-versioning/grain-versioning/).
+Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see [Microsoft Orleans: Grain interface versioning](https://dotnet.github.io/orleans/docs/grains/grain-versioning/grain-versioning/).
 
 ### Elastic scalability &amp; fault tolerance
 
@@ -141,19 +141,19 @@ Orleans runs anywhere that .NET Core or .NET Framework are supported. This inclu
 
 ### Stateless workers
 
-Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously. This enables increased parallelism for stateless functions. For more information, see [Microsoft Orleans: Stateless worker grains](https://dotnet.github.io/orleans/grains/stateless-worker-grains/) documentation.
+Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously. This enables increased parallelism for stateless functions. For more information, see [Microsoft Orleans: Stateless worker grains](https://dotnet.github.io/orleans/docs/grains/stateless-worker-grains/) documentation.
 
 ### Grain call filters
 
-Logic which is common to many grains can be expressed as [an interceptor, or Grain call filter](https://dotnet.github.io/orleans/grains/interceptors/). Orleans supports filters for both incoming and outgoing calls. Some common use-cases of filters are: authorization, logging and telemetry, and error handling.
+Logic which is common to many grains can be expressed as [an interceptor, or Grain call filter](https://dotnet.github.io/orleans/docs/grains/interceptors/). Orleans supports filters for both incoming and outgoing calls. Some common use-cases of filters are: authorization, logging and telemetry, and error handling.
 
 ### Request context
 
-Metadata and other information can be passed along a series of requests using [request context](https://dotnet.github.io/orleans/grains/request-context/). Request context can be used for holding distributed tracing information or any other user-defined values.
+Metadata and other information can be passed along a series of requests using [request context](https://dotnet.github.io/orleans/docs/grains/request-context/). Request context can be used for holding distributed tracing information or any other user-defined values.
 
 ## Documentation
 
-The official documentation for Microsoft Orleans is available at <https://dotnet.github.io/orleans/>.
+The official documentation for Microsoft Orleans is available at <https://dotnet.github.io/orleans/docs/>.
 
 ## [Samples](./samples/#readme)
 
@@ -161,7 +161,7 @@ A variety of samples are available in the official [.NET Samples Browser](https:
 
 ## Get started
 
-Please see the [getting started tutorial](https://dotnet.github.io/orleans/tutorials-and-samples/tutorial-1/).
+Please see the [getting started tutorial](https://dotnet.github.io/orleans/docs/tutorials-and-samples/tutorial-1/).
 
 ### Building
 
@@ -230,5 +230,5 @@ This project is licensed under the [MIT license](LICENSE).
 
 * [Microsoft Research project home](http://research.microsoft.com/projects/orleans/)
 * Technical Report: [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
-* [Microsoft Orleans: Documentation](https://dotnet.github.io/orleans/)
+* [Microsoft Orleans: Documentation](https://dotnet.github.io/orleans/docs/)
 * [Contributing](CONTRIBUTING.md)

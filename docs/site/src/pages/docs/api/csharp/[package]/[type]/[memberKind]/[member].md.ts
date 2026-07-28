@@ -1,33 +1,37 @@
 import type { APIRoute } from 'astro';
-import { getPackages } from '../../../../../lib/api/collection';
-import { renderMemberKindMarkdown, markdownResponse } from '../../../../../lib/api/markdown';
-import { buildMemberKindRoutes } from '../../../../../lib/api/routes';
+import { getPackages } from '../../../../../../../lib/api/collection';
+import {
+  markdownResponse,
+  renderMemberMarkdown,
+} from '../../../../../../../lib/api/markdown';
+import { buildMemberRoutes } from '../../../../../../../lib/api/routes';
 import type {
+  ApiMember,
   ApiType,
-  MemberKind,
   PackageApiDocument,
-} from '../../../../../lib/api/types';
+} from '../../../../../../../lib/api/types';
 
 export const prerender = true;
 
 export async function getStaticPaths() {
   const packages = (await getPackages()).map((entry) => entry.data);
-  return buildMemberKindRoutes(packages).map((route) => ({
+  return buildMemberRoutes(packages).map((route) => ({
     params: {
       package: route.packageSlug,
       type: route.typeSlug,
       memberKind: route.memberKindSlug,
+      member: route.memberSlug,
     },
-    props: { pkg: route.pkg, type: route.type, kind: route.kind },
+    props: { pkg: route.pkg, type: route.type, member: route.member },
   }));
 }
 
 export const GET: APIRoute = ({ props }) =>
   markdownResponse(
-    renderMemberKindMarkdown(
+    renderMemberMarkdown(
       props.pkg as PackageApiDocument,
       props.type as ApiType,
-      props.kind as MemberKind,
+      props.member as ApiMember,
       import.meta.env.BASE_URL,
     ),
   );

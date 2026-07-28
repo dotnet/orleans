@@ -4,11 +4,8 @@ import SampleCard from './SampleCard.astro';
 import type { PreparedGallery } from '../types/gallery';
 
 const preparedGallery: PreparedGallery = gallery;
-const languages = [...new Set(preparedGallery.items.flatMap((sample) => sample.languages))].sort((a, b) =>
-  a.localeCompare(b),
-);
-const tags = [...new Set(preparedGallery.items.flatMap((sample) => sample.tags))].sort((a, b) =>
-  a.localeCompare(b),
+const samples = [...preparedGallery.items].sort(
+  (left, right) => Number(right.featured) - Number(left.featured) || left.title.localeCompare(right.title),
 );
 ---
 
@@ -29,56 +26,26 @@ const tags = [...new Set(preparedGallery.items.flatMap((sample) => sample.tags))
       </div>
     ) : (
       <>
-        <form class="sample-filters" data-sample-filters role="search">
-          <div class="sample-filters__field">
-            <label for="sample-search">Search samples</label>
+        <form class="sample-search" data-sample-filters role="search">
+          <div>
+            <label class="sr-only" for="sample-search">Search samples</label>
             <input
               id="sample-search"
               name="query"
               type="search"
-              placeholder="Title, description, or topic"
+              placeholder="Search samples by name, technology, or scenario"
               data-sample-query
             />
           </div>
-          <div class="sample-filters__field">
-            <label for="sample-language">Language</label>
-            <select id="sample-language" name="language" data-sample-language>
-              <option value="">All languages</option>
-              {languages.map((language) => <option value={language.toLowerCase()}>{language}</option>)}
-            </select>
-          </div>
-          {
-            tags.length > 0 && (
-              <fieldset class="sample-filters__tags">
-                <legend>Topics</legend>
-                <div class="sample-filters__tag-list">
-                  {tags.map((tag) => (
-                    <label>
-                      <input type="checkbox" name="tag" value={tag.toLowerCase()} data-sample-tag />
-                      <span>{tag}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )
-          }
-          <button type="reset">Clear filters</button>
         </form>
-        <noscript>
-          <p class="sample-gallery__noscript">
-            Filters require JavaScript. All samples are listed below.
-          </p>
-        </noscript>
         <p class="sample-gallery__status" data-sample-status aria-live="polite">
-          Showing all {preparedGallery.items.length} samples.
+          {samples.length} samples
         </p>
         <ul class="sample-gallery__list" data-sample-list>
-          {preparedGallery.items.map((sample) => (
+          {samples.map((sample) => (
             <li
               data-sample
               data-search={`${sample.title} ${sample.description} ${sample.languages.join(' ')} ${sample.tags.join(' ')}`.toLowerCase()}
-              data-languages={sample.languages.join('|').toLowerCase()}
-              data-tags={sample.tags.join('|').toLowerCase()}
             >
               <SampleCard sample={sample} />
             </li>
@@ -95,18 +62,11 @@ const tags = [...new Set(preparedGallery.items.flatMap((sample) => sample.tags))
 
   if (gallery instanceof HTMLElement && form instanceof HTMLFormElement) {
     const query = form.querySelector('[data-sample-query]');
-    const language = form.querySelector('[data-sample-language]');
-    const tags = [...form.querySelectorAll('[data-sample-tag]')];
     const samples = [...gallery.querySelectorAll('[data-sample]')];
     const status = gallery.querySelector('[data-sample-status]');
 
     const update = () => {
       const queryValue = query instanceof HTMLInputElement ? query.value.trim().toLowerCase() : '';
-      const languageValue =
-        language instanceof HTMLSelectElement ? language.value.toLowerCase() : '';
-      const tagValues = tags
-        .filter((tag) => tag instanceof HTMLInputElement && tag.checked)
-        .map((tag) => (tag instanceof HTMLInputElement ? tag.value.toLowerCase() : ''));
       let visible = 0;
 
       for (const sample of samples) {
@@ -115,12 +75,7 @@ const tags = [...new Set(preparedGallery.items.flatMap((sample) => sample.tags))
         }
 
         const searchable = sample.dataset.search ?? '';
-        const sampleLanguages = (sample.dataset.languages ?? '').split('|');
-        const sampleTags = (sample.dataset.tags ?? '').split('|');
-        const matches =
-          (!queryValue || searchable.includes(queryValue)) &&
-          (!languageValue || sampleLanguages.includes(languageValue)) &&
-          tagValues.every((tag) => sampleTags.includes(tag));
+        const matches = !queryValue || searchable.includes(queryValue);
         sample.hidden = !matches;
         if (matches) {
           visible += 1;
@@ -128,11 +83,11 @@ const tags = [...new Set(preparedGallery.items.flatMap((sample) => sample.tags))
       }
 
       if (status) {
-        status.textContent = `Showing ${visible} of ${samples.length} samples.`;
+        status.textContent =
+          visible === samples.length ? `${samples.length} samples` : `${visible} matching samples`;
       }
     };
 
     form.addEventListener('input', update);
-    form.addEventListener('reset', () => window.setTimeout(update));
   }
 </script>

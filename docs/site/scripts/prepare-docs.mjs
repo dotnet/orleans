@@ -5,7 +5,6 @@ import {
   collectIncludeTargets,
   collectUidMap,
   convertDocfxMarkdown,
-  convertHubYaml,
 } from './lib/docfx.mjs';
 import { prepareGallery } from './lib/gallery.mjs';
 
@@ -69,13 +68,10 @@ for (const sourcePath of sourceFiles) {
   }
 }
 
-await writeFile(
-  path.join(sourceRoot, 'index.mdx'),
-  await convertHubYaml(path.join(sourceRoot, 'index.yml')),
-  'utf8',
-);
+await cp(path.join(siteRoot, 'src', 'site-pages', 'home.mdx'), path.join(sourceRoot, 'index.mdx'));
+await cp(path.join(siteRoot, 'src', 'site-pages', 'docs.mdx'), path.join(sourceRoot, 'docs.mdx'));
 await cp(path.join(siteRoot, 'src', 'site-pages', 'samples.mdx'), path.join(sourceRoot, 'samples.mdx'));
-pages += 2;
+pages += 3;
 
 const gallery = await prepareGallery({
   repositoryRoot,

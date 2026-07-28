@@ -8,12 +8,14 @@ import { createSidebar } from './scripts/lib/docfx.mjs';
 import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
-sidebar.splice(
-  2,
-  0,
-  { label: 'Samples gallery', link: '/samples/' },
-  { label: 'API reference', link: '/api/csharp/' },
-);
+sidebar.unshift({ label: 'Documentation', link: '/docs/' });
+sidebar.push({
+  label: 'Reference',
+  items: [
+    { label: 'Samples', link: '/samples/' },
+    { label: 'C# API reference', link: '/docs/api/csharp/' },
+  ],
+});
 
 export default defineConfig({
   site: 'https://dotnet.github.io/orleans/',

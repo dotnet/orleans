@@ -89,7 +89,7 @@ describe('DocFX conversion', () => {
       source,
       sourcePath,
       sourceRoot: directory,
-      uidMap: new Map([['Orleans.Overview', '/orleans/overview/']]),
+      uidMap: new Map([['Orleans.Overview', '/orleans/docs/overview/']]),
     });
 
     expect(converted).toContain(':::tip[Tip]');
@@ -103,7 +103,8 @@ describe('DocFX conversion', () => {
     expect(converted).toContain(
       '[IGrain](https://learn.microsoft.com/dotnet/api/orleans.igrain)',
     );
-    expect(converted).toContain('[Overview](/orleans/overview/)');
+    expect(converted).toContain('[Overview](/orleans/docs/overview/)');
+    expect(converted).toContain('slug: docs/guide');
     expect(converted).toContain(
       '[Func&lt;T, U, V, W, X, Y, Z, T8&gt;](https://learn.microsoft.com/dotnet/api/system.func-8)',
     );
@@ -158,7 +159,7 @@ describe('DocFX conversion', () => {
     await expect(createSidebar(tocPath)).resolves.toEqual([
       {
         label: 'Get started',
-        items: [{ label: 'Overview', link: '/overview/' }],
+        items: [{ label: 'Overview', link: '/docs/overview/' }],
       },
     ]);
 
@@ -193,8 +194,8 @@ describe('DocFX conversion', () => {
 
     const converted = await convertHubYaml(hubPath);
     expect(converted).toContain('template: splash');
-    expect(converted).toContain('href="/orleans/overview/"');
-    expect(converted).toContain('href="/orleans/grains/identity/"');
+    expect(converted).toContain('href="/orleans/docs/overview/"');
+    expect(converted).toContain('href="/orleans/docs/grains/identity/"');
     expect(converted).toContain('Identity');
   });
 });

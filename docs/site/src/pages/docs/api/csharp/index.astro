@@ -1,14 +1,14 @@
 ---
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-import ApiBreadcrumbs from '../../../components/api/ApiBreadcrumbs.astro';
-import ApiLinks from '../../../components/api/ApiLinks.astro';
-import { getPackages } from '../../../lib/api/collection';
+import ApiBreadcrumbs from '../../../../components/api/ApiBreadcrumbs.astro';
+import ApiLinks from '../../../../components/api/ApiLinks.astro';
+import { getPackages } from '../../../../lib/api/collection';
 import {
   packagePath,
   packageSlug,
   withBase,
-} from '../../../lib/api/packages';
-import { buildApiSidebar } from '../../../lib/api/sidebar';
+} from '../../../../lib/api/packages';
+import { buildApiSidebar } from '../../../../lib/api/sidebar';
 
 const packages = (await getPackages()).map((entry) => entry.data);
 const sidebar = buildApiSidebar(packages);
@@ -33,12 +33,12 @@ const headings = packages.map((pkg) => ({
   sidebar={sidebar}
   headings={headings}
 >
-  <ApiBreadcrumbs items={[{ label: 'Documentation', href: withBase(base, '/') }, { label: 'API reference' }]} />
+  <ApiBreadcrumbs items={[{ label: 'Documentation', href: withBase(base, '/docs/') }, { label: 'API reference' }]} />
   <p>
     Browse package, type, and member documentation generated directly from Orleans assemblies,
     XML comments, and Source Link metadata.
   </p>
-  <ApiLinks markdown={withBase(base, '/api/csharp.md')} />
+  <ApiLinks markdown={withBase(base, '/docs/api/csharp.md')} />
   {
     packages.length === 0 ? (
       <aside class="api-empty">

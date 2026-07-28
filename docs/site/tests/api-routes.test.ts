@@ -30,10 +30,10 @@ describe('native API routes', () => {
       buildMemberKindRoutes([pkg]).map((route) => route.memberKindSlug),
     ).toEqual(['properties', 'methods']);
     expect(typePath(pkg.package.name, pkg.types[0])).toBe(
-      '/api/csharp/microsoft.orleans.core/grain-1/',
+      '/docs/api/csharp/microsoft.orleans.core/grain-1/',
     );
     expect(memberKindPath(pkg.package.name, pkg.types[0], 'method')).toBe(
-      '/api/csharp/microsoft.orleans.core/grain-1/methods/',
+      '/docs/api/csharp/microsoft.orleans.core/grain-1/methods/',
     );
     expect(buildMemberRoutes([pkg]).map((route) => route.memberSlug)).toEqual([
       'identitystring',
@@ -51,16 +51,16 @@ describe('native API routes', () => {
     expect(
       `${memberKindPath(pkg.package.name, pkg.types[0], 'method')}getprimarykey-string/`,
     ).toBe(
-      '/api/csharp/microsoft.orleans.core/grain-1/methods/getprimarykey-string/',
+      '/docs/api/csharp/microsoft.orleans.core/grain-1/methods/getprimarykey-string/',
     );
   });
 
   test('builds a package-aware Starlight sidebar', () => {
     const sidebar = buildApiSidebar([pkg], pkg.package.name);
     expect(sidebar).toHaveLength(2);
-    expect(sidebar[0]).toEqual({ label: 'API packages', link: '/api/csharp/' });
+    expect(sidebar[0]).toEqual({ label: 'API packages', link: '/docs/api/csharp/' });
     expect(JSON.stringify(sidebar)).toContain(
-      '/api/csharp/microsoft.orleans.core/grain-1/methods/',
+      '/docs/api/csharp/microsoft.orleans.core/grain-1/methods/',
     );
   });
 
