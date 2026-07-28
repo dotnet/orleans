@@ -113,7 +113,7 @@ items:
       - name: Broadcast channels
         href: streaming/broadcast-channel.md
       - name: Streams APIs
-        href: streaming/streams-programming-APIs.md
+        href: streaming/streams-programming-apis.md
       - name: Stream providers
         href: streaming/stream-providers.md
   - name: Host

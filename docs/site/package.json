@@ -10,10 +10,11 @@
     "dev": "npm run prepare:docs && astro dev",
     "preview": "astro preview",
     "prepare:docs": "node scripts/prepare-docs.mjs",
+    "legacy:redirects": "node scripts/generate-legacy-redirects.mjs",
     "test": "vitest run",
     "check": "npm run prepare:docs && astro check",
-    "build": "npm run prepare:docs && astro build",
-    "validate": "npm run prepare:docs && vitest run && astro check && astro build"
+    "build": "npm run prepare:docs && astro build && npm run legacy:redirects",
+    "validate": "npm run prepare:docs && vitest run && astro check && astro build && npm run legacy:redirects"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "7.2.1",

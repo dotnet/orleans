@@ -44,3 +44,12 @@ GitHub Actions validates generated API freshness, compiles documentation snippet
 and samples, builds the complete site, and deploys `dist` to GitHub Pages from
 `main`. Pull requests receive a downloadable site artifact but never receive
 deployment permissions.
+
+Before the first deployment, set **Settings → Pages → Source** to **GitHub
+Actions**. The workflow publishes after pushes to `main`, nightly at 09:00 UTC,
+and on manual dispatch.
+
+The production build also emits compatibility redirects for every URL in the
+legacy `gh-pages` sitemap. Existing pages retain their exact URL when the new
+site owns it; retired documentation and blog URLs redirect to the nearest
+current documentation entry point.

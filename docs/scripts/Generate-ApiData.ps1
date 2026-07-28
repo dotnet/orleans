@@ -391,7 +391,7 @@ try {
             packageVersion = $project.PackageVersion
             packageName = $project.PackageId
             sourceRepo = "https://github.com/dotnet/orleans"
-            sourceCommit = $SourceCommit.ToLowerInvariant()
+            sourceCommit = "main"
             sourceRoot = $repositoryRoot
             sourceFileManifest = $sourceFileManifestPath
             targetFramework = $TargetFramework
@@ -457,7 +457,7 @@ try {
             $document.package.version -ne $project.PackageVersion -or
             $document.package.targetFramework -ne $TargetFramework -or
             $document.package.sourceRepository -ne "https://github.com/dotnet/orleans" -or
-            $document.package.sourceCommit -ne $SourceCommit.ToLowerInvariant()) {
+            $document.package.sourceCommit -ne "main") {
             throw "Package metadata validation failed for '$outputPath'."
         }
 

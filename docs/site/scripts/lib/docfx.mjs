@@ -558,9 +558,7 @@ function convertImages(source, sourcePath) {
 
       const alt = escapeMarkdown(attributes['alt-text']);
       const image = `![${alt}](${attributes.source})`;
-      return attributes.lightbox
-        ? `${indent}[${image}](${attributes.lightbox})`
-        : `${indent}${image}`;
+      return `${indent}${image}`;
     })
     .join('\n');
 }
@@ -648,6 +646,14 @@ function xrefUrl(uid, uidMap) {
 
 function convertXrefs(line, uidMap) {
   let converted = line.replace(
+    /\[((?:\\.|`[^`]*`|[^\]])+)\]\((?:<)?xref:([^)>]+)>?\)/g,
+    (_match, label, reference) => {
+      const [uid] = reference.split('?');
+      const normalizedLabel = label.replace(/\\</g, '&lt;').replace(/\\>/g, '&gt;');
+      return `[${normalizedLabel}](${xrefUrl(uid, uidMap)})`;
+    },
+  );
+  converted = converted.replace(
     /\[([^\]]*<xref:[^>]+>[^\]]*)\]\(([^)]+)\)/g,
     (_match, label, target) => {
       const plainLabel = label.replace(/<xref:([^>]+)>/g, (_xref, reference) => {

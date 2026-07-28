@@ -60,7 +60,12 @@ jobs:
 
       - name: Verify generated API data
         shell: bash
-        run: git diff --exit-code -- docs/site/src/data/pkgs
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=all -- docs/site/src/data/pkgs)" ]; then
+            git status --short --untracked-files=all -- docs/site/src/data/pkgs
+            echo "::error::Generated API data is stale. Run docs/scripts/Generate-ApiData.ps1 and commit the result."
+            exit 1
+          fi
 
       - name: Validate and build site
         working-directory: docs/site
@@ -74,10 +79,6 @@ jobs:
           path: docs/site/dist
           retention-days: 3
           compression-level: 6
-
-      - name: Configure GitHub Pages
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
       - name: Upload GitHub Pages artifact
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
@@ -134,6 +135,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

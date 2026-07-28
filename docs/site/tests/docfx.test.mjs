@@ -72,6 +72,10 @@ describe('DocFX conversion', () => {
       '',
       '<xref:System.Func`8>',
       '',
+      '[ObserverManager\\<IChat>](<xref:Orleans.Utilities.ObserverManager`1>)',
+      '',
+      '[`[assembly: GenerateSerializer(Type)]`](xref:Orleans.CodeGeneration.GenerateSerializerAttribute)',
+      '',
       '# [Visual Studio](#tab/visual-studio)',
       '',
       '## Named section <a name="named-section"></a>',
@@ -99,7 +103,13 @@ describe('DocFX conversion', () => {
     expect(converted).toContain('public string SayHello() => "Hello";');
     expect(converted).not.toContain('// <hello>');
     expect(converted).toContain('{/* Source: Example.cs; region: hello */}');
-    expect(converted).toContain('[![An image](image.png)](image.png)');
+    expect(converted).toContain('![An image](image.png)');
+    expect(converted).toContain(
+      '[ObserverManager&lt;IChat>](https://learn.microsoft.com/dotnet/api/orleans.utilities.observermanager-1)',
+    );
+    expect(converted).toContain(
+      '[`[assembly: GenerateSerializer(Type)]`](https://learn.microsoft.com/dotnet/api/orleans.codegeneration.generateserializerattribute)',
+    );
     expect(converted).toContain(
       '[IGrain](https://learn.microsoft.com/dotnet/api/orleans.igrain)',
     );
