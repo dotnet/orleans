@@ -30,12 +30,12 @@ public class VoteGrain : Grain, IVoteGrain
         var key = option.ToLower();
         if (!_state.State.ContainsKey(key))
         {
-            _logger.LogInformation("Created vote option {Option} and voted...", option);
+            _logger.LogInformation("Created a vote option and recorded a vote");
             _state.State.Add(key, 1);
         }
         else
         {
-            _logger.LogInformation("Voting for {Option}...", option);
+            _logger.LogInformation("Recorded a vote for an existing option");
             _state.State[key] += 1;
         }
 
@@ -51,12 +51,12 @@ public class VoteGrain : Grain, IVoteGrain
         var key = option.ToLower();
         if (!_state.State.ContainsKey(key))
         {
-            _logger.LogWarning("Didn't find vote option {Option}", key);
-            throw new KeyNotFoundException($"Didn't find vote option {key}");
+            _logger.LogWarning("Didn't find the requested vote option");
+            throw new KeyNotFoundException("The requested vote option was not found.");
         }
         else
         {
-            _logger.LogInformation("Removed vote option {Option}...", key);
+            _logger.LogInformation("Removed a vote option");
             _state.State.Remove(key.ToLower());
         }
 

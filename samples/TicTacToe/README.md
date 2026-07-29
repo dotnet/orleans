@@ -49,7 +49,7 @@ Open a terminal window and execute the following at the command prompt:
 dotnet run
 ```
 
-The game server will start and you can open a browser to `http://localhost:5000/` to interact with the game.
+The game server will start and you can open a browser to `https://localhost:5000/` to interact with the game.
 
 If you wish, you can start more instances of the host to see them form a cluster. If you do so, add the `InstanceId` option on the command line to differentiate them. A production application would use something other than the "localhost clustering" which this application uses (see _Program.cs_ for where clustering is configured via `UseLocalhostClustering`) and therefore this `InstanceId` option would not be necessary.
 

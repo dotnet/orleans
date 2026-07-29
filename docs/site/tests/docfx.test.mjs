@@ -84,6 +84,10 @@ describe('DocFX conversion', () => {
       '',
       '[ObserverManager\\<IChat>](<xref:Orleans.Utilities.ObserverManager`1>)',
       '',
+      '<xref:Orleans.Utilities.ObserverManager`2.Notify*> method on [ObserverManager\\<IChat>](<xref:Orleans.Utilities.ObserverManager`1>)',
+      '',
+      '<xref:Orleans.IGrainFactory.GetGrain``1(System.Type,System.Guid)?displayProperty=nameWithType> and [grain references](next.md)',
+      '',
       '[`[assembly: GenerateSerializer(Type)]`](xref:Orleans.CodeGeneration.GenerateSerializerAttribute)',
       '',
       '# [Visual Studio](#tab/visual-studio)',
@@ -117,6 +121,10 @@ describe('DocFX conversion', () => {
     expect(converted).toContain(
       '[ObserverManager&lt;IChat>](https://learn.microsoft.com/dotnet/api/orleans.utilities.observermanager-1)',
     );
+    expect(converted).toContain(
+      '[Notify](https://learn.microsoft.com/dotnet/api/orleans.utilities.observermanager-2.notify) method on [ObserverManager&lt;IChat>](https://learn.microsoft.com/dotnet/api/orleans.utilities.observermanager-1)',
+    );
+    expect(converted).toContain('[grain references](/orleans/docs/next/)');
     expect(converted).toContain(
       '[`[assembly: GenerateSerializer(Type)]`](https://learn.microsoft.com/dotnet/api/orleans.codegeneration.generateserializerattribute)',
     );
@@ -174,6 +182,71 @@ describe('DocFX conversion', () => {
         sourcePath,
       }),
     ).rejects.toThrow("INCLUDE 'missing.md'");
+  });
+
+  test('converts long escaped xref labels without regex backtracking', async () => {
+    const directory = await temporaryDirectory();
+    const sourcePath = path.join(directory, 'guide.md');
+    const escapedLabel = '\\\\'.repeat(10_000);
+
+    const converted = await convertDocfxMarkdown({
+      source: `---\ntitle: Xrefs\n---\n[${escapedLabel}](xref:Orleans.IGrain)`,
+      sourcePath,
+    });
+
+    expect(converted).toContain('(https://learn.microsoft.com/dotnet/api/orleans.igrain)');
+  });
+
+  test('scans unmatched link labels in linear time', async () => {
+    const directory = await temporaryDirectory();
+    const sourcePath = path.join(directory, 'guide.md');
+    const unmatchedLabels = '['.repeat(100_000);
+
+    const converted = await convertDocfxMarkdown({
+      source: `---\ntitle: Links\n---\n${unmatchedLabels}`,
+      sourcePath,
+    });
+
+    expect(converted).toContain(unmatchedLabels);
+  });
+
+  test('scans unmatched link destinations in linear time', async () => {
+    const directory = await temporaryDirectory();
+    const sourcePath = path.join(directory, 'guide.md');
+    const unmatchedDestinations = '[]('.repeat(100_000);
+
+    const converted = await convertDocfxMarkdown({
+      source: `---\ntitle: Links\n---\n${unmatchedDestinations}`,
+      sourcePath,
+    });
+
+    expect(converted).toContain(unmatchedDestinations);
+  });
+
+  test('converts links after code spans containing backslashes', async () => {
+    const directory = await temporaryDirectory();
+    const sourcePath = path.join(directory, 'guide.md');
+
+    const converted = await convertDocfxMarkdown({
+      source: '---\ntitle: Links\n---\n`C:\\\\` [Next](next.md)',
+      sourcePath,
+      sourceRoot: directory,
+    });
+
+    expect(converted).toContain('`C:\\\\` [Next](/orleans/docs/next/)');
+  });
+
+  test('extracts a plain-text title from inline HTML', async () => {
+    const directory = await temporaryDirectory();
+    const sourcePath = path.join(directory, 'guide.md');
+
+    const converted = await convertDocfxMarkdown({
+      source: '---\ntitle: Fallback\n---\n# <span>Safe title</span>',
+      sourcePath,
+    });
+
+    expect(converted).toContain('title: Safe title');
+    expect(converted).not.toContain('<span>');
   });
 
   test('builds navigation from toc.yml and rejects missing targets', async () => {

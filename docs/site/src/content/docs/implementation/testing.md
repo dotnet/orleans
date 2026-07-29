@@ -196,27 +196,27 @@ For new tests, `InProcessTestCluster` is recommended due to its simpler delegate
 
 The `Microsoft.Orleans.TestingHost` NuGet package contains <xref:Orleans.TestingHost.TestCluster>, which you can use to create an in-memory cluster (comprised of two silos by default) for testing grains.
 
-:::code source="snippets/testing/Orleans-testing/Sample.OrleansTesting/HelloGrainTests.cs":::
+:::code source="snippets/testing/orleans-testing/Sample.OrleansTesting/HelloGrainTests.cs":::
 
 Due to the overhead of starting an in-memory cluster, you might want to create a `TestCluster` and reuse it among multiple test cases. For example, achieve this using xUnit's class or collection fixtures.
 
 To share a `TestCluster` between multiple test cases, first create a fixture type:
 
-:::code source="snippets/testing/Orleans-testing/Sample.OrleansTesting/ClusterFixture.cs":::
+:::code source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterFixture.cs":::
 
 Next, create a collection fixture:
 
-:::code source="snippets/testing/Orleans-testing/Sample.OrleansTesting/ClusterCollection.cs":::
+:::code source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterCollection.cs":::
 
 You can now reuse a `TestCluster` in your test cases:
 
-:::code source="snippets/testing/Orleans-testing/Sample.OrleansTesting/HelloGrainTestsWithFixture.cs":::
+:::code source="snippets/testing/orleans-testing/Sample.OrleansTesting/HelloGrainTestsWithFixture.cs":::
 
 When all tests complete and the in-memory cluster silos stop, xUnit calls the <xref:System.IDisposable.Dispose> method of the `ClusterFixture` type. `TestCluster` also has a constructor accepting <xref:Orleans.TestingHost.TestClusterOptions> that you can use to configure the silos in the cluster.
 
 If you use Dependency Injection in your Silo to make services available to Grains, you can use this pattern as well:
 
-:::code source="snippets/testing/Orleans-testing/Sample.OrleansTesting/ClusterFixtureWithConfig.cs"
+:::code source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterFixtureWithConfig.cs"
 
 ## Use mocks
 

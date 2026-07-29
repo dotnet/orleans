@@ -6,13 +6,21 @@ public static class ControllerExtensions
 {
     public static Guid GetGuid(this ControllerBase controller)
     {
-        if (controller.Request.Cookies["playerId"] is { Length: > 0 } idCookie)
+        if (Guid.TryParse(controller.Request.Cookies["playerId"], out var id))
         {
-            return Guid.Parse(idCookie);
+            return id;
         }
 
         var guid = Guid.NewGuid();
-        controller.Response.Cookies.Append("playerId", guid.ToString());
+        controller.Response.Cookies.Append(
+            "playerId",
+            guid.ToString(),
+            new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Strict,
+                Secure = true
+            });
         return guid;
     }
 }

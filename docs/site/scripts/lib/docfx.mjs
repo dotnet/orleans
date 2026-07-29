@@ -705,34 +705,121 @@ function xrefUrl(uid, uidMap) {
   return `https://learn.microsoft.com/dotnet/api/${encodeURI(slug)}`;
 }
 
+function findMarkdownDestinationEnd(source, start) {
+  let depth = 1;
+  for (let index = start + 1; index < source.length; index += 1) {
+    if (source[index] === '\\') {
+      index += 1;
+    } else if (source[index] === '(') {
+      depth += 1;
+    } else if (source[index] === ')' && --depth === 0) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function collectMarkdownLinks(source) {
+  const links = [];
+  const labelStarts = [];
+  let codeDelimiterLength = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    if (codeDelimiterLength === 0 && source[index] === '\\') {
+      index += 1;
+      continue;
+    }
+    if (codeDelimiterLength === 0 && source.startsWith('<xref:', index)) {
+      const end = source.indexOf('>', index + '<xref:'.length);
+      if (end < 0) {
+        break;
+      }
+      index = end;
+      continue;
+    }
+    if (source[index] === '`') {
+      let end = index + 1;
+      while (source[end] === '`') {
+        end += 1;
+      }
+      const delimiterLength = end - index;
+      if (codeDelimiterLength === 0) {
+        codeDelimiterLength = delimiterLength;
+      } else if (delimiterLength === codeDelimiterLength) {
+        codeDelimiterLength = 0;
+      }
+      index = end - 1;
+      continue;
+    }
+    if (codeDelimiterLength !== 0) {
+      continue;
+    }
+    if (source[index] === '[') {
+      labelStarts.push(index);
+      continue;
+    }
+    if (source[index] !== ']' || labelStarts.length === 0 || source[index + 1] !== '(') {
+      if (source[index] === ']') {
+        labelStarts.pop();
+      }
+      continue;
+    }
+
+    const labelStart = labelStarts.pop();
+    const labelEnd = index;
+    const destinationEnd = findMarkdownDestinationEnd(source, labelEnd + 1);
+    if (destinationEnd < 0) {
+      break;
+    }
+    links.push({
+      start: labelStart,
+      labelEnd,
+      end: destinationEnd,
+      label: source.slice(labelStart + 1, labelEnd),
+      destination: source.slice(labelEnd + 2, destinationEnd),
+    });
+    labelStarts.length = 0;
+    index = destinationEnd;
+  }
+  return links;
+}
+
+function replaceMarkdownLinks(source, transform) {
+  const links = collectMarkdownLinks(source);
+  let output = '';
+  let consumed = 0;
+  for (const link of links) {
+    const replacement = transform(link);
+    if (replacement === undefined) {
+      continue;
+    }
+    output += source.slice(consumed, link.start) + replacement;
+    consumed = link.end + 1;
+  }
+  return output + source.slice(consumed);
+}
+
 function convertXrefs(line, uidMap) {
-  let converted = line.replace(
-    /\[((?:\\.|`[^`]*`|[^\]])+)\]\((?:<)?xref:([^)>]+)>?\)/g,
-    (_match, label, reference) => {
-      const [uid] = reference.split('?');
-      const normalizedLabel = label.replace(/\\</g, '&lt;').replace(/\\>/g, '&gt;');
-      return `[${normalizedLabel}](${xrefUrl(uid, uidMap)})`;
-    },
-  );
-  converted = converted.replace(
-    /\[([^\]]*<xref:[^>]+>[^\]]*)\]\(([^)]+)\)/g,
-    (_match, label, target) => {
-      const plainLabel = label.replace(/<xref:([^>]+)>/g, (_xref, reference) => {
+  let converted = replaceMarkdownLinks(line, (link) => {
+    let destination = link.destination;
+    if (destination.startsWith('<') && destination.endsWith('>')) {
+      destination = destination.slice(1, -1);
+    }
+    if (destination.startsWith('xref:')) {
+      const [uid] = destination.slice('xref:'.length).split('?');
+      const label = link.label.replace(/\\</g, '&lt;').replace(/\\>/g, '&gt;');
+      return `[${label}](${xrefUrl(uid, uidMap)})`;
+    }
+    if (link.label.includes('<xref:')) {
+      const plainLabel = link.label.replace(/<xref:([^>]+)>/g, (_xref, reference) => {
         const [uid, query = ''] = reference.split('?');
         return escapeMarkdown(
           humanizeXref(uid, new URLSearchParams(query).get('displayProperty')),
         );
       });
-      return `[${plainLabel}](${target})`;
-    },
-  );
-  converted = converted.replace(
-    /\[([^\]]+)\]\(xref:([^)]+)\)/g,
-    (_, label, reference) => {
-      const [uid] = reference.split('?');
-      return `[${label}](${xrefUrl(uid, uidMap)})`;
-    },
-  );
+      return `[${plainLabel}](${link.destination})`;
+    }
+    return undefined;
+  });
   converted = converted.replace(/<xref:([^>]+)>/g, (_, reference) => {
     const [uid, query = ''] = reference.split('?');
     const displayProperty = new URLSearchParams(query).get('displayProperty');
@@ -815,13 +902,43 @@ function convertLinkTarget(target, sourcePath, sourceRoot) {
 }
 
 function convertLinks(line, sourcePath, sourceRoot) {
-  return line.replace(
-    /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
-    (_match, label, target, title) => {
-      const convertedTarget = convertLinkTarget(target, sourcePath, sourceRoot);
-      return `[${label}](${convertedTarget}${title ? ` "${title}"` : ''})`;
-    },
-  );
+  return replaceMarkdownLinks(line, (link) => {
+    if (link.start > 0 && line[link.start - 1] === '!') {
+      return undefined;
+    }
+
+    let normalizedDestination = link.destination;
+    if (normalizedDestination.startsWith('<') && normalizedDestination.endsWith('>')) {
+      normalizedDestination = normalizedDestination.slice(1, -1);
+    }
+    if (normalizedDestination.startsWith('xref:')) {
+      return undefined;
+    }
+
+    let targetEnd = link.destination.length;
+    if (link.destination.startsWith('<')) {
+      const closingBracket = link.destination.indexOf('>');
+      if (closingBracket < 0) {
+        return undefined;
+      }
+      targetEnd = closingBracket + 1;
+    } else {
+      const whitespace = /\s/.exec(link.destination);
+      if (whitespace) {
+        targetEnd = whitespace.index;
+      }
+    }
+
+    const target = link.destination.slice(0, targetEnd);
+    const remainder = link.destination.slice(targetEnd).trim();
+    const title = remainder.length > 0 ? /^"([^"]*)"$/.exec(remainder)?.[1] : undefined;
+    if (target.length === 0 || (remainder.length > 0 && title === undefined)) {
+      return undefined;
+    }
+
+    const convertedTarget = convertLinkTarget(target, sourcePath, sourceRoot);
+    return `[${link.label}](${convertedTarget}${title ? ` "${title}"` : ''})`;
+  });
 }
 
 function transformOutsideCodeFences(source, transform) {
@@ -894,6 +1011,21 @@ function escapeMdxAngles(source) {
     .replace(/<(img|input|source)(\b[^>]*?)(?<!\/)>/gi, '<$1$2 />');
 }
 
+function stripHtmlTags(value) {
+  let result = '';
+  let insideTag = false;
+  for (const character of value) {
+    if (character === '<') {
+      insideTag = true;
+    } else if (character === '>') {
+      insideTag = false;
+    } else if (!insideTag) {
+      result += character;
+    }
+  }
+  return result;
+}
+
 function extractPageTitle(body, fallbackTitle) {
   const lines = body.split('\n');
   let fence;
@@ -917,9 +1049,9 @@ function extractPageTitle(body, fallbackTitle) {
     const title = heading[1]
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       .replace(/[`*_]/g, '')
-      .replace(/<[^>]+>/g, '')
       .trim();
-    return { body: lines.join('\n'), title: title || fallbackTitle };
+    const plainTextTitle = stripHtmlTags(title);
+    return { body: lines.join('\n'), title: plainTextTitle || fallbackTitle };
   }
   return { body, title: fallbackTitle };
 }
@@ -959,7 +1091,7 @@ export async function convertDocfxMarkdown({
   body = body.replace(/^#{1,6}\s+\[([^\]]+)\]\(#tab\/[^)]+\)\s*$/gm, '### $1');
   body = normalizeFenceLanguages(body);
   body = transformOutsideCodeFences(body, (line) => {
-    const converted = convertLinks(convertXrefs(line, uidMap), sourcePath, sourceRoot);
+    const converted = convertXrefs(convertLinks(line, sourcePath, sourceRoot), uidMap);
     return escapeMdxAngles(converted)
       .replace(/<([A-Z][A-Za-z\d_, ]*)>/g, '&lt;$1&gt;')
       .replace(/<a\s+name="([^"]+)"><\/a>/gi, '<span id="$1"></span>');

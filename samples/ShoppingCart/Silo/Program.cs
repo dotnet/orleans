@@ -51,6 +51,12 @@ else
     app.UseHsts();
 }
 
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none';";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    await next(context);
+});
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
