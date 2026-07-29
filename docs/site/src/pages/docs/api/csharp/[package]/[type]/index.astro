@@ -88,7 +88,7 @@ const headings = [
   />
   <ApiDocContent
     content={type.docs?.summary}
-    allTypes={pkg.types}
+    packages={allPackages}
     packageName={pkg.package.name}
     tag="div"
   />
@@ -99,7 +99,7 @@ const headings = [
         <h2 id="remarks">Remarks</h2>
         <ApiDocContent
           content={type.docs.remarks}
-          allTypes={pkg.types}
+          packages={allPackages}
           packageName={pkg.package.name}
           tag="div"
         />
@@ -152,7 +152,7 @@ const headings = [
                 </a>
                 <ApiDocContent
                   content={member.docs?.summary}
-                  allTypes={pkg.types}
+                  packages={allPackages}
                   packageName={pkg.package.name}
                   tag="span"
                 />

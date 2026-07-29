@@ -103,10 +103,11 @@ export function sourceHref(
   sourceFile?: string,
   sourceLines?: string,
 ): string | undefined {
-  if (!metadata.sourceRepository || !metadata.sourceCommit || !sourceFile) {
+  const revision = process.env.ORLEANS_DOCS_SOURCE_COMMIT ?? metadata.sourceCommit;
+  if (!metadata.sourceRepository || !revision || !sourceFile) {
     return undefined;
   }
-  return `${metadata.sourceRepository.replace(/\/$/, '')}/blob/${metadata.sourceCommit}/${sourceFile}${lineFragment(sourceLines)}`;
+  return `${metadata.sourceRepository.replace(/\/$/, '')}/blob/${revision}/${sourceFile}${lineFragment(sourceLines)}`;
 }
 
 function lineFragment(sourceLines?: string): string {
@@ -214,8 +215,9 @@ function stableRouteHash(value: string): string {
 }
 
 export function memberDisplayName(member: ApiMember, declaringType?: ApiType): string {
-  const name =
-    member.name === '.ctor' && declaringType ? typeDisplayName(declaringType) : member.name;
+  const name = member.name === '.ctor' && declaringType
+    ? typeDisplayName(declaringType)
+    : operatorDisplayName(member) ?? member.name;
   if (member.kind === 'indexer' && member.parameters?.length) {
     return `this[${member.parameters.map((parameter) => shortTypeName(parameter.type)).join(', ')}]`;
   }
@@ -226,6 +228,13 @@ export function memberDisplayName(member: ApiMember, declaringType?: ApiType): s
     return `${name}(${member.parameters.map((parameter) => shortTypeName(parameter.type)).join(', ')})`;
   }
   return name;
+}
+
+function operatorDisplayName(member: ApiMember): string | undefined {
+  if (!member.name.startsWith('op_')) {
+    return undefined;
+  }
+  return /\.((?:(?:implicit|explicit)\s+)?operator\s+[^(]+)\(/.exec(member.signature)?.[1];
 }
 
 export function buildTypeSignature(type: ApiType): string {
@@ -312,6 +321,7 @@ export function findTypeByDocId(types: ApiType[], docId: string): ApiType | unde
     if (!type.fullName) {
       return false;
     }
+
     const arity = genericArity(type);
     const baseName = type.fullName.replace(/`\d+$/, '');
     const encodedName = `${baseName}${arity > 0 ? `\`${arity}` : ''}`;
@@ -320,6 +330,26 @@ export function findTypeByDocId(types: ApiType[], docId: string): ApiType | unde
       nameWithoutParameters.startsWith(`${encodedName}.`)
     );
   });
+}
+
+export function findTypeTargetByDocId(
+  packages: PackageApiDocument[],
+  docId: string,
+  currentPackageName?: string,
+): { packageName: string; type: ApiType } | undefined {
+  const ordered = currentPackageName
+    ? [
+        ...packages.filter((pkg) => pkg.package.name === currentPackageName),
+        ...packages.filter((pkg) => pkg.package.name !== currentPackageName),
+      ]
+    : packages;
+  for (const pkg of ordered) {
+    const type = findTypeByDocId(pkg.types, docId);
+    if (type) {
+      return { packageName: pkg.package.name, type };
+    }
+  }
+  return undefined;
 }
 
 export function assertUniqueApiRoutes(packages: PackageApiDocument[]): void {

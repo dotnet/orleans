@@ -94,9 +94,9 @@ describe('DocFX conversion', () => {
       '',
       'Before<hr><input type="text"><source src="sample.mp4">After',
       '',
-      ':::zone target="docs" pivot="orleans-9-0,orleans-10-0"',
+      '::: zone target="docs" pivot="orleans-9-0,orleans-10-0"',
       'Versioned text.',
-      ':::zone-end',
+      '::: zone-end',
     ].join('\n');
 
     const converted = await convertDocfxMarkdown({
@@ -125,6 +125,7 @@ describe('DocFX conversion', () => {
     );
     expect(converted).toContain('[Overview](/orleans/docs/overview/)');
     expect(converted).toContain('slug: docs/guide');
+    expect(converted).toContain('title: Test guide');
     expect(converted).toContain(
       '[Func&lt;T, U, V, W, X, Y, Z, T8&gt;](https://learn.microsoft.com/dotnet/api/system.func-8)',
     );

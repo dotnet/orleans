@@ -325,7 +325,7 @@ internal sealed class CanonicalModelBuilder(Compilation compilation)
 
         // Modifiers in conventional C# order
         if (isConst) sb.Append("const ");
-        if (isStatic) sb.Append("static ");
+        if (isStatic && !isConst) sb.Append("static ");
         if (isAbstract) sb.Append("abstract ");
         if (isSealed) sb.Append("sealed ");
         if (isOverride) sb.Append("override ");

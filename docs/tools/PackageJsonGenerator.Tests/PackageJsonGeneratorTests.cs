@@ -76,6 +76,40 @@ public sealed class PackageJsonGeneratorTests
     }
 
     [Fact]
+    public void GeneratePackageJson_EmitsValidConstFieldSignature()
+    {
+        using var assembly = TestAssembly.Create(
+            """
+            namespace Sample.Library;
+
+            public static class Constants
+            {
+                public const int Answer = 42;
+            }
+            """);
+
+        var outputPath = Path.Combine(assembly.DirectoryPath, "Package.json");
+        PackageJsonGenerator.GeneratePackageJson(
+            assembly.AssemblyPath,
+            assembly.References,
+            outputPath,
+            versionOverride: "1.2.3",
+            packageNameOverride: "Sample.Package",
+            targetFrameworkOverride: "net10.0");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(outputPath));
+        var member = document.RootElement
+            .GetProperty("types")
+            .EnumerateArray()
+            .Single()
+            .GetProperty("members")
+            .EnumerateArray()
+            .Single();
+
+        Assert.Equal("public const int Constants.Answer", member.GetProperty("signature").GetString());
+    }
+
+    [Fact]
     public void GeneratePackageJson_UsesPortablePdbSourcePath()
     {
         using var assembly = TestAssembly.Create(

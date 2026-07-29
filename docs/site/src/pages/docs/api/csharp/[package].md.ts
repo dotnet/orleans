@@ -14,7 +14,13 @@ export async function getStaticPaths() {
   }));
 }
 
-export const GET: APIRoute = ({ props }) =>
-  markdownResponse(
-    renderPackageMarkdown(props.pkg as PackageApiDocument, import.meta.env.BASE_URL),
+export const GET: APIRoute = async ({ props }) => {
+  const packages = (await getPackages()).map((entry) => entry.data);
+  return markdownResponse(
+    renderPackageMarkdown(
+      props.pkg as PackageApiDocument,
+      import.meta.env.BASE_URL,
+      packages,
+    ),
   );
+};

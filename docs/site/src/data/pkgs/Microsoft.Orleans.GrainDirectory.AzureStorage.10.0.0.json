@@ -38,7 +38,7 @@
           "name": "DEFAULT_TABLE_NAME",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static string AzureTableGrainDirectoryOptions.DEFAULT_TABLE_NAME",
+          "signature": "public const string AzureTableGrainDirectoryOptions.DEFAULT_TABLE_NAME",
           "returnType": "string",
           "isStatic": true,
           "isConst": true,

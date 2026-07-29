@@ -1,7 +1,7 @@
 import {
   buildTypeSignature,
   buildMemberSignature,
-  findTypeByDocId,
+  findTypeTargetByDocId,
   groupMembersByKind,
   groupTypesByNamespace,
   memberDisplayName,
@@ -27,7 +27,7 @@ import type {
 } from './types';
 
 interface MarkdownContext {
-  allTypes: ApiType[];
+  packages: PackageApiDocument[];
   packageName: string;
   base: string;
 }
@@ -56,9 +56,13 @@ export function renderApiIndexMarkdown(
   ]);
 }
 
-export function renderPackageMarkdown(pkg: PackageApiDocument, base = '/'): string {
+export function renderPackageMarkdown(
+  pkg: PackageApiDocument,
+  base = '/',
+  packages: PackageApiDocument[] = [pkg],
+): string {
   const namespaces = groupTypesByNamespace(pkg.types);
-  const context = { allTypes: pkg.types, packageName: pkg.package.name, base };
+  const context = { packages, packageName: pkg.package.name, base };
   const groups = [...namespaces.entries()].map(([namespace, types]) =>
     section(
       namespace,
@@ -82,8 +86,9 @@ export function renderTypeMarkdown(
   pkg: PackageApiDocument,
   type: ApiType,
   base = '/',
+  packages: PackageApiDocument[] = [pkg],
 ): string {
-  const context = { allTypes: pkg.types, packageName: pkg.package.name, base };
+  const context = { packages, packageName: pkg.package.name, base };
   const source = sourceHref(pkg.package, type.sourceFile, type.sourceLines);
   const memberGroups = [...groupMembersByKind(type.members).entries()].map(([kind, members]) =>
     section(
@@ -123,9 +128,10 @@ export function renderMemberKindMarkdown(
   type: ApiType,
   kind: MemberKind,
   base = '/',
+  packages: PackageApiDocument[] = [pkg],
 ): string {
   const members = (type.members ?? []).filter((member) => member.kind === kind);
-  const context = { allTypes: pkg.types, packageName: pkg.package.name, base };
+  const context = { packages, packageName: pkg.package.name, base };
   return finalizeMarkdown([
     `# ${markdownText(typeDisplayName(type))} ${memberKindLabels[kind]}`,
     `[Type overview](${withBase(base, typePath(pkg.package.name, type))})`,
@@ -140,8 +146,9 @@ export function renderMemberMarkdown(
   type: ApiType,
   member: ApiMember,
   base = '/',
+  packages: PackageApiDocument[] = [pkg],
 ): string {
-  const context = { allTypes: pkg.types, packageName: pkg.package.name, base };
+  const context = { packages, packageName: pkg.package.name, base };
   return finalizeMarkdown([
     `# ${markdownText(typeDisplayName(type))}.${markdownText(memberDisplayName(member, type))}`,
     `[Type overview](${withBase(base, typePath(pkg.package.name, type))}) | [${memberKindLabels[member.kind]}](${withBase(base, memberKindPath(pkg.package.name, type, member.kind))})`,
@@ -173,9 +180,13 @@ function renderDocNode(node: ApiDocNode, context: MarkdownContext): string {
     case 'codeblock':
       return `\n\n${codeBlock(node.text ?? '', node.language ?? 'csharp')}\n\n`;
     case 'cref': {
-      const type = findTypeByDocId(context.allTypes, node.value ?? '');
-      return type
-        ? `[${shortTypeName(type.fullName ?? type.name)}](${withBase(context.base, typePath(context.packageName, type))})`
+      const target = findTypeTargetByDocId(
+        context.packages,
+        node.value ?? '',
+        context.packageName,
+      );
+      return target
+        ? `[${shortTypeName(target.type.fullName ?? target.type.name)}](${withBase(context.base, typePath(target.packageName, target.type))})`
         : inlineCode(cleanDocId(node.value ?? ''));
     }
     case 'href':
@@ -320,9 +331,9 @@ function renderSeeAlso(docs: ApiDocumentation, context: MarkdownContext): string
     'See also',
     docs.seeAlso
       .map((docId) => {
-        const type = findTypeByDocId(context.allTypes, docId);
-        return type
-          ? `- [${markdownText(typeDisplayName(type))}](${withBase(context.base, typePath(context.packageName, type))})`
+        const target = findTypeTargetByDocId(context.packages, docId, context.packageName);
+        return target
+          ? `- [${markdownText(typeDisplayName(target.type))}](${withBase(context.base, typePath(target.packageName, target.type))})`
           : `- ${inlineCode(cleanDocId(docId))}`;
       })
       .join('\n'),

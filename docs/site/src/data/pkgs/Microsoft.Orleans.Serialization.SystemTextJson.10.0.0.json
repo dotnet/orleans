@@ -110,7 +110,7 @@
           "name": "WellKnownAlias",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static string JsonCodec.WellKnownAlias",
+          "signature": "public const string JsonCodec.WellKnownAlias",
           "returnType": "string",
           "isStatic": true,
           "isConst": true,

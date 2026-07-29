@@ -53,3 +53,8 @@ The production build also emits compatibility redirects for every URL in the
 legacy `gh-pages` sitemap. Existing pages retain their exact URL when the new
 site owns it; retired documentation and blog URLs redirect to the nearest
 current documentation entry point.
+
+`npm run audit:output` scans the complete rendered site for duplicate or missing
+page headings, leaked Microsoft Learn directives, malformed API signatures and
+operator names, oversized navigation, missing legacy redirects, and GitHub
+Pages size-limit regressions.

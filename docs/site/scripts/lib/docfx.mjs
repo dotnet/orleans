@@ -619,17 +619,24 @@ function convertImages(source, sourcePath) {
 
 function formatPivot(pivot) {
   const match = /^orleans-(\d+)-(x|\d+)$/.exec(pivot);
-  if (!match) {
-    throw new Error(`Unsupported Orleans version pivot '${pivot}'.`);
+  if (match) {
+    return `Orleans ${match[1]}.${match[2]}`;
   }
-  return `Orleans ${match[1]}.${match[2]}`;
+  const labels = {
+    'azure-cosmos-db-nosql': 'Azure Cosmos DB for NoSQL',
+    'azure-storage': 'Azure Storage',
+  };
+  if (labels[pivot]) {
+    return labels[pivot];
+  }
+  throw new Error(`Unsupported documentation pivot '${pivot}'.`);
 }
 
 function convertZones(source, sourcePath) {
   const output = [];
   const stack = [];
   for (const line of source.split('\n')) {
-    const start = /^(\s*):::zone\s+(.+?)\s*$/.exec(line);
+    const start = /^(\s*):::\s*zone\s+(.+?)\s*$/.exec(line);
     if (start) {
       const [, indent, attributeSource] = start;
       const attributes = parseDirectiveAttributes(attributeSource, `version zone in ${sourcePath}`);
@@ -650,7 +657,7 @@ function convertZones(source, sourcePath) {
       continue;
     }
 
-    const end = /^(\s*):::zone-end\s*$/.exec(line);
+    const end = /^(\s*):::\s*zone-end\s*$/.exec(line);
     if (end) {
       if (stack.length === 0) {
         throw new Error(`Unmatched zone-end in ${sourcePath}.`);
@@ -887,23 +894,34 @@ function escapeMdxAngles(source) {
     .replace(/<(img|input|source)(\b[^>]*?)(?<!\/)>/gi, '<$1$2 />');
 }
 
-function removeDuplicateTitle(body, title) {
+function extractPageTitle(body, fallbackTitle) {
   const lines = body.split('\n');
-  const firstContent = lines.findIndex((line) => line.trim().length > 0);
-  if (firstContent < 0) {
-    return body;
-  }
-  const heading = /^#\s+(.+?)\s*$/.exec(lines[firstContent]);
-  if (
-    heading &&
-    heading[1].replaceAll('`', '').trim().toLowerCase() === title.replaceAll('`', '').trim().toLowerCase()
-  ) {
-    lines.splice(firstContent, 1);
-    if (lines[firstContent]?.trim().length === 0) {
-      lines.splice(firstContent, 1);
+  let fence;
+  for (let index = 0; index < lines.length; index += 1) {
+    const marker = /^\s*(`{3,}|~{3,})/.exec(lines[index])?.[1];
+    if (marker) {
+      fence = fence ? undefined : marker[0];
+      continue;
     }
+    if (fence) {
+      continue;
+    }
+    const heading = /^#\s+(.+?)\s*$/.exec(lines[index]);
+    if (!heading) {
+      continue;
+    }
+    lines.splice(index, 1);
+    if (lines[index]?.trim().length === 0) {
+      lines.splice(index, 1);
+    }
+    const title = heading[1]
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[`*_]/g, '')
+      .replace(/<[^>]+>/g, '')
+      .trim();
+    return { body: lines.join('\n'), title: title || fallbackTitle };
   }
-  return lines.join('\n');
+  return { body, title: fallbackTitle };
 }
 
 function assertNoUnconvertedConstructs(body, sourcePath) {
@@ -913,7 +931,7 @@ function assertNoUnconvertedConstructs(body, sourcePath) {
     [/\[!div\b/, 'Learn div block'],
     [/:::code\b/, 'code directive'],
     [/:::image\b/, 'image directive'],
-    [/:::zone(?:-end)?\b/, 'version zone'],
+    [/:::\s*zone(?:-end)?\b/, 'version zone'],
     [/<xref:|\(xref:/, 'xref'],
   ];
   for (const [pattern, name] of checks) {
@@ -931,7 +949,7 @@ export async function convertDocfxMarkdown({
   editUrl,
 }) {
   const { metadata, body: originalBody } = splitFrontmatter(source);
-  const title = typeof metadata.title === 'string' ? metadata.title : inferTitle(sourcePath);
+  const metadataTitle = typeof metadata.title === 'string' ? metadata.title : inferTitle(sourcePath);
   let body = await expandIncludes(originalBody, sourcePath);
   body = await convertCodeDirectives(body, sourcePath);
   body = convertImages(body, sourcePath);
@@ -947,12 +965,14 @@ export async function convertDocfxMarkdown({
       .replace(/<a\s+name="([^"]+)"><\/a>/gi, '<span id="$1"></span>');
   });
   body = convertHtmlCommentsForMdx(body);
-  body = removeDuplicateTitle(body, title).trim();
+  const extractedTitle = extractPageTitle(body, metadataTitle);
+  body = extractedTitle.body.trim();
   assertNoUnconvertedConstructs(body, sourcePath);
   const slug = routeFromSourcePath(sourcePath, sourceRoot)
     .replace(/^\/orleans\//, '')
     .replace(/\/$/, '');
   return `${serializeFrontmatter(metadata, sourcePath, {
+    title: extractedTitle.title,
     frontmatter: {
       slug,
       ...(typeof editUrl === 'string' ? { editUrl } : {}),

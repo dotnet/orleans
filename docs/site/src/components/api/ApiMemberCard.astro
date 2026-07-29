@@ -7,18 +7,18 @@ import {
   shortTypeName,
   sourceHref,
 } from '../../lib/api/packages';
-import type { ApiMember, ApiPackageMetadata, ApiType } from '../../lib/api/types';
+import type { ApiMember, ApiPackageMetadata, ApiType, PackageApiDocument } from '../../lib/api/types';
 import ApiDocContent from './ApiDocContent.astro';
 
 interface Props {
   member: ApiMember;
   type: ApiType;
   packageMetadata: ApiPackageMetadata;
-  allTypes: ApiType[];
+  packages: PackageApiDocument[];
   href?: string;
 }
 
-const { member, type, packageMetadata, allTypes, href } = Astro.props;
+const { member, type, packageMetadata, packages, href } = Astro.props;
 const source = sourceHref(packageMetadata, member.sourceFile, member.sourceLines);
 const badges = [
   member.isStatic ? 'static' : undefined,
@@ -50,7 +50,7 @@ const badges = [
       <div class="api-member-description">
         <ApiDocContent
           content={member.docs.summary}
-          allTypes={allTypes}
+          packages={packages}
           packageName={packageMetadata.name}
           tag="div"
         />
@@ -71,7 +71,7 @@ const badges = [
               <dd>
                 <ApiDocContent
                   content={member.docs?.parameters?.[parameter.name]}
-                  allTypes={allTypes}
+                  packages={packages}
                   packageName={packageMetadata.name}
                   tag="span"
                 />
@@ -88,7 +88,7 @@ const badges = [
         <h3>Returns</h3>
         <ApiDocContent
           content={member.docs.returns}
-          allTypes={allTypes}
+          packages={packages}
           packageName={packageMetadata.name}
           tag="div"
         />
@@ -101,7 +101,7 @@ const badges = [
         <h3>Property value</h3>
         <ApiDocContent
           content={member.docs.value}
-          allTypes={allTypes}
+          packages={packages}
           packageName={packageMetadata.name}
           tag="div"
         />
@@ -121,7 +121,7 @@ const badges = [
               <dd>
                 <ApiDocContent
                   content={exception.description}
-                  allTypes={allTypes}
+                  packages={packages}
                   packageName={packageMetadata.name}
                   tag="span"
                 />
@@ -140,7 +140,7 @@ const badges = [
           <>
             <ApiDocContent
               content={example.description}
-              allTypes={allTypes}
+              packages={packages}
               packageName={packageMetadata.name}
               tag="div"
             />

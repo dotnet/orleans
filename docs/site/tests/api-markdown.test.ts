@@ -6,11 +6,13 @@ import {
   renderMemberMarkdown,
   renderMemberKindMarkdown,
   renderPackageMarkdown,
+  renderDocNodes,
   renderTypeMarkdown,
 } from '../src/lib/api/markdown';
 import {
   buildMemberSignature,
   buildTypeSignature,
+  memberDisplayName,
   memberSlug,
 } from '../src/lib/api/packages';
 import type { PackageApiDocument } from '../src/lib/api/types';
@@ -115,5 +117,47 @@ describe('native API Markdown companions', () => {
         attributes: [{ name: 'ObsoleteAttribute' }],
       }),
     ).toBe('[Obsolete]\npublic void Run()');
+  });
+
+  test('uses C# operator names instead of CLR metadata names', () => {
+    expect(
+      memberDisplayName({
+        name: 'op_Equality',
+        kind: 'method',
+        signature: 'public static bool ChannelId.operator ==(ChannelId left, ChannelId right)',
+        parameters: [
+          { name: 'left', type: 'Sample.ChannelId' },
+          { name: 'right', type: 'Sample.ChannelId' },
+        ],
+      }),
+    ).toBe('operator ==(ChannelId, ChannelId)');
+  });
+
+  test('links crefs to types in other generated packages', () => {
+    const targetPackage: PackageApiDocument = {
+      ...pkg,
+      package: { ...pkg.package, name: 'Microsoft.Orleans.Core.Abstractions' },
+      types: [
+        {
+          name: 'GrainType',
+          fullName: 'Orleans.Runtime.GrainType',
+          namespace: 'Orleans.Runtime',
+          kind: 'struct',
+        },
+      ],
+    };
+
+    expect(
+      renderDocNodes(
+        [{ kind: 'cref', value: 'T:Orleans.Runtime.GrainType' }],
+        {
+          packages: [pkg, targetPackage],
+          packageName: pkg.package.name,
+          base: '/orleans/',
+        },
+      ),
+    ).toBe(
+      '[GrainType](/orleans/docs/api/csharp/microsoft.orleans.core.abstractions/orleans.runtime.graintype/)',
+    );
   });
 });

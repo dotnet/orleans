@@ -390,7 +390,7 @@
           "name": "DefaultBlobContainerName",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static string AzureBlobLeaseProviderOptions.DefaultBlobContainerName",
+          "signature": "public const string AzureBlobLeaseProviderOptions.DefaultBlobContainerName",
           "returnType": "string",
           "isStatic": true,
           "isConst": true,

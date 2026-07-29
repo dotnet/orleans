@@ -14,6 +14,14 @@ const sourceRoot = path.join(siteRoot, 'src', 'content', 'docs');
 const generatedRoot = path.join(siteRoot, '.generated');
 const imageExtensions = new Set(['.gif', '.jpeg', '.jpg', '.png', '.svg', '.webp']);
 
+function isSnippetSupportMarkdown(relativePath) {
+  const segments = relativePath.split(path.sep);
+  return (
+    path.basename(relativePath).toLowerCase() === 'readme.md' &&
+    segments.some((segment) => /^snippets(?:-v3)?$/i.test(segment))
+  );
+}
+
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
@@ -46,7 +54,7 @@ for (const sourcePath of sourceFiles) {
   const relativePath = path.relative(sourceRoot, sourcePath);
   const extension = path.extname(sourcePath).toLowerCase();
   if (extension === '.md') {
-    if (includeTargets.has(path.resolve(sourcePath))) {
+    if (includeTargets.has(path.resolve(sourcePath)) || isSnippetSupportMarkdown(relativePath)) {
       continue;
     }
     const outputPath = path.join(

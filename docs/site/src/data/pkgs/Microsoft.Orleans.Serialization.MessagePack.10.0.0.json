@@ -116,7 +116,7 @@
           "name": "WellKnownAlias",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static string MessagePackCodec.WellKnownAlias",
+          "signature": "public const string MessagePackCodec.WellKnownAlias",
           "returnType": "string",
           "isStatic": true,
           "isConst": true,

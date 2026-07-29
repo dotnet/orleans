@@ -32,6 +32,7 @@ jobs:
     timeout-minutes: 30
     env:
       ORLEANS_DOCS_BUILD_CONCURRENCY: 4
+      ORLEANS_DOCS_SOURCE_COMMIT: ${{ github.ref == 'refs/heads/main' && github.sha || 'main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5

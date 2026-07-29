@@ -631,7 +631,7 @@
           "name": "DurableJobs",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static string DurableJobTimeProviderNames.DurableJobs",
+          "signature": "public const string DurableJobTimeProviderNames.DurableJobs",
           "returnType": "string",
           "isStatic": true,
           "isConst": true,

@@ -121,7 +121,7 @@
           "name": "DEFAULT_INIT_STAGE",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static int DynamoDBStorageOptions.DEFAULT_INIT_STAGE",
+          "signature": "public const int DynamoDBStorageOptions.DEFAULT_INIT_STAGE",
           "returnType": "int",
           "isStatic": true,
           "isConst": true,

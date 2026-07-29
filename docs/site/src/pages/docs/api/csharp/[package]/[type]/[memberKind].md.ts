@@ -22,12 +22,15 @@ export async function getStaticPaths() {
   }));
 }
 
-export const GET: APIRoute = ({ props }) =>
-  markdownResponse(
+export const GET: APIRoute = async ({ props }) => {
+  const packages = (await getPackages()).map((entry) => entry.data);
+  return markdownResponse(
     renderMemberKindMarkdown(
       props.pkg as PackageApiDocument,
       props.type as ApiType,
       props.kind as MemberKind,
       import.meta.env.BASE_URL,
+      packages,
     ),
   );
+};

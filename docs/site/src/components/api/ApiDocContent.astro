@@ -1,23 +1,23 @@
 ---
 import { Code } from '@astrojs/starlight/components';
 import {
-  findTypeByDocId,
+  findTypeTargetByDocId,
   shortTypeName,
   typePath,
   withBase,
 } from '../../lib/api/packages';
-import type { ApiDocNode, ApiType } from '../../lib/api/types';
+import type { ApiDocNode, PackageApiDocument } from '../../lib/api/types';
 
 interface Props {
   content: ApiDocNode[] | string | undefined;
-  allTypes?: ApiType[];
+  packages?: PackageApiDocument[];
   packageName?: string;
   tag?: 'span' | 'div';
 }
 
 const {
   content,
-  allTypes = [],
+  packages = [],
   packageName = '',
   tag = 'span',
 } = Astro.props;
@@ -25,11 +25,11 @@ const base = import.meta.env.BASE_URL;
 const Tag: 'span' | 'div' = tag;
 
 function crefLink(value: string) {
-  const type = findTypeByDocId(allTypes, value);
-  return type
+  const target = findTypeTargetByDocId(packages, value, packageName);
+  return target
     ? {
-        href: withBase(base, typePath(packageName, type)),
-        label: shortTypeName(type.fullName ?? type.name),
+        href: withBase(base, typePath(target.packageName, target.type)),
+        label: shortTypeName(target.type.fullName ?? target.type.name),
       }
     : undefined;
 }
@@ -95,7 +95,7 @@ function dedent(value: string) {
                 <p>
                   <Astro.self
                     content={node.children}
-                    allTypes={allTypes}
+                    packages={packages}
                     packageName={packageName}
                     tag="span"
                   />
@@ -107,7 +107,7 @@ function dedent(value: string) {
                   <strong>{node.value ?? 'Note'}</strong>
                   <Astro.self
                     content={node.children}
-                    allTypes={allTypes}
+                    packages={packages}
                     packageName={packageName}
                     tag="div"
                   />
@@ -123,7 +123,7 @@ function dedent(value: string) {
                           <th>
                             <Astro.self
                               content={node.header.term}
-                              allTypes={allTypes}
+                              packages={packages}
                               packageName={packageName}
                               tag="span"
                             />
@@ -131,7 +131,7 @@ function dedent(value: string) {
                           <th>
                             <Astro.self
                               content={node.header.description}
-                              allTypes={allTypes}
+                              packages={packages}
                               packageName={packageName}
                               tag="span"
                             />
@@ -145,7 +145,7 @@ function dedent(value: string) {
                           <td>
                             <Astro.self
                               content={item.term}
-                              allTypes={allTypes}
+                              packages={packages}
                               packageName={packageName}
                               tag="span"
                             />
@@ -153,7 +153,7 @@ function dedent(value: string) {
                           <td>
                             <Astro.self
                               content={item.description}
-                              allTypes={allTypes}
+                              packages={packages}
                               packageName={packageName}
                               tag="span"
                             />
@@ -173,7 +173,7 @@ function dedent(value: string) {
                         <strong>
                           <Astro.self
                             content={item.term}
-                            allTypes={allTypes}
+                            packages={packages}
                             packageName={packageName}
                             tag="span"
                           />
@@ -182,7 +182,7 @@ function dedent(value: string) {
                       )}
                       <Astro.self
                         content={item.description}
-                        allTypes={allTypes}
+                        packages={packages}
                         packageName={packageName}
                         tag="span"
                       />

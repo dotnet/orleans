@@ -50,19 +50,31 @@ export function buildApiSidebar(
     }
     return current ? [root, packageSidebar(current, false)] : [root];
   }
-  return [root, ...sorted.map((pkg) => packageSidebar(pkg, true))];
+  return [
+    root,
+    ...sorted.map((pkg) => ({
+      label: pkg.package.name,
+      link: packagePath(pkg.package.name),
+    })),
+  ];
 }
 
 function packageSidebar(pkg: PackageApiDocument, collapsed: boolean): SidebarGroup {
   const namespaces = groupTypesByNamespace(pkg.types.filter((type) => type.name));
-  const typeItems =
+  const typeItems: SidebarItem[] =
     namespaces.size > 1
       ? [...namespaces.entries()].map(([namespace, types]) => ({
           label: namespace,
           collapsed: true,
-          items: types.map((type) => typeSidebar(pkg.package.name, type)),
+          items: types.map((type) => ({
+            label: typeDisplayName(type),
+            link: typePath(pkg.package.name, type),
+          })),
         }))
-      : [...namespaces.values()].flat().map((type) => typeSidebar(pkg.package.name, type));
+      : [...namespaces.values()].flat().map((type) => ({
+          label: typeDisplayName(type),
+          link: typePath(pkg.package.name, type),
+        }));
   return {
     label: pkg.package.name,
     collapsed,

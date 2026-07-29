@@ -3,6 +3,7 @@ import fixture from './fixtures/package-api.json';
 import {
   assertUniqueApiRoutes,
   findTypeByDocId,
+  findTypeTargetByDocId,
   memberKindPath,
   typePath,
 } from '../src/lib/api/packages';
@@ -58,12 +59,22 @@ describe('native API routes', () => {
   });
 
   test('builds a package-aware Starlight sidebar', () => {
+    const root = buildApiSidebar([pkg]);
+    expect(root).toEqual([
+      { label: 'API packages', link: '/docs/api/csharp/' },
+      {
+        label: 'Microsoft.Orleans.Core',
+        link: '/docs/api/csharp/microsoft.orleans.core/',
+      },
+    ]);
+
     const sidebar = buildApiSidebar([pkg], pkg.package.name);
     expect(sidebar).toHaveLength(2);
     expect(sidebar[0]).toEqual({ label: 'API packages', link: '/docs/api/csharp/' });
     expect(JSON.stringify(sidebar)).toContain(
-      '/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/methods/',
+      '/docs/api/csharp/microsoft.orleans.core/orleans.grain-1/',
     );
+    expect(JSON.stringify(sidebar)).not.toContain('/methods/');
 
     const contextual = buildApiSidebar([pkg], pkg.package.name, pkg.types[0]);
     expect(contextual).toHaveLength(2);
@@ -150,5 +161,31 @@ describe('native API routes', () => {
     expect(findTypeByDocId(types.reverse(), 'M:Orleans.Grain`1.GetPrimaryKey')).toBe(
       generic,
     );
+  });
+
+  test('resolves XML doc IDs across package boundaries', () => {
+    const targetPackage: PackageApiDocument = {
+      ...pkg,
+      package: { ...pkg.package, name: 'Microsoft.Orleans.Core.Abstractions' },
+      types: [
+        {
+          name: 'GrainType',
+          fullName: 'Orleans.Runtime.GrainType',
+          namespace: 'Orleans.Runtime',
+          kind: 'struct',
+        },
+      ],
+    };
+
+    expect(
+      findTypeTargetByDocId(
+        [pkg, targetPackage],
+        'T:Orleans.Runtime.GrainType',
+        pkg.package.name,
+      ),
+    ).toMatchObject({
+      packageName: 'Microsoft.Orleans.Core.Abstractions',
+      type: { name: 'GrainType' },
+    });
   });
 });

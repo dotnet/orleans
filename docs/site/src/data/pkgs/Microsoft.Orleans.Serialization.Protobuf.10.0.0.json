@@ -697,7 +697,7 @@
           "name": "WellKnownAlias",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static string ProtobufCodec.WellKnownAlias",
+          "signature": "public const string ProtobufCodec.WellKnownAlias",
           "returnType": "string",
           "isStatic": true,
           "isConst": true,

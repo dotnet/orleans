@@ -38,7 +38,7 @@
           "name": "DEFAULT_INIT_STAGE",
           "kind": "field",
           "accessibility": "public",
-          "signature": "public const static int AzureTableTransactionalStateOptions.DEFAULT_INIT_STAGE",
+          "signature": "public const int AzureTableTransactionalStateOptions.DEFAULT_INIT_STAGE",
           "returnType": "int",
           "isStatic": true,
           "isConst": true,

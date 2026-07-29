@@ -88,7 +88,7 @@ const headings = members.map((member) => ({
   <ApiLinks markdown={withBase(base, markdownCompanionPath(route))} />
   <ApiDocContent
     content={type.docs?.summary}
-    allTypes={pkg.types}
+    packages={allPackages}
     packageName={pkg.package.name}
     tag="div"
   />
@@ -99,7 +99,7 @@ const headings = members.map((member) => ({
           member={member}
           type={type}
           packageMetadata={pkg.package}
-          allTypes={pkg.types}
+          packages={allPackages}
           href={withBase(base, memberPath(pkg.package.name, type, member))}
         />
       ))
