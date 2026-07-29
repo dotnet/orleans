@@ -20,7 +20,7 @@ import type { PackageApiDocument } from '../src/lib/api/types';
 const pkg = fixture as PackageApiDocument;
 const grain = pkg.types[0];
 const primaryKeySlug = memberSlug(grain.members![0]);
-const sourceRevision = process.env.ORLEANS_DOCS_SOURCE_COMMIT ?? pkg.metadata.sourceCommit;
+const sourceRevision = process.env.ORLEANS_DOCS_SOURCE_COMMIT ?? pkg.package.sourceCommit;
 
 describe('native API Markdown companions', () => {
   test('renders package and type navigation with source and NuGet links', () => {
