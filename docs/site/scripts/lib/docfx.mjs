@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
@@ -51,6 +51,9 @@ function escapeHtml(value) {
 async function pathExists(filePath) {
   try {
     await access(filePath);
+    if (process.platform === 'win32') {
+      return (await realpath(filePath)) === path.resolve(filePath);
+    }
     return true;
   } catch {
     return false;
@@ -586,35 +589,53 @@ function convertLearnBlocks(source, sourcePath) {
   return output.join('\n');
 }
 
-function convertImages(source, sourcePath) {
-  return source
-    .split('\n')
-    .map((line) => {
-      const match = /^(\s*):::image\s+(.+?):::\s*$/.exec(line);
-      if (!match) {
-        if (line.includes(':::image')) {
-          throw new Error(`Unsupported image directive in ${sourcePath}: ${line.trim()}`);
+async function convertImages(source, sourcePath) {
+  const output = [];
+  for (const line of source.split('\n')) {
+    const match = /^(\s*):::image\s+(.+?):::\s*$/.exec(line);
+    if (!match) {
+      if (line.includes(':::image')) {
+        throw new Error(`Unsupported image directive in ${sourcePath}: ${line.trim()}`);
+      }
+      output.push(line);
+      continue;
+    }
+
+    const [, indent, attributeSource] = match;
+    const attributes = parseDirectiveAttributes(attributeSource, `image directive in ${sourcePath}`);
+    const unknown = Object.keys(attributes).filter(
+      (key) => !['alt-text', 'lightbox', 'source', 'type'].includes(key),
+    );
+    if (unknown.length > 0) {
+      throw new Error(`Unsupported image attributes '${unknown.join(', ')}' in ${sourcePath}.`);
+    }
+    if (!attributes.source || !attributes['alt-text']) {
+      throw new Error(`An image directive in ${sourcePath} requires source and alt-text.`);
+    }
+    for (const [name, target] of [
+      ['source', attributes.source],
+      ['lightbox', attributes.lightbox],
+    ]) {
+      if (
+        target &&
+        !target.startsWith('/') &&
+        !target.startsWith('~') &&
+        !/^[a-z][a-z\d+.-]*:/i.test(target)
+      ) {
+        const pathname = /^[^?#]+/.exec(target)?.[0] ?? target;
+        const imagePath = path.resolve(path.dirname(sourcePath), pathname);
+        if (!(await pathExists(imagePath))) {
+          throw new Error(
+            `Image ${name} '${target}' in ${sourcePath} does not exist with that exact path (${imagePath}).`,
+          );
         }
-        return line;
       }
+    }
 
-      const [, indent, attributeSource] = match;
-      const attributes = parseDirectiveAttributes(attributeSource, `image directive in ${sourcePath}`);
-      const unknown = Object.keys(attributes).filter(
-        (key) => !['alt-text', 'lightbox', 'source', 'type'].includes(key),
-      );
-      if (unknown.length > 0) {
-        throw new Error(`Unsupported image attributes '${unknown.join(', ')}' in ${sourcePath}.`);
-      }
-      if (!attributes.source || !attributes['alt-text']) {
-        throw new Error(`An image directive in ${sourcePath} requires source and alt-text.`);
-      }
-
-      const alt = escapeMarkdown(attributes['alt-text']);
-      const image = `![${alt}](${attributes.source})`;
-      return `${indent}${image}`;
-    })
-    .join('\n');
+    const alt = escapeMarkdown(attributes['alt-text']);
+    output.push(`${indent}![${alt}](${attributes.source})`);
+  }
+  return output.join('\n');
 }
 
 function formatPivot(pivot) {
@@ -1084,7 +1105,7 @@ export async function convertDocfxMarkdown({
   const metadataTitle = typeof metadata.title === 'string' ? metadata.title : inferTitle(sourcePath);
   let body = await expandIncludes(originalBody, sourcePath);
   body = await convertCodeDirectives(body, sourcePath);
-  body = convertImages(body, sourcePath);
+  body = await convertImages(body, sourcePath);
   body = convertLearnBlocks(body, sourcePath);
   body = convertCallouts(body, sourcePath);
   body = convertZones(body, sourcePath);

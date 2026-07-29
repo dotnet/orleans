@@ -69,7 +69,7 @@ The sample application is available as an Azure Developer CLI template. Through 
 
 1. Use the URL in the console to navigate to your web application in the browser.
 
-   :::image type="content" source="media/deploy-scale-Orleans-on-azure/web-application.png" alt-text="Screenshot of the running URL shortener web application.":::
+   :::image type="content" source="media/deploy-scale-orleans-on-azure/web-application.png" alt-text="Screenshot of the running URL shortener web application.":::
 
 1. In the browser address bar, test the `shorten` endpoint by adding a URL path such as `/shorten?url=https://www.microsoft.com`. The page should reload and provide a new URL with a shortened path at the end. Copy the new URL to your clipboard.
 
@@ -331,7 +331,7 @@ Optionally, you can verify that the cluster and state data is stored as expected
 
 1. Select the **OrleansGrainState** table. The table holds a row entry for every URL redirect persisted by the app during your testing.
 
-   :::image type="content" source="media/deploy-scale-Orleans-on-azure/storage-table-entities.png" alt-text="A screenshot showing Orleans data in Azure Table Storage.":::
+   :::image type="content" source="media/deploy-scale-orleans-on-azure/storage-table-entities.png" alt-text="A screenshot showing Orleans data in Azure Table Storage.":::
 
 ::: zone-end
 
@@ -365,7 +365,7 @@ Orleans is designed for distributed applications. Even an app as simple as the U
 
 1. Select **Create** to deploy the new revision.
 
-   :::image type="content" source="media/deploy-scale-Orleans-on-azure/scale-containers.png" alt-text="A screenshot showing how to scale the Azure Container Apps app.":::
+   :::image type="content" source="media/deploy-scale-orleans-on-azure/scale-containers.png" alt-text="A screenshot showing how to scale the Azure Container Apps app.":::
 
 1. After the deployment is finished, repeat the testing steps from the previous section. The app continues to work as expected across several instances and can now handle a higher number of requests.
 

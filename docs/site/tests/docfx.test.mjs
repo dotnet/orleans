@@ -52,6 +52,7 @@ describe('DocFX conversion', () => {
         '}',
       ].join('\n'),
     );
+    await writeFile(path.join(directory, 'image.png'), '');
     const sourcePath = path.join(directory, 'guide.md');
     const source = [
       '---',
@@ -182,6 +183,21 @@ describe('DocFX conversion', () => {
         sourcePath,
       }),
     ).rejects.toThrow("INCLUDE 'missing.md'");
+  });
+
+  test('rejects image directives whose path casing does not match', async () => {
+    const directory = await temporaryDirectory();
+    await mkdir(path.join(directory, 'media'));
+    await writeFile(path.join(directory, 'media', 'image.png'), '');
+    const sourcePath = path.join(directory, 'guide.md');
+
+    await expect(
+      convertDocfxMarkdown({
+        source:
+          '---\ntitle: Image\n---\n:::image type="content" source="media/Image.png" alt-text="Image":::',
+        sourcePath,
+      }),
+    ).rejects.toThrow("does not exist with that exact path");
   });
 
   test('converts long escaped xref labels without regex backtracking', async () => {

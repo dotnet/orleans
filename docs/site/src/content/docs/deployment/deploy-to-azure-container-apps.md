@@ -554,7 +554,7 @@ output acaUrl string = containerApp.properties.configuration.ingress.fqdn
 
 The aforementioned Visual Studio Code extension for Bicep includes a visualizer. All these Bicep files are visualized as follows:
 
-:::image type="content" source="media/shopping-cart-container-app-Bicep-visualizer.png" alt-text="Orleans: Shopping cart sample app Bicep provisioning visualizer rendering." lightbox="media/shopping-cart-container-app-Bicep-visualizer.png":::
+:::image type="content" source="media/shopping-cart-container-app-bicep-visualizer.png" alt-text="Orleans: Shopping cart sample app Bicep provisioning visualizer rendering." lightbox="media/shopping-cart-container-app-bicep-visualizer.png":::
 
 ## Summary
 
