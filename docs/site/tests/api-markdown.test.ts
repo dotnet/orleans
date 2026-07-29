@@ -20,6 +20,7 @@ import type { PackageApiDocument } from '../src/lib/api/types';
 const pkg = fixture as PackageApiDocument;
 const grain = pkg.types[0];
 const primaryKeySlug = memberSlug(grain.members![0]);
+const sourceRevision = process.env.ORLEANS_DOCS_SOURCE_COMMIT ?? pkg.metadata.sourceCommit;
 
 describe('native API Markdown companions', () => {
   test('renders package and type navigation with source and NuGet links', () => {
@@ -38,7 +39,7 @@ describe('native API Markdown companions', () => {
       'https://www.nuget.org/packages/Microsoft.Orleans.Core',
     );
     expect(typeMarkdown).toContain(
-      'https://github.com/dotnet/orleans/blob/0123456789abcdef0123456789abcdef01234567/src/Orleans.Core.Abstractions/Runtime/Grain.cs#L10-L80',
+      `https://github.com/dotnet/orleans/blob/${sourceRevision}/src/Orleans.Core.Abstractions/Runtime/Grain.cs#L10-L80`,
     );
     expect(typeMarkdown).toContain(
       'public abstract class Grain<TState> : Grain, IGrainBase',
