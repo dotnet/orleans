@@ -7,6 +7,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "api:generate": "pwsh ../scripts/Generate-ApiData.ps1 -Parallelism 4",
     "dev": "npm run prepare:docs && astro dev",
     "preview": "astro preview",
     "prepare:docs": "node scripts/prepare-docs.mjs",

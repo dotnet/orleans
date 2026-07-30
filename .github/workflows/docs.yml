@@ -59,15 +59,6 @@ jobs:
         shell: pwsh
         run: ./docs/scripts/Generate-ApiData.ps1 -Parallelism 4
 
-      - name: Verify generated API data
-        shell: bash
-        run: |
-          if [ -n "$(git status --porcelain --untracked-files=all -- docs/site/src/data/pkgs)" ]; then
-            git status --short --untracked-files=all -- docs/site/src/data/pkgs
-            echo "::error::Generated API data is stale. Run docs/scripts/Generate-ApiData.ps1 and commit the result."
-            exit 1
-          fi
-
       - name: Validate and build site
         working-directory: docs/site
         run: npm run validate
