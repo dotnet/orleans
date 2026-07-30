@@ -165,7 +165,7 @@ namespace Orleans.Streams
             try
             {
                 using var _ = new ExecutionContextSuppressor();
-                receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(this.options.InitQueueTimeout))
+                receiverInitTask = OrleansTaskExtentions.SafeExecute(InitializeReceiver)
                     .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId:H} failed to Initialize.");
                 receiverInitTask.Ignore();
             }
@@ -181,11 +181,26 @@ namespace Orleans.Streams
             // Even if the receiver failed to initialize, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterGrainTimer(RunQueuePump, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            StreamingEvents.EmitPullingAgentStarted(streamProviderName, Silo, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
             LogInfoTakingQueue(new(QueueId));
             return Task.CompletedTask;
+
+            async Task InitializeReceiver()
+            {
+                try
+                {
+                    await receiver.Initialize(this.options.InitQueueTimeout);
+                    StreamingEvents.EmitQueueReceiverInitialized(streamProviderName, Silo, QueueId);
+                }
+                catch (Exception exception)
+                {
+                    StreamingEvents.EmitQueueReceiverInitializationFailed(streamProviderName, Silo, QueueId, exception);
+                    throw;
+                }
+            }
         }
 
         public async Task Shutdown()
@@ -195,7 +210,11 @@ namespace Orleans.Streams
 
             var asyncTimer = timer;
             timer = null;
-            asyncTimer?.Dispose();
+            if (asyncTimer is not null)
+            {
+                asyncTimer.Dispose();
+                StreamingEvents.EmitPullingAgentStopped(streamProviderName, Silo, QueueId);
+            }
 
             Task localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
@@ -574,13 +593,27 @@ namespace Orleans.Streams
 
         private void CleanupPubSubCache(DateTime now)
         {
+            List<QualifiedStreamId> inactiveStreams = null;
             foreach (var tuple in pubSubCache)
             {
                 if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
                 {
-                    pubSubCache.Remove(tuple.Key);
-                    tuple.Value.DisposeAll(logger);
-                    StreamingEvents.EmitStreamInactive(streamProviderName, tuple.Key.StreamId, options.StreamInactivityPeriod, Silo);
+                    inactiveStreams ??= new();
+                    inactiveStreams.Add(tuple.Key);
+                }
+            }
+
+            if (inactiveStreams is null)
+            {
+                return;
+            }
+
+            foreach (var streamId in inactiveStreams)
+            {
+                if (pubSubCache.Remove(streamId, out var streamData))
+                {
+                    streamData.DisposeAll(logger);
+                    StreamingEvents.EmitStreamInactive(streamProviderName, streamId.StreamId, options.StreamInactivityPeriod, Silo);
                 }
             }
         }
@@ -677,6 +710,7 @@ namespace Orleans.Streams
                     // Producer registration succeeded; the stream entry is now established.
                     // Subscriber-handshake failures must not tear down the entry from here on.
                     streamData.StreamRegistered = true;
+                    StreamingEvents.EmitPullingAgentStreamRegistered(streamProviderName, Silo, QueueId, streamId.StreamId, GrainId, subscribers.Count);
 
                     LogDebugGotBackSubscribers(subscribers.Count, streamId);
 
@@ -711,6 +745,7 @@ namespace Orleans.Streams
             void FailRegistration(Exception exception)
             {
                 LogWarningFailedToRegisterStream(streamId, exception);
+                StreamingEvents.EmitPullingAgentStreamRegistrationFailed(streamProviderName, Silo, QueueId, streamId.StreamId, exception);
 
                 // Only reached when producer registration itself fails.
                 if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)

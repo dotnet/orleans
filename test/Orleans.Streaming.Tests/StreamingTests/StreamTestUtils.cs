@@ -41,36 +41,41 @@ namespace UnitTests.StreamingTests
         {
             var pubSub = GetStreamPubSub(client);
             var streamId = new QualifiedStreamId(streamProviderName, StreamId.Create(streamNamespace, streamIdGuid));
-            var totalWait = TimeSpan.Zero;
 
-            int consumerCount;
-            while ((consumerCount = await pubSub.ConsumerCount(streamId)) != expectedConsumerCount)
+            await CheckPubSubCount(output, when, "ConsumerCount", streamId, streamProviderName, streamNamespace, expectedConsumerCount, () => pubSub.ConsumerCount(streamId));
+            await CheckPubSubCount(output, when, "PublisherCount", streamId, streamProviderName, streamNamespace, expectedPublisherCount, () => pubSub.ProducerCount(streamId));
+        }
+
+        private static async Task<int> CheckPubSubCount(
+            ITestOutputHelper output,
+            string when,
+            string countName,
+            QualifiedStreamId streamId,
+            string streamProviderName,
+            string streamNamespace,
+            int expectedCount,
+            Func<Task<int>> getCount)
+        {
+            var count = await getCount();
+
+            var message = string.Format(
+                "{0} - {1} for stream {2} = {3}; expected {4}; provider={5}; namespace={6}",
+                when,
+                countName,
+                streamId,
+                count,
+                expectedCount == -1 ? "not checked" : expectedCount,
+                streamProviderName,
+                streamNamespace);
+            var prefix = expectedCount == -1 ? "Not-checked" : count == expectedCount ? "True" : "FALSE";
+            output.WriteLine("--> {0}: {1}", prefix, message);
+
+            if (expectedCount != -1)
             {
-                await Task.Delay(1000);
-                totalWait += TimeSpan.FromMilliseconds(1000);
-                if (totalWait > TimeSpan.FromMilliseconds(5000))
-                {
-                    break;
-                }
+                Assert.True(count == expectedCount, message);
             }
 
-            Assert_AreEqual(output, expectedConsumerCount, consumerCount, "{0} - ConsumerCount for stream {1} = {2}",
-                when, streamId, consumerCount);
-
-            int publisherCount;
-            totalWait = TimeSpan.Zero;
-            while ((publisherCount = await pubSub.ProducerCount(streamId)) != expectedPublisherCount)
-            {
-                await Task.Delay(1000);
-                totalWait += TimeSpan.FromMilliseconds(1000);
-                if (totalWait > TimeSpan.FromMilliseconds(5000))
-                {
-                    break;
-                }
-            }
-
-            Assert_AreEqual(output, expectedPublisherCount, publisherCount, "{0} - PublisherCount for stream {1} = {2}",
-                when, streamId, publisherCount);
+            return count;
         }
 
         internal static void Assert_AreEqual(ITestOutputHelper output, int expected, int actual, string msg, params object[] args)
