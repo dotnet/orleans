@@ -1,0 +1,2575 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Serialization.Abstractions",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AliasAttribute",
+      "fullName": "Orleans.AliasAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type or method, specifies a well-known name which can be used to identify that type or method. "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " In the case of a type, the alias must be globally unique. In the case of a method, the alias must be unique to the declaring type. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "317-317",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AliasAttribute.AliasAttribute(string alias)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "alias",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.AliasAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " In the case of a type, the alias must be globally unique. In the case of a method, the alias must be unique to the declaring type. "
+              }
+            ],
+            "parameters": {
+              "alias": [
+                {
+                  "kind": "text",
+                  "text": "The alias."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "326-329"
+        },
+        {
+          "name": "Alias",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AliasAttribute.Alias",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the alias. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " In the case of a type, the alias must be globally unique. In the case of a method, the alias must be unique to the declaring type. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "337-337"
+        }
+      ]
+    },
+    {
+      "name": "ApplicationPartAttribute",
+      "fullName": "Orleans.ApplicationPartAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Specifies an assembly to be added as an application part. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "488-488",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ApplicationPartAttribute.ApplicationPartAttribute(string assemblyName)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "assemblyName",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.ApplicationPartAttribute"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "assemblyName": [
+                {
+                  "kind": "text",
+                  "text": "The assembly name."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "494-497"
+        },
+        {
+          "name": "AssemblyName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string ApplicationPartAttribute.AssemblyName",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the assembly name. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "502-502"
+        }
+      ]
+    },
+    {
+      "name": "CompoundTypeAliasAttribute",
+      "fullName": "Orleans.CompoundTypeAliasAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that the type should be encoded as a relation from a specified type. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "350-350",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public CompoundTypeAliasAttribute.CompoundTypeAliasAttribute(params object[] components)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "components",
+              "type": "object[]",
+              "modifier": "params"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.CompoundTypeAliasAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "components": [
+                {
+                  "kind": "text",
+                  "text": "The alias components, each of which must be a "
+                },
+                {
+                  "kind": "cref",
+                  "value": "P:Orleans.CompoundTypeAliasAttribute.Components"
+                },
+                {
+                  "kind": "text",
+                  "text": " or a "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.String"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "356-359"
+        },
+        {
+          "name": "Components",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public object[] CompoundTypeAliasAttribute.Components",
+          "returnType": "object[]",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the alias components. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "364-364"
+        }
+      ]
+    },
+    {
+      "name": "DefaultInvokableBaseTypeAttribute",
+      "fullName": "Orleans.DefaultInvokableBaseTypeAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Applied to proxy base types and to attribute types used on invokable interface methods to specify the base type for the invokable object which represents a method call. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "162-162",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DefaultInvokableBaseTypeAttribute.DefaultInvokableBaseTypeAttribute(Type returnType, Type invokableBaseType)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "returnType",
+              "type": "System.Type"
+            },
+            {
+              "name": "invokableBaseType",
+              "type": "System.Type"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.DefaultInvokableBaseTypeAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "invokableBaseType": [
+                {
+                  "kind": "text",
+                  "text": "Type of the invokable base."
+                }
+              ],
+              "returnType": [
+                {
+                  "kind": "text",
+                  "text": "The return type of methods which this attribute applies to."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "169-173"
+        },
+        {
+          "name": "InvokableBaseType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type DefaultInvokableBaseTypeAttribute.InvokableBaseType",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the base type for the invokable object class which will be used to represent method calls to methods which this attribute applies to. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "183-183"
+        },
+        {
+          "name": "ProxyInvokeMethodName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DefaultInvokableBaseTypeAttribute.ProxyInvokeMethodName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "isInitOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the name of the method on the proxy object which is used to invoke this method. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs"
+        },
+        {
+          "name": "ReturnType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type DefaultInvokableBaseTypeAttribute.ReturnType",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the return type of methods which this attribute applies to. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "178-178"
+        }
+      ]
+    },
+    {
+      "name": "DefaultInvokeMethodNameAttribute",
+      "fullName": "Orleans.DefaultInvokeMethodNameAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Applied to proxy base types and to attribute types used on invokable interface methods to specify the base type for the invokable object which represents a method call. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "84-84",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DefaultInvokeMethodNameAttribute.DefaultInvokeMethodNameAttribute(Type returnType, string methodName)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "returnType",
+              "type": "System.Type"
+            },
+            {
+              "name": "methodName",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.DefaultInvokeMethodNameAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "methodName": [
+                {
+                  "kind": "text",
+                  "text": "Name of the method."
+                }
+              ],
+              "returnType": [
+                {
+                  "kind": "text",
+                  "text": "Type of the return."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "91-95"
+        },
+        {
+          "name": "MethodName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string DefaultInvokeMethodNameAttribute.MethodName",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the name of the method on the proxy base type to call when methods are invoked. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "105-105"
+        },
+        {
+          "name": "ReturnType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type DefaultInvokeMethodNameAttribute.ReturnType",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the interface method return type which this attribute applies to. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "100-100"
+        }
+      ]
+    },
+    {
+      "name": "GenerateCodeForDeclaringAssemblyAttribute",
+      "fullName": "Orleans.GenerateCodeForDeclaringAssemblyAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Indicates that the source generator should also inspect and generate code for the assembly containing the specified type. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "551-551",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public GenerateCodeForDeclaringAssemblyAttribute.GenerateCodeForDeclaringAssemblyAttribute(Type type)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "type",
+              "type": "System.Type"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.GenerateCodeForDeclaringAssemblyAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "type": [
+                {
+                  "kind": "text",
+                  "text": "Any type in the assembly which the source generator should inspect and generate source for."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "557-560"
+        },
+        {
+          "name": "Type",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type GenerateCodeForDeclaringAssemblyAttribute.Type",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets a type in the assembly which the source generator should inspect and generate source for. "
+              }
+            ],
+            "value": [
+              {
+                "kind": "text",
+                "text": "The type."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "566-566"
+        }
+      ]
+    },
+    {
+      "name": "GenerateFieldIds",
+      "fullName": "Orleans.GenerateFieldIds",
+      "namespace": "Orleans",
+      "kind": "enum",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " This enum provides options for controlling the field id generation logic. "
+          }
+        ]
+      },
+      "enumMembers": [
+        {
+          "name": "None",
+          "value": 0,
+          "description": "Only members explicitly annotated with a field id will be serialized. This is the default."
+        },
+        {
+          "name": "PublicProperties",
+          "value": 1,
+          "description": "Field ids will be automatically assigned to eligible public properties. To qualify, a property must have an accessible getter, and either an accessible setter or a corresponding constructor parameter."
+        }
+      ],
+      "sourceFile": "src/Orleans.Serialization.Abstractions/GenerateFieldIds.cs",
+      "sourceLines": "6-6",
+      "members": []
+    },
+    {
+      "name": "GenerateMethodSerializersAttribute",
+      "fullName": "Orleans.GenerateMethodSerializersAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to an interface, specifies that support code should be generated to allow remoting of interface calls. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "32-32",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public GenerateMethodSerializersAttribute.GenerateMethodSerializersAttribute(Type proxyBase, bool isExtension = false)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "proxyBase",
+              "type": "System.Type"
+            },
+            {
+              "name": "isExtension",
+              "type": "bool",
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.GenerateMethodSerializersAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "isExtension": [
+                {
+                  "kind": "text",
+                  "text": "if set to "
+                },
+                {
+                  "kind": "langword",
+                  "value": "true"
+                },
+                {
+                  "kind": "text",
+                  "text": ", this is an extension interface."
+                }
+              ],
+              "proxyBase": [
+                {
+                  "kind": "text",
+                  "text": "The proxy base type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "39-43"
+        },
+        {
+          "name": "IsExtension",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool GenerateMethodSerializersAttribute.IsExtension",
+          "returnType": "bool",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets a value indicating whether this interface is an extension interface. "
+              }
+            ],
+            "value": [
+              {
+                "kind": "text",
+                "text": "true if this instance is extension; otherwise, false."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "55-55"
+        },
+        {
+          "name": "ProxyBase",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type GenerateMethodSerializersAttribute.ProxyBase",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the base type which the source generator will use for generated proxy classes. "
+              }
+            ],
+            "value": [
+              {
+                "kind": "text",
+                "text": "The proxy base type."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "49-49"
+        }
+      ]
+    },
+    {
+      "name": "GenerateSerializerAttribute",
+      "fullName": "Orleans.GenerateSerializerAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, specifies that the type is intended to be serialized and that serialization code should be generated for the type. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "13-13",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public GenerateSerializerAttribute.GenerateSerializerAttribute()",
+          "returnType": "void"
+        },
+        {
+          "name": "GenerateFieldIds",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public GenerateFieldIds GenerateSerializerAttribute.GenerateFieldIds",
+          "returnType": "Orleans.GenerateFieldIds",
+          "hasGet": true,
+          "hasSet": true,
+          "isInitOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Get or sets when Orleans should auto-assign field ids. The default behavior is to not auto-assign field ids. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs"
+        },
+        {
+          "name": "IncludePrimaryConstructorParameters",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool GenerateSerializerAttribute.IncludePrimaryConstructorParameters",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "isInitOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Get or sets if primary constructor parameters should automatically be included as Serializable fields. Defaults to "
+              },
+              {
+                "kind": "langword",
+                "value": "true"
+              },
+              {
+                "kind": "text",
+                "text": " for "
+              },
+              {
+                "kind": "langword",
+                "value": "record"
+              },
+              {
+                "kind": "text",
+                "text": " types, "
+              },
+              {
+                "kind": "langword",
+                "value": "false"
+              },
+              {
+                "kind": "text",
+                "text": " otherwise. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs"
+        }
+      ]
+    },
+    {
+      "name": "GeneratedActivatorConstructorAttribute",
+      "fullName": "Orleans.GeneratedActivatorConstructorAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a constructor, indicates that generated activator implementations should use that constructor when activating instances. "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " This attribute can be used to call constructors which require injected dependencies. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "536-536",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public GeneratedActivatorConstructorAttribute.GeneratedActivatorConstructorAttribute()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.GeneratedActivatorConstructorAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "541-543"
+        }
+      ]
+    },
+    {
+      "name": "GetCompletionSourceMethodNameAttribute",
+      "fullName": "Orleans.GetCompletionSourceMethodNameAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Applied to method attributes on invokable interfaces to specify the name of the method to call to get a completion source which is submitted to the submit method and eventually returned to the caller. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "235-235",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public GetCompletionSourceMethodNameAttribute.GetCompletionSourceMethodNameAttribute(string methodName)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "methodName",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.GetCompletionSourceMethodNameAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "methodName": [
+                {
+                  "kind": "text",
+                  "text": "The name of the method used to get a completion source for requests submitted to the runtime."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "241-244"
+        },
+        {
+          "name": "MethodName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string GetCompletionSourceMethodNameAttribute.MethodName",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the name of the method used to get a completion source for requests submitted to the runtime. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "249-249"
+        }
+      ]
+    },
+    {
+      "name": "IConverter",
+      "fullName": "Orleans.IConverter<TValue, TSurrogate>",
+      "namespace": "Orleans",
+      "kind": "interface",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TValue"
+        },
+        {
+          "name": "TSurrogate",
+          "constraints": [
+            "struct"
+          ]
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Functionality for converting between two types. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": "ConvertFromSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract TValue IConverter<TValue, TSurrogate>.ConvertFromSurrogate(in TSurrogate surrogate)",
+          "returnType": "TValue",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "surrogate",
+              "type": "TSurrogate",
+              "modifier": "in"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a surrogate value to the value type. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ConvertToSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract TSurrogate IConverter<TValue, TSurrogate>.ConvertToSurrogate(in TValue value)",
+          "returnType": "TSurrogate",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "value",
+              "type": "TValue",
+              "modifier": "in"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value to the value type. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The surrogate."
+              }
+            ],
+            "parameters": {
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "IPopulator",
+      "fullName": "Orleans.IPopulator<TValue, TSurrogate>",
+      "namespace": "Orleans",
+      "kind": "interface",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TValue",
+          "constraints": [
+            "class"
+          ]
+        },
+        {
+          "name": "TSurrogate",
+          "constraints": [
+            "struct"
+          ]
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Functionality for populating one type from another. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": "Populate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract void IPopulator<TValue, TSurrogate>.Populate(in TSurrogate surrogate, TValue value)",
+          "returnType": "void",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "surrogate",
+              "type": "TSurrogate",
+              "modifier": "in"
+            },
+            {
+              "name": "value",
+              "type": "TValue"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Populates "
+              },
+              {
+                "kind": "paramref",
+                "value": "value"
+              },
+              {
+                "kind": "text",
+                "text": " with values from "
+              },
+              {
+                "kind": "paramref",
+                "value": "surrogate"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "IdAttribute",
+      "fullName": "Orleans.IdAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Specifies the unique identity of a member. "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " Every serializable member in a type which has "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.GenerateSerializerAttribute"
+          },
+          {
+            "kind": "text",
+            "text": " applied to it must have one "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.IdAttribute"
+          },
+          {
+            "kind": "text",
+            "text": " attribute applied with a unique "
+          },
+          {
+            "kind": "cref",
+            "value": "P:Orleans.IdAttribute.Id"
+          },
+          {
+            "kind": "text",
+            "text": " value. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "266-266",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public IdAttribute.IdAttribute(uint id)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "id",
+              "type": "uint"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.IdAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "id": [
+                {
+                  "kind": "text",
+                  "text": "The identifier."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "272-275"
+        },
+        {
+          "name": "Id",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public uint IdAttribute.Id",
+          "returnType": "uint",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the identifier. "
+              }
+            ],
+            "value": [
+              {
+                "kind": "text",
+                "text": "The identifier."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "281-281"
+        }
+      ]
+    },
+    {
+      "name": "ImmutableAttribute",
+      "fullName": "Orleans.ImmutableAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Indicates that the type, type member, parameter, or return value which it is applied to should be treated as immutable and therefore that defensive copies are never required. When applied to non-sealed classes, derived types are not guaranteed to be immutable. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ImmutableAttribute.ImmutableAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "InvokableBaseTypeAttribute",
+      "fullName": "Orleans.InvokableBaseTypeAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Applied to attribute types used on invokable interface methods to specify the base type for the invokable object which represents a method call. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "195-195",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public InvokableBaseTypeAttribute.InvokableBaseTypeAttribute(Type proxyBaseClass, Type returnType, Type invokableBaseType)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "proxyBaseClass",
+              "type": "System.Type"
+            },
+            {
+              "name": "returnType",
+              "type": "System.Type"
+            },
+            {
+              "name": "invokableBaseType",
+              "type": "System.Type"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.InvokableBaseTypeAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "invokableBaseType": [
+                {
+                  "kind": "text",
+                  "text": "Type of the invokable base."
+                }
+              ],
+              "proxyBaseClass": [
+                {
+                  "kind": "text",
+                  "text": "The proxy base class."
+                }
+              ],
+              "returnType": [
+                {
+                  "kind": "text",
+                  "text": "The return type of methods which this attribute applies to."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "203-208"
+        },
+        {
+          "name": "InvokableBaseType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type InvokableBaseTypeAttribute.InvokableBaseType",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the base type to use for the generated invokable object. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "223-223"
+        },
+        {
+          "name": "ProxyBaseClass",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type InvokableBaseTypeAttribute.ProxyBaseClass",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the proxy base class which this attribute applies to. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "213-213"
+        },
+        {
+          "name": "ProxyInvokeMethodName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string InvokableBaseTypeAttribute.ProxyInvokeMethodName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "isInitOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the name of the method on the proxy object to invoke when this method is called. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs"
+        },
+        {
+          "name": "ReturnType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type InvokableBaseTypeAttribute.ReturnType",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the method return type which this attribute applies to. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "218-218"
+        }
+      ]
+    },
+    {
+      "name": "InvokableCustomInitializerAttribute",
+      "fullName": "Orleans.InvokableCustomInitializerAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Applied to interface method attribute types to specify a method to be called on invokable objects which are created when invoking that interface method. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "112-112",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public InvokableCustomInitializerAttribute.InvokableCustomInitializerAttribute(string methodName)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "methodName",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.InvokableCustomInitializerAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "methodName": [
+                {
+                  "kind": "text",
+                  "text": "Name of the method."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "130-135"
+        },
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public InvokableCustomInitializerAttribute.InvokableCustomInitializerAttribute(string methodName, object methodArgumentValue)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "methodName",
+              "type": "string"
+            },
+            {
+              "name": "methodArgumentValue",
+              "type": "object"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.InvokableCustomInitializerAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "methodArgumentValue": [
+                {
+                  "kind": "text",
+                  "text": "The method argument value."
+                }
+              ],
+              "methodName": [
+                {
+                  "kind": "text",
+                  "text": "Name of the method."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "119-124"
+        },
+        {
+          "name": "AttributeArgumentIndex",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int InvokableCustomInitializerAttribute.AttributeArgumentIndex",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "isInitOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the index of the attribute argument to propagate to the custom initializer method. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs"
+        },
+        {
+          "name": "AttributeArgumentName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int InvokableCustomInitializerAttribute.AttributeArgumentName",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "isInitOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the name of the attribute argument to propagate to the custom initializer method. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs"
+        },
+        {
+          "name": "MethodArgumentValue",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public object InvokableCustomInitializerAttribute.MethodArgumentValue",
+          "returnType": "object",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the value to pass to the custom initializer method. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "155-155"
+        },
+        {
+          "name": "MethodName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string InvokableCustomInitializerAttribute.MethodName",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the name of the method. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "140-140"
+        }
+      ]
+    },
+    {
+      "name": "InvokeMethodNameAttribute",
+      "fullName": "Orleans.InvokeMethodNameAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Applied to method attributes on invokable interfaces to specify the name of the method on the base type to call when submitting a request. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "62-62",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public InvokeMethodNameAttribute.InvokeMethodNameAttribute(string invokeMethodName)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "invokeMethodName",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.InvokeMethodNameAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "invokeMethodName": [
+                {
+                  "kind": "text",
+                  "text": "Name of the invoke method."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "68-71"
+        },
+        {
+          "name": "InvokeMethodName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string InvokeMethodNameAttribute.InvokeMethodName",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the name of the invoke method. "
+              }
+            ],
+            "value": [
+              {
+                "kind": "text",
+                "text": "The name of the invoke method."
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "77-77"
+        }
+      ]
+    },
+    {
+      "name": "OmitDefaultMemberValuesAttribute",
+      "fullName": "Orleans.OmitDefaultMemberValuesAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that generated serializers for the type should avoid serializing members if the member value is equal to its default value. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public OmitDefaultMemberValuesAttribute.OmitDefaultMemberValuesAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "OrleansConstructorAttribute",
+      "fullName": "Orleans.OrleansConstructorAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Specifies the constructor the serializer should use when creating new instances from serialized data. "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " At most one constructor can be annotated with this attribute. If multiple constructors are annotated, the presence of this attribute is ignored. "
+          }
+        ],
+        "seeAlso": [
+          "T:Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute"
+        ]
+      },
+      "attributes": [
+        {
+          "name": "System.ObsoleteAttribute",
+          "constructorArguments": [
+            "Use GeneratedActivatorConstructorAttribute instead. This attribute is not recognized by Orleans."
+          ]
+        }
+      ],
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "293-293",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public OrleansConstructorAttribute.OrleansConstructorAttribute()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.OrleansConstructorAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "298-300"
+        }
+      ]
+    },
+    {
+      "name": "RegisterActivatorAttribute",
+      "fullName": "Orleans.RegisterActivatorAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that the type is an activator and that it should be automatically registered. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RegisterActivatorAttribute.RegisterActivatorAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "RegisterConverterAttribute",
+      "fullName": "Orleans.RegisterConverterAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that the type is a converter and that it should be automatically registered. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RegisterConverterAttribute.RegisterConverterAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "RegisterCopierAttribute",
+      "fullName": "Orleans.RegisterCopierAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that the type is an copier and that it should be automatically registered. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RegisterCopierAttribute.RegisterCopierAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "RegisterProviderAttribute",
+      "fullName": "Orleans.RegisterProviderAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that the type is a provider and that it should be automatically registered. "
+          }
+        ],
+        "parameters": {
+          "kind": [
+            {
+              "kind": "text",
+              "text": "The kind of provider, for example, "
+            },
+            {
+              "kind": "code",
+              "text": "\"Clustering\""
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "kind": "code",
+              "text": "\"Reminders\""
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ],
+          "name": [
+            {
+              "kind": "text",
+              "text": "The provider name, for example, "
+            },
+            {
+              "kind": "code",
+              "text": "\"AzureTableStorage\""
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ],
+          "target": [
+            {
+              "kind": "text",
+              "text": "The intended target of the provider, for example, "
+            },
+            {
+              "kind": "code",
+              "text": "\"Server\""
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "kind": "code",
+              "text": "\"Client\""
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ]
+        },
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "375-375",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RegisterProviderAttribute.RegisterProviderAttribute(string name, string kind, string target, Type type)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "kind",
+              "type": "string"
+            },
+            {
+              "name": "target",
+              "type": "string"
+            },
+            {
+              "name": "type",
+              "type": "System.Type"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " When applied to a type, indicates that the type is a provider and that it should be automatically registered. "
+              }
+            ],
+            "parameters": {
+              "kind": [
+                {
+                  "kind": "text",
+                  "text": "The kind of provider, for example, "
+                },
+                {
+                  "kind": "code",
+                  "text": "\"Clustering\""
+                },
+                {
+                  "kind": "text",
+                  "text": ", "
+                },
+                {
+                  "kind": "code",
+                  "text": "\"Reminders\""
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ],
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The provider name, for example, "
+                },
+                {
+                  "kind": "code",
+                  "text": "\"AzureTableStorage\""
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ],
+              "target": [
+                {
+                  "kind": "text",
+                  "text": "The intended target of the provider, for example, "
+                },
+                {
+                  "kind": "code",
+                  "text": "\"Server\""
+                },
+                {
+                  "kind": "text",
+                  "text": ", "
+                },
+                {
+                  "kind": "code",
+                  "text": "\"Client\""
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            },
+            "seeAlso": [
+              "T:System.Attribute"
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "375-402"
+        },
+        {
+          "name": "Kind",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string RegisterProviderAttribute.Kind",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the kind of the provider, for example, "
+              },
+              {
+                "kind": "code",
+                "text": "\"Clustering\""
+              },
+              {
+                "kind": "text",
+                "text": ", "
+              },
+              {
+                "kind": "code",
+                "text": "\"Reminders\""
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "392-392"
+        },
+        {
+          "name": "Name",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string RegisterProviderAttribute.Name",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the provider name, for example, "
+              },
+              {
+                "kind": "code",
+                "text": "\"AzureTableStorage\""
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "387-387"
+        },
+        {
+          "name": "Target",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string RegisterProviderAttribute.Target",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the type used to configure the provider, for example, "
+              },
+              {
+                "kind": "code",
+                "text": "\"Server\""
+              },
+              {
+                "kind": "text",
+                "text": ", "
+              },
+              {
+                "kind": "code",
+                "text": "\"Client\""
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "397-397"
+        },
+        {
+          "name": "Type",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type RegisterProviderAttribute.Type",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the type used to configure the provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "402-402"
+        }
+      ]
+    },
+    {
+      "name": "RegisterSerializerAttribute",
+      "fullName": "Orleans.RegisterSerializerAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that the type is a serializer and that it should be automatically registered. "
+          }
+        ],
+        "seeAlso": [
+          "T:System.Attribute"
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RegisterSerializerAttribute.RegisterSerializerAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "ResponseTimeoutAttribute",
+      "fullName": "Orleans.ResponseTimeoutAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Specifies the response timeout for the interface method which it is specified on. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "573-573",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ResponseTimeoutAttribute.ResponseTimeoutAttribute(string timeout)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "timeout",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies the response timeout for the interface method which it is specified on. "
+              }
+            ],
+            "parameters": {
+              "timeout": [
+                {
+                  "kind": "text",
+                  "text": "The response timeout, using "
+                },
+                {
+                  "kind": "cref",
+                  "value": "M:System.TimeSpan.Parse(System.String)"
+                },
+                {
+                  "kind": "text",
+                  "text": " syntax."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "579-579"
+        },
+        {
+          "name": "Timeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan? ResponseTimeoutAttribute.Timeout",
+          "returnType": "System.TimeSpan?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "isInitOnly": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the response timeout for this method. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs"
+        }
+      ]
+    },
+    {
+      "name": "SerializationCallbacksAttribute",
+      "fullName": "Orleans.SerializationCallbacksAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Specifies a type to be instantiated and invoked when performing serialization operations on instances of the type which this attribute is attached to. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "509-509",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SerializationCallbacksAttribute.SerializationCallbacksAttribute(Type hookType)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "hookType",
+              "type": "System.Type"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Instantiates a new "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.SerializationCallbacksAttribute"
+              },
+              {
+                "kind": "text",
+                "text": " instance. "
+              }
+            ],
+            "parameters": {
+              "hookType": [
+                {
+                  "kind": "text",
+                  "text": "The type of the object used to invoke serialization hooks."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "515-518"
+        },
+        {
+          "name": "HookType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Type SerializationCallbacksAttribute.HookType",
+          "returnType": "System.Type",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The type of the hook class. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " This value is used to get the hooks implementation from an "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.IServiceProvider"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "526-526"
+        }
+      ]
+    },
+    {
+      "name": "SerializerTransparentAttribute",
+      "fullName": "Orleans.SerializerTransparentAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Indicates that the specific type is invisible for serialization purposes. Usable only on abstract types with no serialized fields and effectively removes it from the inheritance hierarchy. Adding/removing this attribute from a type will cause serialization protocol level incompatibility (like type hierarchy changes). "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SerializerTransparentAttribute.SerializerTransparentAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "SuppressReferenceTrackingAttribute",
+      "fullName": "Orleans.SuppressReferenceTrackingAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that generated serializers for the type should not track references to the type. "
+          }
+        ],
+        "remarks": [
+          {
+            "kind": "text",
+            "text": " Reference tracking allows a serializable type to participate in a cyclic object graph. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SuppressReferenceTrackingAttribute.SuppressReferenceTrackingAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "UseActivatorAttribute",
+      "fullName": "Orleans.UseActivatorAttribute",
+      "namespace": "Orleans",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " When applied to a type, indicates that the type should be activated using a registered activator rather than via its constructor or another mechanism. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public UseActivatorAttribute.UseActivatorAttribute()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "ReturnValueProxyAttribute",
+      "fullName": "Orleans.Invocation.ReturnValueProxyAttribute",
+      "namespace": "Orleans.Invocation",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Applied to invokable base types (see TaskRequest) to indicate that instances of derived types should be returned directly from generated proxy methods rather than being passed to the runtime for invocation. This is used to support calling patterns other than request-response, such as streaming. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+      "sourceLines": "628-628",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ReturnValueProxyAttribute.ReturnValueProxyAttribute(string initializerMethodName)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "initializerMethodName",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "630-633"
+        },
+        {
+          "name": "InitializerMethodName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string ReturnValueProxyAttribute.InitializerMethodName",
+          "returnType": "string",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The name of the method to "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.Abstractions/Annotations.cs",
+          "sourceLines": "638-638"
+        }
+      ]
+    },
+    {
+      "name": "FrameworkPartAttribute",
+      "fullName": "Orleans.Metadata.FrameworkPartAttribute",
+      "namespace": "Orleans.Metadata",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "System.Attribute",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Specifies that an assembly does not contain application code. "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FrameworkPartAttribute.FrameworkPartAttribute()",
+          "returnType": "void"
+        }
+      ]
+    }
+  ]
+}

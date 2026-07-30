@@ -1,0 +1,1187 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Transactions.TestKit.xUnit",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "ConsistencyTransactionTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.ConsistencyTransactionTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "baseType": "Orleans.Transactions.TestKit.ConsistencyTransactionTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ConsistencyTransactionTestRunner.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ConsistencyTransactionTestRunnerxUnit.ConsistencyTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "grainFactory",
+              "type": "Orleans.IGrainFactory"
+            },
+            {
+              "name": "output",
+              "type": "Xunit.Abstractions.ITestOutputHelper"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ConsistencyTransactionTestRunner.cs",
+          "sourceLines": "11-13"
+        },
+        {
+          "name": "RandomizedConsistency",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ConsistencyTransactionTestRunnerxUnit.RandomizedConsistency(int numGrains, int scale, bool avoidDeadlocks, bool avoidTimeouts, ReadWriteDetermination readwrite)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "numGrains",
+              "type": "int"
+            },
+            {
+              "name": "scale",
+              "type": "int"
+            },
+            {
+              "name": "avoidDeadlocks",
+              "type": "bool"
+            },
+            {
+              "name": "avoidTimeouts",
+              "type": "bool"
+            },
+            {
+              "name": "readwrite",
+              "type": "Orleans.Transactions.TestKit.Consistency.ReadWriteDetermination"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ConsistencyTransactionTestRunner.cs",
+          "sourceLines": "106-106"
+        }
+      ]
+    },
+    {
+      "name": "ControlledFaultInjectionTransactionTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.ControlledFaultInjectionTransactionTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Transactions.TestKit.ControlledFaultInjectionTransactionTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ControlledFaultInjectionTransactionTestRunnerxUnit.ControlledFaultInjectionTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "grainFactory",
+              "type": "Orleans.IGrainFactory"
+            },
+            {
+              "name": "output",
+              "type": "Xunit.Abstractions.ITestOutputHelper"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs",
+          "sourceLines": "10-11"
+        },
+        {
+          "name": "MultiGrainWriteTransaction_FaultInjection",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ControlledFaultInjectionTransactionTestRunnerxUnit.MultiGrainWriteTransaction_FaultInjection(TransactionFaultInjectPhase injectionPhase, FaultInjectionType injectionType)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "injectionPhase",
+              "type": "Orleans.Transactions.TestKit.TransactionFaultInjectPhase"
+            },
+            {
+              "name": "injectionType",
+              "type": "Orleans.Transactions.TestKit.FaultInjectionType"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs",
+          "sourceLines": "38-38"
+        },
+        {
+          "name": "SingleGrainReadTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ControlledFaultInjectionTransactionTestRunnerxUnit.SingleGrainReadTransaction()",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs",
+          "sourceLines": "16-16"
+        },
+        {
+          "name": "SingleGrainWriteTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ControlledFaultInjectionTransactionTestRunnerxUnit.SingleGrainWriteTransaction()",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs",
+          "sourceLines": "22-22"
+        }
+      ]
+    },
+    {
+      "name": "DisabledTransactionsTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.DisabledTransactionsTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Transactions.TestKit.DisabledTransactionsTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/DisabledTransactionsTestRunner.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": "MultiTransactionGrainsThrowWhenTransactions",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override void DisabledTransactionsTestRunnerxUnit.MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)",
+          "returnType": "void",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "transactionTestGrainClassName",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/DisabledTransactionsTestRunner.cs",
+          "sourceLines": "22-23"
+        },
+        {
+          "name": "TransactionGrainsThrowWhenTransactions",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override void DisabledTransactionsTestRunnerxUnit.TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)",
+          "returnType": "void",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "transactionTestGrainClassName",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/DisabledTransactionsTestRunner.cs",
+          "sourceLines": "15-16"
+        }
+      ]
+    },
+    {
+      "name": "ExclusiveLockTransactionTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.ExclusiveLockTransactionTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "baseType": "Orleans.Transactions.TestKit.ExclusiveLockTransactionTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ExclusiveLockTransactionTestRunner.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": "ConcurrentReadThenWriteWithExclusiveLock_NoLockException",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ExclusiveLockTransactionTestRunnerxUnit.ConcurrentReadThenWriteWithExclusiveLock_NoLockException(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Verifies that using [UseExclusiveLock] on the read method prevents lock upgrade exceptions when concurrent transactions perform Read-then-Write on the same grain. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ExclusiveLockTransactionTestRunner.cs",
+          "sourceLines": "24-24"
+        },
+        {
+          "name": "ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ExclusiveLockTransactionTestRunnerxUnit.ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Verifies that concurrent Read-then-Write transactions on the same grain cause OrleansTransactionLockUpgradeException or OrleansBrokenTransactionLockException when no exclusive lock is used. Scenario (LockUpgradeException): TX1: PerformRead → shared lock acquired TX2: PerformRead → shared lock acquired (same group) TX1: PerformUpdate → lock upgrade fails Scenario (BrokenTransactionLockException): TX1: PerformRead → shared lock acquired TX2: PerformRead → shared lock acquired (same group) TX2: PerformUpdate → upgraded, TX1 rolled back TX1: PerformUpdate → broken lock detected "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ExclusiveLockTransactionTestRunner.cs",
+          "sourceLines": "17-17"
+        }
+      ]
+    },
+    {
+      "name": "GoldenPathTransactionTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "baseType": "Orleans.Transactions.TestKit.GoldenPathTransactionTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "MultiGrainReadWriteTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.MultiGrainReadWriteTransaction(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "45-45"
+        },
+        {
+          "name": "MultiGrainWriteTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.MultiGrainWriteTransaction(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "36-36"
+        },
+        {
+          "name": "MultiWriteToSingleGrainTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.MultiWriteToSingleGrainTransaction(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "63-63"
+        },
+        {
+          "name": "RWRWTest",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.RWRWTest(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "72-72"
+        },
+        {
+          "name": "RepeatGrainReadWriteTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.RepeatGrainReadWriteTransaction(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "54-54"
+        },
+        {
+          "name": "SingleGrainReadTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.SingleGrainReadTransaction(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "18-18"
+        },
+        {
+          "name": "SingleGrainWriteTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.SingleGrainWriteTransaction(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "27-27"
+        },
+        {
+          "name": "WRWRTest",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GoldenPathTransactionTestRunnerxUnit.WRWRTest(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs",
+          "sourceLines": "81-81"
+        }
+      ]
+    },
+    {
+      "name": "GrainFaultTransactionTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.GrainFaultTransactionTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Transactions.TestKit.GrainFaultTransactionTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public GrainFaultTransactionTestRunnerxUnit.GrainFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "grainFactory",
+              "type": "Orleans.IGrainFactory"
+            },
+            {
+              "name": "output",
+              "type": "Xunit.Abstractions.ITestOutputHelper"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs",
+          "sourceLines": "10-11"
+        },
+        {
+          "name": "AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GrainFaultTransactionTestRunnerxUnit.AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs",
+          "sourceLines": "46-46"
+        },
+        {
+          "name": "AbortTransactionOnExceptions",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GrainFaultTransactionTestRunnerxUnit.AbortTransactionOnExceptions(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs",
+          "sourceLines": "19-19"
+        },
+        {
+          "name": "AbortTransactionOnOrphanCalls",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GrainFaultTransactionTestRunnerxUnit.AbortTransactionOnOrphanCalls(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs",
+          "sourceLines": "55-55"
+        },
+        {
+          "name": "AbortTransactionOnReadOnlyViolatedException",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GrainFaultTransactionTestRunnerxUnit.AbortTransactionOnReadOnlyViolatedException(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs",
+          "sourceLines": "28-28"
+        },
+        {
+          "name": "MultiGrainAbortTransactionOnExceptions",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task GrainFaultTransactionTestRunnerxUnit.MultiGrainAbortTransactionOnExceptions(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs",
+          "sourceLines": "37-37"
+        }
+      ]
+    },
+    {
+      "name": "ScopedTransactionsTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.ScopedTransactionsTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "baseType": "Orleans.Transactions.TestKit.ScopedTransactionsTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": "CreateNestedTransactionScopeAndSetValueAndInnerFailAndAssert",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ScopedTransactionsTestRunnerxUnit.CreateNestedTransactionScopeAndSetValueAndInnerFailAndAssert(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs",
+          "sourceLines": "46-46"
+        },
+        {
+          "name": "CreateTransactionScopeAndSetValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ScopedTransactionsTestRunnerxUnit.CreateTransactionScopeAndSetValue(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs",
+          "sourceLines": "19-19"
+        },
+        {
+          "name": "CreateTransactionScopeAndSetValueAndAssert",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ScopedTransactionsTestRunnerxUnit.CreateTransactionScopeAndSetValueAndAssert(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs",
+          "sourceLines": "37-37"
+        },
+        {
+          "name": "CreateTransactionScopeAndSetValueWithFailure",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task ScopedTransactionsTestRunnerxUnit.CreateTransactionScopeAndSetValueWithFailure(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs",
+          "sourceLines": "28-28"
+        }
+      ]
+    },
+    {
+      "name": "TocFaultTransactionTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.TocFaultTransactionTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "baseType": "Orleans.Transactions.TestKit.TocFaultTransactionTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TocFaultTransactionTestRunner.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "MultiGrainWriteTransactionWithCommitException",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TocFaultTransactionTestRunnerxUnit.MultiGrainWriteTransactionWithCommitException(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TocFaultTransactionTestRunner.cs",
+          "sourceLines": "27-27"
+        },
+        {
+          "name": "MultiGrainWriteTransactionWithCommitFailure",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TocFaultTransactionTestRunnerxUnit.MultiGrainWriteTransactionWithCommitFailure(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TocFaultTransactionTestRunner.cs",
+          "sourceLines": "18-18"
+        }
+      ]
+    },
+    {
+      "name": "TocGoldenPathTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.TocGoldenPathTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "baseType": "Orleans.Transactions.TestKit.TocGoldenPathTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TOCGoldenPathTestRunner.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "MultiGrainWriteTransaction",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TocGoldenPathTestRunnerxUnit.MultiGrainWriteTransaction(string grainStates, int grainCount)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            },
+            {
+              "name": "grainCount",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TOCGoldenPathTestRunner.cs",
+          "sourceLines": "17-17"
+        }
+      ]
+    },
+    {
+      "name": "TransactionConcurrencyTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.TransactionConcurrencyTestRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "baseType": "Orleans.Transactions.TestKit.TransactionConcurrencyTestRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionConcurrencyTestRunner.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "SingleSharedGrainTest",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionConcurrencyTestRunnerxUnit.SingleSharedGrainTest(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Two transaction share a single grain "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionConcurrencyTestRunner.cs",
+          "sourceLines": "23-23"
+        },
+        {
+          "name": "TransactionChainTest",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionConcurrencyTestRunnerxUnit.TransactionChainTest(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Chain of transactions, each dependent on the results of the previous "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionConcurrencyTestRunner.cs",
+          "sourceLines": "37-37"
+        },
+        {
+          "name": "TransactionTreeTest",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionConcurrencyTestRunnerxUnit.TransactionTreeTest(string grainStates)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "grainStates",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Single transaction containing two grains is dependent on two other transaction, one from each grain "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionConcurrencyTestRunner.cs",
+          "sourceLines": "51-51"
+        }
+      ]
+    },
+    {
+      "name": "TransactionRecoveryTestsRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.TransactionRecoveryTestsRunnerxUnit",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Transactions.TestKit.TransactionRecoveryTestsRunner",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionRecoveryTestsRunner.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public TransactionRecoveryTestsRunnerxUnit.TransactionRecoveryTestsRunnerxUnit(TestCluster cluster, ITestOutputHelper testOutput)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "cluster",
+              "type": "Orleans.TestingHost.TestCluster"
+            },
+            {
+              "name": "testOutput",
+              "type": "Xunit.Abstractions.ITestOutputHelper"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionRecoveryTestsRunner.cs",
+          "sourceLines": "11-13"
+        },
+        {
+          "name": "TransactionWillRecoverAfterRandomSiloGracefulShutdown",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionRecoveryTestsRunnerxUnit.TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "transactionTestGrainClassName",
+              "type": "string"
+            },
+            {
+              "name": "concurrent",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionRecoveryTestsRunner.cs",
+          "sourceLines": "20-20"
+        },
+        {
+          "name": "TransactionWillRecoverAfterRandomSiloUnGracefulShutdown",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionRecoveryTestsRunnerxUnit.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "transactionTestGrainClassName",
+              "type": "string"
+            },
+            {
+              "name": "concurrent",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionRecoveryTestsRunner.cs",
+          "sourceLines": "28-28"
+        }
+      ]
+    },
+    {
+      "name": "TransactionalStateStorageTestRunnerxUnit",
+      "fullName": "Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>",
+      "namespace": "Orleans.Transactions.TestKit.xUnit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TState",
+          "constraints": [
+            "class",
+            "new()"
+          ]
+        }
+      ],
+      "baseType": "Orleans.Transactions.TestKit.TransactionalStateStorageTestRunner<TState>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public TransactionalStateStorageTestRunnerxUnit<TState>.TransactionalStateStorageTestRunnerxUnit(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory, IGrainFactory grainFactory, ITestOutputHelper testOutput, Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>> assertConfig = null)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "stateStorageFactory",
+              "type": "System.Func<System.Threading.Tasks.Task<Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>>>"
+            },
+            {
+              "name": "stateFactory",
+              "type": "System.Func<int, TState>"
+            },
+            {
+              "name": "grainFactory",
+              "type": "Orleans.IGrainFactory"
+            },
+            {
+              "name": "testOutput",
+              "type": "Xunit.Abstractions.ITestOutputHelper"
+            },
+            {
+              "name": "assertConfig",
+              "type": "System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>>",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Constructor "
+              }
+            ],
+            "parameters": {
+              "assertConfig": [
+                {
+                  "kind": "text",
+                  "text": "A reference to the AwesomeAssertions.Equivalency.EquivalencyOptions`1 configuration object that can be used to influence the way the object graphs are compared"
+                }
+              ],
+              "grainFactory": [
+                {
+                  "kind": "text",
+                  "text": "grain Factory needed for test runner"
+                }
+              ],
+              "stateFactory": [
+                {
+                  "kind": "text",
+                  "text": "factory to create TState for test"
+                }
+              ],
+              "stateStorageFactory": [
+                {
+                  "kind": "text",
+                  "text": "factory to create ITransactionalStateStorage, the test runner are assuming the state in storage is empty when ITransactionalStateStorage was created "
+                }
+              ],
+              "testOutput": [
+                {
+                  "kind": "text",
+                  "text": "test output to helpful messages"
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "28-30"
+        },
+        {
+          "name": "CancelMany",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.CancelMany(int count)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "count",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "106-106"
+        },
+        {
+          "name": "CancelOne",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.CancelOne()",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "49-49"
+        },
+        {
+          "name": "ConfirmMany",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.ConfirmMany(int count, bool useTwoSteps)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "count",
+              "type": "int"
+            },
+            {
+              "name": "useTwoSteps",
+              "type": "bool"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "97-97"
+        },
+        {
+          "name": "ConfirmOne",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.ConfirmOne(bool useTwoSteps)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "useTwoSteps",
+              "type": "bool"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "43-43"
+        },
+        {
+          "name": "ConfirmOneAndCancelOne",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.ConfirmOneAndCancelOne(bool useTwoSteps, bool reverseOrder)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "useTwoSteps",
+              "type": "bool"
+            },
+            {
+              "name": "reverseOrder",
+              "type": "bool"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "64-64"
+        },
+        {
+          "name": "FirstTime_Load_ShouldReturnEmptyLoadResponse",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.FirstTime_Load_ShouldReturnEmptyLoadResponse()",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "35-35"
+        },
+        {
+          "name": "GrowingBatch",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.GrowingBatch()",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "70-70"
+        },
+        {
+          "name": "PrepareMany",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.PrepareMany(int count)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "count",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "85-85"
+        },
+        {
+          "name": "ReplaceMany",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.ReplaceMany(int count)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "count",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "115-115"
+        },
+        {
+          "name": "ReplaceOne",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.ReplaceOne()",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "55-55"
+        },
+        {
+          "name": "ShrinkingBatch",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override Task TransactionalStateStorageTestRunnerxUnit<TState>.ShrinkingBatch()",
+          "returnType": "System.Threading.Tasks.Task",
+          "isOverride": true,
+          "sourceFile": "src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs",
+          "sourceLines": "76-76"
+        }
+      ]
+    }
+  ]
+}

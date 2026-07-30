@@ -1,0 +1,279 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.GrainDirectory.AdoNet",
+    "version": "10.0.0-alpha.1",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AdoNetGrainDirectoryOptionsValidator",
+      "fullName": "Orleans.Configuration.AdoNetGrainDirectoryOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Validates "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions"
+          },
+          {
+            "kind": "text",
+            "text": " configuration. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Options/AdoNetGrainDirectoryOptionsValidator.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetGrainDirectoryOptionsValidator.AdoNetGrainDirectoryOptionsValidator(AdoNetGrainDirectoryOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions"
+              },
+              {
+                "kind": "text",
+                "text": " configuration. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Options/AdoNetGrainDirectoryOptionsValidator.cs",
+          "sourceLines": "8-8"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AdoNetGrainDirectoryOptionsValidator.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Options/AdoNetGrainDirectoryOptionsValidator.cs",
+          "sourceLines": "13-27"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetGrainDirectoryOptions",
+      "fullName": "Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions",
+      "namespace": "Orleans.GrainDirectory.AdoNet",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for the ADO.NET Grain Directory. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/AdoNetGrainDirectoryOptions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetGrainDirectoryOptions.AdoNetGrainDirectoryOptions()",
+          "returnType": "void",
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/AdoNetGrainDirectoryOptions.cs",
+          "sourceLines": "12-19"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetGrainDirectoryOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "attributes": [
+            {
+              "name": "System.ComponentModel.DataAnnotations.RequiredAttribute"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/AdoNetGrainDirectoryOptions.cs"
+        },
+        {
+          "name": "Invariant",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetGrainDirectoryOptions.Invariant",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "attributes": [
+            {
+              "name": "System.ComponentModel.DataAnnotations.RequiredAttribute"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the ADO.NET invariant. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/AdoNetGrainDirectoryOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetGrainDirectorySiloBuilderExtensions",
+      "fullName": "Orleans.Hosting.AdoNetGrainDirectorySiloBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Hosting/AdoNetGrainDirectorySiloBuilderExtensions.cs",
+      "sourceLines": "3-3",
+      "members": [
+        {
+          "name": "AddAdoNetGrainDirectory",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AdoNetGrainDirectorySiloBuilderExtensions.AddAdoNetGrainDirectory(this ISiloBuilder builder, string name, Action<AdoNetGrainDirectoryOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Hosting/AdoNetGrainDirectorySiloBuilderExtensions.cs"
+        },
+        {
+          "name": "AddAdoNetGrainDirectory",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AdoNetGrainDirectorySiloBuilderExtensions.AddAdoNetGrainDirectory(this ISiloBuilder builder, string name, Action<OptionsBuilder<AdoNetGrainDirectoryOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions>>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Hosting/AdoNetGrainDirectorySiloBuilderExtensions.cs"
+        },
+        {
+          "name": "UseAdoNetGrainDirectoryAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AdoNetGrainDirectorySiloBuilderExtensions.UseAdoNetGrainDirectoryAsDefault(this ISiloBuilder builder, Action<AdoNetGrainDirectoryOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Hosting/AdoNetGrainDirectorySiloBuilderExtensions.cs"
+        },
+        {
+          "name": "UseAdoNetGrainDirectoryAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AdoNetGrainDirectorySiloBuilderExtensions.UseAdoNetGrainDirectoryAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AdoNetGrainDirectoryOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.GrainDirectory.AdoNet.AdoNetGrainDirectoryOptions>>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.GrainDirectory.AdoNet/Hosting/AdoNetGrainDirectorySiloBuilderExtensions.cs"
+        }
+      ]
+    }
+  ]
+}

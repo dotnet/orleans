@@ -1,0 +1,716 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Journaling.AzureStorage",
+    "version": "10.0.0-alpha.1",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AzureBlobJournalStorageOptions",
+      "fullName": "Orleans.Journaling.AzureBlobJournalStorageOptions",
+      "namespace": "Orleans.Journaling",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for configuring the Azure Blob state storage provider. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureBlobJournalStorageOptions.AzureBlobJournalStorageOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+          "sourceLines": "16-147"
+        },
+        {
+          "name": "DEFAULT_CONTAINER_NAME",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const string AzureBlobJournalStorageOptions.DEFAULT_CONTAINER_NAME",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const int AzureBlobJournalStorageOptions.DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES",
+          "returnType": "int",
+          "isStatic": true,
+          "isConst": true,
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public static readonly TimeSpan AzureBlobJournalStorageOptions.DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF",
+          "returnType": "System.TimeSpan",
+          "isStatic": true,
+          "isReadOnly": true,
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public static readonly TimeSpan AzureBlobJournalStorageOptions.DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF",
+          "returnType": "System.TimeSpan",
+          "isStatic": true,
+          "isReadOnly": true,
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "ConfigureBlobServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureBlobJournalStorageOptions.ConfigureBlobServiceClient(Func<CancellationToken, Task<BlobServiceClient>> createClientCallback)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "createClientCallback",
+              "type": "System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.BlobServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using the provided callback. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+          "sourceLines": "172-173"
+        },
+        {
+          "name": "ConfigureBlobServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureBlobJournalStorageOptions.ConfigureBlobServiceClient(Uri serviceUri)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.BlobServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+          "sourceLines": "163-165"
+        },
+        {
+          "name": "ConfigureBlobServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureBlobJournalStorageOptions.ConfigureBlobServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "azureSasCredential",
+              "type": "Azure.AzureSasCredential"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.BlobServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.AzureSasCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+          "sourceLines": "190-193"
+        },
+        {
+          "name": "ConfigureBlobServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureBlobJournalStorageOptions.ConfigureBlobServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "sharedKeyCredential",
+              "type": "Azure.Storage.StorageSharedKeyCredential"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.BlobServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Storage.StorageSharedKeyCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+          "sourceLines": "200-203"
+        },
+        {
+          "name": "ConfigureBlobServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureBlobJournalStorageOptions.ConfigureBlobServiceClient(Uri serviceUri, TokenCredential tokenCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "tokenCredential",
+              "type": "Azure.Core.TokenCredential"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.BlobServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Core.TokenCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+          "sourceLines": "180-183"
+        },
+        {
+          "name": "ConfigureBlobServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureBlobJournalStorageOptions.ConfigureBlobServiceClient(string connectionString)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.BlobServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using a connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs",
+          "sourceLines": "154-156"
+        },
+        {
+          "name": "BlobServiceClient",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public BlobServiceClient? AzureBlobJournalStorageOptions.BlobServiceClient",
+          "returnType": "Azure.Storage.Blobs.BlobServiceClient?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the client used to access the Azure Blob Service. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "BuildContainerFactory",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<IServiceProvider, AzureBlobJournalStorageOptions, IBlobContainerFactory> AzureBlobJournalStorageOptions.BuildContainerFactory",
+          "returnType": "System.Func<System.IServiceProvider, Orleans.Journaling.AzureBlobJournalStorageOptions, Orleans.Journaling.IBlobContainerFactory>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " A function for building container factory instances. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "ClientOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public BlobClientOptions? AzureBlobJournalStorageOptions.ClientOptions",
+          "returnType": "Azure.Storage.Blobs.BlobClientOptions?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Options to be used when configuring the blob storage client, or "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": " to use the default options. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "ContainerName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AzureBlobJournalStorageOptions.ContainerName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Container name where state is stored. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "DeleteOldCheckpoints",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool AzureBlobJournalStorageOptions.DeleteOldCheckpoints",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets a value indicating whether obsolete checkpoint blobs are deleted after a new checkpoint is published. Defaults to true. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "GetCheckpointBlobName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<JournalId, string, string> AzureBlobJournalStorageOptions.GetCheckpointBlobName",
+          "returnType": "System.Func<Orleans.Journaling.JournalId, string, string>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the delegate used to generate the checkpoint blob name for a journal snapshot. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " The delegate receives the journal id and an opaque snapshot id generated for the checkpoint. The snapshot id is currently formatted as a 32-character hexadecimal string using "
+              },
+              {
+                "kind": "code",
+                "text": "Guid.ToString(\"N\")"
+              },
+              {
+                "kind": "text",
+                "text": ". The returned value must be a container-relative blob name. The default value is "
+              },
+              {
+                "kind": "code",
+                "text": "{journalId.Value}/chk.{snapshotId}"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "GetWalBlobName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<JournalId, string> AzureBlobJournalStorageOptions.GetWalBlobName",
+          "returnType": "System.Func<Orleans.Journaling.JournalId, string>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the delegate used to generate the write-ahead log blob name for a journal. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "MaxMetadataOnlyConflictRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureBlobJournalStorageOptions.MaxMetadataOnlyConflictRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the maximum number of times a journaling Append, Replace, or Delete operation will refresh its cached WAL ETag and retry in place after observing a metadata-only ETag conflict (for example, a concurrent caller-owned metadata update or generation bump). When the cap is exceeded the storage layer falls back to throwing "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Storage.InconsistentStateException"
+              },
+              {
+                "kind": "text",
+                "text": " and the journaling layer recovers before retrying. Defaults to 5. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "MetadataOnlyConflictInitialBackoff",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureBlobJournalStorageOptions.MetadataOnlyConflictInitialBackoff",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the initial delay applied before re-trying after a metadata-only ETag conflict. Subsequent attempts double the delay (capped at "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.MetadataOnlyConflictMaxBackoff"
+              },
+              {
+                "kind": "text",
+                "text": "). Set to "
+              },
+              {
+                "kind": "cref",
+                "value": "F:System.TimeSpan.Zero"
+              },
+              {
+                "kind": "text",
+                "text": " to retry immediately without backoff. Defaults to 10 ms. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        },
+        {
+          "name": "MetadataOnlyConflictMaxBackoff",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureBlobJournalStorageOptions.MetadataOnlyConflictMaxBackoff",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the upper bound on the per-attempt backoff used by metadata-only conflict retries. The exponential schedule starts at "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Journaling.AzureBlobJournalStorageOptions.MetadataOnlyConflictInitialBackoff"
+              },
+              {
+                "kind": "text",
+                "text": " and never exceeds this value. Defaults to 200 ms. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobJournalStorageOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureBlobStorageHostingExtensions",
+      "fullName": "Orleans.Journaling.AzureBlobStorageHostingExtensions",
+      "namespace": "Orleans.Journaling",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobStorageHostingExtensions.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "AddAzureBlobJournalStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureBlobStorageHostingExtensions.AddAzureBlobJournalStorage(this ISiloBuilder builder)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobStorageHostingExtensions.cs",
+          "sourceLines": "9-9"
+        },
+        {
+          "name": "AddAzureBlobJournalStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureBlobStorageHostingExtensions.AddAzureBlobJournalStorage(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions>? configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Journaling.AzureBlobJournalStorageOptions>?",
+              "isNullable": true
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/AzureBlobStorageHostingExtensions.cs",
+          "sourceLines": "12-30"
+        }
+      ]
+    },
+    {
+      "name": "IBlobContainerFactory",
+      "fullName": "Orleans.Journaling.IBlobContainerFactory",
+      "namespace": "Orleans.Journaling",
+      "kind": "interface",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " A factory for building container clients for blob storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Journaling.AzureStorage/IBlobContainerFactory.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": "GetBlobContainerClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract BlobContainerClient IBlobContainerFactory.GetBlobContainerClient(JournalId journalId)",
+          "returnType": "Azure.Storage.Blobs.BlobContainerClient",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "journalId",
+              "type": "Orleans.Journaling.JournalId"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the container which should be used for the specified journal. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A configured blob client."
+              }
+            ],
+            "parameters": {
+              "journalId": [
+                {
+                  "kind": "text",
+                  "text": "The journal id."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "InitializeAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract Task IBlobContainerFactory.InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken)",
+          "returnType": "System.Threading.Tasks.Task",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "client",
+              "type": "Azure.Storage.Blobs.BlobServiceClient"
+            },
+            {
+              "name": "cancellationToken",
+              "type": "System.Threading.CancellationToken"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initialize any required dependencies using the provided client and options. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Threading.Tasks.Task"
+              },
+              {
+                "kind": "text",
+                "text": " representing the asynchronous operation."
+              }
+            ],
+            "parameters": {
+              "cancellationToken": [
+                {
+                  "kind": "text",
+                  "text": "A token used to cancel the request."
+                }
+              ],
+              "client": [
+                {
+                  "kind": "text",
+                  "text": "The connected blob client"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

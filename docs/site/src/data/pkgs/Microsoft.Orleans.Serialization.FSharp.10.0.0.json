@@ -1,0 +1,4648 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Serialization.FSharp",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "FSharpChoiceCodec",
+      "fullName": "Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4, T5, T6>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        },
+        {
+          "name": "T4"
+        },
+        {
+          "name": "T5"
+        },
+        {
+          "name": "T6"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IDerivedTypeCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "721-721",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCodec<T1, T2, T3, T4, T5, T6>.FSharpChoiceCodec(IFieldCodec<T1> item1Codec, IFieldCodec<T2> item2Codec, IFieldCodec<T3> item3Codec, IFieldCodec<T4> item4Codec, IFieldCodec<T5> item5Codec, IFieldCodec<T6> item6Codec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "item1Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T1>"
+            },
+            {
+              "name": "item2Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T2>"
+            },
+            {
+              "name": "item3Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T3>"
+            },
+            {
+              "name": "item4Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T4>"
+            },
+            {
+              "name": "item5Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T5>"
+            },
+            {
+              "name": "item6Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T6>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "723-751"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCodec",
+      "fullName": "Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4, T5>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        },
+        {
+          "name": "T4"
+        },
+        {
+          "name": "T5"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IDerivedTypeCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "588-588",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCodec<T1, T2, T3, T4, T5>.FSharpChoiceCodec(IFieldCodec<T1> item1Codec, IFieldCodec<T2> item2Codec, IFieldCodec<T3> item3Codec, IFieldCodec<T4> item4Codec, IFieldCodec<T5> item5Codec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "item1Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T1>"
+            },
+            {
+              "name": "item2Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T2>"
+            },
+            {
+              "name": "item3Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T3>"
+            },
+            {
+              "name": "item4Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T4>"
+            },
+            {
+              "name": "item5Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T5>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "590-614"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCodec",
+      "fullName": "Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        },
+        {
+          "name": "T4"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IDerivedTypeCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "465-465",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCodec<T1, T2, T3, T4>.FSharpChoiceCodec(IFieldCodec<T1> item1Codec, IFieldCodec<T2> item2Codec, IFieldCodec<T3> item3Codec, IFieldCodec<T4> item4Codec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "item1Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T1>"
+            },
+            {
+              "name": "item2Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T2>"
+            },
+            {
+              "name": "item3Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T3>"
+            },
+            {
+              "name": "item4Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T4>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "467-487"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCodec",
+      "fullName": "Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IDerivedTypeCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "352-352",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCodec<T1, T2, T3>.FSharpChoiceCodec(IFieldCodec<T1> item1Codec, IFieldCodec<T2> item2Codec, IFieldCodec<T3> item3Codec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "item1Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T1>"
+            },
+            {
+              "name": "item2Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T2>"
+            },
+            {
+              "name": "item3Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T3>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "354-370"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCodec",
+      "fullName": "Orleans.Serialization.FSharpChoiceCodec<T1, T2>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IDerivedTypeCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpChoice<T1, T2>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Serializer for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.FSharp.Core.FSharpChoice`2"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "247-247",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCodec<T1, T2>.FSharpChoiceCodec(IFieldCodec<T1> item1Codec, IFieldCodec<T2> item2Codec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "item1Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T1>"
+            },
+            {
+              "name": "item2Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T2>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.FSharpChoiceCodec`2"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "item1Codec": [
+                {
+                  "kind": "text",
+                  "text": "The codec for "
+                },
+                {
+                  "kind": "typeparamref",
+                  "value": "T1"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ],
+              "item2Codec": [
+                {
+                  "kind": "text",
+                  "text": "The codec for "
+                },
+                {
+                  "kind": "typeparamref",
+                  "value": "T2"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "249-264"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCopier",
+      "fullName": "Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5, T6>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        },
+        {
+          "name": "T4"
+        },
+        {
+          "name": "T5"
+        },
+        {
+          "name": "T6"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6>>",
+        "Orleans.Serialization.Cloning.IDerivedTypeCopier"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "816-816",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCopier<T1, T2, T3, T4, T5, T6>.FSharpChoiceCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2, IDeepCopier<T3> copier3, IDeepCopier<T4> copier4, IDeepCopier<T5> copier5, IDeepCopier<T6> copier6)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier1",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T1>"
+            },
+            {
+              "name": "copier2",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T2>"
+            },
+            {
+              "name": "copier3",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T3>"
+            },
+            {
+              "name": "copier4",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T4>"
+            },
+            {
+              "name": "copier5",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T5>"
+            },
+            {
+              "name": "copier6",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T6>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "825-839"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpChoice<T1, T2, T3, T4, T5, T6> FSharpChoiceCopier<T1, T2, T3, T4, T5, T6>.DeepCopy(FSharpChoice<T1, T2, T3, T4, T5, T6> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "843-859"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCopier",
+      "fullName": "Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        },
+        {
+          "name": "T4"
+        },
+        {
+          "name": "T5"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5>>",
+        "Orleans.Serialization.Cloning.IDerivedTypeCopier"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "677-677",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCopier<T1, T2, T3, T4, T5>.FSharpChoiceCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2, IDeepCopier<T3> copier3, IDeepCopier<T4> copier4, IDeepCopier<T5> copier5)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier1",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T1>"
+            },
+            {
+              "name": "copier2",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T2>"
+            },
+            {
+              "name": "copier3",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T3>"
+            },
+            {
+              "name": "copier4",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T4>"
+            },
+            {
+              "name": "copier5",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T5>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "685-697"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpChoice<T1, T2, T3, T4, T5> FSharpChoiceCopier<T1, T2, T3, T4, T5>.DeepCopy(FSharpChoice<T1, T2, T3, T4, T5> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "701-716"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCopier",
+      "fullName": "Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        },
+        {
+          "name": "T4"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4>>",
+        "Orleans.Serialization.Cloning.IDerivedTypeCopier"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "548-548",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCopier<T1, T2, T3, T4>.FSharpChoiceCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2, IDeepCopier<T3> copier3, IDeepCopier<T4> copier4)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier1",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T1>"
+            },
+            {
+              "name": "copier2",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T2>"
+            },
+            {
+              "name": "copier3",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T3>"
+            },
+            {
+              "name": "copier4",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T4>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "555-565"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpChoice<T1, T2, T3, T4> FSharpChoiceCopier<T1, T2, T3, T4>.DeepCopy(FSharpChoice<T1, T2, T3, T4> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "569-583"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCopier",
+      "fullName": "Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        },
+        {
+          "name": "T3"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3>>",
+        "Orleans.Serialization.Cloning.IDerivedTypeCopier"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "429-429",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCopier<T1, T2, T3>.FSharpChoiceCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2, IDeepCopier<T3> copier3)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier1",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T1>"
+            },
+            {
+              "name": "copier2",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T2>"
+            },
+            {
+              "name": "copier3",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T3>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "435-443"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpChoice<T1, T2, T3> FSharpChoiceCopier<T1, T2, T3>.DeepCopy(FSharpChoice<T1, T2, T3> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "447-460"
+        }
+      ]
+    },
+    {
+      "name": "FSharpChoiceCopier",
+      "fullName": "Orleans.Serialization.FSharpChoiceCopier<T1, T2>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T1"
+        },
+        {
+          "name": "T2"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpChoice<T1, T2>>",
+        "Orleans.Serialization.Cloning.IDerivedTypeCopier"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "322-322",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpChoiceCopier<T1, T2>.FSharpChoiceCopier(IDeepCopier<T1> copier1, IDeepCopier<T2> copier2)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier1",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T1>"
+            },
+            {
+              "name": "copier2",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T2>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "327-331"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpChoice<T1, T2> FSharpChoiceCopier<T1, T2>.DeepCopy(FSharpChoice<T1, T2> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpChoice<T1, T2>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpChoice<T1, T2>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "335-347"
+        }
+      ]
+    },
+    {
+      "name": "FSharpListCodec",
+      "fullName": "Orleans.Serialization.FSharpListCodec<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "baseType": "Orleans.Serialization.Codecs.GeneralizedReferenceTypeSurrogateCodec<Microsoft.FSharp.Collections.FSharpList<T>, Orleans.Serialization.FSharpListSurrogate<T>>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Surrogate serializer for "
+          },
+          {
+            "kind": "typeparamref",
+            "value": "TField"
+          },
+          {
+            "kind": "text",
+            "text": " and all sub-types. "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The type which the implementation of this class supports."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "912-912",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpListCodec<T>.FSharpListCodec(IValueSerializer<FSharpListSurrogate<T>> surrogateSerializer)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "surrogateSerializer",
+              "type": "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpListSurrogate<T>>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "914-916"
+        },
+        {
+          "name": "ConvertFromSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override FSharpList<T> FSharpListCodec<T>.ConvertFromSurrogate(ref FSharpListSurrogate<T> surrogate)",
+          "returnType": "Microsoft.FSharp.Collections.FSharpList<T>",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpListSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value from the surrogate type to the field type. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "920-922"
+        },
+        {
+          "name": "ConvertToSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override void FSharpListCodec<T>.ConvertToSurrogate(FSharpList<T> value, ref FSharpListSurrogate<T> surrogate)",
+          "returnType": "void",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "value",
+              "type": "Microsoft.FSharp.Collections.FSharpList<T>"
+            },
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpListSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value to the surrogate type. "
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "927-930"
+        }
+      ]
+    },
+    {
+      "name": "FSharpListCopier",
+      "fullName": "Orleans.Serialization.FSharpListCopier<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Collections.FSharpList<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "941-941",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpListCopier<T>.FSharpListCopier(IDeepCopier<T> copier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "944-944"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpList<T> FSharpListCopier<T>.DeepCopy(FSharpList<T> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Collections.FSharpList<T>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Collections.FSharpList<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "948-955"
+        }
+      ]
+    },
+    {
+      "name": "FSharpListSurrogate",
+      "fullName": "Orleans.Serialization.FSharpListSurrogate<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "struct",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Provides the base class for value types."
+          }
+        ]
+      },
+      "attributes": [
+        {
+          "name": "Orleans.GenerateSerializerAttribute"
+        }
+      ],
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "934-934",
+      "members": [
+        {
+          "name": "Value",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public List<T> FSharpListSurrogate<T>.Value",
+          "returnType": "System.Collections.Generic.List<T>",
+          "hasGet": true,
+          "hasSet": true,
+          "attributes": [
+            {
+              "name": "Orleans.IdAttribute",
+              "constructorArguments": [
+                "0"
+              ]
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs"
+        }
+      ]
+    },
+    {
+      "name": "FSharpMapCodec",
+      "fullName": "Orleans.Serialization.FSharpMapCodec<TKey, TValue>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TKey"
+        },
+        {
+          "name": "TValue"
+        }
+      ],
+      "baseType": "Orleans.Serialization.Codecs.GeneralizedReferenceTypeSurrogateCodec<Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>, Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Surrogate serializer for "
+          },
+          {
+            "kind": "typeparamref",
+            "value": "TField"
+          },
+          {
+            "kind": "text",
+            "text": " and all sub-types. "
+          }
+        ],
+        "typeParameters": {
+          "TKey": [
+            {
+              "kind": "text",
+              "text": "The type which the implementation of this class supports."
+            }
+          ],
+          "TValue": [
+            {
+              "kind": "text",
+              "text": "The surrogate type serialized in place of "
+            },
+            {
+              "kind": "typeparamref",
+              "value": "TField"
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "1022-1022",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpMapCodec<TKey, TValue>.FSharpMapCodec(IValueSerializer<FSharpMapSurrogate<TKey, TValue>> surrogateSerializer)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "surrogateSerializer",
+              "type": "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1024-1026"
+        },
+        {
+          "name": "ConvertFromSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override FSharpMap<TKey, TValue> FSharpMapCodec<TKey, TValue>.ConvertFromSurrogate(ref FSharpMapSurrogate<TKey, TValue> surrogate)",
+          "returnType": "Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value from the surrogate type to the field type. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1030-1032"
+        },
+        {
+          "name": "ConvertToSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override void FSharpMapCodec<TKey, TValue>.ConvertToSurrogate(FSharpMap<TKey, TValue> value, ref FSharpMapSurrogate<TKey, TValue> surrogate)",
+          "returnType": "void",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "value",
+              "type": "Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>"
+            },
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value to the surrogate type. "
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1037-1041"
+        }
+      ]
+    },
+    {
+      "name": "FSharpMapCopier",
+      "fullName": "Orleans.Serialization.FSharpMapCopier<TKey, TValue>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TKey"
+        },
+        {
+          "name": "TValue"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "1052-1052",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpMapCopier<TKey, TValue>.FSharpMapCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "keyCopier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<TKey>"
+            },
+            {
+              "name": "valueCopier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<TValue>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1057-1061"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpMap<TKey, TValue> FSharpMapCopier<TKey, TValue>.DeepCopy(FSharpMap<TKey, TValue> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1065-1072"
+        }
+      ]
+    },
+    {
+      "name": "FSharpMapSurrogate",
+      "fullName": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>",
+      "namespace": "Orleans.Serialization",
+      "kind": "struct",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TKey"
+        },
+        {
+          "name": "TValue"
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Provides the base class for value types."
+          }
+        ]
+      },
+      "attributes": [
+        {
+          "name": "Orleans.GenerateSerializerAttribute"
+        }
+      ],
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "1045-1045",
+      "members": [
+        {
+          "name": "Value",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public List<Tuple<TKey, TValue>> FSharpMapSurrogate<TKey, TValue>.Value",
+          "returnType": "System.Collections.Generic.List<System.Tuple<TKey, TValue>>",
+          "hasGet": true,
+          "hasSet": true,
+          "attributes": [
+            {
+              "name": "Orleans.IdAttribute",
+              "constructorArguments": [
+                "0"
+              ]
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs"
+        }
+      ]
+    },
+    {
+      "name": "FSharpOptionCodec",
+      "fullName": "Orleans.Serialization.FSharpOptionCodec<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpOption<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Serializer for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.FSharp.Core.FSharpOption`1"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The underlying type."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "47-47",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpOptionCodec<T>.FSharpOptionCodec(IFieldCodec<T> fieldCodec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "fieldCodec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.FSharpOptionCodec`1"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "49-59"
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpOption<T> FSharpOptionCodec<T>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)",
+          "returnType": "Microsoft.FSharp.Core.FSharpOption<T>",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "78-107"
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FSharpOptionCodec<T>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpOption<T> value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Microsoft.FSharp.Core.FSharpOption<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "64-73"
+        }
+      ]
+    },
+    {
+      "name": "FSharpOptionCopier",
+      "fullName": "Orleans.Serialization.FSharpOptionCopier<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpOption<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Copier implementation for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.FSharp.Core.FSharpOption`1"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The underlying value type of the option type."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "116-116",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpOptionCopier<T>.FSharpOptionCopier(IDeepCopier<T> valueCopier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "valueCopier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.FSharpOptionCopier`1"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "valueCopier": [
+                {
+                  "kind": "text",
+                  "text": "The value copier."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "124-127"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpOption<T> FSharpOptionCopier<T>.DeepCopy(FSharpOption<T> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpOption<T>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpOption<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "132-144"
+        }
+      ]
+    },
+    {
+      "name": "FSharpRefCodec",
+      "fullName": "Orleans.Serialization.FSharpRefCodec<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "baseType": "Orleans.Serialization.Codecs.GeneralizedReferenceTypeSurrogateCodec<Microsoft.FSharp.Core.FSharpRef<T>, Orleans.Serialization.FSharpRefSurrogate<T>>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Surrogate serializer for "
+          },
+          {
+            "kind": "typeparamref",
+            "value": "TField"
+          },
+          {
+            "kind": "text",
+            "text": " and all sub-types. "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The type which the implementation of this class supports."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "864-864",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpRefCodec<T>.FSharpRefCodec(IValueSerializer<FSharpRefSurrogate<T>> surrogateSerializer)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "surrogateSerializer",
+              "type": "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpRefSurrogate<T>>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "866-868"
+        },
+        {
+          "name": "ConvertFromSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override FSharpRef<T> FSharpRefCodec<T>.ConvertFromSurrogate(ref FSharpRefSurrogate<T> surrogate)",
+          "returnType": "Microsoft.FSharp.Core.FSharpRef<T>",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpRefSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value from the surrogate type to the field type. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "872-872"
+        },
+        {
+          "name": "ConvertToSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override void FSharpRefCodec<T>.ConvertToSurrogate(FSharpRef<T> value, ref FSharpRefSurrogate<T> surrogate)",
+          "returnType": "void",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "value",
+              "type": "Microsoft.FSharp.Core.FSharpRef<T>"
+            },
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpRefSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value to the surrogate type. "
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "877-878"
+        }
+      ]
+    },
+    {
+      "name": "FSharpRefCopier",
+      "fullName": "Orleans.Serialization.FSharpRefCopier<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpRef<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "889-889",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpRefCopier<T>.FSharpRefCopier(IDeepCopier<T> copier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "892-892"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpRef<T> FSharpRefCopier<T>.DeepCopy(FSharpRef<T> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpRef<T>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpRef<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "895-907"
+        }
+      ]
+    },
+    {
+      "name": "FSharpRefSurrogate",
+      "fullName": "Orleans.Serialization.FSharpRefSurrogate<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "struct",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Provides the base class for value types."
+          }
+        ]
+      },
+      "attributes": [
+        {
+          "name": "Orleans.GenerateSerializerAttribute"
+        }
+      ],
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "882-882",
+      "members": [
+        {
+          "name": "Value",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public T FSharpRefSurrogate<T>.Value",
+          "returnType": "T",
+          "hasGet": true,
+          "hasSet": true,
+          "attributes": [
+            {
+              "name": "Orleans.IdAttribute",
+              "constructorArguments": [
+                "0"
+              ]
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs"
+        }
+      ]
+    },
+    {
+      "name": "FSharpResultCodec",
+      "fullName": "Orleans.Serialization.FSharpResultCodec<T, TError>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        },
+        {
+          "name": "TError"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IDerivedTypeCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpResult<T, TError>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "1085-1085",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpResultCodec<T, TError>.FSharpResultCodec(IFieldCodec<T> item1Codec, IFieldCodec<TError> item2Codec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "item1Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T>"
+            },
+            {
+              "name": "item2Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<TError>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1087-1097"
+        }
+      ]
+    },
+    {
+      "name": "FSharpResultCopier",
+      "fullName": "Orleans.Serialization.FSharpResultCopier<T, TError>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        },
+        {
+          "name": "TError"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpResult<T, TError>>",
+        "Orleans.Serialization.Cloning.IDerivedTypeCopier"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "1146-1146",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpResultCopier<T, TError>.FSharpResultCopier(IDeepCopier<T> copier1, IDeepCopier<TError> copier2)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier1",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T>"
+            },
+            {
+              "name": "copier2",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<TError>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1151-1155"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpResult<T, TError> FSharpResultCopier<T, TError>.DeepCopy(FSharpResult<T, TError> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpResult<T, TError>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpResult<T, TError>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1159-1165"
+        }
+      ]
+    },
+    {
+      "name": "FSharpSetCodec",
+      "fullName": "Orleans.Serialization.FSharpSetCodec<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "baseType": "Orleans.Serialization.Codecs.GeneralizedReferenceTypeSurrogateCodec<Microsoft.FSharp.Collections.FSharpSet<T>, Orleans.Serialization.FSharpSetSurrogate<T>>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Surrogate serializer for "
+          },
+          {
+            "kind": "typeparamref",
+            "value": "TField"
+          },
+          {
+            "kind": "text",
+            "text": " and all sub-types. "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The type which the implementation of this class supports."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "968-968",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpSetCodec<T>.FSharpSetCodec(IValueSerializer<FSharpSetSurrogate<T>> surrogateSerializer)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "surrogateSerializer",
+              "type": "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpSetSurrogate<T>>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "970-972"
+        },
+        {
+          "name": "ConvertFromSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override FSharpSet<T> FSharpSetCodec<T>.ConvertFromSurrogate(ref FSharpSetSurrogate<T> surrogate)",
+          "returnType": "Microsoft.FSharp.Collections.FSharpSet<T>",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpSetSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value from the surrogate type to the field type. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "976-977"
+        },
+        {
+          "name": "ConvertToSurrogate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public override void FSharpSetCodec<T>.ConvertToSurrogate(FSharpSet<T> value, ref FSharpSetSurrogate<T> surrogate)",
+          "returnType": "void",
+          "isOverride": true,
+          "parameters": [
+            {
+              "name": "value",
+              "type": "Microsoft.FSharp.Collections.FSharpSet<T>"
+            },
+            {
+              "name": "surrogate",
+              "type": "Orleans.Serialization.FSharpSetSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Converts a value to the surrogate type. "
+              }
+            ],
+            "parameters": {
+              "surrogate": [
+                {
+                  "kind": "text",
+                  "text": "The surrogate."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "982-984"
+        }
+      ]
+    },
+    {
+      "name": "FSharpSetCopier",
+      "fullName": "Orleans.Serialization.FSharpSetCopier<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Collections.FSharpSet<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "995-995",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpSetCopier<T>.FSharpSetCopier(IDeepCopier<T> copier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "copier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "998-998"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpSet<T> FSharpSetCopier<T>.DeepCopy(FSharpSet<T> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Collections.FSharpSet<T>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Collections.FSharpSet<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "1002-1009"
+        }
+      ]
+    },
+    {
+      "name": "FSharpSetSurrogate",
+      "fullName": "Orleans.Serialization.FSharpSetSurrogate<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "struct",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Provides the base class for value types."
+          }
+        ]
+      },
+      "attributes": [
+        {
+          "name": "Orleans.GenerateSerializerAttribute"
+        }
+      ],
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "988-988",
+      "members": [
+        {
+          "name": "Value",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public List<T> FSharpSetSurrogate<T>.Value",
+          "returnType": "System.Collections.Generic.List<T>",
+          "hasGet": true,
+          "hasSet": true,
+          "attributes": [
+            {
+              "name": "Orleans.IdAttribute",
+              "constructorArguments": [
+                "0"
+              ]
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs"
+        }
+      ]
+    },
+    {
+      "name": "FSharpUnitCodec",
+      "fullName": "Orleans.Serialization.FSharpUnitCodec",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.Unit>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Serializer for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.FSharp.Core.Unit"
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "21-21",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpUnitCodec.FSharpUnitCodec()",
+          "returnType": "void"
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Unit FSharpUnitCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)",
+          "returnType": "Microsoft.FSharp.Core.Unit",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "28-32"
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FSharpUnitCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Unit value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Microsoft.FSharp.Core.Unit"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "24-24"
+        }
+      ]
+    },
+    {
+      "name": "FSharpUnitCopier",
+      "fullName": "Orleans.Serialization.FSharpUnitCopier",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "Orleans.Serialization.Cloning.ShallowCopier<Microsoft.FSharp.Core.Unit>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Copier for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.FSharp.Core.Unit"
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpUnitCopier.FSharpUnitCopier()",
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "name": "FSharpValueOptionCodec",
+      "fullName": "Orleans.Serialization.FSharpValueOptionCodec<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Microsoft.FSharp.Core.FSharpValueOption<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Serializer for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.FSharp.Core.FSharpValueOption`1"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "153-153",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpValueOptionCodec<T>.FSharpValueOptionCodec(IFieldCodec<T> item1Codec)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "item1Codec",
+              "type": "Orleans.Serialization.Codecs.IFieldCodec<T>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.FSharpValueOptionCodec`1"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "item1Codec": [
+                {
+                  "kind": "text",
+                  "text": "The item codec."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "161-164"
+        }
+      ]
+    },
+    {
+      "name": "FSharpValueOptionCopier",
+      "fullName": "Orleans.Serialization.FSharpValueOptionCopier<T>",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Microsoft.FSharp.Core.FSharpValueOption<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Copier for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.FSharp.Core.FSharpValueOption`1"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ],
+        "typeParameters": {
+          "T": [
+            {
+              "kind": "text",
+              "text": "The underlying value type."
+            }
+          ]
+        }
+      },
+      "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+      "sourceLines": "216-216",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public FSharpValueOptionCopier<T>.FSharpValueOptionCopier(IDeepCopier<T> valueCopier)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "valueCopier",
+              "type": "Orleans.Serialization.Cloning.IDeepCopier<T>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.FSharpValueOptionCopier`1"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "valueCopier": [
+                {
+                  "kind": "text",
+                  "text": "The value copier."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "224-227"
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpValueOption<T> FSharpValueOptionCopier<T>.DeepCopy(FSharpValueOption<T> input, CopyContext context)",
+          "returnType": "Microsoft.FSharp.Core.FSharpValueOption<T>",
+          "parameters": [
+            {
+              "name": "input",
+              "type": "Microsoft.FSharp.Core.FSharpValueOption<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "input": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.FSharp/FSharpCodecs.cs",
+          "sourceLines": "232-238"
+        }
+      ]
+    },
+    {
+      "name": "Codec_FSharpListSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Codec_FSharpListSurrogate<T>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Orleans.Serialization.FSharpListSurrogate<T>>",
+        "Orleans.Serialization.Serializers.IValueSerializer",
+        "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpListSurrogate<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Codec_FSharpListSurrogate<T>.Codec_FSharpListSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "Deserialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpListSurrogate<T>.Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, scoped ref FSharpListSurrogate<T> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpListSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Deserializes the specified type. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpListSurrogate<T> Codec_FSharpListSurrogate<T>.ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)",
+          "returnType": "Orleans.Serialization.FSharpListSurrogate<T>",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Serialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpListSurrogate<T>.Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref FSharpListSurrogate<T> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpListSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Serializes the provided value. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpListSurrogate<T>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpListSurrogate<T> value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Orleans.Serialization.FSharpListSurrogate<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Codec_FSharpMapSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Codec_FSharpMapSurrogate<TKey, TValue>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TKey"
+        },
+        {
+          "name": "TValue"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>",
+        "Orleans.Serialization.Serializers.IValueSerializer",
+        "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Codec_FSharpMapSurrogate<TKey, TValue>.Codec_FSharpMapSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "Deserialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpMapSurrogate<TKey, TValue>.Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, scoped ref FSharpMapSurrogate<TKey, TValue> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Deserializes the specified type. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpMapSurrogate<TKey, TValue> Codec_FSharpMapSurrogate<TKey, TValue>.ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)",
+          "returnType": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Serialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpMapSurrogate<TKey, TValue>.Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref FSharpMapSurrogate<TKey, TValue> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Serializes the provided value. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpMapSurrogate<TKey, TValue>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpMapSurrogate<TKey, TValue> value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Codec_FSharpRefSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Codec_FSharpRefSurrogate<T>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Orleans.Serialization.FSharpRefSurrogate<T>>",
+        "Orleans.Serialization.Serializers.IValueSerializer",
+        "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpRefSurrogate<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Codec_FSharpRefSurrogate<T>.Codec_FSharpRefSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "Deserialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpRefSurrogate<T>.Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, scoped ref FSharpRefSurrogate<T> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpRefSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Deserializes the specified type. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpRefSurrogate<T> Codec_FSharpRefSurrogate<T>.ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)",
+          "returnType": "Orleans.Serialization.FSharpRefSurrogate<T>",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Serialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpRefSurrogate<T>.Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref FSharpRefSurrogate<T> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpRefSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Serializes the provided value. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpRefSurrogate<T>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpRefSurrogate<T> value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Orleans.Serialization.FSharpRefSurrogate<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Codec_FSharpSetSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Codec_FSharpSetSurrogate<T>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Orleans.Serialization.FSharpSetSurrogate<T>>",
+        "Orleans.Serialization.Serializers.IValueSerializer",
+        "Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpSetSurrogate<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Codec_FSharpSetSurrogate<T>.Codec_FSharpSetSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "Deserialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpSetSurrogate<T>.Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, scoped ref FSharpSetSurrogate<T> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpSetSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Deserializes the specified type. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpSetSurrogate<T> Codec_FSharpSetSurrogate<T>.ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)",
+          "returnType": "Orleans.Serialization.FSharpSetSurrogate<T>",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Serialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpSetSurrogate<T>.Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref FSharpSetSurrogate<T> instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Serialization.FSharpSetSurrogate<T>",
+              "modifier": "ref"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Serializes the provided value. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_FSharpSetSurrogate<T>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, FSharpSetSurrogate<T> value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Orleans.Serialization.FSharpSetSurrogate<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Copier_FSharpListSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Copier_FSharpListSurrogate<T>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Orleans.Serialization.FSharpListSurrogate<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Copier_FSharpListSurrogate<T>.Copier_FSharpListSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpListSurrogate<T> Copier_FSharpListSurrogate<T>.DeepCopy(FSharpListSurrogate<T> result, CopyContext context)",
+          "returnType": "Orleans.Serialization.FSharpListSurrogate<T>",
+          "parameters": [
+            {
+              "name": "result",
+              "type": "Orleans.Serialization.FSharpListSurrogate<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "result": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Copier_FSharpMapSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Copier_FSharpMapSurrogate<TKey, TValue>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TKey"
+        },
+        {
+          "name": "TValue"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Copier_FSharpMapSurrogate<TKey, TValue>.Copier_FSharpMapSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpMapSurrogate<TKey, TValue> Copier_FSharpMapSurrogate<TKey, TValue>.DeepCopy(FSharpMapSurrogate<TKey, TValue> result, CopyContext context)",
+          "returnType": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>",
+          "parameters": [
+            {
+              "name": "result",
+              "type": "Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "result": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Copier_FSharpRefSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Copier_FSharpRefSurrogate<T>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Orleans.Serialization.FSharpRefSurrogate<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Copier_FSharpRefSurrogate<T>.Copier_FSharpRefSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpRefSurrogate<T> Copier_FSharpRefSurrogate<T>.DeepCopy(FSharpRefSurrogate<T> result, CopyContext context)",
+          "returnType": "Orleans.Serialization.FSharpRefSurrogate<T>",
+          "parameters": [
+            {
+              "name": "result",
+              "type": "Orleans.Serialization.FSharpRefSurrogate<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "result": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Copier_FSharpSetSurrogate",
+      "fullName": "OrleansCodeGen.Orleans.Serialization.Copier_FSharpSetSurrogate<T>",
+      "namespace": "OrleansCodeGen.Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "T"
+        }
+      ],
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IDeepCopier<Orleans.Serialization.FSharpSetSurrogate<T>>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Copier_FSharpSetSurrogate<T>.Copier_FSharpSetSurrogate(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        },
+        {
+          "name": "DeepCopy",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public FSharpSetSurrogate<T> Copier_FSharpSetSurrogate<T>.DeepCopy(FSharpSetSurrogate<T> result, CopyContext context)",
+          "returnType": "Orleans.Serialization.FSharpSetSurrogate<T>",
+          "parameters": [
+            {
+              "name": "result",
+              "type": "Orleans.Serialization.FSharpSetSurrogate<T>"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Serialization.Cloning.CopyContext"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a deep copy of the provided input. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A copy of "
+              },
+              {
+                "kind": "paramref",
+                "value": "input"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "context": [
+                {
+                  "kind": "text",
+                  "text": "The context."
+                }
+              ],
+              "result": [
+                {
+                  "kind": "text",
+                  "text": "The input."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

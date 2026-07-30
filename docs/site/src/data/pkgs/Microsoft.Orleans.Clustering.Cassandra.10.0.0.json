@@ -1,0 +1,675 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Clustering.Cassandra",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "CassandraClusteringOptions",
+      "fullName": "Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions",
+      "namespace": "Orleans.Clustering.Cassandra.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for configuring Cassandra clustering. "
+          }
+        ]
+      },
+      "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraClusteringOptions.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public CassandraClusteringOptions.CassandraClusteringOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraClusteringOptions.cs",
+          "sourceLines": "36-36"
+        },
+        {
+          "name": "ConfigureClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CassandraClusteringOptions.ConfigureClient(Func<IServiceProvider, Task<ISession>> configurationDelegate)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "configurationDelegate",
+              "type": "System.Func<System.IServiceProvider, System.Threading.Tasks.Task<Cassandra.ISession>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the Cassandra client. "
+              }
+            ],
+            "parameters": {
+              "configurationDelegate": [
+                {
+                  "kind": "text",
+                  "text": "The connection string."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraClusteringOptions.cs",
+          "sourceLines": "71-73"
+        },
+        {
+          "name": "ConfigureClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CassandraClusteringOptions.ConfigureClient(string connectionString, string keyspace = \"orleans\")",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "connectionString",
+              "type": "string"
+            },
+            {
+              "name": "keyspace",
+              "type": "string",
+              "isOptional": true,
+              "defaultValue": "orleans"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the Cassandra client. "
+              }
+            ],
+            "parameters": {
+              "connectionString": [
+                {
+                  "kind": "text",
+                  "text": "The connection string."
+                }
+              ],
+              "keyspace": [
+                {
+                  "kind": "text",
+                  "text": "The keyspace."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraClusteringOptions.cs",
+          "sourceLines": "53-63"
+        },
+        {
+          "name": "InitializeRetryMaxDelay",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan CassandraClusteringOptions.InitializeRetryMaxDelay",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Specifies the maximum amount of time to wait after encountering contention during initialization before retrying. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": "This is generally only encountered with large numbers of silos connecting in a short time period and using multi-datacenter Cassandara clusters"
+              }
+            ]
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraClusteringOptions.cs"
+        },
+        {
+          "name": "UseCassandraTtl",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool CassandraClusteringOptions.UseCassandraTtl",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Optionally configure time-to-live behavior for the membership table row data in Cassandra itself, allowing defunct silo cleanup even if a cluster is no longer running. "
+              },
+              {
+                "kind": "text",
+                "text": " When this is "
+              },
+              {
+                "kind": "code",
+                "text": "true"
+              },
+              {
+                "kind": "text",
+                "text": ", "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Configuration.ClusterMembershipOptions.DefunctSiloCleanupPeriod"
+              },
+              {
+                "kind": "text",
+                "text": " CAN be null to enable Cassandra-only defunct silo cleanup. Either way, the Cassandra TTL will still be configured from the configured "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Configuration.ClusterMembershipOptions.DefunctSiloExpiration"
+              },
+              {
+                "kind": "text",
+                "text": " value. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Initial implementation of https://github.com/dotnet/orleans/issues/9164 in that it only affects silo entries that are updated with IAmAlive and will not attempt to update, for instance, the entire membership table. It also will not affect membership tables that have already been created, since it uses the Cassandra table-level "
+              },
+              {
+                "kind": "code",
+                "text": "default_time_to_live"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraClusteringOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "CassandraMembershipHostingExtensions",
+      "fullName": "Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions",
+      "namespace": "Orleans.Clustering.Cassandra.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extension methods for configuring Cassandra as a clustering provider. "
+          }
+        ]
+      },
+      "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs",
+      "sourceLines": "15-15",
+      "members": [
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this IClientBuilder builder)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The client builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The client builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        },
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this IClientBuilder builder, Action<CassandraClusteringOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The client builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The client builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to configure the Cassandra client."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        },
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this IClientBuilder builder, Func<IServiceProvider, Task<ISession>> sessionProvider)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "sessionProvider",
+              "type": "System.Func<System.IServiceProvider, System.Threading.Tasks.Task<Cassandra.ISession>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The client builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The client builder."
+                }
+              ],
+              "sessionProvider": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to create an "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Cassandra.ISession"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        },
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this IClientBuilder builder, string connectionString, string keyspace = \"orleans\")",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "connectionString",
+              "type": "string"
+            },
+            {
+              "name": "keyspace",
+              "type": "string",
+              "isOptional": true,
+              "defaultValue": "orleans"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The client builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The client builder."
+                }
+              ],
+              "connectionString": [
+                {
+                  "kind": "text",
+                  "text": "The Cassandra connection string."
+                }
+              ],
+              "keyspace": [
+                {
+                  "kind": "text",
+                  "text": "The Cassandra keyspace, which defaults to "
+                },
+                {
+                  "kind": "code",
+                  "text": "orleans"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        },
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this ISiloBuilder builder)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": "Pulls "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.Options.IOptions`1"
+              },
+              {
+                "kind": "text",
+                "text": " of type "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Configuration.ClusterOptions"
+              },
+              {
+                "kind": "text",
+                "text": " and "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Cassandra.ISession"
+              },
+              {
+                "kind": "text",
+                "text": " from the DI container"
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The silo builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        },
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this ISiloBuilder builder, Action<CassandraClusteringOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The silo builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to configure the Cassandra client."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        },
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this ISiloBuilder builder, Func<IServiceProvider, Task<ISession>> sessionProvider)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "sessionProvider",
+              "type": "System.Func<System.IServiceProvider, System.Threading.Tasks.Task<Cassandra.ISession>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The silo builder."
+                }
+              ],
+              "sessionProvider": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to create an "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Cassandra.ISession"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        },
+        {
+          "name": "UseCassandraClustering",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder CassandraMembershipHostingExtensions.UseCassandraClustering(this ISiloBuilder builder, string connectionString, string keyspace = \"orleans\")",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "connectionString",
+              "type": "string"
+            },
+            {
+              "name": "keyspace",
+              "type": "string",
+              "isOptional": true,
+              "defaultValue": "orleans"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Orleans clustering using Cassandra. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder."
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": "The silo builder."
+                }
+              ],
+              "connectionString": [
+                {
+                  "kind": "text",
+                  "text": "The Cassandra connection string."
+                }
+              ],
+              "keyspace": [
+                {
+                  "kind": "text",
+                  "text": "The Cassandra keyspace, which defaults to "
+                },
+                {
+                  "kind": "code",
+                  "text": "orleans"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Cassandra/Orleans.Clustering.Cassandra/Hosting/CassandraMembershipHostingExtensions.cs"
+        }
+      ]
+    }
+  ]
+}

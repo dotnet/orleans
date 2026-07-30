@@ -1,0 +1,630 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Streaming.NATS",
+    "version": "10.0.0-alpha.1",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "NatsOptions",
+      "fullName": "Orleans.Streaming.NATS.NatsOptions",
+      "namespace": "Orleans.Streaming.NATS",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration options for the NATS JetStream stream provider "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public NatsOptions.NatsOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs",
+          "sourceLines": "29-63"
+        },
+        {
+          "name": "BatchSize",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int NatsOptions.BatchSize",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum number of messages to fetch in a single batch. Defaults to 100. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        },
+        {
+          "name": "JsonSerializerOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public JsonSerializerOptions? NatsOptions.JsonSerializerOptions",
+          "returnType": "System.Text.Json.JsonSerializerOptions?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " System.Text.Json serializer options to be used by the NATS provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        },
+        {
+          "name": "NatsClientOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public NatsOpts? NatsOptions.NatsClientOptions",
+          "returnType": "NATS.Client.Core.NatsOpts?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configuration options for the NATS client. If not provided, a default client will be created with the name Orleans-{providerName} and will connect to the NATS server at localhost:4222 "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        },
+        {
+          "name": "NumReplicas",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int NatsOptions.NumReplicas",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The number of stream replicas in the NATS JetStream cluster. Higher values improve availability during node restarts (R3 survives single-node failures in a 3-node cluster). The NATS server enforces that the value is odd and does not exceed the cluster size. Defaults to 1. Set to 3 for production clusters with ≥ 3 nodes. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        },
+        {
+          "name": "PartitionCount",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int NatsOptions.PartitionCount",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The number of partitions in the stream. This determines the number of pooling agents that will be created on this Orleans Cluster. This is mapped to a deterministic partitioning scheme of the NATS JetStream stream. The partitions are mapped from "
+              },
+              {
+                "kind": "text",
+                "text": "\"[Provider-Name].*.*\""
+              },
+              {
+                "kind": "text",
+                "text": " to "
+              },
+              {
+                "kind": "text",
+                "text": "\"[Provider-Name].{{partition([PartitionCount],1,2)}}.{{wildcard(1)}}.{{wildcard(2)}}\""
+              },
+              {
+                "kind": "text",
+                "text": ". For details on how partitioning works in NATS JetStream, see "
+              },
+              {
+                "kind": "text",
+                "text": " Defaults to 8. Increase it if you need more parallelism. "
+              },
+              {
+                "kind": "text",
+                "text": " Deterministic partition scheme is a NATS server construct. This provider when started at the first time will create the stream with the partition scheme. If you need to change the partition count, you need to modify the value of this property and, you need to manually modify it on NATS Server first since the provider will not make updates to the JetStream stream definition. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        },
+        {
+          "name": "ProducerCount",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int NatsOptions.ProducerCount",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The number of connections used to send stream messages to NATS JetStream. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        },
+        {
+          "name": "StorageType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public StreamConfigStorage NatsOptions.StorageType",
+          "returnType": "NATS.Client.JetStream.Models.StreamConfigStorage",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The storage backend used by the NATS JetStream stream. Use "
+              },
+              {
+                "kind": "cref",
+                "value": "F:NATS.Client.JetStream.Models.StreamConfigStorage.File"
+              },
+              {
+                "kind": "text",
+                "text": " for durability across NATS server restarts, or "
+              },
+              {
+                "kind": "cref",
+                "value": "F:NATS.Client.JetStream.Models.StreamConfigStorage.Memory"
+              },
+              {
+                "kind": "text",
+                "text": " for lower latency when durability is not required and the NATS server is configured with a memory store. The NATS server must have the corresponding storage type enabled; requesting a storage type the server has not provisioned results in an \"insufficient storage resources available\" error at stream creation. Defaults to "
+              },
+              {
+                "kind": "cref",
+                "value": "F:NATS.Client.JetStream.Models.StreamConfigStorage.File"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        },
+        {
+          "name": "StreamName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string NatsOptions.StreamName",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The NATS JetStream stream name "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "NatsStreamOptionsValidator",
+      "fullName": "Orleans.Streaming.NATS.NatsStreamOptionsValidator",
+      "namespace": "Orleans.Streaming.NATS",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs",
+      "sourceLines": "79-79",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public NatsStreamOptionsValidator.NatsStreamOptionsValidator(NatsOptions options, string? name = null)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Streaming.NATS.NatsOptions"
+            },
+            {
+              "name": "name",
+              "type": "string?",
+              "isNullable": true,
+              "isOptional": true
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs",
+          "sourceLines": "79-79"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void NatsStreamOptionsValidator.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/NatsOptions.cs",
+          "sourceLines": "83-101"
+        }
+      ]
+    },
+    {
+      "name": "ClientBuilderExtensions",
+      "fullName": "Orleans.Streaming.NATS.Hosting.ClientBuilderExtensions",
+      "namespace": "Orleans.Streaming.NATS.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Streaming.NATS/Hosting/ClientBuilderExtensions.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": "AddNatsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ClientBuilderExtensions.AddNatsStreams(this IClientBuilder builder, string name, Action<ClusterClientNatsStreamConfigurator>? configure)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Streaming.NATS.Hosting.ClusterClientNatsStreamConfigurator>?",
+              "isNullable": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure cluster client to use NATS persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/ClientBuilderExtensions.cs",
+          "sourceLines": "26-28"
+        },
+        {
+          "name": "AddNatsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ClientBuilderExtensions.AddNatsStreams(this IClientBuilder builder, string name, Action<NatsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Streaming.NATS.NatsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure cluster client to use NATS persistent streams with default settings "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/ClientBuilderExtensions.cs",
+          "sourceLines": "15-17"
+        }
+      ]
+    },
+    {
+      "name": "ClusterClientNatsStreamConfigurator",
+      "fullName": "Orleans.Streaming.NATS.Hosting.ClusterClientNatsStreamConfigurator",
+      "namespace": "Orleans.Streaming.NATS.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Hosting.ClusterClientPersistentStreamConfigurator",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Client-side configuration provider for persistent streams. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+      "sourceLines": "45-45",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ClusterClientNatsStreamConfigurator.ClusterClientNatsStreamConfigurator(string name, IClientBuilder builder)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder"
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+          "sourceLines": "48-58"
+        },
+        {
+          "name": "ConfigureNats",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ClusterClientNatsStreamConfigurator ClusterClientNatsStreamConfigurator.ConfigureNats(Action<OptionsBuilder<NatsOptions>> configureOptions)",
+          "returnType": "Orleans.Streaming.NATS.Hosting.ClusterClientNatsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Streaming.NATS.NatsOptions>>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+          "sourceLines": "62-63"
+        },
+        {
+          "name": "ConfigurePartitioning",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ClusterClientNatsStreamConfigurator ClusterClientNatsStreamConfigurator.ConfigurePartitioning(int numOfparitions = 8)",
+          "returnType": "Orleans.Streaming.NATS.Hosting.ClusterClientNatsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "numOfparitions",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "8"
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+          "sourceLines": "69-71"
+        }
+      ]
+    },
+    {
+      "name": "SiloBuilderExtensions",
+      "fullName": "Orleans.Streaming.NATS.Hosting.SiloBuilderExtensions",
+      "namespace": "Orleans.Streaming.NATS.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Streaming.NATS/Hosting/SiloBuilderExtensions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": "AddNatsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderExtensions.AddNatsStreams(this ISiloBuilder builder, string name, Action<NatsOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Streaming.NATS.NatsOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use NATS persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/SiloBuilderExtensions.cs",
+          "sourceLines": "14-16"
+        },
+        {
+          "name": "AddNatsStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderExtensions.AddNatsStreams(this ISiloBuilder builder, string name, Action<SiloNatsStreamConfigurator>? configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Streaming.NATS.Hosting.SiloNatsStreamConfigurator>?",
+              "isNullable": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use NATS persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/SiloBuilderExtensions.cs",
+          "sourceLines": "25-28"
+        }
+      ]
+    },
+    {
+      "name": "SiloNatsStreamConfigurator",
+      "fullName": "Orleans.Streaming.NATS.Hosting.SiloNatsStreamConfigurator",
+      "namespace": "Orleans.Streaming.NATS.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Hosting.SiloPersistentStreamConfigurator",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configures persistent streams. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+      "sourceLines": "9-9",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SiloNatsStreamConfigurator.SiloNatsStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureServicesDelegate",
+              "type": "System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+          "sourceLines": "12-22"
+        },
+        {
+          "name": "ConfigureCache",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloNatsStreamConfigurator SiloNatsStreamConfigurator.ConfigureCache(int cacheSize = 4096)",
+          "returnType": "Orleans.Streaming.NATS.Hosting.SiloNatsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "cacheSize",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "4096"
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+          "sourceLines": "32-33"
+        },
+        {
+          "name": "ConfigureNats",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloNatsStreamConfigurator SiloNatsStreamConfigurator.ConfigureNats(Action<OptionsBuilder<NatsOptions>> configureOptions)",
+          "returnType": "Orleans.Streaming.NATS.Hosting.SiloNatsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Streaming.NATS.NatsOptions>>"
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+          "sourceLines": "26-27"
+        },
+        {
+          "name": "ConfigurePartitioning",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloNatsStreamConfigurator SiloNatsStreamConfigurator.ConfigurePartitioning(int numOfparitions = 8)",
+          "returnType": "Orleans.Streaming.NATS.Hosting.SiloNatsStreamConfigurator",
+          "parameters": [
+            {
+              "name": "numOfparitions",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "8"
+            }
+          ],
+          "sourceFile": "src/Orleans.Streaming.NATS/Hosting/NatsStreamConfigurator.cs",
+          "sourceLines": "39-41"
+        }
+      ]
+    }
+  ]
+}

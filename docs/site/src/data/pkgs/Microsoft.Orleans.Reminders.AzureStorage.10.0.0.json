@@ -1,0 +1,1544 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Reminders.AzureStorage",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AzureStorageReminderServiceCollectionExtensions",
+      "fullName": "Orleans.Hosting.AzureStorageReminderServiceCollectionExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+          },
+          {
+            "kind": "text",
+            "text": " extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderServiceCollectionExtensions.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": "UseAzureTableReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection AzureStorageReminderServiceCollectionExtensions.UseAzureTableReminderService(this IServiceCollection services, Action<AzureTableReminderStorageOptions> configure)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Table Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": " The service collection. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderServiceCollectionExtensions.cs",
+          "sourceLines": "28-32"
+        },
+        {
+          "name": "UseAzureTableReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection AzureStorageReminderServiceCollectionExtensions.UseAzureTableReminderService(this IServiceCollection services, Action<OptionsBuilder<AzureTableReminderStorageOptions>> configureOptions)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Table Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": " The service collection. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderServiceCollectionExtensions.cs",
+          "sourceLines": "49-54"
+        },
+        {
+          "name": "UseAzureTableReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection AzureStorageReminderServiceCollectionExtensions.UseAzureTableReminderService(this IServiceCollection services, string connectionString)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Table Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "connectionString": [
+                {
+                  "kind": "text",
+                  "text": " The storage connection string. "
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": " The service collection. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderServiceCollectionExtensions.cs",
+          "sourceLines": "71-82"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageReminderSiloBuilderExtensions",
+      "fullName": "Orleans.Hosting.AzureStorageReminderSiloBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Silo host builder extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderSiloBuilderReminderExtensions.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": "UseAzureTableReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureStorageReminderSiloBuilderExtensions.UseAzureTableReminderService(this ISiloBuilder builder, Action<AzureTableReminderStorageOptions> configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Table Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the reminder store. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderSiloBuilderReminderExtensions.cs",
+          "sourceLines": "26-27"
+        },
+        {
+          "name": "UseAzureTableReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureStorageReminderSiloBuilderExtensions.UseAzureTableReminderService(this ISiloBuilder builder, Action<OptionsBuilder<AzureTableReminderStorageOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Table Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": " The configuration delegate. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderSiloBuilderReminderExtensions.cs",
+          "sourceLines": "44-45"
+        },
+        {
+          "name": "UseAzureTableReminderService",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureStorageReminderSiloBuilderExtensions.UseAzureTableReminderService(this ISiloBuilder builder, string connectionString)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds reminder storage backed by Azure Table Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "connectionString": [
+                {
+                  "kind": "text",
+                  "text": " The storage connection string. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/AzureStorageReminderSiloBuilderReminderExtensions.cs",
+          "sourceLines": "62-73"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptions",
+      "fullName": "Orleans.Reminders.AzureStorage.AzureStorageOperationOptions",
+      "namespace": "Orleans.Reminders.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "30-30",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptions.AzureStorageOperationOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "createClientCallback",
+              "type": "System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>>"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using the provided callback. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "91-92"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "82-83"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "azureSasCredential",
+              "type": "Azure.AzureSasCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.AzureSasCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "109-110"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "sharedKeyCredential",
+              "type": "Azure.Data.Tables.TableSharedKeyCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Data.Tables.TableSharedKeyCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "118-119"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "tokenCredential",
+              "type": "Azure.Core.TokenCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Core.TokenCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "100-101"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using a connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "73-74"
+        },
+        {
+          "name": "ClientOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableClientOptions AzureStorageOperationOptions.ClientOptions",
+          "returnType": "Azure.Data.Tables.TableClientOptions",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Options to be used when configuring the table storage client, or "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": " to use the default options. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "StoragePolicyOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions AzureStorageOperationOptions.StoragePolicyOptions",
+          "returnType": "Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Azure Storage Policy Options "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public virtual string AzureStorageOperationOptions.TableName",
+          "returnType": "string",
+          "isVirtual": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "TableServiceClient",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableServiceClient AzureStorageOperationOptions.TableServiceClient",
+          "returnType": "Azure.Data.Tables.TableServiceClient",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the client used to access the Azure Table Service. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptionsValidator",
+      "fullName": "Orleans.Reminders.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>",
+      "namespace": "Orleans.Reminders.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TOptions",
+          "constraints": [
+            "Orleans.Reminders.AzureStorage.AzureStorageOperationOptions"
+          ]
+        }
+      ],
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "204-204",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "TOptions"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "isOptional": true
+            }
+          ],
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "206-210"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual void AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration()",
+          "returnType": "void",
+          "isVirtual": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "217-218"
+        },
+        {
+          "name": "Name",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AzureStorageOperationOptionsValidator<TOptions>.Name",
+          "returnType": "string",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "213-213"
+        },
+        {
+          "name": "Options",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TOptions AzureStorageOperationOptionsValidator<TOptions>.Options",
+          "returnType": "TOptions",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "212-212"
+        }
+      ]
+    },
+    {
+      "name": "AzureStoragePolicyOptions",
+      "fullName": "Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions",
+      "namespace": "Orleans.Reminders.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+      "sourceLines": "24-24",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions.AzureStoragePolicyOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+          "sourceLines": "30-44"
+        },
+        {
+          "name": "CreationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.CreationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxBulkUpdateRows",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxBulkUpdateRows",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxCreationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxOperationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum number of operation retry attempts. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxPauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.MaxPauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "OperationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.OperationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenCreationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The base delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableReminderStorageOptions",
+      "fullName": "Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions",
+      "namespace": "Orleans.Reminders.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Reminders.AzureStorage.AzureStorageOperationOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Options for Azure Table based reminder table."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureTableReminderStorageOptions.cs",
+      "sourceLines": "4-4",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableReminderStorageOptions.AzureTableReminderStorageOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureTableReminderStorageOptions.cs",
+          "sourceLines": "9-9"
+        },
+        {
+          "name": "DEFAULT_TABLE_NAME",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const string AzureTableReminderStorageOptions.DEFAULT_TABLE_NAME",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureTableReminderStorageOptions.cs"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public override string AzureTableReminderStorageOptions.TableName",
+          "returnType": "string",
+          "isOverride": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureTableReminderStorageOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableReminderStorageOptionsValidator",
+      "fullName": "Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptionsValidator",
+      "namespace": "Orleans.Reminders.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Reminders.AzureStorage.AzureStorageOperationOptionsValidator<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration validator for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureTableReminderStorageOptions.cs",
+      "sourceLines": "16-16",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableReminderStorageOptionsValidator.AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptionsValidator"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The option name to be validated."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The option to be validated."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureTableReminderStorageOptions.cs",
+          "sourceLines": "23-25"
+        }
+      ]
+    },
+    {
+      "name": "AzureBasedReminderTable",
+      "fullName": "Orleans.Runtime.ReminderService.AzureBasedReminderTable",
+      "namespace": "Orleans.Runtime.ReminderService",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.IReminderTable"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+      "sourceLines": "15-15",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureBasedReminderTable.AzureBasedReminderTable(ILoggerFactory loggerFactory, IOptions<ClusterOptions> clusterOptions, IOptions<AzureTableReminderStorageOptions> storageOptions)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "loggerFactory",
+              "type": "Microsoft.Extensions.Logging.ILoggerFactory"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            },
+            {
+              "name": "storageOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+          "sourceLines": "22-38"
+        },
+        {
+          "name": "ReadRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<ReminderEntry> AzureBasedReminderTable.ReadRow(GrainId grainId, string reminderName)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.ReminderEntry>",
+          "parameters": [
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "reminderName",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads the specified entry. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The reminder table entry."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "The grain ID."
+                }
+              ],
+              "reminderName": [
+                {
+                  "kind": "text",
+                  "text": "Name of the reminder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+          "sourceLines": "200-211"
+        },
+        {
+          "name": "ReadRows",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<ReminderTableData> AzureBasedReminderTable.ReadRows(GrainId grainId)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.ReminderTableData>",
+          "parameters": [
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads the reminder table entries associated with the specified grain. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The reminder table entries associated with the specified grain."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "The grain ID."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs"
+        },
+        {
+          "name": "ReadRows",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<ReminderTableData> AzureBasedReminderTable.ReadRows(uint begin, uint end)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.ReminderTableData>",
+          "parameters": [
+            {
+              "name": "begin",
+              "type": "uint"
+            },
+            {
+              "name": "end",
+              "type": "uint"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Returns all rows that have their "
+              },
+              {
+                "kind": "cref",
+                "value": "M:Orleans.Runtime.GrainId.GetUniformHashCode"
+              },
+              {
+                "kind": "text",
+                "text": " in the range (begin, end]. If begin is greater or equal to end, returns all entries with hash greater begin or hash less or equal to end. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The reminder table entries which fall within the specified range."
+              }
+            ],
+            "parameters": {
+              "begin": [
+                {
+                  "kind": "text",
+                  "text": "The exclusive lower bound."
+                }
+              ],
+              "end": [
+                {
+                  "kind": "text",
+                  "text": "The inclusive upper bound."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs"
+        },
+        {
+          "name": "RemoveRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<bool> AzureBasedReminderTable.RemoveRow(GrainId grainId, string reminderName, string eTag)",
+          "returnType": "System.Threading.Tasks.Task<bool>",
+          "parameters": [
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "reminderName",
+              "type": "string"
+            },
+            {
+              "name": "eTag",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Removes a row from the table. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "true if a row with "
+              },
+              {
+                "kind": "paramref",
+                "value": "grainId"
+              },
+              {
+                "kind": "text",
+                "text": " and "
+              },
+              {
+                "kind": "paramref",
+                "value": "reminderName"
+              },
+              {
+                "kind": "text",
+                "text": " existed and was removed successfully, false otherwise"
+              }
+            ],
+            "parameters": {
+              "eTag": [
+                {
+                  "kind": "text",
+                  "text": "The ETag."
+                }
+              ],
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "The grain ID."
+                }
+              ],
+              "reminderName": [
+                {
+                  "kind": "text",
+                  "text": "The reminder name."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+          "sourceLines": "238-263"
+        },
+        {
+          "name": "StartAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AzureBasedReminderTable.StartAsync(CancellationToken cancellationToken)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "cancellationToken",
+              "type": "System.Threading.CancellationToken"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes this instance. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Threading.Tasks.Task"
+              },
+              {
+                "kind": "text",
+                "text": " representing the work performed."
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+          "sourceLines": "48-71"
+        },
+        {
+          "name": "StopAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AzureBasedReminderTable.StopAsync(CancellationToken cancellationToken)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "cancellationToken",
+              "type": "System.Threading.CancellationToken"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Stops the reminder table. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Threading.Tasks.Task"
+              },
+              {
+                "kind": "text",
+                "text": " representing the work performed."
+              }
+            ],
+            "parameters": {
+              "cancellationToken": [
+                {
+                  "kind": "text",
+                  "text": "The cancellation token."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+          "sourceLines": "75-76"
+        },
+        {
+          "name": "TestOnlyClearTable",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AzureBasedReminderTable.TestOnlyClearTable()",
+          "returnType": "System.Threading.Tasks.Task",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Clears the table. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Threading.Tasks.Task"
+              },
+              {
+                "kind": "text",
+                "text": " representing the work performed."
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+          "sourceLines": "155-158"
+        },
+        {
+          "name": "UpsertRow",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<string> AzureBasedReminderTable.UpsertRow(ReminderEntry entry)",
+          "returnType": "System.Threading.Tasks.Task<string>",
+          "parameters": [
+            {
+              "name": "entry",
+              "type": "Orleans.ReminderEntry"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Upserts the specified entry. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The row's new ETag."
+              }
+            ],
+            "parameters": {
+              "entry": [
+                {
+                  "kind": "text",
+                  "text": "The entry."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Reminders.AzureStorage/Storage/AzureBasedReminderTable.cs",
+          "sourceLines": "217-234"
+        }
+      ]
+    }
+  ]
+}

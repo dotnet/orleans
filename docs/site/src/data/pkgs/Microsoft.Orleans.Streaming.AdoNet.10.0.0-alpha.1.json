@@ -1,0 +1,635 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Streaming.AdoNet",
+    "version": "10.0.0-alpha.1",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AdoNetStreamOptions",
+      "fullName": "Orleans.Configuration.AdoNetStreamOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for ADO.NET Streaming. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs",
+      "sourceLines": "7-7",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetStreamOptions.AdoNetStreamOptions()",
+          "returnType": "void",
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs",
+          "sourceLines": "24-57"
+        },
+        {
+          "name": "ConnectionString",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetStreamOptions.ConnectionString",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "DeadLetterEvictionTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AdoNetStreamOptions.DeadLetterEvictionTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The removal timeout until a failed message is deleted from the dead letters table. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "EvictionBatchSize",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AdoNetStreamOptions.EvictionBatchSize",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum number of messages affected by an eviction batch. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "EvictionInterval",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AdoNetStreamOptions.EvictionInterval",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The period of time between eviction activities. These include moving expired messages to dead letters and removing dead letters after their own lifetime. This period is cluster wide and will not change with the number of silos. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "ExpiryTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AdoNetStreamOptions.ExpiryTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The expiry timeout until a message is considered expired and moved to dead letters regardless of attempts. The message is only moved if the current attempt is also past its visibility timeout. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "InitializationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AdoNetStreamOptions.InitializationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " A safety timeout for underlying database initialization. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "Invariant",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AdoNetStreamOptions.Invariant",
+          "returnType": "string",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the ADO.NET invariant. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "MaxAttempts",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AdoNetStreamOptions.MaxAttempts",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum number of attempts to deliver a message. The message is eventually moved to dead letters if these many attempts are made without success. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        },
+        {
+          "name": "VisibilityTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AdoNetStreamOptions.VisibilityTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The timeout until a message is allowed to be dequeued again if not yet confirmed. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AdoNetStreamOptionsValidator",
+      "fullName": "Orleans.Configuration.AdoNetStreamOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Validates "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Configuration.AdoNetStreamOptions"
+          },
+          {
+            "kind": "text",
+            "text": " configuration. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptionsValidator.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AdoNetStreamOptionsValidator.AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.AdoNetStreamOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Configuration.AdoNetStreamOptions"
+              },
+              {
+                "kind": "text",
+                "text": " configuration. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptionsValidator.cs",
+          "sourceLines": "8-8"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AdoNetStreamOptionsValidator.ValidateConfiguration()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/AdoNetStreamOptionsValidator.cs",
+          "sourceLines": "13-52"
+        }
+      ]
+    },
+    {
+      "name": "ClusterClientAdoNetStreamConfigurator",
+      "fullName": "Orleans.Hosting.ClusterClientAdoNetStreamConfigurator",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Hosting.ClusterClientPersistentStreamConfigurator",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Helps set up an individual stream provider on a silo. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamConfigurator.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public ClusterClientAdoNetStreamConfigurator.ClusterClientAdoNetStreamConfigurator(string name, IClientBuilder clientBuilder)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "clientBuilder",
+              "type": "Orleans.Hosting.IClientBuilder"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamConfigurator.cs",
+          "sourceLines": "10-27"
+        },
+        {
+          "name": "ConfigureAdoNet",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ClusterClientAdoNetStreamConfigurator ClusterClientAdoNetStreamConfigurator.ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ClusterClientAdoNetStreamConfigurator",
+          "parameters": [
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetStreamOptions>>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamConfigurator.cs",
+          "sourceLines": "31-35"
+        },
+        {
+          "name": "ConfigureCache",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ClusterClientAdoNetStreamConfigurator ClusterClientAdoNetStreamConfigurator.ConfigureCache(int cacheSize = 4096)",
+          "returnType": "Orleans.Hosting.ClusterClientAdoNetStreamConfigurator",
+          "parameters": [
+            {
+              "name": "cacheSize",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "4096"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamConfigurator.cs",
+          "sourceLines": "40-42"
+        },
+        {
+          "name": "ConfigurePartitioning",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ClusterClientAdoNetStreamConfigurator ClusterClientAdoNetStreamConfigurator.ConfigurePartitioning(int partitions = 8)",
+          "returnType": "Orleans.Hosting.ClusterClientAdoNetStreamConfigurator",
+          "parameters": [
+            {
+              "name": "partitions",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "8"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamConfigurator.cs",
+          "sourceLines": "47-49"
+        }
+      ]
+    },
+    {
+      "name": "ClusterClientAdoNetStreamExtensions",
+      "fullName": "Orleans.Hosting.ClusterClientAdoNetStreamExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Allows configuration of individual ADO.NET streams in a cluster client. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamExtensions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": "AddAdoNetStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ClusterClientAdoNetStreamExtensions.AddAdoNetStreams(this IClientBuilder builder, string name, Action<AdoNetStreamOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AdoNetStreamOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure cluster client to use ADO.NET persistent streams with default settings. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamExtensions.cs",
+          "sourceLines": "13-20"
+        },
+        {
+          "name": "AddAdoNetStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ClusterClientAdoNetStreamExtensions.AddAdoNetStreams(this IClientBuilder builder, string name, Action<ClusterClientAdoNetStreamConfigurator> configure)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Hosting.ClusterClientAdoNetStreamConfigurator>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure cluster client to use ADO.NET persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/ClusterClientAdoNetStreamExtensions.cs",
+          "sourceLines": "28-36"
+        }
+      ]
+    },
+    {
+      "name": "SiloAdoNetStreamConfigurator",
+      "fullName": "Orleans.Hosting.SiloAdoNetStreamConfigurator",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Hosting.SiloPersistentStreamConfigurator",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Helps set up an individual stream provider on a silo. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloAdoNetStreamConfigurator.cs",
+      "sourceLines": "8-8",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SiloAdoNetStreamConfigurator.SiloAdoNetStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureDelegate",
+              "type": "System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloAdoNetStreamConfigurator.cs",
+          "sourceLines": "10-27"
+        },
+        {
+          "name": "ConfigureAdoNet",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloAdoNetStreamConfigurator SiloAdoNetStreamConfigurator.ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.SiloAdoNetStreamConfigurator",
+          "parameters": [
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetStreamOptions>>"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloAdoNetStreamConfigurator.cs",
+          "sourceLines": "31-35"
+        },
+        {
+          "name": "ConfigureCache",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloAdoNetStreamConfigurator SiloAdoNetStreamConfigurator.ConfigureCache(int cacheSize = 4096)",
+          "returnType": "Orleans.Hosting.SiloAdoNetStreamConfigurator",
+          "parameters": [
+            {
+              "name": "cacheSize",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "4096"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloAdoNetStreamConfigurator.cs",
+          "sourceLines": "40-42"
+        },
+        {
+          "name": "ConfigurePartitioning",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public SiloAdoNetStreamConfigurator SiloAdoNetStreamConfigurator.ConfigurePartitioning(int partitions = 8)",
+          "returnType": "Orleans.Hosting.SiloAdoNetStreamConfigurator",
+          "parameters": [
+            {
+              "name": "partitions",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "8"
+            }
+          ],
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloAdoNetStreamConfigurator.cs",
+          "sourceLines": "47-49"
+        }
+      ]
+    },
+    {
+      "name": "SiloBuilderAdoNetStreamExtensions",
+      "fullName": "Orleans.Hosting.SiloBuilderAdoNetStreamExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Allows configuration of individual ADO.NET streams in a silo. "
+          }
+        ]
+      },
+      "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloBuilderAdoNetStreamExtensions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": "AddAdoNetStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderAdoNetStreamExtensions.AddAdoNetStreams(this ISiloBuilder builder, string name, Action<AdoNetStreamOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AdoNetStreamOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use ADO.NET persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloBuilderAdoNetStreamExtensions.cs",
+          "sourceLines": "13-20"
+        },
+        {
+          "name": "AddAdoNetStreams",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder SiloBuilderAdoNetStreamExtensions.AddAdoNetStreams(this ISiloBuilder builder, string name, Action<SiloAdoNetStreamConfigurator> configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Hosting.SiloAdoNetStreamConfigurator>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use ADO.NET persistent streams. "
+              }
+            ]
+          },
+          "sourceFile": "src/AdoNet/Orleans.Streaming.AdoNet/Hosting/SiloBuilderAdoNetStreamExtensions.cs",
+          "sourceLines": "28-36"
+        }
+      ]
+    }
+  ]
+}

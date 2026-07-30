@@ -1,0 +1,1523 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Persistence.Redis",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "RedisGrainStorageServiceCollectionExtensions",
+      "fullName": "Orleans.Hosting.RedisGrainStorageServiceCollectionExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+          },
+          {
+            "kind": "text",
+            "text": " extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisGrainStorageServiceCollectionExtensions.cs",
+      "sourceLines": "19-19",
+      "members": [
+        {
+          "name": "AddRedisGrainStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorage(this IServiceCollection services, string name, Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>>",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as a grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisGrainStorageServiceCollectionExtensions.cs"
+        },
+        {
+          "name": "AddRedisGrainStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorage(this IServiceCollection services, string name, Action<RedisStorageOptions> configureOptions)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Persistence.RedisStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as a grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisGrainStorageServiceCollectionExtensions.cs"
+        },
+        {
+          "name": "AddRedisGrainStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>>",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as the default grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisGrainStorageServiceCollectionExtensions.cs"
+        },
+        {
+          "name": "AddRedisGrainStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<RedisStorageOptions> configureOptions)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Persistence.RedisStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as the default grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisGrainStorageServiceCollectionExtensions.cs"
+        }
+      ]
+    },
+    {
+      "name": "RedisSiloBuilderExtensions",
+      "fullName": "Orleans.Hosting.RedisSiloBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Hosting.ISiloBuilder"
+          },
+          {
+            "kind": "text",
+            "text": " extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisSiloBuilderExtensions.cs",
+      "sourceLines": "12-12",
+      "members": [
+        {
+          "name": "AddRedisGrainStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder RedisSiloBuilderExtensions.AddRedisGrainStorage(this ISiloBuilder builder, string name)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as a grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisSiloBuilderExtensions.cs",
+          "sourceLines": "48-48"
+        },
+        {
+          "name": "AddRedisGrainStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder RedisSiloBuilderExtensions.AddRedisGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<RedisStorageOptions>> configureOptionsBuilder)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptionsBuilder",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as a grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisSiloBuilderExtensions.cs",
+          "sourceLines": "55-55"
+        },
+        {
+          "name": "AddRedisGrainStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder RedisSiloBuilderExtensions.AddRedisGrainStorage(this ISiloBuilder builder, string name, Action<RedisStorageOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Persistence.RedisStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as a grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisSiloBuilderExtensions.cs",
+          "sourceLines": "27-27"
+        },
+        {
+          "name": "AddRedisGrainStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder RedisSiloBuilderExtensions.AddRedisGrainStorageAsDefault(this ISiloBuilder builder)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as the default grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisSiloBuilderExtensions.cs",
+          "sourceLines": "34-34"
+        },
+        {
+          "name": "AddRedisGrainStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder RedisSiloBuilderExtensions.AddRedisGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<RedisStorageOptions>> configureOptionsBuilder)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptionsBuilder",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as the default grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisSiloBuilderExtensions.cs",
+          "sourceLines": "41-41"
+        },
+        {
+          "name": "AddRedisGrainStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder RedisSiloBuilderExtensions.AddRedisGrainStorageAsDefault(this ISiloBuilder builder, Action<RedisStorageOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Persistence.RedisStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures Redis as the default grain storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Hosting/RedisSiloBuilderExtensions.cs",
+          "sourceLines": "19-19"
+        }
+      ]
+    },
+    {
+      "name": "RedisGrainStorage",
+      "fullName": "Orleans.Persistence.RedisGrainStorage",
+      "namespace": "Orleans.Persistence",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.ILifecycleParticipant<Orleans.Runtime.ISiloLifecycle>",
+        "Orleans.Storage.IGrainStorage",
+        "System.IAsyncDisposable",
+        "System.IDisposable"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Redis-based grain storage provider "
+          }
+        ]
+      },
+      "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+      "sourceLines": "24-24",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RedisGrainStorage.RedisGrainStorage(string name, RedisStorageOptions options, IGrainStorageSerializer grainStorageSerializer, IOptions<ClusterOptions> clusterOptions, IActivatorProvider activatorProvider, ILogger<RedisGrainStorage> logger)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "options",
+              "type": "Orleans.Persistence.RedisStorageOptions"
+            },
+            {
+              "name": "grainStorageSerializer",
+              "type": "Orleans.Storage.IGrainStorageSerializer"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            },
+            {
+              "name": "activatorProvider",
+              "type": "Orleans.Serialization.Serializers.IActivatorProvider"
+            },
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Persistence.RedisGrainStorage>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Persistence.RedisGrainStorage"
+              },
+              {
+                "kind": "text",
+                "text": " type. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+          "sourceLines": "42-59"
+        },
+        {
+          "name": "ClearStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task RedisGrainStorage.ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Delete / Clear data function for this storage instance."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Completion promise for the Delete operation on the specified grain."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "Grain ID"
+                }
+              ],
+              "grainState": [
+                {
+                  "kind": "text",
+                  "text": "Copy of last-known state data object for this grain."
+                }
+              ],
+              "grainType": [
+                {
+                  "kind": "text",
+                  "text": "Name of the state for this grain"
+                }
+              ]
+            },
+            "typeParameters": {
+              "T": [
+                {
+                  "kind": "text",
+                  "text": "The grain state type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+          "sourceLines": "206-254"
+        },
+        {
+          "name": "Dispose",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void RedisGrainStorage.Dispose()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources."
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+          "sourceLines": "258-273"
+        },
+        {
+          "name": "DisposeAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ValueTask RedisGrainStorage.DisposeAsync()",
+          "returnType": "System.Threading.Tasks.ValueTask",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources asynchronously."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A task that represents the asynchronous dispose operation."
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+          "sourceLines": "277-292"
+        },
+        {
+          "name": "Participate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void RedisGrainStorage.Participate(ISiloLifecycle lifecycle)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "lifecycle",
+              "type": "Orleans.Runtime.ISiloLifecycle"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds the provided observer as a participant in the lifecycle. "
+              }
+            ],
+            "parameters": {
+              "lifecycle": [
+                {
+                  "kind": "text",
+                  "text": " The observer. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+          "sourceLines": "64-66"
+        },
+        {
+          "name": "ReadStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task RedisGrainStorage.ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Read data function for this storage instance."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Completion promise for the Read operation on the specified grain."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "Grain ID"
+                }
+              ],
+              "grainState": [
+                {
+                  "kind": "text",
+                  "text": "State data object to be populated for this grain."
+                }
+              ],
+              "grainType": [
+                {
+                  "kind": "text",
+                  "text": "Name of the state for this grain"
+                }
+              ]
+            },
+            "typeParameters": {
+              "T": [
+                {
+                  "kind": "text",
+                  "text": "The grain state type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+          "sourceLines": "93-127"
+        },
+        {
+          "name": "WriteStateAsync",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task RedisGrainStorage.WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "grainType",
+              "type": "string"
+            },
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            },
+            {
+              "name": "grainState",
+              "type": "Orleans.IGrainState<T>"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "T"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Write data function for this storage instance."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "Completion promise for the Write operation on the specified grain."
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "Grain ID"
+                }
+              ],
+              "grainState": [
+                {
+                  "kind": "text",
+                  "text": "State data object to be written for this grain."
+                }
+              ],
+              "grainType": [
+                {
+                  "kind": "text",
+                  "text": "Name of the state for this grain"
+                }
+              ]
+            },
+            "typeParameters": {
+              "T": [
+                {
+                  "kind": "text",
+                  "text": "The grain state type."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorage.cs",
+          "sourceLines": "146-171"
+        }
+      ]
+    },
+    {
+      "name": "RedisGrainStorageFactory",
+      "fullName": "Orleans.Persistence.RedisGrainStorageFactory",
+      "namespace": "Orleans.Persistence",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Factory used to create instances of Redis grain storage. "
+          }
+        ]
+      },
+      "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorageFactory.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": "Create",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static RedisGrainStorage RedisGrainStorageFactory.Create(IServiceProvider services, string name)",
+          "returnType": "Orleans.Persistence.RedisGrainStorage",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "System.IServiceProvider"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Creates a grain storage instance. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisGrainStorageFactory.cs",
+          "sourceLines": "18-20"
+        }
+      ]
+    },
+    {
+      "name": "RedisStorageOptions",
+      "fullName": "Orleans.Persistence.RedisStorageOptions",
+      "namespace": "Orleans.Persistence",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Storage.IStorageProviderSerializerOptions"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Redis grain storage options. "
+          }
+        ]
+      },
+      "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs",
+      "sourceLines": "15-15",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RedisStorageOptions.RedisStorageOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs",
+          "sourceLines": "25-42"
+        },
+        {
+          "name": "DefaultCreateMultiplexer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> RedisStorageOptions.DefaultCreateMultiplexer(RedisStorageOptions options)",
+          "returnType": "System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Persistence.RedisStorageOptions"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The default multiplexer creation delegate. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs",
+          "sourceLines": "59-59"
+        },
+        {
+          "name": "ConfigurationOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public ConfigurationOptions? RedisStorageOptions.ConfigurationOptions",
+          "returnType": "StackExchange.Redis.ConfigurationOptions?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the Redis client configuration. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs"
+        },
+        {
+          "name": "CreateMultiplexer",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<RedisStorageOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> RedisStorageOptions.CreateMultiplexer",
+          "returnType": "System.Func<Orleans.Persistence.RedisStorageOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The delegate used to create a Redis connection multiplexer and indicate whether it is shared. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " When "
+              },
+              {
+                "kind": "code",
+                "text": "IsShared"
+              },
+              {
+                "kind": "text",
+                "text": " is "
+              },
+              {
+                "kind": "langword",
+                "value": "true"
+              },
+              {
+                "kind": "text",
+                "text": ", the provider will not dispose the returned multiplexer. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs"
+        },
+        {
+          "name": "DeleteStateOnClear",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool RedisStorageOptions.DeleteStateOnClear",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Whether or not to delete state during a clear operation. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs"
+        },
+        {
+          "name": "EntryExpiry",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan? RedisStorageOptions.EntryExpiry",
+          "returnType": "System.TimeSpan?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Entry expiry, null by default. A value should be set only for ephemeral environments, such as testing environments. Setting a value different from "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": " will cause duplicate activations in the cluster. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs"
+        },
+        {
+          "name": "GetStorageKey",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<string, GrainId, RedisKey>? RedisStorageOptions.GetStorageKey",
+          "returnType": "System.Func<string, Orleans.Runtime.GrainId, StackExchange.Redis.RedisKey>?",
+          "isReturnNullable": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the Redis key for the provided grain type and grain identifier. If not set, the default implementation will be used, which is equivalent to "
+              },
+              {
+                "kind": "code",
+                "text": "{ServiceId}/state/{grainId}/{grainType}"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs"
+        },
+        {
+          "name": "GrainStorageSerializer",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public IGrainStorageSerializer RedisStorageOptions.GrainStorageSerializer",
+          "returnType": "Orleans.Storage.IGrainStorageSerializer",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the serializer to use for this storage provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs"
+        },
+        {
+          "name": "InitStage",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int RedisStorageOptions.InitStage",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Stage of silo lifecycle where storage should be initialized. Storage must be initialized prior to use. "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "RedisStorageOptionsExtensions",
+      "fullName": "Orleans.Persistence.RedisStorageOptionsExtensions",
+      "namespace": "Orleans.Persistence",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extension methods for configuring "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Persistence.RedisStorageOptions"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs",
+      "sourceLines": "65-65",
+      "members": [
+        {
+          "name": "UseGetRedisKeyIgnoringGrainType",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static void RedisStorageOptionsExtensions.UseGetRedisKeyIgnoringGrainType(this OptionsBuilder<RedisStorageOptions> optionsBuilder)",
+          "returnType": "void",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "optionsBuilder",
+              "type": "Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>",
+              "modifier": "this"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the provided options to use a Redis key format that ignores the grain type, equivalent to "
+              },
+              {
+                "kind": "code",
+                "text": "{ServiceId}/state/{grainId}"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " This method is provided as a compatibility utility for users who are migrating from prerelease versions of the Redis storage provider. "
+              }
+            ],
+            "parameters": {
+              "optionsBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The options builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Providers/RedisStorageOptions.cs",
+          "sourceLines": "76-81"
+        }
+      ]
+    },
+    {
+      "name": "RedisStorageException",
+      "fullName": "Orleans.Persistence.Redis.RedisStorageException",
+      "namespace": "Orleans.Persistence.Redis",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "System.Exception",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Exception for throwing from Redis grain storage. "
+          }
+        ]
+      },
+      "attributes": [
+        {
+          "name": "Orleans.GenerateSerializerAttribute"
+        }
+      ],
+      "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisStorageException.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RedisStorageException.RedisStorageException()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Persistence.Redis.RedisStorageException"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisStorageException.cs",
+          "sourceLines": "15-17"
+        },
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RedisStorageException.RedisStorageException(string message)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Persistence.Redis.RedisStorageException"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "message": [
+                {
+                  "kind": "text",
+                  "text": "The error message that explains the reason for the exception."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisStorageException.cs",
+          "sourceLines": "23-25"
+        },
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public RedisStorageException.RedisStorageException(string message, Exception inner)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "message",
+              "type": "string"
+            },
+            {
+              "name": "inner",
+              "type": "System.Exception"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Persistence.Redis.RedisStorageException"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "inner": [
+                {
+                  "kind": "text",
+                  "text": "The exception that is the cause of the current exception, or a null reference (Nothing in Visual Basic) if no inner exception is specified."
+                }
+              ],
+              "message": [
+                {
+                  "kind": "text",
+                  "text": "The error message that explains the reason for the exception."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Redis/Orleans.Persistence.Redis/Storage/RedisStorageException.cs",
+          "sourceLines": "32-34"
+        }
+      ]
+    },
+    {
+      "name": "Codec_RedisStorageException",
+      "fullName": "OrleansCodeGen.Orleans.Persistence.Redis.Codec_RedisStorageException",
+      "namespace": "OrleansCodeGen.Orleans.Persistence.Redis",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.Codecs.IFieldCodec<Orleans.Persistence.Redis.RedisStorageException>",
+        "Orleans.Serialization.Serializers.IBaseCodec",
+        "Orleans.Serialization.Serializers.IBaseCodec<Orleans.Persistence.Redis.RedisStorageException>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Codec_RedisStorageException.Codec_RedisStorageException(IBaseCodec<Exception> _baseTypeSerializer)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "_baseTypeSerializer",
+              "type": "Orleans.Serialization.Serializers.IBaseCodec<System.Exception>"
+            }
+          ]
+        },
+        {
+          "name": "Deserialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_RedisStorageException.Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, RedisStorageException instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Persistence.Redis.RedisStorageException"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Deserializes into the provided value. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ReadValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public RedisStorageException Codec_RedisStorageException.ReadValue<TReaderInput>(ref Reader<TReaderInput> reader, Field field)",
+          "returnType": "Orleans.Persistence.Redis.RedisStorageException",
+          "parameters": [
+            {
+              "name": "reader",
+              "type": "Orleans.Serialization.Buffers.Reader<TReaderInput>",
+              "modifier": "ref"
+            },
+            {
+              "name": "field",
+              "type": "Orleans.Serialization.WireProtocol.Field"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TReaderInput"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Reads a value. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The value."
+              }
+            ],
+            "parameters": {
+              "field": [
+                {
+                  "kind": "text",
+                  "text": "The field."
+                }
+              ],
+              "reader": [
+                {
+                  "kind": "text",
+                  "text": "The reader."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TReaderInput": [
+                {
+                  "kind": "text",
+                  "text": "The reader input type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Serialize",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_RedisStorageException.Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, RedisStorageException instance)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "instance",
+              "type": "Orleans.Persistence.Redis.RedisStorageException"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Serializes the provided value. "
+              }
+            ],
+            "parameters": {
+              "instance": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "WriteField",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void Codec_RedisStorageException.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, RedisStorageException value)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "writer",
+              "type": "Orleans.Serialization.Buffers.Writer<TBufferWriter>",
+              "modifier": "ref"
+            },
+            {
+              "name": "fieldIdDelta",
+              "type": "uint"
+            },
+            {
+              "name": "expectedType",
+              "type": "System.Type"
+            },
+            {
+              "name": "value",
+              "type": "Orleans.Persistence.Redis.RedisStorageException"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TBufferWriter",
+              "constraints": [
+                "System.Buffers.IBufferWriter<byte>"
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Writes a field. "
+              }
+            ],
+            "parameters": {
+              "expectedType": [
+                {
+                  "kind": "text",
+                  "text": "The expected type."
+                }
+              ],
+              "fieldIdDelta": [
+                {
+                  "kind": "text",
+                  "text": "The field identifier delta."
+                }
+              ],
+              "value": [
+                {
+                  "kind": "text",
+                  "text": "The value."
+                }
+              ],
+              "writer": [
+                {
+                  "kind": "text",
+                  "text": "The writer."
+                }
+              ]
+            },
+            "typeParameters": {
+              "TBufferWriter": [
+                {
+                  "kind": "text",
+                  "text": "The buffer writer type."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Copier_RedisStorageException",
+      "fullName": "OrleansCodeGen.Orleans.Persistence.Redis.Copier_RedisStorageException",
+      "namespace": "OrleansCodeGen.Orleans.Persistence.Redis",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "baseType": "Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<Orleans.Persistence.Redis.RedisStorageException, System.Exception>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Default copier implementation for (rarely copied) exception classes "
+          }
+        ]
+      },
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public Copier_RedisStorageException.Copier_RedisStorageException(ICodecProvider codecProvider)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "codecProvider",
+              "type": "Orleans.Serialization.Serializers.ICodecProvider"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

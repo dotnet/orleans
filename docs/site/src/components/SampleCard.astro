@@ -1,0 +1,35 @@
+---
+import type { GallerySample } from '../types/gallery';
+
+interface Props {
+  sample: GallerySample;
+}
+const { sample } = Astro.props;
+const sourceUrl = `https://github.com/dotnet/orleans/tree/main/samples/${sample.path.replace(/^\/+/, '')}`;
+const chips = [...sample.languages, ...sample.tags.slice(0, 2)];
+---
+
+<a class="sample-card" href={sourceUrl} aria-label={`View the ${sample.title} sample source`}>
+  {
+    sample.image ? (
+      <img
+        class="sample-card__image"
+        src={sample.image.startsWith('http') ? sample.image : `${import.meta.env.BASE_URL}${sample.image}`}
+        alt=""
+        loading="lazy"
+      />
+    ) : (
+      <div class="sample-card__placeholder" aria-hidden="true">
+        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" />
+      </div>
+    )
+  }
+  <div class="sample-card__body">
+    <h2>{sample.title}</h2>
+    <p>{sample.description}</p>
+    <div class="sample-card__chips">
+      {chips.map((chip) => <span>{chip}</span>)}
+    </div>
+    <span class="sample-card__link">View source <span aria-hidden="true">→</span></span>
+  </div>
+</a>

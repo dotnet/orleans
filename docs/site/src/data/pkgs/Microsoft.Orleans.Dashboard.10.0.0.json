@@ -1,0 +1,393 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Dashboard",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "DashboardOptions",
+      "fullName": "Orleans.Dashboard.DashboardOptions",
+      "namespace": "Orleans.Dashboard",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration options for the Orleans Dashboard. "
+          }
+        ]
+      },
+      "sourceFile": "src/Dashboard/Orleans.Dashboard/DashboardOptions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public DashboardOptions.DashboardOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/DashboardOptions.cs",
+          "sourceLines": "20-27"
+        },
+        {
+          "name": "CounterUpdateIntervalMs",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DashboardOptions.CounterUpdateIntervalMs",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the number of milliseconds between counter samples. Must be greater than or equal to 1000. The default is 1000 (1 second). "
+              }
+            ]
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/DashboardOptions.cs"
+        },
+        {
+          "name": "HideTrace",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool DashboardOptions.HideTrace",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets a value indicating whether to disable the trace feature. When true, the live log streaming endpoint will be disabled. The default is false. "
+              }
+            ]
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/DashboardOptions.cs"
+        },
+        {
+          "name": "HistoryLength",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int DashboardOptions.HistoryLength",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the length of the history to maintain for metrics. Higher values provide more historical data but consume more memory. The default is 100. "
+              }
+            ]
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/DashboardOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "GrainProfilerOptions",
+      "fullName": "Orleans.Dashboard.GrainProfilerOptions",
+      "namespace": "Orleans.Dashboard",
+      "kind": "class",
+      "accessibility": "public",
+      "isSealed": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration options for the grain profiler. "
+          }
+        ]
+      },
+      "sourceFile": "src/Dashboard/Orleans.Dashboard/GrainProfilerOptions.cs",
+      "sourceLines": "6-6",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public GrainProfilerOptions.GrainProfilerOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/GrainProfilerOptions.cs",
+          "sourceLines": "22-22"
+        },
+        {
+          "name": "DeactivationTime",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan GrainProfilerOptions.DeactivationTime",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the duration of inactivity (no dashboard queries) after which profiling is automatically disabled. This setting only applies when "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Dashboard.GrainProfilerOptions.TraceAlways"
+              },
+              {
+                "kind": "text",
+                "text": " is "
+              },
+              {
+                "kind": "langword",
+                "value": "false"
+              },
+              {
+                "kind": "text",
+                "text": ". After this period without queries, profiling stops to reduce overhead until the next dashboard query. Default is 1 minute. "
+              }
+            ]
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/GrainProfilerOptions.cs"
+        },
+        {
+          "name": "TraceAlways",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public bool GrainProfilerOptions.TraceAlways",
+          "returnType": "bool",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets a value indicating whether tracing should always be enabled, regardless of dashboard activity. When set to "
+              },
+              {
+                "kind": "langword",
+                "value": "true"
+              },
+              {
+                "kind": "text",
+                "text": ", profiling data is continuously collected even when the dashboard is not being queried. When set to "
+              },
+              {
+                "kind": "langword",
+                "value": "false"
+              },
+              {
+                "kind": "text",
+                "text": " (default), profiling is automatically disabled after "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Dashboard.GrainProfilerOptions.DeactivationTime"
+              },
+              {
+                "kind": "text",
+                "text": " of inactivity. Default is "
+              },
+              {
+                "kind": "langword",
+                "value": "false"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/GrainProfilerOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "ServiceCollectionExtensions",
+      "fullName": "Orleans.Dashboard.ServiceCollectionExtensions",
+      "namespace": "Orleans.Dashboard",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Provides extension methods for configuring and integrating the Orleans Dashboard. "
+          }
+        ]
+      },
+      "sourceFile": "src/Dashboard/Orleans.Dashboard/ServiceCollectionExtensions.cs",
+      "sourceLines": "29-29",
+      "members": [
+        {
+          "name": "AddDashboard",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IClientBuilder ServiceCollectionExtensions.AddDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)",
+          "returnType": "Orleans.Hosting.IClientBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "clientBuilder",
+              "type": "Orleans.Hosting.IClientBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Dashboard.DashboardOptions>?",
+              "isNullable": true,
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds Orleans Dashboard services to an Orleans client builder. This allows you to host the Orleans Dashboard application on an Orleans client, so long as the silos also have the dashboard added. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The service collection for method chaining."
+              }
+            ],
+            "parameters": {
+              "clientBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The client builder."
+                }
+              ],
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "Optional configuration action for "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Dashboard.DashboardOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/ServiceCollectionExtensions.cs",
+          "sourceLines": "386-392"
+        },
+        {
+          "name": "AddDashboard",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder ServiceCollectionExtensions.AddDashboard(this ISiloBuilder siloBuilder, Action<DashboardOptions>? configureOptions = null)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "siloBuilder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Dashboard.DashboardOptions>?",
+              "isNullable": true,
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds Orleans Dashboard services to the silo builder. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The silo builder for method chaining."
+              }
+            ],
+            "parameters": {
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "Optional configuration action for "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Dashboard.DashboardOptions"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ],
+              "siloBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The silo builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/ServiceCollectionExtensions.cs",
+          "sourceLines": "39-40"
+        },
+        {
+          "name": "MapOrleansDashboard",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static RouteGroupBuilder ServiceCollectionExtensions.MapOrleansDashboard(this IEndpointRouteBuilder endpoints, string? routePrefix = null)",
+          "returnType": "Microsoft.AspNetCore.Routing.RouteGroupBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "endpoints",
+              "type": "Microsoft.AspNetCore.Routing.IEndpointRouteBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "routePrefix",
+              "type": "string?",
+              "isNullable": true,
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Maps Orleans Dashboard endpoints using ASP.NET Core minimal APIs. Returns an "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.AspNetCore.Builder.IEndpointConventionBuilder"
+              },
+              {
+                "kind": "text",
+                "text": " that can be used to apply authentication, authorization, or other endpoint configuration. "
+              }
+            ],
+            "examples": [
+              {
+                "code": "\n             // Basic usage\n             app.MapOrleansDashboard();\n            \n             // With authentication\n             app.MapOrleansDashboard().RequireAuthorization();\n            \n             // With custom base path\n             app.MapOrleansDashboard(routePrefix: \"/dashboard\");\n             ",
+                "language": "csharp"
+              }
+            ]
+          },
+          "sourceFile": "src/Dashboard/Orleans.Dashboard/ServiceCollectionExtensions.cs",
+          "sourceLines": "97-313"
+        }
+      ]
+    }
+  ]
+}

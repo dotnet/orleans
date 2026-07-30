@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <_SampleProjectContents>$([System.IO.File]::ReadAllText('$(MSBuildProjectFullPath)'))</_SampleProjectContents>
+    <_SampleUsesOrleans>$(_SampleProjectContents.Contains('$(SourceRoot)src'))</_SampleUsesOrleans>
+    <_SampleUsesOrleansServer>$(_SampleProjectContents.Contains('Orleans.Server.csproj'))</_SampleUsesOrleansServer>
+  </PropertyGroup>
+
+  <Import Project="..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <LangVersion Condition="'$(MSBuildProjectExtension)' == '.vbproj'">latest</LangVersion>
+    <OrleansBuildTimeCodeGen Condition="'$(_SampleUsesOrleans)' == 'true'">true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(_SampleUsesOrleans)' == 'true'">
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(_SampleUsesOrleansServer)' == 'true'">
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+</Project>

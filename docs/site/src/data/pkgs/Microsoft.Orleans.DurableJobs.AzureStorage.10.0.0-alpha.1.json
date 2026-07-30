@@ -1,0 +1,147 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.DurableJobs.AzureStorage",
+    "version": "10.0.0-alpha.1",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AzureStorageDurableJobsExtensions",
+      "fullName": "Orleans.Hosting.AzureStorageDurableJobsExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extensions for configuring Azure Blob Storage durable jobs. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.DurableJobs.AzureStorage/Hosting/AzureStorageDurableJobsExtensions.cs",
+      "sourceLines": "15-15",
+      "members": [
+        {
+          "name": "UseAzureBlobDurableJobs",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IServiceCollection AzureStorageDurableJobsExtensions.UseAzureBlobDurableJobs(this IServiceCollection services, Action<AzureBlobJournalStorageOptions> configure)",
+          "returnType": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Journaling.AzureBlobJournalStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds durable jobs storage backed by Azure Blob Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the durable jobs storage. "
+                }
+              ],
+              "services": [
+                {
+                  "kind": "text",
+                  "text": " The service collection. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.DurableJobs.AzureStorage/Hosting/AzureStorageDurableJobsExtensions.cs",
+          "sourceLines": "55-65"
+        },
+        {
+          "name": "UseAzureBlobDurableJobs",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureStorageDurableJobsExtensions.UseAzureBlobDurableJobs(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions> configure)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configure",
+              "type": "System.Action<Orleans.Journaling.AzureBlobJournalStorageOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds durable jobs storage backed by Azure Blob Storage. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " The provided "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Hosting.ISiloBuilder"
+              },
+              {
+                "kind": "text",
+                "text": ", for chaining. "
+              }
+            ],
+            "parameters": {
+              "builder": [
+                {
+                  "kind": "text",
+                  "text": " The builder. "
+                }
+              ],
+              "configure": [
+                {
+                  "kind": "text",
+                  "text": " The delegate used to configure the durable jobs storage. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.DurableJobs.AzureStorage/Hosting/AzureStorageDurableJobsExtensions.cs",
+          "sourceLines": "31-38"
+        }
+      ]
+    }
+  ]
+}

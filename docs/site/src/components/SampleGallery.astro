@@ -1,0 +1,93 @@
+---
+import gallery from '../../.generated/gallery.json';
+import SampleCard from './SampleCard.astro';
+import type { PreparedGallery } from '../types/gallery';
+
+const preparedGallery: PreparedGallery = gallery;
+const samples = [...preparedGallery.items].sort(
+  (left, right) => Number(right.featured) - Number(left.featured) || left.title.localeCompare(right.title),
+);
+---
+
+<section class="sample-gallery" data-sample-gallery>
+  {
+    preparedGallery.missing ? (
+      <div class="sample-gallery__empty">
+        <h2>Sample catalog not available yet</h2>
+        <p>
+          This development branch does not contain <code>samples/gallery.json</code>. The gallery
+          will populate automatically when the catalog is available.
+        </p>
+      </div>
+    ) : preparedGallery.items.length === 0 ? (
+      <div class="sample-gallery__empty">
+        <h2>No samples published</h2>
+        <p>The sample catalog is present but does not contain any entries.</p>
+      </div>
+    ) : (
+      <>
+        <form class="sample-search" data-sample-filters role="search">
+          <div>
+            <label class="sr-only" for="sample-search">Search samples</label>
+            <input
+              id="sample-search"
+              name="query"
+              type="search"
+              placeholder="Search samples by name, technology, or scenario"
+              data-sample-query
+            />
+          </div>
+        </form>
+        <p class="sample-gallery__status" data-sample-status aria-live="polite">
+          {samples.length} samples
+        </p>
+        <ul class="sample-gallery__list" data-sample-list>
+          {samples.map((sample) => (
+            <li
+              data-sample
+              data-search={`${sample.title} ${sample.description} ${sample.languages.join(' ')} ${sample.tags.join(' ')}`.toLowerCase()}
+            >
+              <SampleCard sample={sample} />
+            </li>
+          ))}
+        </ul>
+      </>
+    )
+  }
+</section>
+
+<script>
+  const gallery = document.querySelector('[data-sample-gallery]');
+  const form = gallery?.querySelector('[data-sample-filters]');
+
+  if (gallery instanceof HTMLElement && form instanceof HTMLFormElement) {
+    const query = form.querySelector('[data-sample-query]');
+    const samples = [...gallery.querySelectorAll('[data-sample]')];
+    const status = gallery.querySelector('[data-sample-status]');
+
+    const update = () => {
+      const queryValue = query instanceof HTMLInputElement ? query.value.trim().toLowerCase() : '';
+      let visible = 0;
+
+      for (const sample of samples) {
+        if (!(sample instanceof HTMLElement)) {
+          continue;
+        }
+
+        const searchable = sample.dataset.search ?? '';
+        const matches = !queryValue || searchable.includes(queryValue);
+        sample.hidden = !matches;
+        if (matches) {
+          visible += 1;
+        }
+      }
+
+      if (status) {
+        status.textContent =
+          visible === samples.length ? `${samples.length} samples` : `${visible} matching samples`;
+      }
+    };
+
+    form.addEventListener('input', update);
+  }
+</script>

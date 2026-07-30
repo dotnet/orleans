@@ -1,0 +1,119 @@
+import { readFile, readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import legacyPaths from '../src/data/legacy-pages.json' with { type: 'json' };
+
+const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const distRoot = path.join(siteRoot, 'dist');
+const maxPublishedBytes = 1024 * 1024 * 1024;
+const maxApiRootBytes = 1024 * 1024;
+const failures = [];
+
+async function walk(directory) {
+  const files = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await walk(entryPath)));
+    } else if (entry.isFile()) {
+      files.push(entryPath);
+    }
+  }
+  return files;
+}
+
+function relative(file) {
+  return path.relative(distRoot, file).replaceAll('\\', '/');
+}
+
+function fail(file, message) {
+  failures.push(`${relative(file)}: ${message}`);
+}
+
+const files = await walk(distRoot);
+const totalBytes = (await Promise.all(files.map(async (file) => (await stat(file)).size))).reduce(
+  (total, size) => total + size,
+  0,
+);
+if (totalBytes > maxPublishedBytes) {
+  failures.push(`Published site is ${(totalBytes / 1024 / 1024).toFixed(1)} MiB; limit is 1024 MiB.`);
+}
+
+const apiRoot = path.join(distRoot, 'docs', 'api', 'csharp', 'index.html');
+if ((await stat(apiRoot)).size > maxApiRootBytes) {
+  failures.push('docs/api/csharp/index.html exceeds 1 MiB; API root navigation is too large.');
+}
+
+const suspiciousPatterns = [
+  [/\[!VIDEO\b/i, 'unconverted VIDEO directive'],
+  [/\[!div\b/i, 'unconverted Learn div directive'],
+  [/\[!INCLUDE\b/i, 'unconverted INCLUDE directive'],
+  [/&lt;xref:|<xref:/i, 'unconverted xref'],
+  [/:::\s*zone(?:-end)?\b/i, 'unconverted zone directive'],
+  [/href="(?:%5B|\[)/i, 'Markdown encoded as an href'],
+];
+
+for (const file of files.filter((candidate) => candidate.endsWith('.html'))) {
+  const html = await readFile(file, 'utf8');
+  const isRedirect = /http-equiv="refresh"/i.test(html);
+  if (file.endsWith(`${path.sep}index.html`) && !isRedirect && relative(file) !== '404.html') {
+    const h1Count = [...html.matchAll(/<h1\b/gi)].length;
+    if (h1Count !== 1) {
+      fail(file, `expected one H1, found ${h1Count}`);
+    }
+  }
+  for (const [pattern, description] of suspiciousPatterns) {
+    if (pattern.test(html)) {
+      fail(file, description);
+    }
+  }
+}
+
+const apiMarkdown = files.filter(
+  (file) => file.endsWith('.md') && relative(file).startsWith('docs/api/csharp/'),
+);
+for (const file of apiMarkdown) {
+  const markdown = await readFile(file, 'utf8');
+  if (/\bconst\s+static\b/.test(markdown)) {
+    fail(file, 'invalid C# modifier order "const static"');
+  }
+  if (/^# .*\.op_[A-Za-z]/m.test(markdown)) {
+    fail(file, 'CLR operator metadata name leaked into heading');
+  }
+}
+
+const snippetReadme = path.join(
+  distRoot,
+  'docs',
+  'host',
+  'snippets',
+  'transport-layer-security',
+  'README',
+  'index.html',
+);
+if (files.includes(snippetReadme)) {
+  failures.push('Snippet support README was published as a conceptual page.');
+}
+
+for (const legacyPath of legacyPaths) {
+  const relativeLegacy = decodeURIComponent(legacyPath.slice('/orleans/'.length));
+  const outputPath = path.join(distRoot, relativeLegacy);
+  if (!files.includes(outputPath)) {
+    failures.push(`Missing legacy Pages compatibility path '${legacyPath}'.`);
+  }
+}
+
+if (failures.length > 0) {
+  console.error(`Rendered output audit found ${failures.length} issue(s):`);
+  for (const failure of failures.slice(0, 100)) {
+    console.error(`- ${failure}`);
+  }
+  if (failures.length > 100) {
+    console.error(`- ${failures.length - 100} additional issue(s) omitted`);
+  }
+  process.exit(1);
+}
+
+console.log(
+  `Rendered output audit passed: ${files.length} files, ${(totalBytes / 1024 / 1024).toFixed(1)} MiB.`,
+);

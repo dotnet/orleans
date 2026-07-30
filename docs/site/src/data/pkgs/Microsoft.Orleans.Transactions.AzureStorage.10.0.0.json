@@ -1,0 +1,1167 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Transactions.AzureStorage",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AzureTableTransactionalStateOptions",
+      "fullName": "Orleans.Configuration.AzureTableTransactionalStateOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Transactions.AzureStorage.AzureStorageOperationOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateOptions.cs",
+      "sourceLines": "5-5",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableTransactionalStateOptions.AzureTableTransactionalStateOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateOptions.cs",
+          "sourceLines": "10-15"
+        },
+        {
+          "name": "DEFAULT_INIT_STAGE",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const int AzureTableTransactionalStateOptions.DEFAULT_INIT_STAGE",
+          "returnType": "int",
+          "isStatic": true,
+          "isConst": true,
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateOptions.cs"
+        },
+        {
+          "name": "InitStage",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureTableTransactionalStateOptions.InitStage",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Stage of silo lifecycle where storage should be initialized. Storage must be initialized prior to use. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateOptions.cs"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public override string AzureTableTransactionalStateOptions.TableName",
+          "returnType": "string",
+          "isOverride": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Azure table where transactional grain state will be stored "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableTransactionalStateOptionsValidator",
+      "fullName": "Orleans.Configuration.AzureTableTransactionalStateOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.Transactions.AzureStorage.AzureStorageOperationOptionsValidator<Orleans.Configuration.AzureTableTransactionalStateOptions>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Configuration validator for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Configuration.AzureTableTransactionalStateOptions"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateOptions.cs",
+      "sourceLines": "22-22",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableTransactionalStateOptionsValidator.AzureTableTransactionalStateOptionsValidator(AzureTableTransactionalStateOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.AzureTableTransactionalStateOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Configuration.AzureTableTransactionalStateOptionsValidator"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "name": [
+                {
+                  "kind": "text",
+                  "text": "The option name to be validated."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The option to be validated."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateOptions.cs",
+          "sourceLines": "29-31"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableTransactionServicecollectionExtensions",
+      "fullName": "Orleans.Hosting.AzureTableTransactionServicecollectionExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+          },
+          {
+            "kind": "text",
+            "text": " extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/Hosting/AzureTableTransactionServicecollectionExtensions.cs",
+      "sourceLines": "17-17",
+      "members": []
+    },
+    {
+      "name": "AzureTableTransactionSiloBuilderExtensions",
+      "fullName": "Orleans.Hosting.AzureTableTransactionSiloBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/Hosting/AzureTableTransactionsSiloBuilderExtensions.cs",
+      "sourceLines": "9-9",
+      "members": [
+        {
+          "name": "AddAzureTableTransactionalStateStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorage(this ISiloBuilder builder, string name, Action<AzureTableTransactionalStateOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AzureTableTransactionalStateOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use azure table storage for transactional grain storage. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/Hosting/AzureTableTransactionsSiloBuilderExtensions.cs"
+        },
+        {
+          "name": "AddAzureTableTransactionalStateStorage",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableTransactionalStateOptions>>",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use azure table storage for transactional grain storage. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/Hosting/AzureTableTransactionsSiloBuilderExtensions.cs"
+        },
+        {
+          "name": "AddAzureTableTransactionalStateStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, Action<AzureTableTransactionalStateOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AzureTableTransactionalStateOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use azure table storage as the default transactional grain storage. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/Hosting/AzureTableTransactionsSiloBuilderExtensions.cs"
+        },
+        {
+          "name": "AddAzureTableTransactionalStateStorageAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableTransactionalStateOptions>>",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configure silo to use azure table storage as the default transactional grain storage. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/Hosting/AzureTableTransactionsSiloBuilderExtensions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptions",
+      "fullName": "Orleans.Transactions.AzureStorage.AzureStorageOperationOptions",
+      "namespace": "Orleans.Transactions.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "30-30",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptions.AzureStorageOperationOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "createClientCallback",
+              "type": "System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>>"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using the provided callback. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "91-92"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "82-83"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "azureSasCredential",
+              "type": "Azure.AzureSasCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.AzureSasCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "109-110"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "sharedKeyCredential",
+              "type": "Azure.Data.Tables.TableSharedKeyCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Data.Tables.TableSharedKeyCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "118-119"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "tokenCredential",
+              "type": "Azure.Core.TokenCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Core.TokenCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "100-101"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using a connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "73-74"
+        },
+        {
+          "name": "ClientOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableClientOptions AzureStorageOperationOptions.ClientOptions",
+          "returnType": "Azure.Data.Tables.TableClientOptions",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Options to be used when configuring the table storage client, or "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": " to use the default options. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "StoragePolicyOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions AzureStorageOperationOptions.StoragePolicyOptions",
+          "returnType": "Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Azure Storage Policy Options "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public virtual string AzureStorageOperationOptions.TableName",
+          "returnType": "string",
+          "isVirtual": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "TableServiceClient",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableServiceClient AzureStorageOperationOptions.TableServiceClient",
+          "returnType": "Azure.Data.Tables.TableServiceClient",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the client used to access the Azure Table Service. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptionsValidator",
+      "fullName": "Orleans.Transactions.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>",
+      "namespace": "Orleans.Transactions.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TOptions",
+          "constraints": [
+            "Orleans.Transactions.AzureStorage.AzureStorageOperationOptions"
+          ]
+        }
+      ],
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "204-204",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "TOptions"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "isOptional": true
+            }
+          ],
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "206-210"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual void AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration()",
+          "returnType": "void",
+          "isVirtual": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "217-218"
+        },
+        {
+          "name": "Name",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AzureStorageOperationOptionsValidator<TOptions>.Name",
+          "returnType": "string",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "213-213"
+        },
+        {
+          "name": "Options",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TOptions AzureStorageOperationOptionsValidator<TOptions>.Options",
+          "returnType": "TOptions",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "212-212"
+        }
+      ]
+    },
+    {
+      "name": "AzureStoragePolicyOptions",
+      "fullName": "Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions",
+      "namespace": "Orleans.Transactions.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+      "sourceLines": "24-24",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions.AzureStoragePolicyOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+          "sourceLines": "30-44"
+        },
+        {
+          "name": "CreationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.CreationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxBulkUpdateRows",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxBulkUpdateRows",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxCreationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxOperationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum number of operation retry attempts. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxPauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.MaxPauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "OperationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.OperationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenCreationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The base delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableTransactionalStateStorage",
+      "fullName": "Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage<TState>",
+      "namespace": "Orleans.Transactions.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TState",
+          "constraints": [
+            "class",
+            "new()"
+          ]
+        }
+      ],
+      "interfaces": [
+        "Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorage.cs",
+      "sourceLines": "16-16",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableTransactionalStateStorage<TState>.AzureTableTransactionalStateStorage(TableClient table, string partition, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "table",
+              "type": "Azure.Data.Tables.TableClient"
+            },
+            {
+              "name": "partition",
+              "type": "string"
+            },
+            {
+              "name": "JsonSettings",
+              "type": "Newtonsoft.Json.JsonSerializerSettings"
+            },
+            {
+              "name": "logger",
+              "type": "Microsoft.Extensions.Logging.ILogger<Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage<TState>>"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorage.cs",
+          "sourceLines": "27-38"
+        },
+        {
+          "name": "Load",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<TransactionalStorageLoadResponse<TState>> AzureTableTransactionalStateStorage<TState>.Load()",
+          "returnType": "System.Threading.Tasks.Task<Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>>",
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorage.cs",
+          "sourceLines": "44-117"
+        },
+        {
+          "name": "Store",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<string> AzureTableTransactionalStateStorage<TState>.Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)",
+          "returnType": "System.Threading.Tasks.Task<string>",
+          "parameters": [
+            {
+              "name": "expectedETag",
+              "type": "string"
+            },
+            {
+              "name": "metadata",
+              "type": "Orleans.Transactions.Abstractions.TransactionalStateMetaData"
+            },
+            {
+              "name": "statesToPrepare",
+              "type": "System.Collections.Generic.List<Orleans.Transactions.Abstractions.PendingTransactionState<TState>>"
+            },
+            {
+              "name": "commitUpTo",
+              "type": "long?",
+              "isNullable": true
+            },
+            {
+              "name": "abortAfter",
+              "type": "long?",
+              "isNullable": true
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorage.cs",
+          "sourceLines": "121-216"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableTransactionalStateStorageFactory",
+      "fullName": "Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorageFactory",
+      "namespace": "Orleans.Transactions.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.ILifecycleParticipant<Orleans.Runtime.ISiloLifecycle>",
+        "Orleans.Transactions.Abstractions.ITransactionalStateStorageFactory"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorageFactory.cs",
+      "sourceLines": "16-16",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableTransactionalStateStorageFactory.AzureTableTransactionalStateStorageFactory(string name, AzureTableTransactionalStateOptions options, IOptions<ClusterOptions> clusterOptions, IServiceProvider services, ILoggerFactory loggerFactory)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.AzureTableTransactionalStateOptions"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            },
+            {
+              "name": "services",
+              "type": "System.IServiceProvider"
+            },
+            {
+              "name": "loggerFactory",
+              "type": "Microsoft.Extensions.Logging.ILoggerFactory"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorageFactory.cs",
+          "sourceLines": "31-38"
+        },
+        {
+          "name": "Create",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ITransactionalStateStorage<TState> AzureTableTransactionalStateStorageFactory.Create<TState>(string stateName, IGrainContext context)",
+          "returnType": "Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>",
+          "parameters": [
+            {
+              "name": "stateName",
+              "type": "string"
+            },
+            {
+              "name": "context",
+              "type": "Orleans.Runtime.IGrainContext"
+            }
+          ],
+          "genericParameters": [
+            {
+              "name": "TState",
+              "constraints": [
+                "class",
+                "new()"
+              ]
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorageFactory.cs",
+          "sourceLines": "42-43"
+        },
+        {
+          "name": "Create",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ITransactionalStateStorageFactory AzureTableTransactionalStateStorageFactory.Create(IServiceProvider services, string name)",
+          "returnType": "Orleans.Transactions.Abstractions.ITransactionalStateStorageFactory",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "services",
+              "type": "System.IServiceProvider"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorageFactory.cs",
+          "sourceLines": "27-28"
+        },
+        {
+          "name": "Participate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureTableTransactionalStateStorageFactory.Participate(ISiloLifecycle lifecycle)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "lifecycle",
+              "type": "Orleans.Runtime.ISiloLifecycle"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds the provided observer as a participant in the lifecycle. "
+              }
+            ],
+            "parameters": {
+              "lifecycle": [
+                {
+                  "kind": "text",
+                  "text": " The observer. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.Transactions.AzureStorage/TransactionalState/AzureTableTransactionalStateStorageFactory.cs",
+          "sourceLines": "48-49"
+        }
+      ]
+    }
+  ]
+}

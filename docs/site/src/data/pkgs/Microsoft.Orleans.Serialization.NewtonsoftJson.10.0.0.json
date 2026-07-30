@@ -1,0 +1,443 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Serialization.NewtonsoftJson",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "NewtonsoftJsonCodec",
+      "fullName": "Orleans.Serialization.NewtonsoftJsonCodec",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Serialization.Cloning.IDeepCopier",
+        "Orleans.Serialization.Cloning.IGeneralizedCopier",
+        "Orleans.Serialization.Codecs.IFieldCodec",
+        "Orleans.Serialization.ITypeFilter",
+        "Orleans.Serialization.Serializers.IGeneralizedCodec"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "attributes": [
+        {
+          "name": "Orleans.AliasAttribute",
+          "constructorArguments": [
+            "json.net"
+          ]
+        }
+      ],
+      "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/NewtonsoftJsonCodec.cs",
+      "sourceLines": "22-22",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public NewtonsoftJsonCodec.NewtonsoftJsonCodec(IEnumerable<ICodecSelector> serializableTypeSelectors, IEnumerable<ICopierSelector> copyableTypeSelectors, IOptions<NewtonsoftJsonCodecOptions> options)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serializableTypeSelectors",
+              "type": "System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICodecSelector>"
+            },
+            {
+              "name": "copyableTypeSelectors",
+              "type": "System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICopierSelector>"
+            },
+            {
+              "name": "options",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Serialization.NewtonsoftJsonCodecOptions>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new instance of the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.NewtonsoftJsonCodec"
+              },
+              {
+                "kind": "text",
+                "text": " class. "
+              }
+            ],
+            "parameters": {
+              "copyableTypeSelectors": [
+                {
+                  "kind": "text",
+                  "text": "Filters used to indicate which types should be copied by this codec."
+                }
+              ],
+              "options": [
+                {
+                  "kind": "text",
+                  "text": "The JSON codec options."
+                }
+              ],
+              "serializableTypeSelectors": [
+                {
+                  "kind": "text",
+                  "text": "Filters used to indicate which types should be serialized by this codec."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/NewtonsoftJsonCodec.cs",
+          "sourceLines": "41-50"
+        },
+        {
+          "name": "WellKnownAlias",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const string NewtonsoftJsonCodec.WellKnownAlias",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The well-known type alias for this codec. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/NewtonsoftJsonCodec.cs"
+        }
+      ]
+    },
+    {
+      "name": "NewtonsoftJsonCodecOptions",
+      "fullName": "Orleans.Serialization.NewtonsoftJsonCodecOptions",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Options for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Serialization.NewtonsoftJsonCodec"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/NewtonsoftJsonCodecOptions.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public NewtonsoftJsonCodecOptions.NewtonsoftJsonCodecOptions()",
+          "returnType": "void"
+        },
+        {
+          "name": "IsCopyableType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<Type, bool?> NewtonsoftJsonCodecOptions.IsCopyableType",
+          "returnType": "System.Func<System.Type, bool?>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets a delegate used to determine if a type is supported by the JSON serializer for copying. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/NewtonsoftJsonCodecOptions.cs"
+        },
+        {
+          "name": "IsSerializableType",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public Func<Type, bool?> NewtonsoftJsonCodecOptions.IsSerializableType",
+          "returnType": "System.Func<System.Type, bool?>",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets a delegate used to determine if a type is supported by the JSON serializer for serialization and deserialization. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/NewtonsoftJsonCodecOptions.cs"
+        },
+        {
+          "name": "SerializerSettings",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public JsonSerializerSettings NewtonsoftJsonCodecOptions.SerializerSettings",
+          "returnType": "Newtonsoft.Json.JsonSerializerSettings",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Newtonsoft.Json.JsonSerializerSettings"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/NewtonsoftJsonCodecOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "SerializationHostingExtensions",
+      "fullName": "Orleans.Serialization.SerializationHostingExtensions",
+      "namespace": "Orleans.Serialization",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Extension method for "
+          },
+          {
+            "kind": "cref",
+            "value": "T:Orleans.Serialization.ISerializerBuilder"
+          },
+          {
+            "kind": "text",
+            "text": ". "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/SerializationHostingExtensions.cs",
+      "sourceLines": "15-15",
+      "members": [
+        {
+          "name": "AddNewtonsoftJsonSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISerializerBuilder SerializationHostingExtensions.AddNewtonsoftJsonSerializer(this ISerializerBuilder serializerBuilder, Func<Type, bool> isSerializable, Func<Type, bool> isCopyable, Action<OptionsBuilder<NewtonsoftJsonCodecOptions>> configureOptions)",
+          "returnType": "Orleans.Serialization.ISerializerBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "serializerBuilder",
+              "type": "Orleans.Serialization.ISerializerBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "isSerializable",
+              "type": "System.Func<System.Type, bool>"
+            },
+            {
+              "name": "isCopyable",
+              "type": "System.Func<System.Type, bool>"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Serialization.NewtonsoftJsonCodecOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds support for serializing and deserializing values using "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Newtonsoft.Json.JsonSerializer"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to configure the options for the JSON serializer."
+                }
+              ],
+              "isCopyable": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to indicate which types should be copied by this codec."
+                }
+              ],
+              "isSerializable": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to indicate which types should be serialized by this codec."
+                }
+              ],
+              "serializerBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The serializer builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/SerializationHostingExtensions.cs",
+          "sourceLines": "67-100"
+        },
+        {
+          "name": "AddNewtonsoftJsonSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISerializerBuilder SerializationHostingExtensions.AddNewtonsoftJsonSerializer(this ISerializerBuilder serializerBuilder, Func<Type, bool> isSupported, Action<OptionsBuilder<NewtonsoftJsonCodecOptions>> configureOptions)",
+          "returnType": "Orleans.Serialization.ISerializerBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "serializerBuilder",
+              "type": "Orleans.Serialization.ISerializerBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "isSupported",
+              "type": "System.Func<System.Type, bool>"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Serialization.NewtonsoftJsonCodecOptions>>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds support for serializing and deserializing values using "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Newtonsoft.Json.JsonSerializer"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "configureOptions": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to configure the options for the JSON serializer."
+                }
+              ],
+              "isSupported": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to indicate which types should be serialized and copied by this codec."
+                }
+              ],
+              "serializerBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The serializer builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/SerializationHostingExtensions.cs",
+          "sourceLines": "49-52"
+        },
+        {
+          "name": "AddNewtonsoftJsonSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISerializerBuilder SerializationHostingExtensions.AddNewtonsoftJsonSerializer(this ISerializerBuilder serializerBuilder, Func<Type, bool> isSupported, JsonSerializerSettings jsonSerializerSettings = null)",
+          "returnType": "Orleans.Serialization.ISerializerBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "serializerBuilder",
+              "type": "Orleans.Serialization.ISerializerBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "isSupported",
+              "type": "System.Func<System.Type, bool>"
+            },
+            {
+              "name": "jsonSerializerSettings",
+              "type": "Newtonsoft.Json.JsonSerializerSettings",
+              "isOptional": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds support for serializing and deserializing values using "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Newtonsoft.Json.JsonSerializer"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ],
+            "parameters": {
+              "isSupported": [
+                {
+                  "kind": "text",
+                  "text": "A delegate used to indicate which types should be serialized and copied by this codec."
+                }
+              ],
+              "jsonSerializerSettings": [
+                {
+                  "kind": "text",
+                  "text": "The JSON serializer settings."
+                }
+              ],
+              "serializerBuilder": [
+                {
+                  "kind": "text",
+                  "text": "The serializer builder."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.NewtonsoftJson/SerializationHostingExtensions.cs",
+          "sourceLines": "29-37"
+        }
+      ]
+    }
+  ]
+}

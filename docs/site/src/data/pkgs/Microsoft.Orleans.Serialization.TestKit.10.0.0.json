@@ -1,0 +1,1453 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.Serialization.TestKit",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "CopierTester",
+      "fullName": "Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TValue"
+        },
+        {
+          "name": "TCopier",
+          "constraints": [
+            "class",
+            "Orleans.Serialization.Cloning.IDeepCopier<TValue>"
+          ]
+        }
+      ],
+      "baseType": "Orleans.Serialization.TestKit.SerializationTester",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Test methods for copiers. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/CopierTester.cs",
+      "sourceLines": "19-19",
+      "members": [
+        {
+          "name": "CanCopyCollectionViaSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CopierTester<TValue, TCopier>.CanCopyCollectionViaSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if values can be round-tripped when used as an element in a strongly-typed list. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/CopierTester.cs",
+          "sourceLines": "223-242"
+        },
+        {
+          "name": "CanCopyCollectionViaUntypedSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CopierTester<TValue, TCopier>.CanCopyCollectionViaUntypedSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if values can be round-tripped when used as an element in a list of object. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/CopierTester.cs",
+          "sourceLines": "250-273"
+        },
+        {
+          "name": "CanCopyTupleViaSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CopierTester<TValue, TCopier>.CanCopyTupleViaSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if strongly-typed tuples containing the field type can be copied. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/CopierTester.cs",
+          "sourceLines": "162-184"
+        },
+        {
+          "name": "CanCopyUntypedTupleViaSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CopierTester<TValue, TCopier>.CanCopyUntypedTupleViaSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if object-typed tuples containing the field type can be copied. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/CopierTester.cs",
+          "sourceLines": "192-215"
+        },
+        {
+          "name": "CopiedValuesAreEqual",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CopierTester<TValue, TCopier>.CopiedValuesAreEqual()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if copied values are equal. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/CopierTester.cs",
+          "sourceLines": "108-127"
+        },
+        {
+          "name": "ReferencesAreAddedToCopyContext",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void CopierTester<TValue, TCopier>.ReferencesAreAddedToCopyContext()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if references are added to the copy context. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/CopierTester.cs",
+          "sourceLines": "135-154"
+        }
+      ]
+    },
+    {
+      "name": "FieldCodecTester",
+      "fullName": "Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TValue"
+        },
+        {
+          "name": "TCodec",
+          "constraints": [
+            "class",
+            "Orleans.Serialization.Codecs.IFieldCodec<TValue>"
+          ]
+        }
+      ],
+      "baseType": "Orleans.Serialization.TestKit.SerializationTester",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Methods for testing field codecs. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+      "sourceLines": "27-27",
+      "members": [
+        {
+          "name": "CanRoundTripCollectionViaSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripCollectionViaSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether a strongly typed collection of values can be round-tripped. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "590-626"
+        },
+        {
+          "name": "CanRoundTripDefaultValueViaCodec",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripDefaultValueViaCodec()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if round-tripped default values are equal. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "810-810"
+        },
+        {
+          "name": "CanRoundTripTupleViaSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripTupleViaSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if values can be round-tripped when used as a field in a tuple. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "682-713"
+        },
+        {
+          "name": "CanRoundTripViaObjectSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaObjectSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if values can be round-tripped through "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.Serializer`1"
+              },
+              {
+                "kind": "text",
+                "text": " when using "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Object"
+              },
+              {
+                "kind": "text",
+                "text": " as the type parameter. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "759-798"
+        },
+        {
+          "name": "CanRoundTripViaSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if values can be round-tripped through "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.Serializer`1"
+              },
+              {
+                "kind": "text",
+                "text": " when using "
+              },
+              {
+                "kind": "typeparamref",
+                "value": "TValue"
+              },
+              {
+                "kind": "text",
+                "text": " as the type parameter. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "721-751"
+        },
+        {
+          "name": "CanRoundTripViaSerializer_Array",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_Array()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly round-trips values when writing to an array. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "295-323"
+        },
+        {
+          "name": "CanRoundTripViaSerializer_Memory",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_Memory()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly round-trips values when writing to a memory slice. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "331-359"
+        },
+        {
+          "name": "CanRoundTripViaSerializer_MemoryStream",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_MemoryStream()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly round-trips values when writing to a memory stream. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "367-402"
+        },
+        {
+          "name": "CanRoundTripViaSerializer_ReadByteByByte",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_ReadByteByByte()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly round-trips values when reading byte-by-byte, simulating fragmented reads. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "410-441"
+        },
+        {
+          "name": "CanRoundTripViaSerializer_Span",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_Span()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly round-trips values when writing to a span. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "259-287"
+        },
+        {
+          "name": "CanRoundTripViaSerializer_StreamPooled",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_StreamPooled()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly round-trips values when using a pooled stream. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "221-251"
+        },
+        {
+          "name": "CanRoundTripWeaklyTypedCollectionViaSerializer",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanRoundTripWeaklyTypedCollectionViaSerializer()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether a strongly typed collection of values can be round-tripped. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "634-674"
+        },
+        {
+          "name": "CanSkipDefaultValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanSkipDefaultValue()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if default values can be skipped over. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "822-822"
+        },
+        {
+          "name": "CanSkipValue",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CanSkipValue()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if values can be skipped over. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "816-816"
+        },
+        {
+          "name": "CorrectlyAdvancesReferenceCounter",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CorrectlyAdvancesReferenceCounter()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly advances the reference counter when writing to a pipe and reading from a pipe. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "174-213"
+        },
+        {
+          "name": "CorrectlyAdvancesReferenceCounterStream",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CorrectlyAdvancesReferenceCounterStream()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec correctly advances the reference counter when writing to a stream and reading from a stream. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "118-166"
+        },
+        {
+          "name": "CorrectlyHandlesBuffers",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.CorrectlyHandlesBuffers()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if buffers are handled correctly. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "830-851"
+        },
+        {
+          "name": "ProducesValidBitStream",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.ProducesValidBitStream()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether the codec produces a valid bit stream. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "449-476"
+        },
+        {
+          "name": "RoundTrippedValuesEqual",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.RoundTrippedValuesEqual()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks if round-tripped values are equal. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "804-804"
+        },
+        {
+          "name": "WritersProduceSameResults",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void FieldCodecTester<TValue, TCodec>.WritersProduceSameResults()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Checks whether various buffer writers produce bit-wise identical results. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/FieldCodecTester.cs",
+          "sourceLines": "484-582"
+        }
+      ]
+    },
+    {
+      "name": "IOutputBuffer",
+      "fullName": "Orleans.Serialization.TestKit.IOutputBuffer",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "interface",
+      "accessibility": "public",
+      "sourceFile": "src/Orleans.Serialization.TestKit/IOutputBuffer.cs",
+      "sourceLines": "5-5",
+      "members": [
+        {
+          "name": "GetReadOnlySequence",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public abstract ReadOnlySequence<byte> IOutputBuffer.GetReadOnlySequence(int maxSegmentSize)",
+          "returnType": "System.Buffers.ReadOnlySequence<byte>",
+          "isAbstract": true,
+          "parameters": [
+            {
+              "name": "maxSegmentSize",
+              "type": "int"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ReadOnlySequenceHelper",
+      "fullName": "Orleans.Serialization.TestKit.ReadOnlySequenceHelper",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/ReadOnlySequenceHelper.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": "Batch",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static IEnumerable<byte[]> ReadOnlySequenceHelper.Batch(this IEnumerable<byte> sequence, int batchSize)",
+          "returnType": "System.Collections.Generic.IEnumerable<byte[]>",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "sequence",
+              "type": "System.Collections.Generic.IEnumerable<byte>",
+              "modifier": "this"
+            },
+            {
+              "name": "batchSize",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/ReadOnlySequenceHelper.cs",
+          "sourceLines": "15-31"
+        },
+        {
+          "name": "CreateReadOnlySequence",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ReadOnlySequence<byte> ReadOnlySequenceHelper.CreateReadOnlySequence(params byte[][] buffers)",
+          "returnType": "System.Buffers.ReadOnlySequence<byte>",
+          "isStatic": true,
+          "parameters": [
+            {
+              "name": "buffers",
+              "type": "byte[][]",
+              "modifier": "params"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/ReadOnlySequenceHelper.cs",
+          "sourceLines": "39-50"
+        },
+        {
+          "name": "ToReadOnlySequence",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ReadOnlySequence<byte> ReadOnlySequenceHelper.ToReadOnlySequence(this IEnumerable<Memory<byte>> buffers)",
+          "returnType": "System.Buffers.ReadOnlySequence<byte>",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "buffers",
+              "type": "System.Collections.Generic.IEnumerable<System.Memory<byte>>",
+              "modifier": "this"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/ReadOnlySequenceHelper.cs"
+        },
+        {
+          "name": "ToReadOnlySequence",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ReadOnlySequence<byte> ReadOnlySequenceHelper.ToReadOnlySequence(this IEnumerable<byte[]> buffers)",
+          "returnType": "System.Buffers.ReadOnlySequence<byte>",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "buffers",
+              "type": "System.Collections.Generic.IEnumerable<byte[]>",
+              "modifier": "this"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/ReadOnlySequenceHelper.cs"
+        }
+      ]
+    },
+    {
+      "name": "SerializationTester",
+      "fullName": "Orleans.Serialization.TestKit.SerializationTester",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "interfaces": [
+        "System.IDisposable"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Base class for serialization test helpers. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/SerializationTester.cs",
+      "sourceLines": "12-12",
+      "members": []
+    },
+    {
+      "name": "SerializationTesterFixture",
+      "fullName": "Orleans.Serialization.TestKit.SerializationTesterFixture",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "System.IDisposable"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Fixture which owns a serializer service provider shared by all instances of a test class. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/SerializationTester.cs",
+      "sourceLines": "93-93",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public SerializationTesterFixture.SerializationTesterFixture()",
+          "returnType": "void",
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Initializes a new "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Serialization.TestKit.SerializationTesterFixture"
+              },
+              {
+                "kind": "text",
+                "text": " instance. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/SerializationTester.cs",
+          "sourceLines": "95-103"
+        },
+        {
+          "name": "ServiceProvider",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public IServiceProvider SerializationTesterFixture.ServiceProvider",
+          "returnType": "System.IServiceProvider",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets the service provider. "
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/SerializationTester.cs",
+          "sourceLines": "108-108"
+        }
+      ]
+    },
+    {
+      "name": "TestBufferWriterStruct",
+      "fullName": "Orleans.Serialization.TestKit.TestBufferWriterStruct",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "struct",
+      "accessibility": "public",
+      "isSealed": true,
+      "interfaces": [
+        "Orleans.Serialization.TestKit.IOutputBuffer",
+        "System.Buffers.IBufferWriter<byte>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Provides the base class for value types."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/TestBufferWriterStruct.cs",
+      "sourceLines": "10-10",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public TestBufferWriterStruct.TestBufferWriterStruct(byte[] buffer)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "buffer",
+              "type": "byte[]"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestBufferWriterStruct.cs",
+          "sourceLines": "17-19"
+        },
+        {
+          "name": "Advance",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void TestBufferWriterStruct.Advance(int bytes)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "bytes",
+              "type": "int"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Notifies the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Buffers.IBufferWriter`1"
+              },
+              {
+                "kind": "text",
+                "text": " that "
+              },
+              {
+                "kind": "paramref",
+                "value": "count"
+              },
+              {
+                "kind": "text",
+                "text": " data items were written to the output "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Span`1"
+              },
+              {
+                "kind": "text",
+                "text": " or "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Memory`1"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "bytes": [
+                {
+                  "kind": "text",
+                  "text": "The number of data items written to the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Span`1"
+                },
+                {
+                  "kind": "text",
+                  "text": " or "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Memory`1"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestBufferWriterStruct.cs",
+          "sourceLines": "21-21"
+        },
+        {
+          "name": "GetMemory",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public readonly Memory<byte> TestBufferWriterStruct.GetMemory(int sizeHint = 0)",
+          "returnType": "System.Memory<byte>",
+          "parameters": [
+            {
+              "name": "sizeHint",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "0"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Returns a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Memory`1"
+              },
+              {
+                "kind": "text",
+                "text": " to write to that is at least the requested size (specified by "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ")."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Memory`1"
+              },
+              {
+                "kind": "text",
+                "text": " of at least the size "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ". If "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": " is 0, returns a non-empty buffer."
+              }
+            ],
+            "parameters": {
+              "sizeHint": [
+                {
+                  "kind": "text",
+                  "text": "The minimum length of the returned "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Memory`1"
+                },
+                {
+                  "kind": "text",
+                  "text": ". If 0, a non-empty buffer is returned."
+                }
+              ]
+            },
+            "exceptions": [
+              {
+                "type": "T:System.OutOfMemoryException",
+                "description": [
+                  {
+                    "kind": "text",
+                    "text": "The requested buffer size is not available."
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestBufferWriterStruct.cs",
+          "sourceLines": "24-24"
+        },
+        {
+          "name": "GetReadOnlySequence",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public readonly ReadOnlySequence<byte> TestBufferWriterStruct.GetReadOnlySequence(int maxSegmentSize)",
+          "returnType": "System.Buffers.ReadOnlySequence<byte>",
+          "parameters": [
+            {
+              "name": "maxSegmentSize",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestBufferWriterStruct.cs",
+          "sourceLines": "30-30"
+        },
+        {
+          "name": "GetSpan",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public readonly Span<byte> TestBufferWriterStruct.GetSpan(int sizeHint)",
+          "returnType": "System.Span<byte>",
+          "parameters": [
+            {
+              "name": "sizeHint",
+              "type": "int"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Returns a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Span`1"
+              },
+              {
+                "kind": "text",
+                "text": " to write to that is at least the requested size (specified by "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ")."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Span`1"
+              },
+              {
+                "kind": "text",
+                "text": " of at least the size "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ". If "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": " is 0, returns a non-empty buffer."
+              }
+            ],
+            "parameters": {
+              "sizeHint": [
+                {
+                  "kind": "text",
+                  "text": "The minimum length of the returned "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Span`1"
+                },
+                {
+                  "kind": "text",
+                  "text": ". If 0, a non-empty buffer is returned."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestBufferWriterStruct.cs",
+          "sourceLines": "27-27"
+        }
+      ]
+    },
+    {
+      "name": "TestMultiSegmentBufferWriter",
+      "fullName": "Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.Serialization.TestKit.IOutputBuffer",
+        "System.Buffers.IBufferWriter<byte>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/TestMultiSegmentBufferWriter.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public TestMultiSegmentBufferWriter.TestMultiSegmentBufferWriter(int maxAllocationSize)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "maxAllocationSize",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestMultiSegmentBufferWriter.cs",
+          "sourceLines": "13-20"
+        },
+        {
+          "name": "Advance",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void TestMultiSegmentBufferWriter.Advance(int bytes)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "bytes",
+              "type": "int"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Notifies the "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Buffers.IBufferWriter`1"
+              },
+              {
+                "kind": "text",
+                "text": " that "
+              },
+              {
+                "kind": "paramref",
+                "value": "count"
+              },
+              {
+                "kind": "text",
+                "text": " data items were written to the output "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Span`1"
+              },
+              {
+                "kind": "text",
+                "text": " or "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Memory`1"
+              },
+              {
+                "kind": "text",
+                "text": "."
+              }
+            ],
+            "parameters": {
+              "bytes": [
+                {
+                  "kind": "text",
+                  "text": "The number of data items written to the "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Span`1"
+                },
+                {
+                  "kind": "text",
+                  "text": " or "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Memory`1"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestMultiSegmentBufferWriter.cs",
+          "sourceLines": "24-31"
+        },
+        {
+          "name": "GetMemory",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Memory<byte> TestMultiSegmentBufferWriter.GetMemory(int sizeHint = 0)",
+          "returnType": "System.Memory<byte>",
+          "parameters": [
+            {
+              "name": "sizeHint",
+              "type": "int",
+              "isOptional": true,
+              "defaultValue": "0"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Returns a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Memory`1"
+              },
+              {
+                "kind": "text",
+                "text": " to write to that is at least the requested size (specified by "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ")."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Memory`1"
+              },
+              {
+                "kind": "text",
+                "text": " of at least the size "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ". If "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": " is 0, returns a non-empty buffer."
+              }
+            ],
+            "parameters": {
+              "sizeHint": [
+                {
+                  "kind": "text",
+                  "text": "The minimum length of the returned "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Memory`1"
+                },
+                {
+                  "kind": "text",
+                  "text": ". If 0, a non-empty buffer is returned."
+                }
+              ]
+            },
+            "exceptions": [
+              {
+                "type": "T:System.OutOfMemoryException",
+                "description": [
+                  {
+                    "kind": "text",
+                    "text": "The requested buffer size is not available."
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestMultiSegmentBufferWriter.cs",
+          "sourceLines": "35-48"
+        },
+        {
+          "name": "GetReadOnlySequence",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ReadOnlySequence<byte> TestMultiSegmentBufferWriter.GetReadOnlySequence(int maxSegmentSize)",
+          "returnType": "System.Buffers.ReadOnlySequence<byte>",
+          "parameters": [
+            {
+              "name": "maxSegmentSize",
+              "type": "int"
+            }
+          ],
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestMultiSegmentBufferWriter.cs",
+          "sourceLines": "70-70"
+        },
+        {
+          "name": "GetSpan",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Span<byte> TestMultiSegmentBufferWriter.GetSpan(int sizeHint)",
+          "returnType": "System.Span<byte>",
+          "parameters": [
+            {
+              "name": "sizeHint",
+              "type": "int"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": "Returns a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Span`1"
+              },
+              {
+                "kind": "text",
+                "text": " to write to that is at least the requested size (specified by "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ")."
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Span`1"
+              },
+              {
+                "kind": "text",
+                "text": " of at least the size "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": ". If "
+              },
+              {
+                "kind": "paramref",
+                "value": "sizeHint"
+              },
+              {
+                "kind": "text",
+                "text": " is 0, returns a non-empty buffer."
+              }
+            ],
+            "parameters": {
+              "sizeHint": [
+                {
+                  "kind": "text",
+                  "text": "The minimum length of the returned "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:System.Span`1"
+                },
+                {
+                  "kind": "text",
+                  "text": ". If 0, a non-empty buffer is returned."
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestMultiSegmentBufferWriter.cs",
+          "sourceLines": "53-66"
+        },
+        {
+          "name": "PeekAllBuffers",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public ReadOnlySequence<byte> TestMultiSegmentBufferWriter.PeekAllBuffers()",
+          "returnType": "System.Buffers.ReadOnlySequence<byte>",
+          "sourceFile": "src/Orleans.Serialization.TestKit/TestMultiSegmentBufferWriter.cs",
+          "sourceLines": "72-72"
+        }
+      ]
+    },
+    {
+      "name": "ValueTypeFieldCodecTester",
+      "fullName": "Orleans.Serialization.TestKit.ValueTypeFieldCodecTester<TField, TCodec>",
+      "namespace": "Orleans.Serialization.TestKit",
+      "kind": "class",
+      "accessibility": "public",
+      "isAbstract": true,
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TField",
+          "constraints": [
+            "struct"
+          ]
+        },
+        {
+          "name": "TCodec",
+          "constraints": [
+            "class",
+            "Orleans.Serialization.Codecs.IFieldCodec<TField>"
+          ]
+        }
+      ],
+      "baseType": "Orleans.Serialization.TestKit.FieldCodecTester<TField, TCodec>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": " Methods for testing field codecs. "
+          }
+        ]
+      },
+      "sourceFile": "src/Orleans.Serialization.TestKit/ValueTypeFieldCodecTester.cs",
+      "sourceLines": "11-11",
+      "members": [
+        {
+          "name": "DirectAccessValueSerializerRoundTrip",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void ValueTypeFieldCodecTester<TField, TCodec>.DirectAccessValueSerializerRoundTrip()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Serialization.TestKit/ValueTypeFieldCodecTester.cs",
+          "sourceLines": "38-43"
+        },
+        {
+          "name": "ValueSerializerRoundTrip",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void ValueTypeFieldCodecTester<TField, TCodec>.ValueSerializerRoundTrip()",
+          "returnType": "void",
+          "sourceFile": "src/Orleans.Serialization.TestKit/ValueTypeFieldCodecTester.cs",
+          "sourceLines": "24-33"
+        }
+      ]
+    }
+  ]
+}

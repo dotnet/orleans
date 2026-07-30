@@ -1,0 +1,1275 @@
+{
+  "package": {
+    "name": "Microsoft.Orleans.GrainDirectory.AzureStorage",
+    "version": "10.0.0",
+    "targetFramework": "net10.0",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "sourceCommit": "main"
+  },
+  "types": [
+    {
+      "name": "AzureTableGrainDirectoryOptions",
+      "fullName": "Orleans.Configuration.AzureTableGrainDirectoryOptions",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Options/AzureTableGrainDirectoryOptions.cs",
+      "sourceLines": "5-5",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableGrainDirectoryOptions.AzureTableGrainDirectoryOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Options/AzureTableGrainDirectoryOptions.cs",
+          "sourceLines": "10-10"
+        },
+        {
+          "name": "DEFAULT_TABLE_NAME",
+          "kind": "field",
+          "accessibility": "public",
+          "signature": "public const string AzureTableGrainDirectoryOptions.DEFAULT_TABLE_NAME",
+          "returnType": "string",
+          "isStatic": true,
+          "isConst": true,
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Options/AzureTableGrainDirectoryOptions.cs"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public override string AzureTableGrainDirectoryOptions.TableName",
+          "returnType": "string",
+          "isOverride": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Options/AzureTableGrainDirectoryOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableGrainDirectoryOptionsValidator",
+      "fullName": "Orleans.Configuration.AzureTableGrainDirectoryOptionsValidator",
+      "namespace": "Orleans.Configuration",
+      "kind": "class",
+      "accessibility": "public",
+      "baseType": "Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<Orleans.Configuration.AzureTableGrainDirectoryOptions>",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Options/AzureTableGrainDirectoryOptions.cs",
+      "sourceLines": "14-14",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableGrainDirectoryOptionsValidator.AzureTableGrainDirectoryOptionsValidator(AzureTableGrainDirectoryOptions options, string name)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "Orleans.Configuration.AzureTableGrainDirectoryOptions"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Options/AzureTableGrainDirectoryOptions.cs",
+          "sourceLines": "16-18"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptions",
+      "fullName": "Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions",
+      "namespace": "Orleans.GrainDirectory.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "30-30",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptions.AzureStorageOperationOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "createClientCallback",
+              "type": "System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>>"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using the provided callback. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "91-92"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "82-83"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "azureSasCredential",
+              "type": "Azure.AzureSasCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.AzureSasCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "109-110"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "sharedKeyCredential",
+              "type": "Azure.Data.Tables.TableSharedKeyCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Data.Tables.TableSharedKeyCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "118-119"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "serviceUri",
+              "type": "System.Uri"
+            },
+            {
+              "name": "tokenCredential",
+              "type": "Azure.Core.TokenCredential"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using an authenticated service URI and a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Azure.Core.TokenCredential"
+              },
+              {
+                "kind": "text",
+                "text": ". "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "100-101"
+        },
+        {
+          "name": "ConfigureTableServiceClient",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "connectionString",
+              "type": "string"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "System.ObsoleteAttribute",
+              "constructorArguments": [
+                "Set the TableServiceClient property directly."
+              ]
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Configures the "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient"
+              },
+              {
+                "kind": "text",
+                "text": " using a connection string. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "73-74"
+        },
+        {
+          "name": "ClientOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableClientOptions AzureStorageOperationOptions.ClientOptions",
+          "returnType": "Azure.Data.Tables.TableClientOptions",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Options to be used when configuring the table storage client, or "
+              },
+              {
+                "kind": "langword",
+                "value": "null"
+              },
+              {
+                "kind": "text",
+                "text": " to use the default options. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "StoragePolicyOptions",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions AzureStorageOperationOptions.StoragePolicyOptions",
+          "returnType": "Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions",
+          "hasGet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Azure Storage Policy Options "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "42-42"
+        },
+        {
+          "name": "TableName",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public virtual string AzureStorageOperationOptions.TableName",
+          "returnType": "string",
+          "isVirtual": true,
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Table name for Azure Storage "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        },
+        {
+          "name": "TableServiceClient",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TableServiceClient AzureStorageOperationOptions.TableServiceClient",
+          "returnType": "Azure.Data.Tables.TableServiceClient",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Gets or sets the client used to access the Azure Table Service. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureStorageOperationOptionsValidator",
+      "fullName": "Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>",
+      "namespace": "Orleans.GrainDirectory.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "isGeneric": true,
+      "genericParameters": [
+        {
+          "name": "TOptions",
+          "constraints": [
+            "Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions"
+          ]
+        }
+      ],
+      "interfaces": [
+        "Orleans.IConfigurationValidator"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+      "sourceLines": "204-204",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "options",
+              "type": "TOptions"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "isOptional": true
+            }
+          ],
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "206-210"
+        },
+        {
+          "name": "ValidateConfiguration",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public virtual void AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration()",
+          "returnType": "void",
+          "isVirtual": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Validates system configuration and throws an exception if configuration is not valid. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "217-218"
+        },
+        {
+          "name": "Name",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public string AzureStorageOperationOptionsValidator<TOptions>.Name",
+          "returnType": "string",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "213-213"
+        },
+        {
+          "name": "Options",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TOptions AzureStorageOperationOptionsValidator<TOptions>.Options",
+          "returnType": "TOptions",
+          "hasGet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStorageOperationOptions.cs",
+          "sourceLines": "212-212"
+        }
+      ]
+    },
+    {
+      "name": "AzureStoragePolicyOptions",
+      "fullName": "Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions",
+      "namespace": "Orleans.GrainDirectory.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+      "sourceLines": "24-24",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureStoragePolicyOptions.AzureStoragePolicyOptions()",
+          "returnType": "void",
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs",
+          "sourceLines": "30-44"
+        },
+        {
+          "name": "CreationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.CreationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxBulkUpdateRows",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxBulkUpdateRows",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxCreationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public int AzureStoragePolicyOptions.MaxOperationRetries",
+          "returnType": "int",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum number of operation retry attempts. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "MaxPauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.MaxPauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The maximum delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "OperationTimeout",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.OperationTimeout",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenCreationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenCreationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        },
+        {
+          "name": "PauseBetweenOperationRetries",
+          "kind": "property",
+          "accessibility": "public",
+          "signature": "public TimeSpan AzureStoragePolicyOptions.PauseBetweenOperationRetries",
+          "returnType": "System.TimeSpan",
+          "hasGet": true,
+          "hasSet": true,
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " The base delay used by the Azure SDK exponential retry policy. "
+              }
+            ]
+          },
+          "sourceFile": "src/Azure/Shared/Storage/AzureStoragePolicyOptions.cs"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableGrainDirectory",
+      "fullName": "Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory",
+      "namespace": "Orleans.GrainDirectory.AzureStorage",
+      "kind": "class",
+      "accessibility": "public",
+      "interfaces": [
+        "Orleans.GrainDirectory.IGrainDirectory",
+        "Orleans.ILifecycleParticipant<Orleans.Runtime.ISiloLifecycle>"
+      ],
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+      "sourceLines": "16-16",
+      "members": [
+        {
+          "name": ".ctor",
+          "kind": "constructor",
+          "accessibility": "public",
+          "signature": "public AzureTableGrainDirectory.AzureTableGrainDirectory(AzureTableGrainDirectoryOptions directoryOptions, IOptions<ClusterOptions> clusterOptions, ILoggerFactory loggerFactory)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "directoryOptions",
+              "type": "Orleans.Configuration.AzureTableGrainDirectoryOptions"
+            },
+            {
+              "name": "clusterOptions",
+              "type": "Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>"
+            },
+            {
+              "name": "loggerFactory",
+              "type": "Microsoft.Extensions.Logging.ILoggerFactory"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "61-70"
+        },
+        {
+          "name": "InitializeIfNeeded",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AzureTableGrainDirectory.InitializeIfNeeded(CancellationToken ct = default(CancellationToken))",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "ct",
+              "type": "System.Threading.CancellationToken",
+              "isOptional": true
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "186-187"
+        },
+        {
+          "name": "Lookup",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<GrainAddress?> AzureTableGrainDirectory.Lookup(GrainId grainId)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>",
+          "parameters": [
+            {
+              "name": "grainId",
+              "type": "Orleans.Runtime.GrainId"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Lookup for a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " for a given Grain ID. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " entry found in the directory, if any"
+              }
+            ],
+            "parameters": {
+              "grainId": [
+                {
+                  "kind": "text",
+                  "text": "The Grain ID to lookup"
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "74-82"
+        },
+        {
+          "name": "Participate",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public void AzureTableGrainDirectory.Participate(ISiloLifecycle lifecycle)",
+          "returnType": "void",
+          "parameters": [
+            {
+              "name": "lifecycle",
+              "type": "Orleans.Runtime.ISiloLifecycle"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Adds the provided observer as a participant in the lifecycle. "
+              }
+            ],
+            "parameters": {
+              "lifecycle": [
+                {
+                  "kind": "text",
+                  "text": " The observer. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "192-193"
+        },
+        {
+          "name": "Register",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<GrainAddress?> AzureTableGrainDirectory.Register(GrainAddress address)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>",
+          "parameters": [
+            {
+              "name": "address",
+              "type": "Orleans.Runtime.GrainAddress"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Register a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " entry in the directory. Only one "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " per "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Runtime.GrainAddress.GrainId"
+              },
+              {
+                "kind": "text",
+                "text": " can be registered. If there is already an existing entry, the directory will not override it. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " that is effectively registered in the directory."
+              }
+            ],
+            "parameters": {
+              "address": [
+                {
+                  "kind": "text",
+                  "text": "The "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Runtime.GrainAddress"
+                },
+                {
+                  "kind": "text",
+                  "text": " to register"
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "84-84"
+        },
+        {
+          "name": "Register",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task<GrainAddress?> AzureTableGrainDirectory.Register(GrainAddress address, GrainAddress? previousAddress)",
+          "returnType": "System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>",
+          "parameters": [
+            {
+              "name": "address",
+              "type": "Orleans.Runtime.GrainAddress"
+            },
+            {
+              "name": "previousAddress",
+              "type": "Orleans.Runtime.GrainAddress?",
+              "isNullable": true
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Register a "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " entry in the directory. Only one "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " per "
+              },
+              {
+                "kind": "cref",
+                "value": "P:Orleans.Runtime.GrainAddress.GrainId"
+              },
+              {
+                "kind": "text",
+                "text": " can be registered. If there is already an existing entry, the directory will not override it. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": "The "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " that is effectively registered in the directory."
+              }
+            ],
+            "parameters": {
+              "address": [
+                {
+                  "kind": "text",
+                  "text": "The "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Runtime.GrainAddress"
+                },
+                {
+                  "kind": "text",
+                  "text": " to register"
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "84-84"
+        },
+        {
+          "name": "Unregister",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AzureTableGrainDirectory.Unregister(GrainAddress address)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "address",
+              "type": "Orleans.Runtime.GrainAddress"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Unregisters the specified "
+              },
+              {
+                "kind": "cref",
+                "value": "T:Orleans.Runtime.GrainAddress"
+              },
+              {
+                "kind": "text",
+                "text": " entry from the directory. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Threading.Tasks.Task"
+              },
+              {
+                "kind": "text",
+                "text": " representing the operation. "
+              }
+            ],
+            "parameters": {
+              "address": [
+                {
+                  "kind": "text",
+                  "text": " The "
+                },
+                {
+                  "kind": "cref",
+                  "value": "T:Orleans.Runtime.GrainAddress"
+                },
+                {
+                  "kind": "text",
+                  "text": " to unregister. "
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "120-132"
+        },
+        {
+          "name": "UnregisterMany",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AzureTableGrainDirectory.UnregisterMany(List<GrainAddress> addresses)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "addresses",
+              "type": "System.Collections.Generic.List<Orleans.Runtime.GrainAddress>"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "136-149"
+        },
+        {
+          "name": "UnregisterSilos",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public Task AzureTableGrainDirectory.UnregisterSilos(List<SiloAddress> siloAddresses)",
+          "returnType": "System.Threading.Tasks.Task",
+          "parameters": [
+            {
+              "name": "siloAddresses",
+              "type": "System.Collections.Generic.List<Orleans.Runtime.SiloAddress>"
+            }
+          ],
+          "docs": {
+            "summary": [
+              {
+                "kind": "text",
+                "text": " Unregisters all grain directory entries which point to any of the specified silos. "
+              }
+            ],
+            "remarks": [
+              {
+                "kind": "text",
+                "text": " Can be a No-Op depending on the implementation. "
+              }
+            ],
+            "returns": [
+              {
+                "kind": "text",
+                "text": " A "
+              },
+              {
+                "kind": "cref",
+                "value": "T:System.Threading.Tasks.Task"
+              },
+              {
+                "kind": "text",
+                "text": " representing the operation. "
+              }
+            ],
+            "parameters": {
+              "siloAddresses": [
+                {
+                  "kind": "text",
+                  "text": "The silos to be removed from the directory"
+                }
+              ]
+            }
+          },
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/AzureTableGrainDirectory.cs",
+          "sourceLines": "154-154"
+        }
+      ]
+    },
+    {
+      "name": "AzureTableGrainDirectoryServiceCollectionExtensions",
+      "fullName": "Orleans.Hosting.AzureTableGrainDirectoryServiceCollectionExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "cref",
+            "value": "T:Microsoft.Extensions.DependencyInjection.IServiceCollection"
+          },
+          {
+            "kind": "text",
+            "text": " extensions. "
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Hosting/AzureTableGrainDirectoryServiceCollectionExtensions.cs",
+      "sourceLines": "15-15",
+      "members": []
+    },
+    {
+      "name": "AzureTableGrainDirectorySiloBuilderExtensions",
+      "fullName": "Orleans.Hosting.AzureTableGrainDirectorySiloBuilderExtensions",
+      "namespace": "Orleans.Hosting",
+      "kind": "class",
+      "accessibility": "public",
+      "isStatic": true,
+      "docs": {
+        "summary": [
+          {
+            "kind": "text",
+            "text": "Supports all classes in the .NET class hierarchy and provides low-level services to derived classes. This is the ultimate base class of all .NET classes; it is the root of the type hierarchy."
+          }
+        ]
+      },
+      "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Hosting/AzureTableGrainDirectoryExtensions.cs",
+      "sourceLines": "9-9",
+      "members": [
+        {
+          "name": "AddAzureTableGrainDirectory",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableGrainDirectorySiloBuilderExtensions.AddAzureTableGrainDirectory(this ISiloBuilder builder, string name, Action<AzureTableGrainDirectoryOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AzureTableGrainDirectoryOptions>"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Hosting/AzureTableGrainDirectoryExtensions.cs"
+        },
+        {
+          "name": "AddAzureTableGrainDirectory",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableGrainDirectorySiloBuilderExtensions.AddAzureTableGrainDirectory(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableGrainDirectoryOptions>>"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Hosting/AzureTableGrainDirectoryExtensions.cs"
+        },
+        {
+          "name": "UseAzureTableGrainDirectoryAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableGrainDirectorySiloBuilderExtensions.UseAzureTableGrainDirectoryAsDefault(this ISiloBuilder builder, Action<AzureTableGrainDirectoryOptions> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Orleans.Configuration.AzureTableGrainDirectoryOptions>"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Hosting/AzureTableGrainDirectoryExtensions.cs"
+        },
+        {
+          "name": "UseAzureTableGrainDirectoryAsDefault",
+          "kind": "method",
+          "accessibility": "public",
+          "signature": "public static ISiloBuilder AzureTableGrainDirectorySiloBuilderExtensions.UseAzureTableGrainDirectoryAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)",
+          "returnType": "Orleans.Hosting.ISiloBuilder",
+          "isStatic": true,
+          "isExtension": true,
+          "parameters": [
+            {
+              "name": "builder",
+              "type": "Orleans.Hosting.ISiloBuilder",
+              "modifier": "this"
+            },
+            {
+              "name": "configureOptions",
+              "type": "System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableGrainDirectoryOptions>>"
+            }
+          ],
+          "sourceFile": "src/Azure/Orleans.GrainDirectory.AzureStorage/Hosting/AzureTableGrainDirectoryExtensions.cs"
+        }
+      ]
+    }
+  ]
+}

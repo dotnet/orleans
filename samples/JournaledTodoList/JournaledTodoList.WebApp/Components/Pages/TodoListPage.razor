@@ -1,0 +1,102 @@
+﻿@page "/todolist/{ListId}"
+<PageTitle>Todo List - @ListId</PageTitle>
+<div class="d-flex flex-column">
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Todo List: @ListId</h2>
+        </div>
+        <div class="col-md-6">
+            <h2>Event History</h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            @if (IsViewingHistory)
+            {
+                <div class="alert alert-warning" role="alert">
+                    <strong>Viewing historical version</strong>
+                    <span>as of @currentViewTimestamp.Value.ToLocalTime().ToString("g").</span>
+                    <a @onclick:preventDefault @onclick:stopPropagation @onclick="ReturnToCurrentVersion" href="#" class="link-offset-2">To current version</a>.
+                </div>
+            }
+            else
+            {
+                <form @onsubmit="AddItem">
+                    <div class="input-group input-group-lg">
+                        <input type="text" class="form-control" placeholder="Add a new item..." @bind="newItemTitle" autofocus />
+                        <button type="submit" class="btn btn-primary" disabled="@IsViewingHistory">Add</button>
+                    </div>
+                </form>
+            }
+        </div>
+
+        <div class="col-md-6">
+            <div class="alert alert-info" role="alert">
+                Below is the history of the list. Click on a change to see the todo list at that time.
+            </div>
+        </div>
+    </div>
+
+    <div class="row flex-grow-1">
+        <div class="col-md-6 d-flex flex-column" style="height: calc(100vh - 200px); overflow-y: auto;">
+            @if (todoList is null)
+            {
+                <div>Loading...</div>
+            }
+            else if (todoList.Items.IsEmpty)
+            {
+                <div class="alert alert-info">No items in this list yet. Add one above!</div>
+            }
+            else
+            {
+                <div class="d-flex flex-column">
+                    @foreach (var item in todoList.Items)
+                    {
+                        <div class="input-group mb-3" @key="item.Id">
+                            <div class="input-group-text">
+                                <input class="form-check-input mt-0" type="checkbox"
+                                       checked="@item.IsCompleted" @onchange="() => ToggleItem(item.Id)"
+                                       aria-label="Toggles todo item"
+                                       disabled="@IsViewingHistory">
+                            </div>
+                            <input type="text" class="form-control" aria-label="Todo text"
+                                   value="@item.Title"
+                                   @onchange="(e) => UpdateItem(item.Id, e.Value as string)"
+                                   disabled="@(IsViewingHistory || item.IsCompleted)">
+                            <button class="btn btn-danger" type="button"
+                                    @onclick="() => RemoveItem(item.Id)"
+                                    disabled="@IsViewingHistory">
+                                Remove
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <div class="col-md-6 d-flex flex-column" style="height: calc(100vh - 200px); overflow-y: auto;">
+            @if (history.IsDefault)
+            {
+                <div>Loading history...</div>
+            }
+            else if (history.IsEmpty)
+            {
+                <div class="alert alert-info">No history yet.</div>
+            }
+            else
+            {
+                <div class="list-group">
+                    @foreach (var evt in history.OrderByDescending(e => e.Timestamp))
+                    {
+                        <button type="button" class="list-group-item list-group-item-action @(IsCurrentHistoryItem(evt) ? "list-group-item-primary" : "list-group-item-light")"
+                                aria-current="@IsCurrentHistoryItem(evt)"
+                                @onclick="() => ViewAtTimestamp(evt.Timestamp)">
+                            <small class="text-muted">@evt.Timestamp.ToLocalTime().ToString("g")</small>
+                            <div>@evt.GetDescription()</div>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
