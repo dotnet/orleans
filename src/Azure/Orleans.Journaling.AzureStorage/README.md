@@ -17,6 +17,20 @@ siloBuilder.AddAzureBlobJournalStorage(options =>
 });
 ```
 
+## Azure Table journal storage
+
+The package also provides an Azure Table implementation, `AddAzureTableJournalStorage`. Each journal is stored as one table partition: a header row carries the journal manifest and is the optimistic concurrency fence, and journal bytes are stored in data rows whose keys order the current generation by sequence. Every append commits its rows together with the header update in a single entity group transaction, and recovery replays the whole journal with a single partition range query, avoiding the per-block pacing which append blob replay is subject to. Because an append is limited by entity group transaction limits, a single journal batch must not exceed 2 MiB; replace operations may be any size.
+
+```csharp
+siloBuilder.AddAzureTableJournalStorage(options =>
+{
+    options.TableName = "journal";
+    options.TableServiceClient = tableServiceClient;
+});
+```
+
+`AzureTableJournalStorageOptions.GetPartitionKey` can be used to apply a custom partition layout. The returned key must be unique per journal, satisfy Azure Table partition-key restrictions, and contain at most 1,024 characters. The canonical journal id is stored in the header so catalog listing remains accurate with custom mappings.
+
 ## Getting Started
 To use this package, install it via NuGet:
 
