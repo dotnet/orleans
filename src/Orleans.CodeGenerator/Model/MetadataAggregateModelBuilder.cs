@@ -40,6 +40,7 @@ internal static class MetadataAggregateModelBuilder
         var generatedProxyTypes = GetGeneratedProxyTypes(normalizedProxyInterfaces);
         var invokableInterfaces = GetInvokableInterfaces(normalizedProxyInterfaces);
         var generatedInvokableActivatorMetadataNames = GetGeneratedInvokableActivatorMetadataNames(proxyOutputs);
+        var generatedCompoundTypeAliases = GetGeneratedCompoundTypeAliases(proxyOutputs);
         var defaultCopiers = GetDefaultCopiers(normalizedSerializableTypes);
 
         return new MetadataAggregateModel(
@@ -52,6 +53,7 @@ internal static class MetadataAggregateModelBuilder
             GeneratedProxyTypes: generatedProxyTypes,
             InvokableInterfaces: invokableInterfaces,
             GeneratedInvokableActivatorMetadataNames: generatedInvokableActivatorMetadataNames,
+            GeneratedCompoundTypeAliases: generatedCompoundTypeAliases,
             InterfaceImplementations: normalizedReferenceData.InterfaceImplementations,
             DefaultCopiers: defaultCopiers);
     }
@@ -308,6 +310,20 @@ internal static class MetadataAggregateModelBuilder
             .OrderBy(static metadataName => metadataName, StringComparer.Ordinal)];
     }
 
+    private static ImmutableArray<CompoundTypeAliasModel> GetGeneratedCompoundTypeAliases(ImmutableArray<ProxyOutputModel> proxyOutputs)
+    {
+        if (proxyOutputs.IsDefaultOrEmpty)
+        {
+            return [];
+        }
+
+        return [.. proxyOutputs
+            .SelectMany(static output => output.CompatibilityInvokableAliases)
+            .Distinct()
+            .OrderBy(static alias => ReferenceAssemblyModelExtractor.GetCompoundTypeAliasOrderKey(alias), StringComparer.Ordinal)
+            .ThenBy(static alias => alias.TargetType.SyntaxString, StringComparer.Ordinal)];
+    }
+
     private static ImmutableArray<DefaultCopierModel> GetDefaultCopiers(ImmutableArray<SerializableTypeModel> serializableTypes)
         => [.. serializableTypes
             .Where(static type => type.IsShallowCopyable && !type.IsGenericType)
@@ -335,5 +351,4 @@ internal static class MetadataAggregateModelBuilder
             : new TypeRef(qualifiedName);
     }
 }
-
 

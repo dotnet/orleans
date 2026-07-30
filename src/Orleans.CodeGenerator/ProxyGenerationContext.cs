@@ -1,6 +1,8 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator;
@@ -9,6 +11,8 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
 {
     private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
     private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
+    private readonly Dictionary<INamedTypeSymbol, List<CompoundTypeAliasModel>> _compatibilityInvokableAliases = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<string> _generatedCompatibilityInvokableMetadataNames = new(StringComparer.Ordinal);
     private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
 
     internal ProxyGenerationContext(Compilation compilation, CodeGeneratorOptions options)
@@ -54,6 +58,9 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             }
         }
     }
+
+    internal IReadOnlyList<CompoundTypeAliasModel> GetCompatibilityInvokableAliases(INamedTypeSymbol interfaceType)
+        => _compatibilityInvokableAliases.TryGetValue(interfaceType.OriginalDefinition, out var aliases) ? aliases : [];
 
     internal uint? GetId(ISymbol memberSymbol) => GeneratedCodeUtilities.GetId(LibraryTypes, memberSymbol);
 
@@ -233,7 +240,27 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             var compatInvokableId = new InvokableMethodId(proxyBaseInfo, interfaceType, method);
             var compatMethodDescription = InvokableMethodDescription.Create(compatInvokableId, interfaceType);
             var compatInvokable = InvokableGenerator.Generate(compatMethodDescription);
+            if (!_generatedCompatibilityInvokableMetadataNames.Add(compatInvokable.MetadataName))
+            {
+                return proxyMethodDescription;
+            }
+
             AddMember(compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax);
+            var aliasComponents = InvokableGenerator.GetCompoundTypeAliasComponents(
+                compatInvokableId,
+                interfaceType,
+                compatMethodDescription.GeneratedMethodId);
+            var alias = new CompoundTypeAliasModel(
+                aliasComponents.Select(static component => component.IsType
+                    ? new CompoundAliasComponentModel(new TypeRef(component.TypeValue!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))
+                    : new CompoundAliasComponentModel(component.StringValue!)).ToImmutableArray(),
+                new TypeRef(compatInvokable.OpenTypeSyntax.ToString()));
+            if (!_compatibilityInvokableAliases.TryGetValue(interfaceType.OriginalDefinition, out var aliases))
+            {
+                aliases = _compatibilityInvokableAliases[interfaceType.OriginalDefinition] = [];
+            }
+
+            aliases.Add(alias);
         }
 
         return proxyMethodDescription;

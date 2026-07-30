@@ -7,6 +7,7 @@ internal sealed record class ProxyOutputModel(
     ProxyInterfaceModel ProxyInterface,
     EquatableArray<string> OwnedInvokableMetadataNames,
     EquatableArray<string> OwnedInvokableActivatorMetadataNames,
+    EquatableArray<CompoundTypeAliasModel> CompatibilityInvokableAliases,
     bool UseDeclaredInvokableFallback)
 {
     public ProxyOutputModel(
@@ -17,6 +18,7 @@ internal sealed record class ProxyOutputModel(
             proxyInterface,
             ownedInvokableMetadataNames,
             EquatableArray<string>.Empty,
+            EquatableArray<CompoundTypeAliasModel>.Empty,
             useDeclaredInvokableFallback)
     {
     }

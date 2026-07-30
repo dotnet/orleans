@@ -1488,6 +1488,25 @@ public class DemoClass
         Assert.True(
             CountGeneratedInvokableClasses(configuredSource) > CountGeneratedInvokableClasses(baselineSource),
             "Enabling compatibility invokers should generate additional invokable classes for inherited grain methods.");
+
+        var compatibilityInvokers = configuredResult.GeneratedSources
+            .Where(static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal))
+            .SelectMany(static source => CSharpSyntaxTree.ParseText(source.SourceText.ToString().TrimStart('\uFEFF'))
+                .GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<ClassDeclarationSyntax>())
+            .Where(static declaration => declaration.Identifier.ValueText.StartsWith("Invokable_IDerivedGrain_", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Single(compatibilityInvokers);
+
+        var metadataSource = configuredResult.GeneratedSources
+            .Single(source => source.HintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal))
+            .SourceText
+            .ToString();
+        Assert.Contains(
+            "typeof(OrleansCodeGen.TestProject.Invokable_IDerivedGrain_",
+            metadataSource,
+            StringComparison.Ordinal);
     }
 
     [Fact]

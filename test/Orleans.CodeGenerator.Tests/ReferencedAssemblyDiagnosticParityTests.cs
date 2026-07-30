@@ -76,10 +76,11 @@ public class ReferencedAssemblyDiagnosticParityTests
     }
 
     [Fact]
-    public async Task GenerateCodeForDeclaringAssembly_EmitsReferencedSerializersLocalProxiesAndMetadataOnce()
+    public async Task GenerateCodeForDeclaringAssembly_EmitsReferencedSerializersProxiesAndMetadataOnce()
     {
         const string libraryCode = """
             using Orleans;
+            using System.Threading.Tasks;
 
             namespace LibraryProject;
 
@@ -92,6 +93,11 @@ public class ReferencedAssemblyDiagnosticParityTests
             {
                 [Id(0)]
                 public string Value { get; set; } = string.Empty;
+            }
+
+            public interface ILibraryGrain : IGrainWithIntegerKey
+            {
+                Task<PublicReferencedDto> Get();
             }
             """;
 
@@ -115,11 +121,14 @@ public class ReferencedAssemblyDiagnosticParityTests
         Assert.Equal(1, CountGeneratedClassDeclarations(result, "Codec_PublicReferencedDto"));
         Assert.Equal(1, CountGeneratedClassDeclarations(result, "Copier_PublicReferencedDto"));
         Assert.Equal(1, CountGeneratedClassDeclarations(result, "Activator_PublicReferencedDto"));
+        Assert.Equal(1, CountGeneratedClassDeclarations(result, "Proxy_ILibraryGrain"));
         Assert.Equal(1, CountGeneratedClassDeclarations(result, "Proxy_IConsumerGrain"));
         Assert.Equal(1, CountMetadataTypeRegistrations(result, "Serializers", "Codec_PublicReferencedDto"));
         Assert.Equal(1, CountMetadataTypeRegistrations(result, "Copiers", "Copier_PublicReferencedDto"));
         Assert.Equal(1, CountMetadataTypeRegistrations(result, "Activators", "Activator_PublicReferencedDto"));
+        Assert.Equal(1, CountMetadataTypeRegistrations(result, "InterfaceProxies", "Proxy_ILibraryGrain"));
         Assert.Equal(1, CountMetadataTypeRegistrations(result, "InterfaceProxies", "Proxy_IConsumerGrain"));
+        Assert.Equal(1, CountMetadataTypeRegistrations(result, "Interfaces", "ILibraryGrain"));
         Assert.Equal(1, CountMetadataTypeRegistrations(result, "Interfaces", "IConsumerGrain"));
 
         var outputCompilation = consumerCompilation.AddSyntaxTrees(CreateGeneratedSyntaxTrees(result));

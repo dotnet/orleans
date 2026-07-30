@@ -150,7 +150,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             .ToImmutableArray();
 
         var aliasTree = CompoundTypeAliasEmissionTree.Create();
-        foreach (var alias in aliases.Concat(generatedAliases))
+        foreach (var alias in aliases.Concat(generatedAliases).Concat(_metadataModel.GeneratedCompoundTypeAliases))
         {
             aliasTree.Add(alias.Components, alias.TargetType);
         }

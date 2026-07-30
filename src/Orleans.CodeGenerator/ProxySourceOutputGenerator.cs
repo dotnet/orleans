@@ -336,11 +336,18 @@ internal static class ProxySourceOutputGenerator
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(static value => value, StringComparer.Ordinal)
                     .ToImmutableArray();
+                var compatibilityInvokableAliases = proxyContext
+                    .GetCompatibilityInvokableAliases(interfaceDescription.InterfaceType)
+                    .Distinct()
+                    .OrderBy(static alias => ReferenceAssemblyModelExtractor.GetCompoundTypeAliasOrderKey(alias), StringComparer.Ordinal)
+                    .ThenBy(static alias => alias.TargetType.SyntaxString, StringComparer.Ordinal)
+                    .ToImmutableArray();
 
                 return new ProxyOutputModel(
                     model,
                     ownedInvokableMetadataNames,
                     ownedInvokableActivatorMetadataNames,
+                    compatibilityInvokableAliases,
                     useDeclaredInvokableFallback);
             })];
     }
@@ -425,6 +432,5 @@ internal static class ProxySourceOutputGenerator
             .OrderBy(static generatedInvokable => generatedInvokable.MetadataName, StringComparer.Ordinal);
     }
 }
-
 
 

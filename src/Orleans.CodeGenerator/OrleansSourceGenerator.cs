@@ -101,20 +101,6 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance)
             .WithTrackingName(CollectedProxyInterfacesTrackingName);
 
-        var preparedProxyOutputs = collectedProxies
-            .Combine(compilationProvider)
-            .Combine(generatorOptions)
-            .Select(static (input, ct) => ProxySourceOutputGenerator.CreateProxyOutputPreparation(input.Left.Right, input.Left.Left, input.Right, ct))
-            .WithTrackingName(PreparedProxyOutputsTrackingName);
-
-        context.RegisterSourceOutput(preparedProxyOutputs, static (productionContext, input) =>
-        {
-            if (input.Diagnostic is { } diagnostic)
-            {
-                productionContext.ReportDiagnostic(diagnostic);
-            }
-        });
-
         // Extract reference assembly data (application parts, well-known type IDs, aliases)
         var refAssemblyDataResults = compilationProvider
             .Combine(generatorOptions)
@@ -137,6 +123,25 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 
         var refAssemblyData = refAssemblyDataResults
             .Select(static (result, _) => result.Model);
+
+        var allProxyInterfaces = collectedProxies
+            .Combine(refAssemblyData)
+            .Select(static (input, _) => ModelExtractor.MergeProxyInterfaces(input.Left, input.Right.ReferencedProxyInterfaces))
+            .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance);
+
+        var preparedProxyOutputs = allProxyInterfaces
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .Select(static (input, ct) => ProxySourceOutputGenerator.CreateProxyOutputPreparation(input.Left.Right, input.Left.Left, input.Right, ct))
+            .WithTrackingName(PreparedProxyOutputsTrackingName);
+
+        context.RegisterSourceOutput(preparedProxyOutputs, static (productionContext, input) =>
+        {
+            if (input.Diagnostic is { } diagnostic)
+            {
+                productionContext.ReportDiagnostic(diagnostic);
+            }
+        });
 
         var preparedProxyOutputModels = preparedProxyOutputs
             .Select(static (result, _) => result.ProxyOutputModels)
