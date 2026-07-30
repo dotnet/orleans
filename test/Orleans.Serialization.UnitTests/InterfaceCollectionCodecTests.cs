@@ -271,6 +271,30 @@ public class InterfaceCollectionRegressionTests
     }
 
     [Fact]
+    public void RuntimeConcreteCodecDoesNotRequireFallbackElementCodec()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        Assert.False(serializer.CanSerialize(typeof(UnsupportedElement)));
+        Assert.True(serializer.CanSerialize(typeof(IReadOnlyList<UnsupportedElement>)));
+
+        IReadOnlyList<UnsupportedElement> original = new GeneratedUnsupportedElementReadOnlyList { Marker = "preserved" };
+        var result = serializer.Deserialize<IReadOnlyList<UnsupportedElement>>(
+            serializer.SerializeToArray(original));
+
+        var concrete = Assert.IsType<GeneratedUnsupportedElementReadOnlyList>(result);
+        Assert.Equal("preserved", concrete.Marker);
+    }
+
+    [Fact]
+    public void NullInterfaceFieldDoesNotRequireFallbackElementCodec()
+    {
+        var result = RoundTrip(new UnsupportedElementListContainer());
+
+        Assert.Null(result.Values);
+    }
+
+    [Fact]
     public void RuntimeConcreteSetComparerIsPreservedWhenAvailable()
     {
         var original = new SetContainer
@@ -347,6 +371,19 @@ public class InterfaceCollectionRegressionTests
     }
 
 #if !NETCOREAPP3_1
+    [Fact]
+    public void CanDeserializeLegacyInterfaceCodecPayload()
+    {
+        const string payload = "3001D8283104374C697374496E74657266616365436F64656360315B5B696E745D5D000701050009000DE0";
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer<IList<int>>>();
+
+        var result = serializer.Deserialize(Convert.FromHexString(payload));
+
+        Assert.IsType<List<int>>(result);
+        Assert.Equal(ExpectedArray, result);
+    }
+
     [Fact]
     public Task EnumerableInterfaceFallback_Formatted_MatchesSnapshot()
         => VerifyFallbackBitStream<IEnumerable<int>>(new UnknownList<int>(ExpectedArray), EnumerableCodecAlias);
@@ -505,6 +542,32 @@ public class InterfaceCollectionRegressionTests
         public int this[int index] => Values[index];
 
         public IEnumerator<int> GetEnumerator() => Values.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    public sealed class UnsupportedElement;
+
+    [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.InterfaceCollectionRegressionTests.UnsupportedElementListContainer")]
+    public sealed class UnsupportedElementListContainer
+    {
+        [Id(0)]
+        public IList<UnsupportedElement> Values { get; set; }
+    }
+
+    [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.InterfaceCollectionRegressionTests.GeneratedUnsupportedElementReadOnlyList")]
+    public sealed class GeneratedUnsupportedElementReadOnlyList : IReadOnlyList<UnsupportedElement>
+    {
+        [Id(0)]
+        public string Marker { get; set; }
+
+        public int Count => 0;
+
+        public UnsupportedElement this[int index] => throw new ArgumentOutOfRangeException(nameof(index));
+
+        public IEnumerator<UnsupportedElement> GetEnumerator() => Enumerable.Empty<UnsupportedElement>().GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }

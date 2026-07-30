@@ -2,7 +2,6 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
-using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
@@ -224,7 +223,7 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
 
     protected ListInterfaceCodec(IFieldCodec<T> elementCodec)
     {
-        _elementCodec = OrleansGeneratedCodeHelper.UnwrapService(this, elementCodec);
+        _elementCodec = elementCodec;
     }
 
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TInterface value) where TBufferWriter : IBufferWriter<byte>
@@ -340,8 +339,8 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
 
     protected SetInterfaceCodec(IFieldCodec<T> elementCodec, IFieldCodec<IEqualityComparer<T>> comparerCodec)
     {
-        _elementCodec = OrleansGeneratedCodeHelper.UnwrapService(this, elementCodec);
-        _comparerCodec = OrleansGeneratedCodeHelper.UnwrapService(this, comparerCodec);
+        _elementCodec = elementCodec;
+        _comparerCodec = comparerCodec;
     }
 
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TInterface value) where TBufferWriter : IBufferWriter<byte>
@@ -468,9 +467,9 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
         IFieldCodec<TValue> valueCodec,
         IFieldCodec<IEqualityComparer<TKey>> comparerCodec)
     {
-        _keyCodec = OrleansGeneratedCodeHelper.UnwrapService(this, keyCodec);
-        _valueCodec = OrleansGeneratedCodeHelper.UnwrapService(this, valueCodec);
-        _comparerCodec = OrleansGeneratedCodeHelper.UnwrapService(this, comparerCodec);
+        _keyCodec = keyCodec;
+        _valueCodec = valueCodec;
+        _comparerCodec = comparerCodec;
     }
 
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TInterface value) where TBufferWriter : IBufferWriter<byte>
