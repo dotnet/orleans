@@ -11,5 +11,11 @@ public static class GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembl
 
     private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
-    internal static Diagnostic CreateDiagnostic(AttributeData attribute, ITypeSymbol type) => Diagnostic.Create(Rule, attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span), type.ToDisplayString(), attribute.ToString());
+    internal static Diagnostic CreateDiagnostic(AttributeData attribute, ITypeSymbol type)
+    {
+        var location = attribute.ApplicationSyntaxReference is { } syntaxReference
+            ? syntaxReference.SyntaxTree.GetLocation(syntaxReference.Span)
+            : Location.None;
+        return Diagnostic.Create(Rule, location, type.ToDisplayString(), attribute.ToString());
+    }
 }

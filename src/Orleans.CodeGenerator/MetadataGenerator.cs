@@ -28,7 +28,13 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         var generatedInvokableActivatorMetadataNames = new HashSet<string>(
             model.GeneratedInvokableActivatorMetadataNames,
             StringComparer.Ordinal);
-        var generatedInvokables = GetGeneratedInvokableMetadata(orderedProxyInterfaces, generatedInvokableActivatorMetadataNames);
+        var generatedInvokableMetadataNames = new HashSet<string>(
+            model.GeneratedInvokableMetadataNames,
+            StringComparer.Ordinal);
+        var generatedInvokables = GetGeneratedInvokableMetadata(
+            orderedProxyInterfaces,
+            generatedInvokableMetadataNames,
+            generatedInvokableActivatorMetadataNames);
         var serializableRegistrations = GetOrderedSerializableRegistrations(model, generatedInvokables);
 
         var addSerializerMethod = configParam.Member("Serializers").Member("Add");
@@ -239,6 +245,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
     private ImmutableArray<GeneratedInvokableMetadata> GetGeneratedInvokableMetadata(
         ImmutableArray<ProxyInterfaceModel> proxyInterfaces,
+        HashSet<string> generatedInvokableMetadataNames,
         HashSet<string> generatedInvokableActivatorMetadataNames)
     {
         var result = ImmutableArray.CreateBuilder<GeneratedInvokableMetadata>();
@@ -250,7 +257,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             {
                 var metadata = CreateGeneratedInvokableMetadata(proxy, method, generatedInvokableActivatorMetadataNames);
                 var key = metadata.TypeSyntax.ToString();
-                if (seen.Add(key))
+                if (generatedInvokableMetadataNames.Contains(metadata.MetadataName) && seen.Add(key))
                 {
                     result.Add(metadata);
                 }
@@ -334,6 +341,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             : null;
 
         return new GeneratedInvokableMetadata(
+            metadataName,
             typeSyntax,
             method.ContainingInterfaceType,
             aliases,
@@ -541,6 +549,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
     }
 
     private readonly struct GeneratedInvokableMetadata(
+        string metadataName,
         TypeSyntax typeSyntax,
         TypeRef sourceType,
         ImmutableArray<CompoundTypeAliasModel> aliases,
@@ -549,6 +558,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         TypeSyntax? activatorTypeSyntax,
         SourceLocationModel sourceLocation)
     {
+        public string MetadataName { get; } = metadataName;
         public TypeSyntax TypeSyntax { get; } = typeSyntax;
         public TypeRef SourceType { get; } = sourceType;
         public ImmutableArray<CompoundTypeAliasModel> Aliases { get; } = aliases;

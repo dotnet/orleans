@@ -135,6 +135,122 @@ public class ReferencedAssemblyDiagnosticParityTests
         AssertNoCompilationErrors(outputCompilation);
     }
 
+    [Fact]
+    public async Task GenerateCodeForDeclaringAssembly_EmitsInheritedInvokablesFromReferencedInterfaces()
+    {
+        const string baseLibraryCode = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace BaseLibrary;
+
+            public interface IBaseGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+            """;
+
+        const string derivedLibraryCode = """
+            namespace DerivedLibrary;
+
+            public sealed class Marker
+            {
+            }
+
+            public interface IDerivedGrain : BaseLibrary.IBaseGrain
+            {
+            }
+            """;
+
+        const string consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(DerivedLibrary.Marker))]
+            """;
+
+        var baseLibraryCompilation = await TestCompilationHelper.CreateCompilation(baseLibraryCode, "BaseLibrary");
+        var derivedLibraryCompilation = await TestCompilationHelper.CreateCompilation(
+            derivedLibraryCode,
+            "DerivedLibrary",
+            baseLibraryCompilation.ToMetadataReference());
+        var consumerCompilation = await TestCompilationHelper.CreateCompilation(
+            consumerCode,
+            "ConsumerProject",
+            baseLibraryCompilation.ToMetadataReference(),
+            derivedLibraryCompilation.ToMetadataReference());
+
+        var result = RunSourceGenerator(consumerCompilation);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains(
+            GetGeneratedCompilationUnits(result)
+                .SelectMany(static root => root.DescendantNodes().OfType<ClassDeclarationSyntax>()),
+            static declaration => declaration.Identifier.ValueText.StartsWith("Invokable_IBaseGrain_", StringComparison.Ordinal));
+        AssertNoCompilationErrors(consumerCompilation.AddSyntaxTrees(CreateGeneratedSyntaxTrees(result)));
+    }
+
+    [Fact]
+    public async Task GenerateCodeForDeclaringAssembly_DoesNotRegisterExistingGeneratedInvokables()
+    {
+        const string libraryCode = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace LibraryProject;
+
+            public sealed class Marker
+            {
+            }
+
+            public interface ILibraryGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+            """;
+
+        const string consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryProject.Marker))]
+            """;
+
+        var libraryCompilation = await TestCompilationHelper.CreateCompilation(libraryCode, "LibraryProject");
+        GeneratorDriver libraryDriver = CSharpGeneratorDriver.Create(new OrleansSerializationSourceGenerator().AsSourceGenerator());
+        libraryDriver = libraryDriver.RunGeneratorsAndUpdateCompilation(
+            libraryCompilation,
+            out var generatedLibraryCompilation,
+            out var libraryGeneratorDiagnostics);
+        Assert.Empty(libraryGeneratorDiagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        AssertNoCompilationErrors(generatedLibraryCompilation);
+
+        var consumerCompilation = await TestCompilationHelper.CreateCompilation(
+            consumerCode,
+            "ConsumerProject",
+            generatedLibraryCompilation.ToMetadataReference());
+        var result = RunSourceGenerator(consumerCompilation);
+
+        Assert.Empty(result.Diagnostics);
+        AssertNoCompilationErrors(consumerCompilation.AddSyntaxTrees(CreateGeneratedSyntaxTrees(result)));
+    }
+
+    [Fact]
+    public async Task GenerateCodeForDeclaringAssembly_ReportsTypesWithoutDeclaringAssemblies()
+    {
+        const string consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(int[]))]
+            """;
+
+        var consumerCompilation = await TestCompilationHelper.CreateCompilation(consumerCode, "ConsumerProject");
+        var result = RunSourceGenerator(consumerCompilation);
+
+        var diagnostic = Assert.Single(
+            result.Diagnostics,
+            static diagnostic => diagnostic.Id == GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.DiagnosticId);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+    }
+
     private static async Task<GeneratorRunResult> RunSourceGeneratorForConsumer(
         string libraryCode,
         string consumerCode)

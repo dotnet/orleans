@@ -14,6 +14,7 @@ internal sealed record class MetadataAggregateModel(
     EquatableArray<TypeRef> ActivatableTypes,
     EquatableArray<TypeRef> GeneratedProxyTypes,
     EquatableArray<TypeRef> InvokableInterfaces,
+    EquatableArray<string> GeneratedInvokableMetadataNames,
     EquatableArray<string> GeneratedInvokableActivatorMetadataNames,
     EquatableArray<CompoundTypeAliasModel> GeneratedCompoundTypeAliases,
     EquatableArray<InterfaceImplementationModel> InterfaceImplementations,

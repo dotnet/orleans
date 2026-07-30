@@ -6,6 +6,7 @@ namespace Orleans.CodeGenerator.Model;
 internal sealed record class ProxyOutputModel(
     ProxyInterfaceModel ProxyInterface,
     EquatableArray<string> OwnedInvokableMetadataNames,
+    EquatableArray<string> EmittedInvokableMetadataNames,
     EquatableArray<string> OwnedInvokableActivatorMetadataNames,
     EquatableArray<CompoundTypeAliasModel> CompatibilityInvokableAliases,
     bool UseDeclaredInvokableFallback)
@@ -16,6 +17,7 @@ internal sealed record class ProxyOutputModel(
         bool useDeclaredInvokableFallback)
         : this(
             proxyInterface,
+            ownedInvokableMetadataNames,
             ownedInvokableMetadataNames,
             EquatableArray<string>.Empty,
             EquatableArray<CompoundTypeAliasModel>.Empty,

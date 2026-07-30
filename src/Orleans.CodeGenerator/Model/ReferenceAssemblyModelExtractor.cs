@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
@@ -240,7 +241,8 @@ internal static class ReferenceAssemblyModelExtractor
             var declaringAssembly = type.OriginalDefinition.ContainingAssembly;
             if (declaringAssembly is null)
             {
-                continue;
+                throw new OrleansGeneratorDiagnosticAnalysisException(
+                    GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.CreateDiagnostic(attr, type));
             }
 
             ComputeAssembliesToExamine(
@@ -319,5 +321,4 @@ internal static class ReferenceAssemblyModelExtractor
             kind);
     }
 }
-
 

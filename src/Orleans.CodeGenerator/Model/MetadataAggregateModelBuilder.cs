@@ -39,6 +39,7 @@ internal static class MetadataAggregateModelBuilder
         var activatableTypes = GetActivatableTypes(normalizedSerializableTypes);
         var generatedProxyTypes = GetGeneratedProxyTypes(normalizedProxyInterfaces);
         var invokableInterfaces = GetInvokableInterfaces(normalizedProxyInterfaces);
+        var generatedInvokableMetadataNames = GetGeneratedInvokableMetadataNames(proxyOutputs);
         var generatedInvokableActivatorMetadataNames = GetGeneratedInvokableActivatorMetadataNames(proxyOutputs);
         var generatedCompoundTypeAliases = GetGeneratedCompoundTypeAliases(proxyOutputs);
         var defaultCopiers = GetDefaultCopiers(normalizedSerializableTypes);
@@ -52,6 +53,7 @@ internal static class MetadataAggregateModelBuilder
             ActivatableTypes: activatableTypes,
             GeneratedProxyTypes: generatedProxyTypes,
             InvokableInterfaces: invokableInterfaces,
+            GeneratedInvokableMetadataNames: generatedInvokableMetadataNames,
             GeneratedInvokableActivatorMetadataNames: generatedInvokableActivatorMetadataNames,
             GeneratedCompoundTypeAliases: generatedCompoundTypeAliases,
             InterfaceImplementations: normalizedReferenceData.InterfaceImplementations,
@@ -310,6 +312,19 @@ internal static class MetadataAggregateModelBuilder
             .OrderBy(static metadataName => metadataName, StringComparer.Ordinal)];
     }
 
+    private static ImmutableArray<string> GetGeneratedInvokableMetadataNames(ImmutableArray<ProxyOutputModel> proxyOutputs)
+    {
+        if (proxyOutputs.IsDefaultOrEmpty)
+        {
+            return [];
+        }
+
+        return [.. proxyOutputs
+            .SelectMany(static output => output.EmittedInvokableMetadataNames)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static metadataName => metadataName, StringComparer.Ordinal)];
+    }
+
     private static ImmutableArray<CompoundTypeAliasModel> GetGeneratedCompoundTypeAliases(ImmutableArray<ProxyOutputModel> proxyOutputs)
     {
         if (proxyOutputs.IsDefaultOrEmpty)
@@ -351,4 +366,3 @@ internal static class MetadataAggregateModelBuilder
             : new TypeRef(qualifiedName);
     }
 }
-

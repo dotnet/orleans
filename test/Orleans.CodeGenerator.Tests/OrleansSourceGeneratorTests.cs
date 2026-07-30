@@ -1510,6 +1510,52 @@ public class DemoClass
     }
 
     [Fact]
+    public async Task CompatibilityInvokersOption_PreservesCrossNamespaceInvokables()
+    {
+        var code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace A
+            {
+                public interface IFoo : IGrainWithIntegerKey
+                {
+                    Task Ping();
+                }
+            }
+
+            namespace B
+            {
+                public interface IFoo : A.IFoo
+                {
+                }
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var result = RunSourceGenerator(
+            compilation,
+            new Dictionary<string, string>
+            {
+                ["build_property.orleansgeneratecompatibilityinvokers"] = "true",
+            });
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains(
+            result.GeneratedSources,
+            static source => source.SourceText.ToString().Contains(
+                "namespace OrleansCodeGen.B",
+                StringComparison.Ordinal)
+                && source.SourceText.ToString().Contains(
+                    "class Invokable_IFoo_",
+                    StringComparison.Ordinal));
+
+        var outputCompilation = compilation.AddSyntaxTrees(
+            result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
     public async Task AttachDebuggerFalseOption_DoesNotChangeOutput()
     {
         var code = """

@@ -33,13 +33,13 @@ internal static class ProxySourceOutputGenerator
                 StringComparer.Ordinal);
             var emitDeclaredMethodsFallback = proxyOutputModel.UseDeclaredInvokableFallback;
             var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription).ToImmutableArray();
-            var generatedInvokableClassNames = new HashSet<string>(
-                generatedInvokables.Select(static invokable => invokable.ClassDeclarationSyntax.Identifier.ValueText),
+            var generatedMemberMetadataNames = new HashSet<string>(
+                generatedInvokables.Select(static invokable => invokable.MetadataName),
                 StringComparer.Ordinal);
+            generatedMemberMetadataNames.Add(GetMetadataName(interfaceDescription.GeneratedNamespace, proxyClass));
             var additionalInvokableClasses = proxyContext.GetEmittedMembers()
                 .Where(entry => entry.Member is ClassDeclarationSyntax classDeclaration
-                    && !string.Equals(classDeclaration.Identifier.ValueText, proxyClass.Identifier.ValueText, StringComparison.Ordinal)
-                    && !generatedInvokableClassNames.Contains(classDeclaration.Identifier.ValueText))
+                    && !generatedMemberMetadataNames.Contains(GetMetadataName(entry.Namespace, classDeclaration)))
                 .Select(entry => (entry.Namespace, ClassDeclaration: (ClassDeclarationSyntax)entry.Member))
                 .OrderBy(static entry => entry.Namespace, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.ClassDeclaration.Identifier.ValueText, StringComparer.Ordinal)
@@ -279,7 +279,6 @@ internal static class ProxySourceOutputGenerator
 
         var assemblyName = compilation.AssemblyName ?? "assembly";
         var proxyEntries = proxyContext.MetadataModel.InvokableInterfaces.Values
-            .Where(desc => SymbolEqualityComparer.Default.Equals(desc.InterfaceType.ContainingAssembly, compilation.Assembly))
             .OrderBy(static desc => desc.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), StringComparer.Ordinal)
             .Select(desc => (HintName: GeneratedSourceOutput.CreateProxyHintName(assemblyName, desc), Description: desc))
             .ToImmutableArray();
@@ -325,12 +324,19 @@ internal static class ProxySourceOutputGenerator
                         : ownedInvokableMetadataNames.Length == 0
                             && !generatedInvokables.Any(invokable => invokableOwners.ContainsKey(invokable.MetadataName));
                 var ownedInvokableMetadataNameSet = new HashSet<string>(ownedInvokableMetadataNames, StringComparer.Ordinal);
-                var ownedInvokableActivatorMetadataNames = generatedInvokables
+                var emittedInvokables = generatedInvokables
                     .Where(invokable => ShouldEmitInvokable(
                         invokable,
                         interfaceDescription.InterfaceType,
                         ownedInvokableMetadataNameSet,
                         useDeclaredInvokableFallback))
+                    .ToImmutableArray();
+                var emittedInvokableMetadataNames = emittedInvokables
+                    .Select(static invokable => invokable.MetadataName)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(static value => value, StringComparer.Ordinal)
+                    .ToImmutableArray();
+                var ownedInvokableActivatorMetadataNames = emittedInvokables
                     .Where(static invokable => ActivatorGenerator.ShouldGenerateActivator(invokable))
                     .Select(static invokable => invokable.MetadataName)
                     .Distinct(StringComparer.Ordinal)
@@ -346,6 +352,7 @@ internal static class ProxySourceOutputGenerator
                 return new ProxyOutputModel(
                     model,
                     ownedInvokableMetadataNames,
+                    emittedInvokableMetadataNames,
                     ownedInvokableActivatorMetadataNames,
                     compatibilityInvokableAliases,
                     useDeclaredInvokableFallback);
@@ -431,6 +438,14 @@ internal static class ProxySourceOutputGenerator
             .Where(generatedInvokable => proxyContext.Compilation.GetTypeByMetadataName(generatedInvokable.MetadataName) is null)
             .OrderBy(static generatedInvokable => generatedInvokable.MetadataName, StringComparer.Ordinal);
     }
-}
 
+    private static string GetMetadataName(string generatedNamespace, ClassDeclarationSyntax classDeclaration)
+    {
+        var name = string.IsNullOrEmpty(generatedNamespace)
+            ? classDeclaration.Identifier.ValueText
+            : $"{generatedNamespace}.{classDeclaration.Identifier.ValueText}";
+        var arity = classDeclaration.TypeParameterList?.Parameters.Count ?? 0;
+        return arity == 0 ? name : $"{name}`{arity}";
+    }
+}
 
