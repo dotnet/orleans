@@ -1,0 +1,126 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import ApiBreadcrumbs from '../../../../../components/api/ApiBreadcrumbs.astro';
+import ApiDocContent from '../../../../../components/api/ApiDocContent.astro';
+import ApiLinks from '../../../../../components/api/ApiLinks.astro';
+import { getPackages } from '../../../../../lib/api/collection';
+import {
+  groupTypesByNamespace,
+  markdownCompanionPath,
+  nugetHref,
+  packagePath,
+  typeDisplayName,
+  typePath,
+  withBase,
+} from '../../../../../lib/api/packages';
+import { buildPackageRoutes } from '../../../../../lib/api/routes';
+import { buildApiSidebar } from '../../../../../lib/api/sidebar';
+import type { PackageApiDocument } from '../../../../../lib/api/types';
+
+export async function getStaticPaths() {
+  const packages = (await getPackages()).map((entry) => entry.data);
+  return buildPackageRoutes(packages).map((route) => ({
+    params: { package: route.packageSlug },
+    props: { pkg: route.pkg, allPackages: packages },
+  }));
+}
+
+interface Props {
+  pkg: PackageApiDocument;
+  allPackages: PackageApiDocument[];
+}
+
+const { pkg, allPackages }: Props = Astro.props;
+const base = import.meta.env.BASE_URL;
+const sidebar = buildApiSidebar(allPackages, pkg.package.name);
+const namespaces = groupTypesByNamespace(pkg.types);
+const namespaceId = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const headings = [...namespaces.keys()].map((namespace) => ({
+  depth: 2 as const,
+  slug: namespaceId(namespace),
+  text: namespace,
+}));
+---
+
+<StarlightPage
+  frontmatter={{
+    title: pkg.package.name,
+    description: `${pkg.package.name} ${pkg.package.version} API reference.`,
+    editUrl: false,
+    prev: false,
+    next: false,
+    tableOfContents: false,
+    pagefind: true,
+  }}
+  sidebar={sidebar}
+  headings={headings}
+>
+  <ApiBreadcrumbs
+    items={[
+      { label: 'Documentation', href: withBase(base, '/') },
+      { label: 'API reference', href: withBase(base, '/docs/api/csharp/') },
+      { label: pkg.package.name },
+    ]}
+  />
+  <p>
+    <strong>{pkg.package.version}</strong> · {pkg.package.targetFramework}
+  </p>
+  <ApiLinks
+    nuget={nugetHref(pkg.package.name)}
+    source={pkg.package.sourceRepository}
+    markdown={withBase(base, markdownCompanionPath(packagePath(pkg.package.name)))}
+  />
+  {
+    [...namespaces.entries()].map(([namespace, types]) => (
+      <section>
+        <h2 id={namespaceId(namespace)}>{namespace}</h2>
+        <div class="api-type-list">
+          {types.map((type) => (
+            <article>
+              <h3>
+                <a href={withBase(base, typePath(pkg.package.name, type))}>
+                  {typeDisplayName(type)}
+                </a>
+              </h3>
+              <span class="api-kind">{type.kind}</span>
+              <ApiDocContent
+                content={type.docs?.summary}
+                packages={allPackages}
+                packageName={pkg.package.name}
+                tag="div"
+              />
+            </article>
+          ))}
+        </div>
+      </section>
+    ))
+  }
+</StarlightPage>
+
+<style>
+  .api-type-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .api-type-list article {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    background: var(--sl-color-bg-nav);
+  }
+
+  .api-type-list h3 {
+    display: inline;
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .api-kind {
+    margin-inline-start: 0.5rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.75rem;
+    text-transform: capitalize;
+  }
+</style>

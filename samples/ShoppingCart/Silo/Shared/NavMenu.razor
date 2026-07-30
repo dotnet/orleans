@@ -1,0 +1,33 @@
+@inject ShoppingCartService Cart
+
+<MudNavMenu Rounded="true" Margin=Margin.Normal Class="pa-2" Color=Color.Tertiary>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+    <MudNavLink Href="shop" Icon="@Icons.Material.Filled.CreditCard">Shop Inventory</MudNavLink>
+    <MudNavLink Href="products" Icon="@Icons.Material.Filled.ProductionQuantityLimits">Product Management</MudNavLink>
+    <MudNavLink Href="cart" Icon="@Icons.Material.Filled.ShoppingCart">
+        <MudBadge Color="Color.Tertiary" Overlap="true" Bordered="true" Content="@_count" Origin="Origin.CenterRight" Class="mud-width-full">
+            Cart
+        </MudBadge>
+    </MudNavLink>
+</MudNavMenu>
+
+@code {
+    int _count = 0;
+
+    [Inject]
+    public ComponentStateChangedObserver Observer { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Observer.OnStateChanged += UpdateCountAsync;
+
+        await UpdateCountAsync();
+    }
+
+    Task UpdateCountAsync() =>
+        InvokeAsync(async () =>
+        {
+            _count = await Cart.GetCartCountAsync();
+            StateHasChanged();
+        });
+}

@@ -1,0 +1,93 @@
+@page "/todo"
+@inject ApiService ApiService
+
+<h1>Todo (@todos.Count(todo => !todo.IsDone))</h1>
+@foreach (var todo in todos.OrderBy(x => x.Timestamp))
+{
+    <div class="input-group mb-3">
+        <div class="input-group-text">
+            <input class="form-check-input mt-0"
+                   type="checkbox"
+                   checked="@todo.IsDone"
+                   @onchange="@(() => HandleTodoDoneAsync(todo, !todo.IsDone))"
+                   aria-label="Toggle task status">
+        </div>
+        <button class="btn btn-outline-danger" type="button" @onclick="@(() => HandleDeleteTodoAsync(todo))">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
+                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
+            </svg>
+        </button>
+        <InputText class="form-control"
+                   aria-label="Task"
+                   Value="@todo.Title"
+                   ValueChanged="@(title => HandleTodoTitleChangeAsync(todo, title))"
+                   ValueExpression="() => todo.Title" />
+    </div>
+}
+
+<form @onsubmit="@AddTodoAsync">
+    <div class="input-group mb-3">
+        <input type="text" @bind="@newTodo" class="form-control" placeholder="Something todo" aria-label="Something todo" aria-describedby="button-add">
+        <button class="btn btn-outline-secondary" type="submit" id="button-add">Add Todo</button>
+    </div>
+</form>
+
+@code {
+
+    private Guid ownerKey = Guid.Empty;
+    private HashSet<TodoItem> todos = new();
+    private string? newTodo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        todos = (await ApiService.GetTodosAsync(ownerKey))?.ToHashSet() ?? new();
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task AddTodoAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(newTodo))
+        {
+            // create a new todo
+            var todo = new TodoItem
+            {
+                Key = Guid.NewGuid(),
+                OwnerKey = ownerKey,
+                IsDone = false,
+                Title = newTodo
+            };
+
+            // add it to the cluster
+            await ApiService.SetTodoAsync(todo);
+
+            // show it on the user interface
+            todos.Add(todo);
+
+            // reset the box
+            newTodo = null;
+        }
+    }
+
+    private async Task HandleTodoDoneAsync(TodoItem item, bool isDone)
+    {
+        item = item with { IsDone = isDone };
+
+        await ApiService.SetTodoAsync(item);
+    }
+
+    private async Task HandleTodoTitleChangeAsync(TodoItem item, string title)
+    {
+        item = item with { Title = title };
+
+        await ApiService.SetTodoAsync(item);
+    }
+
+    private async Task HandleDeleteTodoAsync(TodoItem item)
+    {
+        await ApiService.DeleteTodoAsync(item.Key);
+
+        todos.Remove(item);
+    }
+}

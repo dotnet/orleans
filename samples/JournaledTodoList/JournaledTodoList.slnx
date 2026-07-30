@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="JournaledTodoList.AppHost/JournaledTodoList.AppHost.csproj" />
+  <Project Path="JournaledTodoList.ServiceDefaults/JournaledTodoList.ServiceDefaults.csproj" />
+  <Project Path="JournaledTodoList.WebApp/JournaledTodoList.WebApp.csproj" />
+</Solution>

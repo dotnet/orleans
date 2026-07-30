@@ -1,0 +1,5 @@
+node_modules/
+.astro/
+.generated/
+dist/
+public/sample-images/

@@ -32,6 +32,9 @@ bld/
 [Oo]bj/
 Artifacts/
 
+# Generated documentation API data
+/docs/site/src/data/pkgs/*.json
+
 # Roslyn cache directories
 *.ide/
 

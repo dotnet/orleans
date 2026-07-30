@@ -1,0 +1,59 @@
+---
+title: Orleans documentation
+description: Learn the Orleans programming model and build, operate, and deploy production distributed applications.
+editUrl: false
+prev: false
+next: false
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Orleans makes distributed application development approachable by extending familiar .NET concepts across a cluster. Start with the programming model, follow a quickstart, or jump directly to the area you need.
+
+<CardGrid>
+  <LinkCard
+    icon="rocket"
+    href="/orleans/docs/quickstarts/build-your-first-orleans-app/"
+    title="Build your first Orleans app"
+    description="Create a local silo and client, define a grain, and make your first call."
+  />
+  <LinkCard
+    icon="puzzle"
+    href="/orleans/docs/grains/"
+    title="Understand grains"
+    description="Learn grain identity, references, lifecycle, placement, persistence, and concurrency."
+  />
+  <LinkCard
+    icon="setting"
+    href="/orleans/docs/host/configuration-guide/"
+    title="Configure and host"
+    description="Configure clients and silos using the .NET generic host and dependency injection."
+  />
+  <LinkCard
+    icon="rocket"
+    href="/orleans/docs/deployment/"
+    title="Deploy Orleans"
+    description="Run Orleans on Kubernetes, Azure services, virtual machines, or your own infrastructure."
+  />
+  <LinkCard
+    icon="random"
+    href="/orleans/docs/streaming/"
+    title="Process streams"
+    description="Connect producers and consumers using Orleans' virtual stream programming model."
+  />
+  <LinkCard
+    icon="open-book"
+    href="https://dotnet.github.io/orleans/docs/api/csharp/"
+    title="Browse the C# API"
+    description="Explore packages, types, and members generated directly from Orleans assemblies."
+  />
+</CardGrid>
+
+## Popular topics
+
+- [Why Orleans?](/orleans/docs/benefits/)
+- [Grain persistence](/orleans/docs/grains/grain-persistence/)
+- [Timers and reminders](/orleans/docs/grains/timers-and-reminders/)
+- [Observability](/orleans/docs/host/monitoring/)
+- [Testing Orleans applications](/orleans/docs/implementation/testing/)
+- [Migration guide](/orleans/docs/migration-guide/)
