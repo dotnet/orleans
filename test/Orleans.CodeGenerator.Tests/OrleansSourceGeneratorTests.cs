@@ -187,6 +187,33 @@ public record class DemoDataRecordClass([property: Id(0)] string Value);
 public record DemoDataRecord([property: Id(0)] string Value);");
 
     /// <summary>
+    /// Tests serializer generation for records with [Id] attributes on primary constructor parameters.
+    /// This is the new, more concise syntax that avoids the need for [property: Id(0)].
+    /// Verifies that:
+    /// - [Id] on constructor parameters is properly detected and used
+    /// - Generated serializers correctly handle the property-parameter relationship
+    /// - Both simple records and records with additional properties work correctly
+    /// </summary>
+    [Fact]
+    public Task TestRecordsWithParameterIdAttributes() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public record SimpleRecord([Id(0)] int Value, [Id(1)] string Name);
+
+[GenerateSerializer]
+public record RecordWithExtraProperty([Id(0)] int Id, [Id(1)] string Name)
+{
+    [Id(2)]
+    public string Description { get; init; }
+}
+
+[GenerateSerializer]
+public record struct RecordStructWithParameterId([Id(0)] string Value);");
+
+    /// <summary>
     /// Tests serializer generation for generic types.
     /// Generic types require:
     /// - Generating specialized serializers for each concrete type usage
