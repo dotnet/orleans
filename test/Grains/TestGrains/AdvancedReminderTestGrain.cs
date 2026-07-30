@@ -11,6 +11,7 @@ internal sealed class AdvancedReminderTestGrain(Orleans.AdvancedReminders.IRemin
 {
     private readonly Orleans.AdvancedReminders.IReminderTable _reminderTable = reminderTable;
     private int _tickCount;
+    private string? _unregisterOnNextTick;
 
     public async Task Register(string name, TimeSpan dueTime, TimeSpan period)
     {
@@ -19,6 +20,12 @@ internal sealed class AdvancedReminderTestGrain(Orleans.AdvancedReminders.IRemin
             ReminderSchedule.Interval(dueTime, period),
             ReminderPriority.Normal,
             MissedReminderAction.FireImmediately);
+    }
+
+    public async Task RegisterAndUnregisterOnNextTick(string name, TimeSpan dueTime, TimeSpan period)
+    {
+        _unregisterOnNextTick = name;
+        await Register(name, dueTime, period);
     }
 
     public async Task Unregister(string name)
@@ -61,9 +68,20 @@ internal sealed class AdvancedReminderTestGrain(Orleans.AdvancedReminders.IRemin
 
     public Task ClearRawTable() => _reminderTable.TestOnlyClearTable();
 
-    public Task ReceiveReminder(string reminderName, Orleans.AdvancedReminders.Runtime.TickStatus status)
+    public async Task ReceiveReminder(string reminderName, Orleans.AdvancedReminders.Runtime.TickStatus status)
     {
         _tickCount++;
-        return Task.CompletedTask;
+        if (!string.Equals(_unregisterOnNextTick, reminderName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var reminder = await this.GetAdvancedReminder(reminderName);
+        if (reminder is not null)
+        {
+            await this.UnregisterAdvancedReminder(reminder);
+        }
+
+        _unregisterOnNextTick = null;
     }
 }

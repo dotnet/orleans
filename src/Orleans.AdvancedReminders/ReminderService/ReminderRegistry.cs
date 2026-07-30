@@ -137,7 +137,7 @@ internal static class ReminderValidation
             throw new ArgumentOutOfRangeException(nameof(schedule), "Cannot use negative period to create a reminder");
         }
 
-        if (period < options.MinimumReminderPeriod)
+        if (!schedule.IsOneShot && period < options.MinimumReminderPeriod)
         {
             throw new ArgumentException(
                 $"Cannot register reminder {reminderName} as requested period ({period}) is less than minimum allowed reminder period ({options.MinimumReminderPeriod})");

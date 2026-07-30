@@ -1,6 +1,6 @@
 # Microsoft Orleans Advanced Reminders
 
-Advanced Reminders adds interval and cron schedules, priorities, missed-reminder policies, and administrative paging on top of Orleans Durable Jobs.
+Advanced Reminders adds one-shot, interval, and cron schedules, priorities, missed-reminder policies, and administrative paging on top of Orleans Durable Jobs.
 
 > This package is prerelease. The in-memory provider is intended for development and testing because its reminder definitions and jobs do not survive a full cluster restart.
 
@@ -47,6 +47,8 @@ public sealed class CleanupGrain : Grain, ICleanupGrain, Orleans.AdvancedReminde
 ```
 
 Use `GetAdvancedReminder`, `GetAdvancedReminders`, and `UnregisterAdvancedReminder` to inspect or remove registrations. `ReminderOptions.MinimumReminderPeriod` applies to both interval and cron registrations.
+
+Use `ReminderSchedule.OneShot(dueTime)` or `ReminderSchedule.OneShot(dueAtUtc)` for durable work which must fire once. A one-shot registration removes itself after its callback completes.
 
 ## Documentation
 

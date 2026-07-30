@@ -13,7 +13,8 @@ public sealed class ReminderSchedule
         DateTime? dueAtUtc,
         TimeSpan? period,
         string? cronExpression,
-        string? cronTimeZoneId)
+        string? cronTimeZoneId,
+        bool isOneShot)
     {
         Kind = kind;
         DueTime = dueTime;
@@ -21,6 +22,7 @@ public sealed class ReminderSchedule
         Period = period;
         CronExpression = cronExpression;
         CronTimeZoneId = cronTimeZoneId;
+        IsOneShot = isOneShot;
     }
 
     public Runtime.ReminderScheduleKind Kind { get; }
@@ -37,12 +39,20 @@ public sealed class ReminderSchedule
 
     public bool UsesAbsoluteDueTime => DueAtUtc.HasValue;
 
+    internal bool IsOneShot { get; }
+
+    public static ReminderSchedule OneShot(TimeSpan dueTime)
+        => new(Runtime.ReminderScheduleKind.Interval, dueTime, null, TimeSpan.Zero, null, null, isOneShot: true);
+
+    public static ReminderSchedule OneShot(DateTime dueAtUtc)
+        => new(Runtime.ReminderScheduleKind.Interval, null, dueAtUtc, TimeSpan.Zero, null, null, isOneShot: true);
+
     public static ReminderSchedule Interval(TimeSpan dueTime, TimeSpan period)
-        => new(Runtime.ReminderScheduleKind.Interval, dueTime, null, period, null, null);
+        => new(Runtime.ReminderScheduleKind.Interval, dueTime, null, period, null, null, isOneShot: false);
 
     public static ReminderSchedule Interval(DateTime dueAtUtc, TimeSpan period)
-        => new(Runtime.ReminderScheduleKind.Interval, null, dueAtUtc, period, null, null);
+        => new(Runtime.ReminderScheduleKind.Interval, null, dueAtUtc, period, null, null, isOneShot: false);
 
     public static ReminderSchedule Cron(string cronExpression, string? cronTimeZoneId = null)
-        => new(Runtime.ReminderScheduleKind.Cron, null, null, null, cronExpression, cronTimeZoneId);
+        => new(Runtime.ReminderScheduleKind.Cron, null, null, null, cronExpression, cronTimeZoneId, isOneShot: false);
 }

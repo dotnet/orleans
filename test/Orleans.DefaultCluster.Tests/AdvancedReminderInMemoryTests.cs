@@ -68,6 +68,29 @@ public sealed class AdvancedReminderInMemoryTests(AdvancedReminderInMemoryTests.
         Assert.Equal(tickCount, await grain.GetTickCount());
     }
 
+    [Fact, TestCategory("BVT"), TestCategory("Reminders")]
+    public async Task InMemoryProvider_CallbackCanUnregisterItsOwnReminder()
+    {
+        var grain = fixture.Cluster.GrainFactory.GetGrain<IAdvancedReminderTestGrain>(Random.Shared.NextInt64());
+        const string reminderName = "in-memory-self-unregister";
+
+        await grain.RegisterAndUnregisterOnNextTick(
+            reminderName,
+            TimeSpan.FromMilliseconds(50),
+            TimeSpan.FromMilliseconds(100));
+
+        await WaitUntilAsync(
+            async () => await grain.GetTickCount().WaitAsync(TimeSpan.FromSeconds(2)) > 0,
+            TimeSpan.FromSeconds(10));
+        await WaitUntilAsync(
+            async () => !await grain.Exists(reminderName).WaitAsync(TimeSpan.FromSeconds(2)),
+            TimeSpan.FromSeconds(10));
+
+        var tickCount = await grain.GetTickCount();
+        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        Assert.Equal(tickCount, await grain.GetTickCount());
+    }
+
     private static async Task WaitUntilAsync(Func<Task<bool>> condition, TimeSpan timeout)
     {
         using var cancellation = new CancellationTokenSource(timeout);

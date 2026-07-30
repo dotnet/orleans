@@ -765,6 +765,45 @@ public class ReminderRegistryValidationTests
     }
 
     [Fact]
+    public async Task RegisterOneShot_AllowsZeroPeriodWithoutLoweringMinimumReminderPeriod()
+    {
+        var service = Substitute.For<AdvancedReminderServiceInterface>();
+        var reminder = Substitute.For<IGrainReminder>();
+        var grainId = GrainId.Create("test", "one-shot");
+        var dueAtUtc = new DateTime(2026, 7, 26, 12, 0, 0, DateTimeKind.Utc);
+        service.RegisterOrUpdateReminder(
+                grainId,
+                "r",
+                Arg.Any<ReminderSchedule>(),
+                ReminderPriority.Normal,
+                MissedReminderAction.FireImmediately)
+            .Returns(Task.FromResult(reminder));
+        var registry = CreateRegistry(
+            new AdvancedReminderOptions { MinimumReminderPeriod = TimeSpan.FromHours(1) },
+            reminderService: service);
+
+        var result = await registry.RegisterOrUpdateReminder(
+            grainId,
+            "r",
+            ReminderSchedule.OneShot(dueAtUtc),
+            ReminderPriority.Normal,
+            MissedReminderAction.FireImmediately);
+
+        Assert.Same(reminder, result);
+        _ = service.Received(1).RegisterOrUpdateReminder(
+            grainId,
+            "r",
+            Arg.Is<ReminderSchedule>(schedule =>
+                schedule.Kind == ReminderScheduleKind.Interval
+                && schedule.IsOneShot
+                && schedule.DueAtUtc == dueAtUtc
+                && schedule.DueTime == null
+                && schedule.Period == TimeSpan.Zero),
+            ReminderPriority.Normal,
+            MissedReminderAction.FireImmediately);
+    }
+
+    [Fact]
     public async Task RegisterInterval_RejectsEmptyName()
     {
         var registry = CreateRegistry();
@@ -2241,6 +2280,60 @@ public class AdvancedReminderServiceTests
         });
         await reminderTable.Received(1).RemoveRow(entry.GrainId, entry.ReminderName, entry.ETag);
         await reminderTable.DidNotReceive().UpsertRow(Arg.Any<ReminderEntry>());
+    }
+
+    [Fact]
+    public async Task OneShotReminder_RegistersFiresOnceAndRemovesRegistration()
+    {
+        var now = new DateTimeOffset(2026, 7, 26, 12, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(now);
+        var grainId = GrainId.Create("test", "one-shot-lifecycle");
+        var reminderTable = new MutableReminderTable(current: null);
+        var remindable = new CallbackRemindable(() => Task.CompletedTask);
+        var dispatcher = CreateDispatcherGrain(GrainId.Create("sys", "one-shot-lifecycle-dispatcher"));
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<AdvancedRemindable>(grainId).Returns(remindable);
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null).Returns(dispatcher);
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(CreateDurableJob(callInfo.Arg<ScheduleJobRequest>())));
+        var service = CreateService(
+            reminderTable,
+            options: new AdvancedReminderOptions { MinimumReminderPeriod = TimeSpan.FromHours(1) },
+            jobManager: jobManager,
+            grainFactory: grainFactory,
+            timeProvider: timeProvider);
+        dispatcher.Service = service;
+        var dueAt = now.AddMinutes(5);
+
+        await service.RegisterOrUpdateReminder(
+            grainId,
+            "one-shot",
+            ReminderSchedule.OneShot(dueAt.UtcDateTime),
+            ReminderPriority.Normal,
+            MissedReminderAction.FireImmediately);
+        var registered = await reminderTable.ReadRow(grainId, "one-shot");
+
+        Assert.NotNull(registered);
+        Assert.Equal(TimeSpan.Zero, registered.Period);
+        Assert.Equal(dueAt.UtcDateTime, registered.NextDueUtc);
+        Assert.NotEmpty(registered.ScheduleId);
+        Assert.NotEmpty(registered.JobId);
+        timeProvider.Advance(TimeSpan.FromMinutes(5));
+
+        await service.ProcessDueReminderCoreAsync(
+            grainId,
+            "one-shot",
+            registered.ScheduleId,
+            CancellationToken.None);
+
+        Assert.Single(remindable.ReceivedStatuses);
+        Assert.Equal(TimeSpan.Zero, remindable.ReceivedStatuses[0].Period);
+        Assert.Null(await reminderTable.ReadRow(grainId, "one-shot"));
+        Assert.Contains(reminderTable.RemoveAttempts, attempt => attempt.Removed);
+        await jobManager.Received(1).ScheduleJobAsync(
+            Arg.Any<ScheduleJobRequest>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

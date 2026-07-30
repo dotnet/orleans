@@ -85,6 +85,7 @@ internal sealed class AdvancedReminderDispatcherGrain(
     {
         try
         {
+            using var reentrancy = RequestContext.AllowCallChainReentrancy();
             await _reminderService.ProcessDueReminderCoreAsync(grainId, reminderName, expectedScheduleId, cancellationToken);
             ClearRetry(reminderName);
         }

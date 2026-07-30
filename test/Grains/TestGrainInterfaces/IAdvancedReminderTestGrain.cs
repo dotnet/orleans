@@ -6,6 +6,8 @@ public interface IAdvancedReminderTestGrain : IGrainWithIntegerKey
 {
     Task Register(string name, TimeSpan dueTime, TimeSpan period);
 
+    Task RegisterAndUnregisterOnNextTick(string name, TimeSpan dueTime, TimeSpan period);
+
     Task Unregister(string name);
 
     Task<bool> Exists(string name);
