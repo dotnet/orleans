@@ -1,9 +1,9 @@
 #nullable enable
+using System.Threading;
 using Azure;
 using Orleans.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using System.Threading;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;

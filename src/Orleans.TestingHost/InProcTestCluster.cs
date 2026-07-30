@@ -3,29 +3,29 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Core.Internal;
-using Orleans.Runtime;
-using Orleans.Runtime.Placement;
-using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
-using Orleans.Configuration;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans.TestingHost.InMemoryTransport;
-using System.Net;
-using Orleans.Statistics;
-using Orleans.TestingHost.InProcess;
-using Orleans.Runtime.Hosting;
-using Orleans.GrainDirectory;
-using Orleans.Messaging;
-using Orleans.Hosting;
-using Orleans.Runtime.TestHooks;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Configuration.Internal;
+using Orleans.Core.Internal;
+using Orleans.GrainDirectory;
+using Orleans.Hosting;
+using Orleans.Messaging;
+using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
+using Orleans.Runtime.Placement;
+using Orleans.Runtime.TestHooks;
+using Orleans.Statistics;
+using Orleans.TestingHost.InMemoryTransport;
+using Orleans.TestingHost.InProcess;
 using Orleans.TestingHost.Logging;
+using Orleans.TestingHost.Utils;
 
 #nullable disable
 namespace Orleans.TestingHost;
@@ -125,7 +125,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="grainId">The ID of the grain to find.</param>
     /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
     /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
-    #nullable enable
+#nullable enable
     public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
     {
         foreach (var silo in Silos)

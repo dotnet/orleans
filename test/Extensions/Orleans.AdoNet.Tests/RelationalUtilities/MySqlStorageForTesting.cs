@@ -30,7 +30,7 @@ namespace UnitTests.General
         {
             get { return @"DROP DATABASE `{0}`"; }
         }
-         
+
         protected override string ExistsDatabaseTemplate
         {
             get { return "SELECT COUNT(1) FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{0}'"; }

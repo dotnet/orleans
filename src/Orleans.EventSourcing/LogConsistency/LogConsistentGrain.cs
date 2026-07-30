@@ -1,12 +1,12 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.Providers;
 
 #nullable disable
 namespace Orleans.EventSourcing
@@ -108,7 +108,8 @@ namespace Orleans.EventSourcing
             {
                 var errMsg = $"No log consistency provider found loading grain type {this.GetType().FullName}";
                 throw new BadProviderConfigException(errMsg);
-            };
+            }
+            ;
 
             return defaultFactory;
         }

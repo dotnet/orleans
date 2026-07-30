@@ -1,10 +1,10 @@
 using System.Net;
-using Orleans.Concurrency;
-using Orleans.Runtime;
-using UnitTests.GrainInterfaces;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
 using Orleans.Internal;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -70,7 +70,7 @@ namespace UnitTests.Grains
                 var reply = new List<Tuple<SiloAddress, ActivationId>>();
                 for (int i = 0; i < 10; i++)
                 {
-                    var siloAddress = SiloAddress.New(new IPEndPoint(ConfigUtilities.GetLocalIPAddress(),0), 0);
+                    var siloAddress = SiloAddress.New(new IPEndPoint(ConfigUtilities.GetLocalIPAddress(), 0), 0);
                     reply.Add(new Tuple<SiloAddress, ActivationId>(siloAddress, ActivationId.NewId()));
                 }
                 list.Add(new Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>>(id, 3, reply));
@@ -206,8 +206,8 @@ namespace UnitTests.Grains
         public async Task InterleavingConsistencyTest(int numItems)
         {
             TimeSpan delay = TimeSpan.FromMilliseconds(1);
-            List<Task> getFileMetadataPromises = new List<Task>(numItems*2);
-            Dictionary<int, string> fileMetadatas = new Dictionary<int, string>(numItems*2);
+            List<Task> getFileMetadataPromises = new List<Task>(numItems * 2);
+            Dictionary<int, string> fileMetadatas = new Dictionary<int, string>(numItems * 2);
 
             for (int i = 0; i < numItems; i++)
             {
@@ -217,7 +217,7 @@ namespace UnitTests.Grains
                     {
                         await Task.Delay(RandomTimeSpan.Next(delay));
                         int fileMetadata = capture;
-                        if ((fileMetadata%2) == 0)
+                        if ((fileMetadata % 2) == 0)
                         {
                             fileMetadatas.Add(fileMetadata, fileMetadata.ToString());
                         }

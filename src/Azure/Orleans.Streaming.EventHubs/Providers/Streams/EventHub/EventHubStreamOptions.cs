@@ -1,10 +1,10 @@
+using System;
 using Azure;
 using Azure.Core;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System;
 
 #nullable disable
 namespace Orleans.Configuration
@@ -122,7 +122,7 @@ namespace Orleans.Configuration
             {
                 throw new ArgumentNullException(nameof(credential));
             }
-            
+
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
 

@@ -29,12 +29,12 @@ public class RebalancingOptionsTests
     [Theory]
     [InlineData(1000, 1, 0, 0.2, 0.2, 0, -0.1, 0, 999)]
     [InlineData(2000, 2, -1, 0.05, 0.05, 0.5, 1.1, 10, 500)]
-    [InlineData(1000, 1, 2, 0, 0.05, 0.5, 0.5, 10, 999)]    
-    [InlineData(1000, 1, 2, 0.05, 0, 0.5, 0.5, 10, 999)]    
+    [InlineData(1000, 1, 2, 0, 0.05, 0.5, 0.5, 10, 999)]
+    [InlineData(1000, 1, 2, 0.05, 0, 0.5, 0.5, 10, 999)]
     [InlineData(1000, 1, 2, 0.05, 0.05, -0.1, 0.5, 10, 999)]
-    [InlineData(1000, 1, 2, 0.05, 0.05, 0.5, 1.1, 10, 999)] 
-    [InlineData(1000, 1, 2, 0.05, 0.05, 0.5, 0.5, 0, 999)]  
-    [InlineData(1000, 1, 2, 0.05, 0.05, 0.5, 0.5, 10, 999)] 
+    [InlineData(1000, 1, 2, 0.05, 0.05, 0.5, 1.1, 10, 999)]
+    [InlineData(1000, 1, 2, 0.05, 0.05, 0.5, 0.5, 0, 999)]
+    [InlineData(1000, 1, 2, 0.05, 0.05, 0.5, 0.5, 10, 999)]
 
     public void InvalidOptionsShouldThrow(
         int sessionCyclePeriodMilliseconds,

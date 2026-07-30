@@ -1,11 +1,11 @@
+using System.Diagnostics;
+using System.Net.Sockets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using System.Diagnostics;
-using System.Net.Sockets;
 using TestExtensions;
 using Xunit;
 

@@ -37,7 +37,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-            for (var i = 0; i< 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 await producer.Produce();
             }

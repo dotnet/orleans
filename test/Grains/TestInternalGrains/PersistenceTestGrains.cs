@@ -660,7 +660,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation(" ==================================== Test1 Started");
             CheckRuntimeEnvironment();
-            for (var i = 1*Multiple; i < 2*Multiple; i++)
+            for (var i = 1 * Multiple; i < 2 * Multiple; i++)
             {
                 var t1 = SetOne(i);
                 await t1;
@@ -686,7 +686,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("==================================== Test2 Started");
             CheckRuntimeEnvironment();
-            for (var i = 2*Multiple; i < 3*Multiple; i++)
+            for (var i = 2 * Multiple; i < 3 * Multiple; i++)
             {
                 var t1 = _other.SetOne(i);
                 await t1;
@@ -890,11 +890,11 @@ namespace UnitTests.Grains
                 logger.LogTrace("Test1.Finish");
             }
 
-           CheckRuntimeEnvironment();
-//#if DEBUG
-//            // HACK for testing
-//            Logger.SetTraceLevelOverrides(overridesOff.ToList());
-//#endif
+            CheckRuntimeEnvironment();
+            //#if DEBUG
+            //            // HACK for testing
+            //            Logger.SetTraceLevelOverrides(overridesOff.ToList());
+            //#endif
         }
 
         public async Task Task_Delay(bool doStart)
@@ -1081,7 +1081,7 @@ namespace UnitTests.Grains
                 Field2 = value.Field2,
             };
     }
-    
+
 
     public sealed class RecordTypeWithoutPublicParameterlessConstructorGrain : IGrainBase, IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>
     {

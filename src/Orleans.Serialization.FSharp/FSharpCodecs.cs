@@ -317,7 +317,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2> : IDeepCopier<FSharpChoice<T1, T2>>, IDerivedTypeCopier
     {
@@ -424,7 +424,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3> : IDeepCopier<FSharpChoice<T1, T2, T3>>, IDerivedTypeCopier
     {
@@ -543,7 +543,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4> : IDeepCopier<FSharpChoice<T1, T2, T3, T4>>, IDerivedTypeCopier
     {
@@ -672,7 +672,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4, T5> : IDeepCopier<FSharpChoice<T1, T2, T3, T4, T5>>, IDerivedTypeCopier
     {
@@ -811,7 +811,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+
     [RegisterCopier]
     public class FSharpChoiceCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<FSharpChoice<T1, T2, T3, T4, T5, T6>>, IDerivedTypeCopier
     {
@@ -1141,7 +1141,7 @@ namespace Orleans.Serialization
             return result;
         }
     }
-    
+
     [RegisterCopier]
     public class FSharpResultCopier<T, TError> : IDeepCopier<FSharpResult<T, TError>>, IDerivedTypeCopier
     {

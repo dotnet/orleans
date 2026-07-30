@@ -94,10 +94,10 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if (this.streamSubscriptionObserver != null)
             {
                 var streamProvider = this.providerRuntime.ServiceProvider.GetKeyedService<IStreamProvider>(streamId.ProviderName);
-                if(streamProvider != null)
+                if (streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
                     await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
@@ -127,7 +127,7 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverBatch(batch, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if (this.streamSubscriptionObserver != null)
             {
                 var streamProvider = this.providerRuntime.ServiceProvider.GetKeyedService<IStreamProvider>(streamId.ProviderName);
                 if (streamProvider != null)

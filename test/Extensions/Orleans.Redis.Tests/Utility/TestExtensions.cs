@@ -1,5 +1,5 @@
-using Orleans.Runtime;
 using System.Net;
+using Orleans.Runtime;
 
 namespace Tester.Redis.Utility
 {

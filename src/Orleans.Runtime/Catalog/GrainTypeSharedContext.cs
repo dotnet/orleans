@@ -9,8 +9,8 @@ using Orleans.GrainDirectory;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 

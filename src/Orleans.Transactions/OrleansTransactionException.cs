@@ -1,6 +1,6 @@
-using Orleans.Runtime;
 using System;
 using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 #nullable disable
 namespace Orleans.Transactions
@@ -129,7 +129,7 @@ namespace Orleans.Transactions
         /// </summary>
         [Id(0)]
         public string TransactionId { get; private set; }
- 
+
         public OrleansTransactionAbortedException(string transactionId, string msg, Exception innerException) : base(msg, innerException)
         {
             this.TransactionId = transactionId;

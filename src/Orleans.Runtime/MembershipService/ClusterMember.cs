@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class ClusterMember : IEquatable<ClusterMember>, ISpanFormattable
-    {                
+    {
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterMember"/> class.
         /// </summary>                

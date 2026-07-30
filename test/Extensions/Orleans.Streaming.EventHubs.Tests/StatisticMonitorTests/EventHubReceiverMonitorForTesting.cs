@@ -8,7 +8,7 @@ namespace ServiceBus.Tests.MonitorTests
 
         public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
         {
-            if(success) Interlocked.Increment(ref this.CallCounters.TrackInitializationCallCounter);
+            if (success) Interlocked.Increment(ref this.CallCounters.TrackInitializationCallCounter);
         }
 
         public void TrackRead(bool success, TimeSpan callTime, Exception exception)
@@ -29,7 +29,7 @@ namespace ServiceBus.Tests.MonitorTests
 
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class EventHubReceiverMonitorCounters 
+    public class EventHubReceiverMonitorCounters
     {
         [Orleans.Id(0)]
         public int TrackInitializationCallCounter;

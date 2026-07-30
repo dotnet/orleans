@@ -99,6 +99,8 @@ public interface IJobShard : IAsyncDisposable
 public abstract class JobShard : IJobShard
 {
     private readonly InMemoryJobQueue _jobQueue;
+    private readonly SemaphoreSlim _mutationLock = new(1, 1);
+    private bool _isAddingCompleted;
 
     /// <inheritdoc/>
     public string Id { get; protected set; }
@@ -113,7 +115,11 @@ public abstract class JobShard : IJobShard
     public IDictionary<string, string>? Metadata { get; protected set; }
 
     /// <inheritdoc/>
-    public bool IsAddingCompleted { get; protected set; }
+    public bool IsAddingCompleted
+    {
+        get => Volatile.Read(ref _isAddingCompleted);
+        protected set => Volatile.Write(ref _isAddingCompleted, value);
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShard"/> class.
@@ -141,54 +147,93 @@ public abstract class JobShard : IJobShard
     /// <inheritdoc/>
     public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
-        if (IsAddingCompleted)
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
         {
-            return null;
+            if (IsAddingCompleted)
+            {
+                return null;
+            }
+
+            if (request.DueTime < StartTime || request.DueTime > EndTime)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
+            }
+
+            var jobId = DurableJobIdentity.CreateId(request);
+            if (_jobQueue.TryGetJob(jobId, out var existing))
+            {
+                return DurableJobIdentity.IsEquivalent(existing!, request)
+                    ? existing
+                    : throw new InvalidOperationException($"Idempotency key '{request.IdempotencyKey}' is already associated with a different durable job request.");
+            }
+
+            var job = new DurableJob
+            {
+                Id = jobId,
+                TargetGrainId = request.Target,
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                ShardId = Id,
+                Metadata = DurableJobIdentity.SnapshotMetadata(request.Metadata),
+                TraceParent = request.TraceParent,
+                TraceState = request.TraceState,
+                Priority = request.Priority,
+            };
+
+            await PersistAddJobAsync(job, cancellationToken);
+            _jobQueue.Enqueue(job, 0);
+            return job;
         }
-
-        if (request.DueTime < StartTime || request.DueTime > EndTime)
+        finally
         {
-            throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
+            _mutationLock.Release();
         }
-
-        var jobId = Guid.NewGuid().ToString();
-        var job = new DurableJob
-        {
-            Id = jobId,
-            TargetGrainId = request.Target,
-            Name = request.JobName,
-            DueTime = request.DueTime,
-            ShardId = Id,
-            Metadata = request.Metadata,
-            TraceParent = request.TraceParent,
-            TraceState = request.TraceState,
-        };
-
-        await PersistAddJobAsync(jobId, request.JobName, request.DueTime, request.Target, request.Metadata, cancellationToken);
-        _jobQueue.Enqueue(job, 0);
-        return job;
     }
 
     /// <inheritdoc/>
     public async Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
-        await PersistRemoveJobAsync(jobId, cancellationToken);
-        return _jobQueue.CancelJob(jobId);
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            await PersistRemoveJobAsync(jobId, cancellationToken);
+            return _jobQueue.CancelJob(jobId);
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
     }
 
     /// <inheritdoc/>
-    public Task MarkAsCompleteAsync(CancellationToken cancellationToken)
+    public async Task MarkAsCompleteAsync(CancellationToken cancellationToken)
     {
-        IsAddingCompleted = true;
-        _jobQueue.MarkAsComplete();
-        return Task.CompletedTask;
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            IsAddingCompleted = true;
+            _jobQueue.MarkAsComplete();
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
     }
 
     /// <inheritdoc/>
     public async Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
-        await PersistRetryJobAsync(jobContext.Job.Id, newDueTime, cancellationToken);
-        _jobQueue.RetryJobLater(jobContext, newDueTime);
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            await PersistRetryJobAsync(jobContext.Job.Id, newDueTime, cancellationToken);
+            _jobQueue.RetryJobLater(jobContext, newDueTime);
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
     }
 
     /// <summary>
@@ -204,14 +249,10 @@ public abstract class JobShard : IJobShard
     /// <summary>
     /// Persists the addition of a new job to the underlying storage.
     /// </summary>
-    /// <param name="jobId">The unique identifier of the job.</param>
-    /// <param name="jobName">The name of the job.</param>
-    /// <param name="dueTime">The time when the job should be executed.</param>
-    /// <param name="target">The grain identifier of the target grain.</param>
-    /// <param name="metadata">Optional metadata to associate with the job.</param>
+    /// <param name="job">The complete durable job to persist.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    protected abstract Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+    protected abstract Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken);
 
     /// <summary>
     /// Persists the removal of a job from the underlying storage.

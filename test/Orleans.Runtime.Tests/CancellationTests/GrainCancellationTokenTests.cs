@@ -249,43 +249,43 @@ namespace UnitTests.CancellationTests
             }
         }
 
-    private async Task<Tuple<ILongRunningTaskGrain<T1>, ILongRunningTaskGrain<T1>>> GetGrains<T1>(bool placeOnDifferentSilos = true)
-    {
-        var attemptNumber = 0;
-        var attemptLimit = 50;
-        ILongRunningTaskGrain<T1> grain, target;
-        string instanceId, targetInstanceId;
-        do
+        private async Task<Tuple<ILongRunningTaskGrain<T1>, ILongRunningTaskGrain<T1>>> GetGrains<T1>(bool placeOnDifferentSilos = true)
         {
-            if (attemptNumber > 0)
+            var attemptNumber = 0;
+            var attemptLimit = 50;
+            ILongRunningTaskGrain<T1> grain, target;
+            string instanceId, targetInstanceId;
+            do
             {
-                if (attemptNumber >= attemptLimit)
+                if (attemptNumber > 0)
                 {
-                    throw new Exception("Could not make requested grains placement");
+                    if (attemptNumber >= attemptLimit)
+                    {
+                        throw new Exception("Could not make requested grains placement");
+                    }
+
+                    await Task.Delay(500);
                 }
 
-                await Task.Delay(500);
-            }
+                ++attemptNumber;
+                var firstSilo = fixture.HostedCluster.Silos.First().SiloAddress;
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, firstSilo);
+                grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<T1>>(Guid.NewGuid());
+                instanceId = await grain.GetRuntimeInstanceId();
 
-            ++attemptNumber;
-            var firstSilo = fixture.HostedCluster.Silos.First().SiloAddress;
-            RequestContext.Set(IPlacementDirector.PlacementHintKey, firstSilo);
-            grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<T1>>(Guid.NewGuid());
-            instanceId = await grain.GetRuntimeInstanceId();
+                if (placeOnDifferentSilos)
+                {
+                    var secondSilo = fixture.HostedCluster.Silos.Skip(1).First().SiloAddress;
+                    RequestContext.Set(IPlacementDirector.PlacementHintKey, secondSilo);
+                }
 
-            if (placeOnDifferentSilos)
-            {
-                var secondSilo = fixture.HostedCluster.Silos.Skip(1).First().SiloAddress;
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, secondSilo);
-            }
+                target = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<T1>>(Guid.NewGuid());
+                targetInstanceId = await target.GetRuntimeInstanceId();
+                RequestContext.Clear();
+            } while (placeOnDifferentSilos && instanceId.Equals(targetInstanceId) || !placeOnDifferentSilos && !instanceId.Equals(targetInstanceId));
 
-            target = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<T1>>(Guid.NewGuid());
-            targetInstanceId = await target.GetRuntimeInstanceId();
-            RequestContext.Clear();
-        } while (placeOnDifferentSilos && instanceId.Equals(targetInstanceId) || !placeOnDifferentSilos && !instanceId.Equals(targetInstanceId));
-
-        return new Tuple<ILongRunningTaskGrain<T1>, ILongRunningTaskGrain<T1>>(grain, target);
-    }
+            return new Tuple<ILongRunningTaskGrain<T1>, ILongRunningTaskGrain<T1>>(grain, target);
+        }
 
         private async Task WaitForCallCancellation<T>(ILongRunningTaskGrain<T> grain, Guid callId)
         {

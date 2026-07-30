@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.DurableJobs;
-using Xunit;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace Tester.DurableJobs;
 
@@ -169,7 +169,7 @@ public class DurableJobTestsRunner
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(10);
 
         var job = await grain.ScheduleJobAsync("RealJob", dueTime).WaitAsync(cancellationToken);
-        
+
         var fakeJob = new DurableJob
         {
             Id = "non-existent-id",
@@ -306,9 +306,9 @@ public class DurableJobTestsRunner
         Assert.Equal("3", job.Metadata["FailUntilAttempt"]);
 
         // Wait for the job to eventually succeed (with retries)
-        // Default retry policy: retry up to 5 times with exponential backoff (1s, 2s, 4s, 8s, 16s)
+        // Default retry policy: make up to 5 total attempts with exponential backoff (2s, 4s, 8s, 16s).
         // We expect 3 attempts: fail at DequeueCount=1, fail at DequeueCount=2, succeed at DequeueCount=3
-        // Total time: ~2s (initial) + 1s (first retry delay) + 2s (second retry delay) = ~5s
+        // Total time: ~2s (initial) + 2s (first retry delay) + 4s (second retry delay) = ~8s
         await grain.WaitForJobToSucceed(job.Id).WaitAsync(cancellationToken);
 
         Assert.True(await grain.HasJobSucceeded(job.Id).WaitAsync(cancellationToken));
@@ -326,5 +326,20 @@ public class DurableJobTestsRunner
         Assert.NotNull(finalContext);
         Assert.Equal(3, finalContext.DequeueCount);
         Assert.Equal(job.Id, finalContext.Job.Id);
+    }
+
+    public async Task HandlerExecutionUsesAnExclusiveGrainTurn(CancellationToken cancellationToken)
+    {
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("exclusive-handler-turn");
+        var job = await grain.ScheduleBlockingJobAsync(DateTimeOffset.UtcNow.AddSeconds(1)).WaitAsync(cancellationToken);
+        await grain.WaitForBlockingJobToStart().WaitAsync(cancellationToken);
+
+        var normalTurn = grain.EnterNormalTurn();
+        await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        Assert.False(normalTurn.IsCompleted, "A normal grain call overlapped durable job handler execution.");
+
+        await grain.ReleaseBlockingJob().WaitAsync(cancellationToken);
+        Assert.True(await normalTurn.WaitAsync(cancellationToken));
+        await grain.WaitForJobToRun(job.Id).WaitAsync(cancellationToken);
     }
 }

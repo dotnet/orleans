@@ -293,7 +293,7 @@ namespace Orleans.CodeGenerator
             _uInt128,
             _int128,
             _half
-        }.Where(t => t is {}).ToArray()!;
+        }.Where(t => t is { }).ToArray()!;
 
         public INamedTypeSymbol ImmutableAttribute { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }

@@ -1,10 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
 using Orleans.CodeGeneration;
 using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
 
 namespace Orleans.Concurrency
 {

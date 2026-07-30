@@ -1,4 +1,4 @@
-﻿using UnitTests.GrainInterfaces;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.Grains
@@ -38,7 +38,7 @@ namespace UnitTests.Grains
             for (var i = 0; i < iterationCount; ++i)
             {
                 var n = i;
-                tasks[n] = 
+                tasks[n] =
                     target.OnParallelStress(n)
                     .ContinueWith(
                         completed =>
@@ -46,7 +46,7 @@ namespace UnitTests.Grains
                                 Assert.True(completed.IsCompleted);
                                 Assert.Equal(10000 + n, completed.Result);
                             });
-                
+
             }
             return Task.WhenAll(tasks);
         }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Time.Testing;
+using NonSilo.Tests.Testing;
 using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.Runtime;
@@ -76,6 +77,74 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
+    public async Task GetAsyncEnumerator_OrdersSameDueTimeByPriority()
+    {
+        var queue = new InMemoryJobQueue();
+        var dueTime = DateTimeOffset.UtcNow.AddMilliseconds(-100);
+        var normal = CreateJob("normal", dueTime, priority: 0);
+        var high = CreateJob("high", dueTime, priority: 1);
+
+        queue.Enqueue(normal, 0);
+        queue.Enqueue(high, 0);
+        queue.MarkAsComplete();
+
+        var results = new List<string>();
+        await foreach (var context in queue.WithCancellation(CancellationToken.None))
+        {
+            results.Add(context.Job.Name);
+            if (results.Count == 2)
+            {
+                break;
+            }
+        }
+
+        Assert.Equal(["high", "normal"], results);
+    }
+
+    [Fact]
+    public void DurableJobIdentity_ReusesExplicitIdempotencyKeyOnlyForEquivalentRequest()
+    {
+        var target = GrainId.Create("test", "idempotent");
+        var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
+        var request = new ScheduleJobRequest
+        {
+            IdempotencyKey = "generation-1",
+            Target = target,
+            JobName = "job",
+            DueTime = dueTime,
+            Priority = 1,
+            Metadata = new Dictionary<string, string> { ["key"] = "value" },
+        };
+
+        var id = DurableJobIdentity.CreateId(request);
+        var repeatedId = DurableJobIdentity.CreateId(request);
+        var job = new DurableJob
+        {
+            Id = id,
+            Name = request.JobName,
+            DueTime = request.DueTime,
+            TargetGrainId = request.Target,
+            ShardId = "shard",
+            Priority = request.Priority,
+            Metadata = request.Metadata,
+        };
+
+        Assert.Equal(id, repeatedId);
+        Assert.True(DurableJobIdentity.IsEquivalent(job, request));
+        var conflictingRequest = new ScheduleJobRequest
+        {
+            IdempotencyKey = request.IdempotencyKey,
+            Target = request.Target,
+            JobName = request.JobName,
+            DueTime = request.DueTime.AddSeconds(1),
+            Priority = request.Priority,
+            Metadata = request.Metadata,
+        };
+        Assert.Equal(id, DurableJobIdentity.CreateId(conflictingRequest));
+        Assert.False(DurableJobIdentity.IsEquivalent(job, conflictingRequest));
+    }
+
+    [Fact]
     public async Task GetAsyncEnumerator_IncrementsDequeueCount()
     {
         var queue = new InMemoryJobQueue();
@@ -127,6 +196,34 @@ public class InMemoryJobQueueTests
 
         Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(job.Id, enumerator.Current.Job.Id);
+    }
+
+    [Fact]
+    public async Task GetAsyncEnumerator_WithDelayBeyondTimerLimit_WaitsInBoundedSteps()
+    {
+        var timeProvider = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var job = CreateJob("far-future", timeProvider.GetUtcNow().AddDays(100));
+        queue.Enqueue(job, 0);
+        queue.MarkAsComplete();
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        var moveNextTask = enumerator.MoveNextAsync().AsTask();
+        await timeProvider.WaitForCreatedTimerCountAsync(1);
+        Assert.False(moveNextTask.IsCompleted);
+
+        timeProvider.Advance(DurableJobTimeLimits.MaximumTimerDelay);
+        await timeProvider.WaitForCreatedTimerCountAsync(2);
+        Assert.False(moveNextTask.IsCompleted);
+
+        timeProvider.Advance(DurableJobTimeLimits.MaximumTimerDelay);
+        await timeProvider.WaitForCreatedTimerCountAsync(3);
+        Assert.False(moveNextTask.IsCompleted);
+
+        timeProvider.Advance(TimeSpan.FromDays(1));
+        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(job.Id, enumerator.Current.Job.Id);
+        Assert.Equal(3, timeProvider.CreatedTimerCount);
     }
 
     [Fact]
@@ -410,7 +507,7 @@ public class InMemoryJobQueueTests
         Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
-    private static DurableJob CreateJob(string id, DateTimeOffset dueTime)
+    private static DurableJob CreateJob(string id, DateTimeOffset dueTime, int priority = 0)
     {
         return new DurableJob
         {
@@ -419,7 +516,8 @@ public class InMemoryJobQueueTests
             DueTime = dueTime,
             TargetGrainId = GrainId.Create("test", id),
             ShardId = "shard1",
-            Metadata = null
+            Metadata = null,
+            Priority = priority,
         };
     }
 
@@ -431,4 +529,5 @@ public class InMemoryJobQueueTests
         context.DequeueCount.Returns(dequeueCount);
         return context;
     }
+
 }

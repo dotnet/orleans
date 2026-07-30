@@ -91,7 +91,7 @@ namespace Orleans.Runtime
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-            ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;      
+            ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
             SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;
@@ -109,10 +109,7 @@ namespace Orleans.Runtime
 #pragma warning restore 618
         }
 
-        public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount
-            } CpuUsagePercentage={EnvironmentStatistics.FilteredCpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.FilteredMemoryUsageBytes
-            } AvailableMemory={EnvironmentStatistics.FilteredAvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes
-            } IsOverloaded={IsOverloaded} ClientCount={ClientCount} ReceivedMessages={ReceivedMessages} SentMessages={SentMessages} DateTime={DateTime}";
+        public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount} CpuUsagePercentage={EnvironmentStatistics.FilteredCpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.FilteredMemoryUsageBytes} AvailableMemory={EnvironmentStatistics.FilteredAvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes} IsOverloaded={IsOverloaded} ClientCount={ClientCount} ReceivedMessages={ReceivedMessages} SentMessages={SentMessages} DateTime={DateTime}";
     }
 
     /// <summary>
@@ -167,7 +164,7 @@ namespace Orleans.Runtime
         public GrainId GrainId { get; init; }
     }
 
-    #nullable enable
+#nullable enable
 
     [Serializable, GenerateSerializer, Immutable]
     internal sealed class DetailedGrainReport
@@ -203,13 +200,6 @@ namespace Orleans.Runtime
         [Id(7)]
         public string? LocalActivation { get; init; }
 
-        public override string ToString() => @$"{Environment.NewLine
-            }**DetailedGrainReport for grain {Grain} from silo {SiloName} SiloAddress={SiloAddress}{Environment.NewLine
-            }   LocalCacheActivationAddresses={LocalCacheActivationAddress}{Environment.NewLine
-            }   LocalDirectoryActivationAddresses={LocalDirectoryActivationAddress}{Environment.NewLine
-            }   PrimaryForGrain={PrimaryForGrain}{Environment.NewLine
-            }   GrainClassTypeName={GrainClassTypeName}{Environment.NewLine
-            }   LocalActivation:{Environment.NewLine
-            }{LocalActivation}.{Environment.NewLine}";
+        public override string ToString() => @$"{Environment.NewLine}**DetailedGrainReport for grain {Grain} from silo {SiloName} SiloAddress={SiloAddress}{Environment.NewLine}   LocalCacheActivationAddresses={LocalCacheActivationAddress}{Environment.NewLine}   LocalDirectoryActivationAddresses={LocalDirectoryActivationAddress}{Environment.NewLine}   PrimaryForGrain={PrimaryForGrain}{Environment.NewLine}   GrainClassTypeName={GrainClassTypeName}{Environment.NewLine}   LocalActivation:{Environment.NewLine}{LocalActivation}.{Environment.NewLine}";
     }
 }

@@ -2,11 +2,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.Redis;
 using Orleans.Messaging;
-using Xunit;
-using UnitTests.MembershipTests;
+using StackExchange.Redis;
 using TestExtensions;
 using UnitTests;
-using StackExchange.Redis;
+using UnitTests.MembershipTests;
+using Xunit;
 
 namespace Tester.Redis.Clustering
 {

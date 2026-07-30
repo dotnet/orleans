@@ -4,12 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.Runtime;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
-using Orleans.Configuration;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting;
 
@@ -47,12 +47,20 @@ public static class DurableJobsExtensions
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
             sp.GetRequiredService<IOptions<SiloMessagingOptions>>(),
+            sp.GetRequiredService<IInternalGrainFactory>(),
             sp.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
             sp.GetRequiredService<DurableJobsInstruments>()));
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
             return new DurableJobReceiverExtension(
+                grainContextAccessor.GrainContext,
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>());
+        });
+        services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobExecutionExtension), (sp, _) =>
+        {
+            var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
+            return new DurableJobExecutionExtension(
                 grainContextAccessor.GrainContext,
                 sp.GetRequiredService<DurableJobReceiverExtensionShared>());
         });
@@ -84,7 +92,7 @@ public static class DurableJobsExtensions
     /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
-    internal static IServiceCollection UseInMemoryDurableJobs(this IServiceCollection services)
+    public static IServiceCollection UseInMemoryDurableJobs(this IServiceCollection services)
     {
         var builder = new ServiceCollectionSiloBuilder(services);
         builder.AddJournalStorage();

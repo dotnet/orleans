@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Reflection;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -5,9 +8,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
-using System.Collections.Immutable;
-using System.Reflection;
-using System.Text;
 using Xunit;
 
 namespace Analyzers.Tests;

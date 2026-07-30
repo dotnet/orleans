@@ -64,7 +64,7 @@ namespace Orleans.Streams
         {
             if (ReferenceEquals(null, obj)) return false;
             // Note: Can't use the 'as' operator on PubSubSubscriptionState because it is a struct.
-            return obj is PubSubSubscriptionState && Equals((PubSubSubscriptionState) obj);
+            return obj is PubSubSubscriptionState && Equals((PubSubSubscriptionState)obj);
         }
 
         public bool Equals(PubSubSubscriptionState other)

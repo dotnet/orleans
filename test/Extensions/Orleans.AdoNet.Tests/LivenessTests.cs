@@ -1,8 +1,8 @@
-using Orleans.Tests.SqlUtils;
+using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost;
+using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using Xunit.Abstractions;
-using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.MembershipTests
 {

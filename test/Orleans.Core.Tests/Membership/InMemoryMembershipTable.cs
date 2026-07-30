@@ -1,6 +1,6 @@
-using Orleans.Runtime;
-using Orleans;
 using System.Collections.Immutable;
+using Orleans;
+using Orleans.Runtime;
 
 namespace NonSilo.Tests.Membership
 {

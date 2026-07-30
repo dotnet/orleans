@@ -96,12 +96,12 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         switch (command)
         {
             case SetCommand:
-            {
-                var key = OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader);
-                var value = OrleansBinaryCommandCodecHelpers.ReadValue(valueCodec, ref reader);
-                consumer.ApplySet(key, value);
-                break;
-            }
+                {
+                    var key = OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader);
+                    var value = OrleansBinaryCommandCodecHelpers.ReadValue(valueCodec, ref reader);
+                    consumer.ApplySet(key, value);
+                    break;
+                }
             case RemoveCommand:
                 consumer.ApplyRemove(OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader));
                 break;

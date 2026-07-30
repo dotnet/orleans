@@ -6,6 +6,7 @@ using Orleans.GrainDirectory;
 using Orleans.Runtime;
 
 namespace Orleans.TestingHost.InProcess;
+
 internal sealed class InProcessGrainDirectory(Func<SiloAddress, SiloStatus> getSiloStatus) : IGrainDirectory
 {
     private readonly ConcurrentDictionary<GrainId, GrainAddress> _entries = [];
@@ -14,7 +15,7 @@ internal sealed class InProcessGrainDirectory(Func<SiloAddress, SiloStatus> getS
     {
         if (_entries.TryGetValue(grainId, out var result) && !IsSiloDead(result))
         {
-            return Task.FromResult<GrainAddress?>(result); 
+            return Task.FromResult<GrainAddress?>(result);
         }
 
         return Task.FromResult<GrainAddress?>(null);

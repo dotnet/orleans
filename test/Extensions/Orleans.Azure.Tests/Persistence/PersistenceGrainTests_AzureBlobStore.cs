@@ -1,9 +1,9 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
+using Orleans.Configuration;
+using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.TestingHost;
-using Orleans.Configuration;
 
 namespace Tester.AzureUtils.Persistence;
 

@@ -1,6 +1,6 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
-using System.Runtime.CompilerServices;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
@@ -37,7 +37,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         public Task StartPeriodicProducing(TimeSpan? firePeriod = null)
         {
             logger.LogInformation("StartPeriodicProducing");
-            var period = (firePeriod == null)? defaultFirePeriod : firePeriod;
+            var period = (firePeriod == null) ? defaultFirePeriod : firePeriod;
             producerTimer = this.RegisterGrainTimer(TimerCallback, TimeSpan.Zero, period.Value);
             return Task.CompletedTask;
         }

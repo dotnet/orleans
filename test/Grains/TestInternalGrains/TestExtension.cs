@@ -1,4 +1,4 @@
-﻿using UnitTests.GrainInterfaces;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -40,7 +40,7 @@ namespace UnitTests.Grains
             return Task.FromResult(someString);
         }
     }
-    
+
     public class AutoExtension : IAutoExtension
     {
         public Task<string> CheckExtension()

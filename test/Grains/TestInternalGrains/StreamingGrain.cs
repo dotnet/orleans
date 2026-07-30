@@ -16,9 +16,9 @@ namespace UnitTests.Grains
     public class StreamItem
     {
         [Id(0)]
-        public string       Data;
+        public string Data;
         [Id(1)]
-        public Guid         StreamId;
+        public Guid StreamId;
 
         public StreamItem(string data, Guid streamId)
         {
@@ -110,7 +110,7 @@ namespace UnitTests.Grains
             if (ProviderName != null)
             {
                 throw new InvalidOperationException("Redundant call to BecomeConsumer");
-            }                
+            }
 
             _streamId = streamId;
             ProviderName = streamProvider.Name;
@@ -467,7 +467,7 @@ namespace UnitTests.Grains
             var activationId = _grainContext.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
             _logger.LogInformation("OnActivateAsync");
-             _producers = new List<IProducerObserver>();
+            _producers = new List<IProducerObserver>();
             _cleanedUpFlag = new InterlockedFlag();
             return Task.CompletedTask;
         }
@@ -512,7 +512,7 @@ namespace UnitTests.Grains
             await Task.WhenAll(_producers.Select(p => p.ProducePeriodicSeries(timerCallback =>
                 {
                     return this.RegisterGrainTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
-                },count)).ToArray());
+                }, count)).ToArray());
         }
 
         public virtual async Task<int> GetExpectedItemsProduced()
@@ -768,7 +768,7 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             var activationId = RuntimeContext.Current.ActivationId;
-            _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_Reentrant_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId) ;
+            _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_Reentrant_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
             _logger.LogInformation("OnActivateAsync");
             await base.OnActivateAsync(cancellationToken);
         }
@@ -973,5 +973,5 @@ namespace UnitTests.Grains
 
     [ImplicitStreamSubscription("TestNamespace1")]
     public class Streaming_ImplicitlySubscribedConsumerGrain : Streaming_ImplicitlySubscribedConsumerGrainBase, IStreaming_ImplicitlySubscribedConsumerGrain
-    {}
+    { }
 }

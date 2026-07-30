@@ -11,7 +11,7 @@ namespace Orleans.Streams
 {
     [Serializable]
     [GenerateSerializer]
-    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
+    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle
     {
         [Id(0)]
         [JsonProperty]

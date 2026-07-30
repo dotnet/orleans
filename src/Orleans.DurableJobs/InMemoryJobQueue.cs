@@ -32,7 +32,16 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
     /// </summary>
-    public int Count => _jobsIdToBucket.Count;
+    public int Count
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _jobsIdToBucket.Count;
+            }
+        }
+    }
 
     /// <summary>
     /// Adds a durable job to the queue with the specified dequeue count.
@@ -144,7 +153,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 DueTime = newDueTime,
                 TargetGrainId = existing.Job.TargetGrainId,
                 ShardId = existing.Job.ShardId,
-                Metadata = existing.Job.Metadata
+                Metadata = existing.Job.Metadata,
+                TraceParent = existing.Job.TraceParent,
+                TraceState = existing.Job.TraceState,
+                Priority = existing.Job.Priority,
             };
 
             oldBucket.RemoveJob(jobId);
@@ -175,6 +187,21 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             }
 
             return result;
+        }
+    }
+
+    public bool TryGetJob(string jobId, out DurableJob? job)
+    {
+        lock (_syncLock)
+        {
+            if (_jobsIdToBucket.TryGetValue(jobId, out var bucket) && bucket.TryGetJob(jobId, out var item))
+            {
+                job = item.Job;
+                return true;
+            }
+
+            job = null;
+            return false;
         }
     }
 
@@ -213,7 +240,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             {
                 RemoveEmptyBuckets();
 
-                if (Count == 0)
+                if (_jobsIdToBucket.Count == 0)
                 {
                     if (_isComplete)
                     {
@@ -320,7 +347,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var queueChangedTask = queueChanged.WaitAsync(waitCancellation.Token);
-        var delayTask = Task.Delay(delay.Value, _timeProvider, waitCancellation.Token);
+        var delayTask = Task.Delay(DurableJobTimeLimits.ClampTimerDelay(delay.Value), _timeProvider, waitCancellation.Token);
         var completedTask = await Task.WhenAny(queueChangedTask, delayTask);
         waitCancellation.Cancel();
         await completedTask;
@@ -337,7 +364,10 @@ internal sealed class JobBucket
 
     public DateTimeOffset DueTime { get; private set; }
 
-    public IEnumerable<(DurableJob Job, int DequeueCount)> Jobs => _jobs.Values;
+    public IEnumerable<(DurableJob Job, int DequeueCount)> Jobs
+        => _jobs.Values
+            .OrderByDescending(static item => item.Job.Priority)
+            .ThenBy(static item => item.Job.Id, StringComparer.Ordinal);
 
     public JobBucket(DateTimeOffset dueTime)
     {

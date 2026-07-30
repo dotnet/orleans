@@ -4,8 +4,8 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Core.Diagnostics;
+using Orleans.Runtime;
 
 namespace Orleans
 {

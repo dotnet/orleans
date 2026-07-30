@@ -45,8 +45,8 @@ namespace Tester.RelationalUtilities
             {
                 setupScript,
                 CreateStreamTestTable
-            }; 
-            
+            };
+
 
             return batches;
         }

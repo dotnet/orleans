@@ -57,12 +57,12 @@ namespace Orleans.Streams
 
         public Task<int> ProducerCount(QualifiedStreamId streamId)
         {
-            return explicitPubSub.ProducerCount(streamId); 
+            return explicitPubSub.ProducerCount(streamId);
         }
 
         public Task<int> ConsumerCount(QualifiedStreamId streamId)
         {
-            return explicitPubSub.ConsumerCount(streamId); 
+            return explicitPubSub.ConsumerCount(streamId);
         }
 
         public async Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer)

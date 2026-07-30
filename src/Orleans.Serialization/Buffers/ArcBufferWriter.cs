@@ -1404,7 +1404,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
 
         CheckValidity();
         Debug.Assert(offset >= 0);
-        Debug.Assert(length >= 0); 
+        Debug.Assert(length >= 0);
         Debug.Assert(offset + length <= Length);
         ArcBuffer result;
 

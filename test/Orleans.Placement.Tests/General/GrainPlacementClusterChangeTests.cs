@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

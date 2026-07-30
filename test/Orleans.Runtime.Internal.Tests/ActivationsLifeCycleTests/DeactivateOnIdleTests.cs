@@ -1,16 +1,16 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Internal;
-using Orleans.Configuration;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Placement;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -38,7 +38,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             testCluster = builder.Build();
             testCluster.Deploy();
         }
-        
+
         public void Dispose()
         {
             try

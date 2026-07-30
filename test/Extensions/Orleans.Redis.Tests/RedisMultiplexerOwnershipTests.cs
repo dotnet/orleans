@@ -14,6 +14,8 @@ using Orleans.Storage;
 using StackExchange.Redis;
 using TestExtensions;
 using Xunit;
+using AdvancedRedisReminderTable = Orleans.AdvancedReminders.Redis.RedisReminderTable;
+using AdvancedRedisReminderTableOptions = Orleans.AdvancedReminders.Redis.RedisReminderTableOptions;
 
 namespace Tester.Redis;
 
@@ -129,6 +131,37 @@ public sealed class RedisMultiplexerOwnershipTests
 
         ConnectionMultiplexer connection = null;
         var (provider, initialize) = CreateReminderTable(async _ =>
+        {
+            connection = await ConnectionMultiplexer.ConnectAsync(GetConfigurationOptions());
+            return ((IConnectionMultiplexer)connection, false);
+        });
+
+        await AssertExclusiveMultiplexerDisposed(() => connection, initialize, GetDispose(provider, useAsyncDispose));
+    }
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RedisAdvancedReminderTable_Dispose_DoesNotDisposeSharedMultiplexer(bool useAsyncDispose)
+    {
+        TestUtils.CheckForRedis();
+
+        using var connection = await ConnectionMultiplexer.ConnectAsync(GetConfigurationOptions());
+        var (provider, initialize) = CreateAdvancedReminderTable(
+            _ => Task.FromResult((Multiplexer: (IConnectionMultiplexer)connection, IsShared: true)));
+
+        await AssertSharedMultiplexerNotDisposed(connection, initialize, GetDispose(provider, useAsyncDispose));
+    }
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RedisAdvancedReminderTable_Dispose_DisposesExclusiveMultiplexer(bool useAsyncDispose)
+    {
+        TestUtils.CheckForRedis();
+
+        ConnectionMultiplexer connection = null;
+        var (provider, initialize) = CreateAdvancedReminderTable(async _ =>
         {
             connection = await ConnectionMultiplexer.ConnectAsync(GetConfigurationOptions());
             return ((IConnectionMultiplexer)connection, false);
@@ -265,7 +298,8 @@ public sealed class RedisMultiplexerOwnershipTests
             ISiloLifecycleSubject lifecycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             storage.Participate(lifecycle);
             await lifecycle.OnStart(CancellationToken.None);
-        });
+        }
+        );
     }
 
     private static (RedisMembershipTable Provider, Func<Task> Initialize) CreateMembershipTable(
@@ -303,6 +337,25 @@ public sealed class RedisMultiplexerOwnershipTests
         });
 
         var table = new RedisReminderTable(NullLogger<RedisReminderTable>.Instance, clusterOptions, options);
+        return (table, () => table.Init());
+    }
+
+    private static (AdvancedRedisReminderTable Provider, Func<Task> Initialize) CreateAdvancedReminderTable(
+        Func<AdvancedRedisReminderTableOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> createMultiplexer)
+    {
+        var options = Options.Create(new AdvancedRedisReminderTableOptions
+        {
+            ConfigurationOptions = GetConfigurationOptions(),
+            CreateMultiplexer = createMultiplexer,
+        });
+
+        var clusterOptions = Options.Create(new ClusterOptions
+        {
+            ServiceId = Guid.NewGuid().ToString("N"),
+            ClusterId = Guid.NewGuid().ToString("N"),
+        });
+
+        var table = new AdvancedRedisReminderTable(NullLogger<AdvancedRedisReminderTable>.Instance, clusterOptions, options);
         return (table, () => table.Init());
     }
 

@@ -1,5 +1,5 @@
-using Orleans.Dashboard.Model;
 using System;
+using Orleans.Dashboard.Model;
 
 namespace Benchmarks.Dashboard
 {

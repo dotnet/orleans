@@ -1,7 +1,7 @@
 
 using System;
-using System.Threading;
 using System.Collections.Concurrent;
+using System.Threading;
 
 #nullable disable
 namespace Orleans.Providers.Streams.Common

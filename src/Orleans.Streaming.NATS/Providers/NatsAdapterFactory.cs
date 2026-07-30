@@ -1,13 +1,13 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Streams;
 using Orleans.Configuration;
-using Orleans.Serialization;
 using Orleans.Configuration.Overrides;
 using Orleans.Providers.Streams.Common;
+using Orleans.Serialization;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.NATS;
 

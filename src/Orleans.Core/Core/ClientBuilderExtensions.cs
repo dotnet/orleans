@@ -1,16 +1,16 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Hosting
 {
@@ -196,7 +196,7 @@ namespace Orleans.Hosting
             string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
-            return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
+            return builder.UseLocalhostClustering(new[] { gatewayPort }, serviceId, clusterId);
         }
 
         /// <summary>

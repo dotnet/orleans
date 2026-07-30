@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using BenchmarkDotNet.Running;
+using Benchmarks.GrainStorage;
 using Benchmarks.Journaling;
 using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
-using Benchmarks.GrainStorage;
 
 namespace Benchmarks;
 
@@ -263,7 +263,7 @@ internal class Program
             "Running grain storage benchmark against memory",
             () =>
             {
-                var benchmark = new GrainStorageBenchmark(10, 10000, TimeSpan.FromSeconds( 30 ));
+                var benchmark = new GrainStorageBenchmark(10, 10000, TimeSpan.FromSeconds(30));
                 benchmark.MemorySetup();
                 return benchmark;
             },
@@ -276,7 +276,7 @@ internal class Program
             "Running grain storage benchmark against Azure Table",
             () =>
             {
-                var benchmark = new GrainStorageBenchmark(100, 10000, TimeSpan.FromSeconds( 30 ));
+                var benchmark = new GrainStorageBenchmark(100, 10000, TimeSpan.FromSeconds(30));
                 benchmark.AzureTableSetup();
                 return benchmark;
             },
@@ -289,7 +289,7 @@ internal class Program
             "Running grain storage benchmark against Azure Blob",
             () =>
             {
-                var benchmark = new GrainStorageBenchmark(10, 10000, TimeSpan.FromSeconds( 30 ));
+                var benchmark = new GrainStorageBenchmark(10, 10000, TimeSpan.FromSeconds(30));
                 benchmark.AzureBlobSetup();
                 return benchmark;
             },
@@ -314,21 +314,21 @@ internal class Program
             "Running grain storage benchmark against AdoNet",
             () =>
             {
-                var benchmark = new GrainStorageBenchmark(100, 10000, TimeSpan.FromSeconds( 30 ));
+                var benchmark = new GrainStorageBenchmark(100, 10000, TimeSpan.FromSeconds(30));
                 benchmark.AdoNetSetup();
                 return benchmark;
             },
             benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
             benchmark => benchmark.Teardown());
         },
-            ["Dashboard"] = _ =>
-            {
-                BenchmarkRunner.Run<Benchmarks.Dashboard.DashboardGrainBenchmark>();
-            },
-            ["Dashboard.Manual"] = _ =>
-            {
-                new Benchmarks.Dashboard.ManualTests().Run();
-            },
+        ["Dashboard"] = _ =>
+        {
+            BenchmarkRunner.Run<Benchmarks.Dashboard.DashboardGrainBenchmark>();
+        },
+        ["Dashboard.Manual"] = _ =>
+        {
+            new Benchmarks.Dashboard.ManualTests().Run();
+        },
         ["Journaling"] = args =>
         {
             _ = BenchmarkSwitcher.FromTypes([

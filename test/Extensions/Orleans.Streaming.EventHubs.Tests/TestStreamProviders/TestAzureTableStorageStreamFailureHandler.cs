@@ -5,8 +5,8 @@ using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Serialization;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using TestExtensions;
 using Tester.AzureUtils;
+using TestExtensions;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {

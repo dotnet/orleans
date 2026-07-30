@@ -1,8 +1,8 @@
 using System;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Streaming.NATS.Hosting;
 

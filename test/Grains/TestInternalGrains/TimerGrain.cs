@@ -736,7 +736,7 @@ namespace UnitTestGrains
             foreach (var task in _allTimerCallsTasks.Select(t => t.Task))
             {
                 var (state, ct) = await task;
-                var stateString  = Assert.IsType<string>(state);
+                var stateString = Assert.IsType<string>(state);
                 var hasState = string.Equals("STATE", stateString, StringComparison.Ordinal);
                 if (hasState)
                 {
@@ -1275,7 +1275,7 @@ namespace UnitTestGrains
             foreach (var task in _allTimerCallsTasks.Select(t => t.Task))
             {
                 var (state, ct) = await task;
-                var stateString  = Assert.IsType<string>(state);
+                var stateString = Assert.IsType<string>(state);
                 var hasState = string.Equals("STATE", stateString, StringComparison.Ordinal);
                 if (hasState)
                 {

@@ -40,8 +40,8 @@ namespace UnitTests.StorageTests.AdoNet
         [SkippableFact, TestCategory("Functional")]
         public async Task Streaming_PostgreSql_Test()
         {
-            using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
-            {             
+            using (var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
+            {
                 var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(_storage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
                 Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
             }

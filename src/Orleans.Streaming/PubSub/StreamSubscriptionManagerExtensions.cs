@@ -1,7 +1,7 @@
-using Orleans.Streams.Core;
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 #nullable disable
 namespace Orleans.Streams.PubSub

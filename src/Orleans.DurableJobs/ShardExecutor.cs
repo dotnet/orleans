@@ -77,12 +77,13 @@ internal sealed partial class ShardExecutor
         try
         {
             var now = _timeProvider.GetUtcNow();
-            if (shard.StartTime > now)
+            while (shard.StartTime > now)
             {
                 // Wait until the shard's start time
                 var delay = shard.StartTime - now;
                 LogWaitingForShardStartTime(_logger, shard.Id, delay, shard.StartTime);
-                await Task.Delay(delay, _timeProvider, cancellationToken);
+                await Task.Delay(DurableJobTimeLimits.ClampTimerDelay(delay), _timeProvider, cancellationToken);
+                now = _timeProvider.GetUtcNow();
             }
 
             LogBeginProcessingShard(_logger, shard.Id);
@@ -271,7 +272,7 @@ internal sealed partial class ShardExecutor
             // Cancellation is handled by shard takeover, so only non-cancellation failures are retried here.
             if (failureException is not null)
             {
-                var retryTime = _options.ShouldRetry(jobContext, failureException);
+                var retryTime = _options.GetRetryTime(jobContext, failureException, _timeProvider);
                 if (retryTime is not null)
                 {
                     LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
@@ -283,6 +284,7 @@ internal sealed partial class ShardExecutor
                 else
                 {
                     LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
+                    await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
                     _durableJobsInstruments.OnJobFailed(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                     activity?.SetTag(ActivityTagKeys.DurableJobStatus, "failed");
                     DurableJobsDiagnostics.SetError(activity, failureException);

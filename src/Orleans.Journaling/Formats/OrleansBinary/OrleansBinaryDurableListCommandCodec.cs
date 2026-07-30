@@ -122,19 +122,19 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
                 consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case SetCommand:
-            {
-                var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
-                var item = OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader);
-                consumer.ApplySet(index, item);
-                break;
-            }
+                {
+                    var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
+                    var item = OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader);
+                    consumer.ApplySet(index, item);
+                    break;
+                }
             case InsertCommand:
-            {
-                var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
-                var item = OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader);
-                consumer.ApplyInsert(index, item);
-                break;
-            }
+                {
+                    var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
+                    var item = OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader);
+                    consumer.ApplyInsert(index, item);
+                    break;
+                }
             case RemoveCommand:
                 consumer.ApplyRemoveAt(OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader));
                 break;

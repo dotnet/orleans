@@ -1,12 +1,12 @@
 using AWSUtils.Tests.StorageTests;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.TestingHost;
-using UnitTests.StreamingTests;
-using Xunit;
+using OrleansAWSUtils.Streams;
 using TestExtensions;
 using UnitTests.Streaming;
-using OrleansAWSUtils.Streams;
+using UnitTests.StreamingTests;
+using Xunit;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -56,7 +56,7 @@ namespace AWSUtils.Tests.Streaming
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                         options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                     })
-                    .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
+                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
             }
         }
 
@@ -71,7 +71,7 @@ namespace AWSUtils.Tests.Streaming
                     }));
             }
         }
-        
+
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();

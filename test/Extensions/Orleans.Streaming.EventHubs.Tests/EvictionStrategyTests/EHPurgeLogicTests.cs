@@ -1,18 +1,18 @@
-using Orleans.Providers.Streams.Common;
-using Orleans.Streaming.EventHubs;
-using Orleans.Streams;
 using System.Collections.Concurrent;
+using System.Globalization;
+using Azure.Messaging.EventHubs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
-using Xunit;
-using Orleans.Streaming.EventHubs.Testing;
-using Azure.Messaging.EventHubs;
-using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Statistics;
-using System.Globalization;
+using Orleans.Streaming.EventHubs;
+using Orleans.Streaming.EventHubs.Testing;
+using Orleans.Streams;
+using Xunit;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -71,7 +71,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var tasks = new List<Task>();
             //add items into cache, make sure will allocate multiple buffers from the pool
             int itemAddToCache = 100;
-            foreach(var cache in this.cacheList)
+            foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
 
@@ -175,10 +175,11 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //Each cache should have all buffers purged, except for current buffer
             this.evictionStrategyList.ForEach(strategy => Assert.Single(strategy.InUseBuffers));
             var oldBuffersInCaches = new List<FixedSizeBuffer>();
-            this.evictionStrategyList.ForEach(strategy => {
+            this.evictionStrategyList.ForEach(strategy =>
+            {
                 foreach (var inUseBuffer in strategy.InUseBuffers)
                     oldBuffersInCaches.Add(inUseBuffer);
-                });
+            });
             //add items into cache again
             itemAddToCache = 100;
             foreach (var cache in this.cacheList)
@@ -186,7 +187,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             await Task.WhenAll(tasks);
             //block pool should have purged buffers returned by now, and used those to allocate buffer for new item
             var newBufferAllocated = new List<FixedSizeBuffer>();
-            this.evictionStrategyList.ForEach(strategy => {
+            this.evictionStrategyList.ForEach(strategy =>
+            {
                 foreach (var inUseBuffer in strategy.InUseBuffers)
                     newBufferAllocated.Add(inUseBuffer);
             });

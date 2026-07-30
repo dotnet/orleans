@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Orleans.Runtime;
 using NATS.Client.Core;
 using NATS.Client.JetStream.Models;
+using Orleans.Runtime;
 
 namespace Orleans.Streaming.NATS;
 

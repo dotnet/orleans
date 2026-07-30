@@ -1,4 +1,4 @@
-﻿//#define USE_GENERICS
+//#define USE_GENERICS
 
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -23,7 +23,7 @@ namespace UnitTests.GrainInterfaces
         Task<StreamSubscriptionHandle<int>> AddConsumer(Guid streamId, string providerName);
         Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<int> consumerHandle);
 #endif
-        
+
         Task BecomeProducer(Guid streamId, string providerName);
         Task RemoveProducer(Guid streamId, string providerName);
         Task ClearGrain();
@@ -43,7 +43,7 @@ namespace UnitTests.GrainInterfaces
         Task<SiloAddress> GetLocation();
     }
 
-        
+
     public interface IStreamUnsubscribeTestGrain : IGrainWithIntegerKey
     {
         Task Subscribe(Guid streamId, string providerName);

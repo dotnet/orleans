@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
@@ -8,7 +8,7 @@ namespace Orleans.Transactions.TestKit.xUnit
     public class TransactionRecoveryTestsRunnerxUnit : TransactionRecoveryTestsRunner
     {
         public TransactionRecoveryTestsRunnerxUnit(TestCluster cluster, ITestOutputHelper testOutput)
-            :base(cluster, testOutput.WriteLine)
+            : base(cluster, testOutput.WriteLine)
         {
         }
 

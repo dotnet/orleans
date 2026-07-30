@@ -291,11 +291,11 @@ public sealed class ObserverManagerTests
 
         observerManager.ClearExpired();
 
-         // Half should be removed due to expiration.
+        // Half should be removed due to expiration.
         Assert.Equal(5, observerManager.Count);
         for (var i = 0; i < 5; i++)
         {
-             // First half should be removed.
+            // First half should be removed.
             Assert.DoesNotContain(i, observerManager.Observers.Values);
         }
 

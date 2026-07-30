@@ -36,7 +36,7 @@ namespace UnitTests.General
             RequestContextTestUtils.ClearActivityId();
             RequestContext.Clear();
         }
-        
+
         public void Dispose()
         {
             RequestContextTestUtils.ClearActivityId();
@@ -51,7 +51,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId);
             Guid result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
+            Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -66,19 +66,19 @@ namespace UnitTests.General
 
             RequestContext.Set(key, val);
             var result = await grain.TraceIdEcho();
-            Assert.Equal(val,  result);  // "Immediate RequestContext echo was not correct"
+            Assert.Equal(val, result);  // "Immediate RequestContext echo was not correct"
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDoubleEcho();
-            Assert.Equal(val2,  result);  // "Transitive RequestContext echo was not correct"
+            Assert.Equal(val2, result);  // "Transitive RequestContext echo was not correct"
 
             RequestContext.Set(key, val);
             result = await grain.TraceIdDelayedEcho1();
-            Assert.Equal(val,  result); // "Delayed (StartNew) RequestContext echo was not correct");
+            Assert.Equal(val, result); // "Delayed (StartNew) RequestContext echo was not correct");
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDelayedEcho2();
-            Assert.Equal(val2,  result); // "Delayed (ContinueWith) RequestContext echo was not correct");
+            Assert.Equal(val2, result); // "Delayed (ContinueWith) RequestContext echo was not correct");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -93,23 +93,23 @@ namespace UnitTests.General
 
             RequestContext.Set(key, val);
             var result = await grain.TraceIdEcho();
-            Assert.Equal(val,  result);  // "Immediate RequestContext echo was not correct"
+            Assert.Equal(val, result);  // "Immediate RequestContext echo was not correct"
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDoubleEcho();
-            Assert.Equal(val2,  result);  // "Transitive RequestContext echo was not correct"
+            Assert.Equal(val2, result);  // "Transitive RequestContext echo was not correct"
 
             RequestContext.Set(key, val);
             result = await grain.TraceIdDelayedEcho1();
-            Assert.Equal(val,  result); // "Delayed (StartNew) RequestContext echo was not correct");
+            Assert.Equal(val, result); // "Delayed (StartNew) RequestContext echo was not correct");
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDelayedEcho2();
-            Assert.Equal(val2,  result); // "Delayed (ContinueWith) RequestContext echo was not correct");
+            Assert.Equal(val2, result); // "Delayed (ContinueWith) RequestContext echo was not correct");
 
             RequestContext.Set(key, val);
             result = await grain.TraceIdDelayedEchoAwait();
-            Assert.Equal(val,  result); // "Delayed (Await) RequestContext echo was not correct");
+            Assert.Equal(val, result); // "Delayed (Await) RequestContext echo was not correct");
 
             // Expected behaviour is this won't work, because Task.Run by design does not use Orleans task scheduler
             //RequestContext.Set(key, val2);
@@ -123,8 +123,8 @@ namespace UnitTests.General
             var grain = this.fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
             Tuple<string, string> requestContext = await grain.TestRequestContext();
             this.fixture.Logger.LogInformation("Request Context is: {RequestContext}", requestContext);
-            Assert.Equal("binks",  requestContext.Item1);  // "Item1=" + requestContext.Item1
-            Assert.Equal("binks",  requestContext.Item2);  // "Item2=" + requestContext.Item2
+            Assert.Equal("binks", requestContext.Item1);  // "Item1=" + requestContext.Item1
+            Assert.Equal("binks", requestContext.Item2);  // "Item2=" + requestContext.Item2
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -138,17 +138,17 @@ namespace UnitTests.General
 
             RequestContext.Set(RequestContext.CALL_CHAIN_REENTRANCY_HEADER, activityId);
             Guid result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
+            Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
             RequestContext.Set(RequestContext.CALL_CHAIN_REENTRANCY_HEADER, nullActivityId);
             result = await grain.E2EActivityId();
-            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+            Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
 
             RequestContext.Set(RequestContext.CALL_CHAIN_REENTRANCY_HEADER, activityId2);
             result = await grain.E2EActivityId();
-            Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
+            Assert.Equal(activityId2, result);  // "E2E ActivityId 2 not propagated correctly"
             RequestContext.Clear();
         }
 
@@ -172,14 +172,14 @@ namespace UnitTests.General
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
-                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+                Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
             }
             RequestContext.Clear();
 
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             RequestContext.ReentrancyId = activityId2;
             result = await grain.E2EActivityId();
-            Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
+            Assert.Equal(activityId2, result);  // "E2E ActivityId 2 not propagated correctly"
             RequestContext.Clear();
         }
 
@@ -195,7 +195,7 @@ namespace UnitTests.General
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             RequestContext.ReentrancyId = activityId;
             Guid result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
+            Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
             RequestContext.ReentrancyId = nullActivityId;
@@ -203,14 +203,14 @@ namespace UnitTests.General
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
-                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+                Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
             }
             RequestContext.Clear();
 
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             RequestContext.ReentrancyId = activityId2;
             result = await grain.E2EActivityId();
-            Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
+            Assert.Equal(activityId2, result);  // "E2E ActivityId 2 not propagated correctly"
             RequestContext.Clear();
         }
 
@@ -224,14 +224,14 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Guid result = await grain.E2EActivityId();
-            Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
+            Assert.Equal(nullActivityId, result);  // "E2E ActivityId should not exist"
 
             result = await grain.E2EActivityId();
-            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+            Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
 
             result = await grain.E2EActivityId();
-            Assert.Equal(nullActivityId,  result);  // "E2E ActivityId 2 should not exist"
+            Assert.Equal(nullActivityId, result);  // "E2E ActivityId 2 should not exist"
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));  // "No ActivityId context should be set"
 
             for (int i = 0; i < Environment.ProcessorCount; i++)
@@ -240,7 +240,7 @@ namespace UnitTests.General
 
                 result = await grain.E2EActivityId();
 
-                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+                Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
 
                 RequestContext.Clear();
             }
@@ -254,26 +254,26 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Guid result = await grain.E2EActivityId();
-            Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
+            Assert.Equal(nullActivityId, result);  // "E2E ActivityId should not exist"
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
-           Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
+            Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             result = await grain.E2EActivityId();
-            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+            Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
-           Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
+            Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
-                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+                Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
             }
             RequestContext.Clear();
             RequestContextTestUtils.SetActivityId(nullActivityId);
-           Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
+            Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             result = await grain.E2EActivityId();
-            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
+            Assert.Equal(nullActivityId, result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
         }
 
@@ -287,7 +287,7 @@ namespace UnitTests.General
 
             RequestContext.ReentrancyId = activityId;
             Guid result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
+            Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
             RequestContext.Clear();
 
             using (RequestContext.SuppressCallChainReentrancy())
@@ -299,12 +299,12 @@ namespace UnitTests.General
 
             RequestContext.ReentrancyId = activityId2;
             result = await grain.E2EActivityId();
-            Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 should have been propagated"
+            Assert.Equal(activityId2, result);  // "E2E ActivityId #2 should have been propagated"
             RequestContext.Clear();
 
             RequestContext.ReentrancyId = activityId;
             result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
+            Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly after #2"
             RequestContext.Clear();
         }
     }

@@ -90,7 +90,7 @@ namespace UnitTests.General
             }
 
             // check that every "prefer local grain" was placed on the same silo with its requesting random grain
-            foreach(int key in Enumerable.Range(0, numGrains))
+            foreach (int key in Enumerable.Range(0, numGrains))
             {
                 string random = randomGrainPlaces.ElementAt(key);
                 string preferLocal = preferLocalGrainPlaces.ElementAt(key);

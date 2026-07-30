@@ -1,9 +1,9 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting.Kubernetes;
 using Orleans.Runtime;
-using System;
 
 #nullable disable
 namespace Orleans.Hosting

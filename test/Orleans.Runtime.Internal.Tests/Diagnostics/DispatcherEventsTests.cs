@@ -2,9 +2,9 @@ using System.Collections.Concurrent;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Runtime.Diagnostics;
 using TestExtensions;
 using Xunit;
-using Orleans.Runtime.Diagnostics;
 
 namespace UnitTests.Diagnostics;
 

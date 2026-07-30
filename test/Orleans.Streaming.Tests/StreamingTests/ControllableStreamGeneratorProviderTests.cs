@@ -56,7 +56,7 @@ namespace UnitTests.StreamingTests
         {
             this.fixture = fixture;
         }
-        
+
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateControllableGeneratedStreamsTest()
         {

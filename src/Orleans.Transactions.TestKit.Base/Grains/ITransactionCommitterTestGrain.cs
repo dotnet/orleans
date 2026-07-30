@@ -1,6 +1,6 @@
-﻿
-using Orleans.Transactions.Abstractions;
+
 using System.Threading.Tasks;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit
 {

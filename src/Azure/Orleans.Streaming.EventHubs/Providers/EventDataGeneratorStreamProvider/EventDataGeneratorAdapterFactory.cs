@@ -168,7 +168,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                     this.RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
                     break;
                 case (int)Commands.Stop_Producing_On_Stream:
-                    this.StopProducingOnStream((StreamId) arg);
+                    this.StopProducingOnStream((StreamId)arg);
                     break;
                 default: break;
 
@@ -178,7 +178,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)
         {
-            var generatorOptions= services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
+            var generatorOptions = services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);

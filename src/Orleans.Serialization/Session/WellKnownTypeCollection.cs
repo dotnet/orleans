@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Options;
-using Orleans.Serialization.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Options;
+using Orleans.Serialization.Configuration;
 
 #nullable disable
 namespace Orleans.Serialization.Session

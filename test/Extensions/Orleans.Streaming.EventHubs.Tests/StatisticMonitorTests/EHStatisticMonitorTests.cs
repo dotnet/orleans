@@ -1,15 +1,15 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using ServiceBus.Tests.SlowConsumingTests;
 using ServiceBus.Tests.TestStreamProviders;
 using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit;
-using ServiceBus.Tests.SlowConsumingTests;
-using Orleans.Providers.Streams.Common;
-using Orleans.Streaming.EventHubs.Testing;
-using Orleans.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ServiceBus.Tests.MonitorTests
 {
@@ -44,7 +44,7 @@ namespace ServiceBus.Tests.MonitorTests
                         .AddPersistentStreams(
                             StreamProviderName,
                             EHStreamProviderForMonitorTestsAdapterFactory.Create,
-                            b=>
+                            b =>
                             {
                                 b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
                                 b.Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval));

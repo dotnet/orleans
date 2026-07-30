@@ -75,11 +75,11 @@ namespace NonSilo.Tests
             const int countLimit = 5;
             Func<int, Task<int>> myFunc = ((int funcCounter) =>
             {
-// ReSharper disable AccessToModifiedClosure
+                // ReSharper disable AccessToModifiedClosure
                 Assert.Equal(counter, funcCounter);
                 this.output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
-// ReSharper restore AccessToModifiedClosure
+                // ReSharper restore AccessToModifiedClosure
             });
             Func<int, int, bool> successFilter = ((int count, int i) => count != countLimit);
 
@@ -126,8 +126,8 @@ namespace NonSilo.Tests
 
             int maxRetries = 5;
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(
-                myFunc, 
-                maxRetries, 
+                myFunc,
+                maxRetries,
                 errorFilter,
                 default,
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
@@ -159,7 +159,7 @@ namespace NonSilo.Tests
             {
                 this.output.WriteLine("Running ERROR FILTER for {0} time.", i);
                 Assert.Equal(lastIteration, i);
-                if (i==0 || i==1)
+                if (i == 0 || i == 1)
                     return true;
                 else if (i == 2)
                     throw exc;

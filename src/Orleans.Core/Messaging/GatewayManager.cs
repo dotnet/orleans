@@ -163,7 +163,7 @@ namespace Orleans.Messaging
         /// </summary>
         /// <returns></returns>
         public SiloAddress? GetLiveGateway()
-        #nullable disable
+#nullable disable
         {
             List<SiloAddress> live = GetLiveGateways();
             int count = live.Count;

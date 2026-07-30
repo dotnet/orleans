@@ -1,4 +1,4 @@
-﻿using BenchmarkGrainInterfaces.MapReduce;
+using BenchmarkGrainInterfaces.MapReduce;
 
 namespace BenchmarkGrains.MapReduce
 {

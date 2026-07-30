@@ -11,8 +11,8 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
-using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
 #nullable disable
 namespace Orleans.Streams

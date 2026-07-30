@@ -670,14 +670,14 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 {
                     var innerSw = ValueStopwatch.StartNew();
                     Immutable<List<GrainAddress>> result = default;
-                        if (isValidation)
-                        {
-                            result = await client.GetRegisteredActivations(version, range, isValidation: true);
-                        }
-                        else
-                        {
-                            result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
-                        }
+                    if (isValidation)
+                    {
+                        result = await client.GetRegisteredActivations(version, range, isValidation: true);
+                    }
+                    else
+                    {
+                        result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
+                    }
 
                     return result;
                 },

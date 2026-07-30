@@ -2,8 +2,8 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Configuration;
+using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 
 namespace Orleans.Hosting

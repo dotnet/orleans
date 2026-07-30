@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
+using Orleans.Runtime;
 
 #nullable disable
 namespace Orleans.Dashboard.Core;
@@ -15,6 +15,8 @@ internal interface IDashboardClient
     Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats();
 
     Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize);
+
+    Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(int pageNumber, int pageSize);
 
     Task<Immutable<SiloRuntimeStatistics[]>> HistoricalStats(string siloAddress);
 

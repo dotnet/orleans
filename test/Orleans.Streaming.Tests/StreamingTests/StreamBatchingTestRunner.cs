@@ -1,5 +1,5 @@
-using Orleans.Streams;
 using Orleans.Runtime;
+using Orleans.Streams;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -29,7 +29,7 @@ namespace UnitTests.StreamingTests
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
             IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
-            for(int i = 0; i< ExpectedConsumed; i++)
+            for (int i = 0; i < ExpectedConsumed; i++)
             {
                 await stream.OnNextAsync(i.ToString());
             }

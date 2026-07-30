@@ -86,7 +86,7 @@ public class GrainDirectoryPartitionTests
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
 
         // Insert invalid entry, pointing to dead silo
-       Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress, previousAddress: null));
+        Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress, previousAddress: null));
     }
 
     /// <summary>

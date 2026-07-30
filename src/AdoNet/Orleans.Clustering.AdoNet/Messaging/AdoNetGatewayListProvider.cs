@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
-using Orleans.Messaging;
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 #nullable disable
 namespace Orleans.Runtime.Membership

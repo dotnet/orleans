@@ -20,6 +20,8 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
     private Dictionary<string, string> jobTraceIds = new();
     private readonly ILocalDurableJobManager _localDurableJobManager;
     private readonly ILogger<DurableJobGrain> _logger;
+    private TaskCompletionSource _blockingJobStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource _releaseBlockingJob = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public DurableJobGrain(ILocalDurableJobManager localDurableJobManager, ILogger<DurableJobGrain> logger)
     {
@@ -32,15 +34,20 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
         return Task.FromResult(jobRunStatus.TryGetValue(jobId, out var taskResult) && taskResult.Task.IsCompleted);
     }
 
-    public Task ExecuteJobAsync(IJobRunContext ctx, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IJobRunContext ctx, CancellationToken cancellationToken)
     {
+        if (string.Equals(ctx.Job.Name, "BlockingJob", StringComparison.Ordinal))
+        {
+            _blockingJobStarted.TrySetResult();
+            await _releaseBlockingJob.Task.WaitAsync(cancellationToken);
+        }
+
         _logger.LogInformation("Job {JobId} received at {ReceivedTime}", ctx.Job.Id, DateTime.UtcNow);
         jobExecutionTimes[ctx.Job.Id] = DateTimeOffset.UtcNow;
         jobContexts[ctx.Job.Id] = ctx;
         cancellationTokenStatus[ctx.Job.Id] = cancellationToken.IsCancellationRequested;
         jobTraceIds[ctx.Job.Id] = Activity.Current?.TraceId.ToString() ?? string.Empty;
         jobRunStatus[ctx.Job.Id].SetResult();
-        return Task.CompletedTask;
     }
 
     public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
@@ -102,5 +109,22 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
     public Task<string> GetJobTraceId(string jobId)
     {
         return Task.FromResult(jobTraceIds.TryGetValue(jobId, out var traceId) ? traceId : string.Empty);
+    }
+
+    public async Task<DurableJob> ScheduleBlockingJobAsync(DateTimeOffset scheduledTime)
+    {
+        _blockingJobStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _releaseBlockingJob = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        return await ScheduleJobAsync("BlockingJob", scheduledTime);
+    }
+
+    public Task WaitForBlockingJobToStart() => _blockingJobStarted.Task;
+
+    public Task<bool> EnterNormalTurn() => Task.FromResult(true);
+
+    public Task ReleaseBlockingJob()
+    {
+        _releaseBlockingJob.TrySetResult();
+        return Task.CompletedTask;
     }
 }

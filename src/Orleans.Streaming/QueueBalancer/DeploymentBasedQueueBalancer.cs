@@ -3,11 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime;
 
 #nullable disable
 namespace Orleans.Streams
@@ -28,14 +28,14 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private List<QueueId> allQueues;
         private bool isStarting;
-        
+
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
             DeploymentBasedQueueBalancerOptions options,
             IServiceProvider services,
             ILogger<DeploymentBasedQueueBalancer> logger)
-            : base (services, logger)
+            : base(services, logger)
         {
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
@@ -68,7 +68,7 @@ namespace Orleans.Streams
             NotifyAfterStart().Ignore();
             return base.Initialize(queueMapper);
         }
-        
+
         private async Task NotifyAfterStart()
         {
             await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
@@ -135,8 +135,8 @@ namespace Orleans.Streams
             return new BestFitBalancer<string, QueueId>(allSiloNames, allQueues);
         }
 
-        private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle, 
-            ConcurrentDictionary<SiloAddress, bool> immatureSilos, 
+        private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle,
+            ConcurrentDictionary<SiloAddress, bool> immatureSilos,
             Dictionary<string, List<QueueId>> idealDistribution)
         {
             HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();

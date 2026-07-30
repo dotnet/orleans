@@ -79,7 +79,7 @@ namespace UnitTests.Grains
 
             lock (tcss)
             {
-                if(tcss.ContainsKey(key))
+                if (tcss.ContainsKey(key))
                     throw new InvalidOperationException("Duplicate call for the same grain ID.");
 
                 var tcs = new TaskCompletionSource<bool>();

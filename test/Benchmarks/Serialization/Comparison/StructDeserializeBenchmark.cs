@@ -1,16 +1,16 @@
 using BenchmarkDotNet.Attributes;
+using Benchmarks.Serialization.Models;
+using Benchmarks.Serialization.Utilities;
+using Hyperion;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using Xunit;
+using ZeroFormatter;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
-using Hyperion;
-using ZeroFormatter;
-using Benchmarks.Serialization.Models;
-using Benchmarks.Serialization.Utilities;
 
 namespace Benchmarks.Serialization.Comparison;
 
@@ -127,4 +127,4 @@ public class StructDeserializeBenchmark
 
     [Benchmark(Description = "SpanJson")]
     public int SpanJsonUtf8() => SumResult(SpanJson.JsonSerializer.Generic.Utf8.Deserialize<IntStruct>(SpanJsonInput));
-} 
+}

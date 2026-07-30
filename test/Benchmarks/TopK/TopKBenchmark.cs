@@ -350,40 +350,40 @@ public class TopKBenchmark
     }
 }
 
-    // https://jasoncrease.medium.com/rejection-sampling-the-zipf-distribution-6b359792cffa
-    internal sealed class ZipfRejectionSampler
+// https://jasoncrease.medium.com/rejection-sampling-the-zipf-distribution-6b359792cffa
+internal sealed class ZipfRejectionSampler
+{
+    private readonly Random _rand;
+    private readonly double _skew;
+    private readonly double _t;
+
+    public ZipfRejectionSampler(Random random, long cardinality, double skew)
     {
-        private readonly Random _rand;
-        private readonly double _skew;
-        private readonly double _t;
+        _rand = random;
+        _skew = skew;
+        _t = (Math.Pow(cardinality, 1 - skew) - skew) / (1 - skew);
+    }
 
-        public ZipfRejectionSampler(Random random, long cardinality, double skew)
+    public long Sample()
+    {
+        while (true)
         {
-            _rand = random;
-            _skew = skew;
-            _t = (Math.Pow(cardinality, 1 - skew) - skew) / (1 - skew);
-        }
+            double invB = bInvCdf(_rand.NextDouble());
+            long sampleX = (long)(invB + 1);
+            double yRand = _rand.NextDouble();
+            double ratioTop = Math.Pow(sampleX, -_skew);
+            double ratioBottom = sampleX <= 1 ? 1 / _t : Math.Pow(invB, -_skew) / _t;
+            double rat = (ratioTop) / (ratioBottom * _t);
 
-        public long Sample()
-        {
-            while (true)
-            {
-                double invB = bInvCdf(_rand.NextDouble());
-                long sampleX = (long)(invB + 1);
-                double yRand = _rand.NextDouble();
-                double ratioTop = Math.Pow(sampleX, -_skew);
-                double ratioBottom = sampleX <= 1 ? 1 / _t : Math.Pow(invB, -_skew) / _t;
-                double rat = (ratioTop) / (ratioBottom * _t);
-
-                if (yRand < rat)
-                    return sampleX;
-            }
-        }
-        private double bInvCdf(double p)
-        {
-            if (p * _t <= 1)
-                return p * _t;
-            else
-                return Math.Pow((p * _t) * (1 - _skew) + _skew, 1 / (1 - _skew));
+            if (yRand < rat)
+                return sampleX;
         }
     }
+    private double bInvCdf(double p)
+    {
+        if (p * _t <= 1)
+            return p * _t;
+        else
+            return Math.Pow((p * _t) * (1 - _skew) + _skew, 1 / (1 - _skew));
+    }
+}

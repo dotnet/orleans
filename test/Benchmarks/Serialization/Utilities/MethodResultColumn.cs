@@ -1,7 +1,7 @@
+using System.Reflection;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
-using System.Reflection;
 
 namespace Benchmarks.Serialization.Utilities;
 

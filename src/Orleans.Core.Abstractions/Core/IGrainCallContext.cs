@@ -75,7 +75,7 @@ namespace Orleans
         /// Gets or sets the result.
         /// </summary>
         object? Result { get; set; }
-       
+
         /// <summary>
         /// Gets or sets the response.
         /// </summary>

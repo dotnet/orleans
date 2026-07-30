@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Providers
@@ -14,7 +14,7 @@ namespace Orleans.Providers
         public static TSerializer GetOrCreateSerializer(IServiceProvider serviceProvider)
         {
             return serviceProvider.GetService<TSerializer>() ??
-                   (TSerializer) ObjectFactory.Value(serviceProvider, null);
+                   (TSerializer)ObjectFactory.Value(serviceProvider, null);
         }
     }
 }

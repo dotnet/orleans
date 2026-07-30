@@ -123,7 +123,8 @@ namespace Orleans.AzureUtils
 
                 LogFoundGateway(gatewaySiloInstances.Count, this.DeploymentId);
                 return gatewaySiloInstances;
-            }catch(Exception exc)
+            }
+            catch (Exception exc)
             {
                 LogErrorSearchingGateway(exc, this.DeploymentId);
                 throw;

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
 using Xunit;
@@ -220,6 +221,74 @@ public class ShardClaimBudgetTests
         Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
     }
 
+    [Theory]
+    [InlineData(nameof(DurableJobsOptions.ShardActivationBufferPeriod))]
+    [InlineData(nameof(DurableJobsOptions.MaxConcurrentJobsPerSilo))]
+    [InlineData(nameof(DurableJobsOptions.OverloadBackoffDelay))]
+    public void ValidateConfiguration_InvalidExecutionOption_Throws(string optionName)
+    {
+        var value = new DurableJobsOptions();
+        switch (optionName)
+        {
+            case nameof(DurableJobsOptions.ShardActivationBufferPeriod):
+                value.ShardActivationBufferPeriod = TimeSpan.FromTicks(-1);
+                break;
+            case nameof(DurableJobsOptions.MaxConcurrentJobsPerSilo):
+                value.MaxConcurrentJobsPerSilo = 0;
+                break;
+            case nameof(DurableJobsOptions.OverloadBackoffDelay):
+                value.OverloadBackoffDelay = TimeSpan.Zero;
+                break;
+        }
+
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            Options.Create(value));
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+        Assert.Contains(optionName, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(nameof(DurableJobsOptions.ShardActivationBufferPeriod))]
+    [InlineData(nameof(DurableJobsOptions.JobStatusPollInterval))]
+    [InlineData(nameof(DurableJobsOptions.OverloadBackoffDelay))]
+    [InlineData(nameof(DurableJobsOptions.SlowStartInterval))]
+    [InlineData(nameof(DurableJobsOptions.ShardBatchLingerDelay))]
+    [InlineData(nameof(DurableJobsOptions.AdoptionFailureWindow))]
+    public void ValidateConfiguration_TimerDelayBeyondRuntimeLimit_Throws(string optionName)
+    {
+        var value = new DurableJobsOptions();
+        var tooLarge = DurableJobTimeLimits.MaximumTimerDelay.Add(TimeSpan.FromMilliseconds(1));
+        switch (optionName)
+        {
+            case nameof(DurableJobsOptions.ShardActivationBufferPeriod):
+                value.ShardActivationBufferPeriod = tooLarge;
+                break;
+            case nameof(DurableJobsOptions.JobStatusPollInterval):
+                value.JobStatusPollInterval = tooLarge;
+                break;
+            case nameof(DurableJobsOptions.OverloadBackoffDelay):
+                value.OverloadBackoffDelay = tooLarge;
+                break;
+            case nameof(DurableJobsOptions.SlowStartInterval):
+                value.SlowStartInterval = tooLarge;
+                break;
+            case nameof(DurableJobsOptions.ShardBatchLingerDelay):
+                value.ShardBatchLingerDelay = tooLarge;
+                break;
+            case nameof(DurableJobsOptions.AdoptionFailureWindow):
+                value.AdoptionFailureWindow = tooLarge;
+                break;
+        }
+
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            Options.Create(value));
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
     [Fact]
     public void ValidateConfiguration_ValidShardClaimOptions_DoesNotThrow()
     {
@@ -248,5 +317,22 @@ public class ShardClaimBudgetTests
             options);
 
         validator.ValidateConfiguration();
+    }
+
+    [Fact]
+    public void DefaultRetryPolicy_AtMaximumDate_ClampsRetryTime()
+    {
+        var context = Substitute.For<IJobRunContext>();
+        context.DequeueCount.Returns(1);
+
+        var retryAt = new DurableJobsOptions().GetRetryTime(context, new InvalidOperationException(),
+            new FixedTimeProvider(DateTimeOffset.MaxValue));
+
+        Assert.Equal(DateTimeOffset.MaxValue, retryAt);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

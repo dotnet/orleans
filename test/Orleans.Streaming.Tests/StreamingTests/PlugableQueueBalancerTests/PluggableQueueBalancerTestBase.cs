@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
+using Xunit;
 
 namespace Tester.StreamingTests
 {
@@ -28,8 +28,8 @@ namespace Tester.StreamingTests
 
         private async Task<bool> CheckLeases(ILeaseManagerGrain leaseManager, int siloCount, int expectedResponsibilityPerBalancer, bool lastTry)
         {
-            Dictionary<string,int> responsibilityMap = await leaseManager.GetResponsibilityMap();
-            if(lastTry)
+            Dictionary<string, int> responsibilityMap = await leaseManager.GetResponsibilityMap();
+            if (lastTry)
             {
                 //there should be one StreamQueueBalancer per silo
                 Assert.Equal(responsibilityMap.Count, siloCount);

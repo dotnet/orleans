@@ -67,11 +67,11 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("help")))
+                using (var process = Process.Start(CreateProcessArguments("help")))
                 {
                     process.WaitForExit();
                     StringBuilder help = new();
-                    while(!process.StandardOutput.EndOfStream)
+                    while (!process.StandardOutput.EndOfStream)
                     {
                         help.Append(process.StandardOutput.ReadLine());
                     }
@@ -108,7 +108,7 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("start")))
+                using (var process = Process.Start(CreateProcessArguments("start")))
                 {
                     if (process == null) return false;
                     process.WaitForExit();
@@ -132,7 +132,7 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("stop")))
+                using (var process = Process.Start(CreateProcessArguments("stop")))
                 {
                     process.WaitForExit();
                     return process.ExitCode == 0;

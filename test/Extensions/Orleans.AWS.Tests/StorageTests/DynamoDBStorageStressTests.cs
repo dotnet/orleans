@@ -1,8 +1,8 @@
-using Amazon.DynamoDBv2.Model;
-using Orleans.TestingHost.Utils;
 using System.Diagnostics;
 using System.Globalization;
+using Amazon.DynamoDBv2.Model;
 using AWSUtils.Tests.StorageTests.AWSUtils;
+using Orleans.TestingHost.Utils;
 using Xunit;
 using Xunit.Abstractions;
 

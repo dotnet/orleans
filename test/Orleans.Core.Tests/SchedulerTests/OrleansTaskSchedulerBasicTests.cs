@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
+using Orleans.TestingHost.Utils;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.TestingHost.Utils;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -264,7 +264,7 @@ namespace UnitTests.SchedulerTests
 
             var n = 0;
             var finished = new TaskCompletionSource<int>();
-            var numCompleted = new[] {0};
+            var numCompleted = new[] { 0 };
             var gates = new SemaphoreSlim[10];
             for (var i = 0; i < 10; i++)
             {

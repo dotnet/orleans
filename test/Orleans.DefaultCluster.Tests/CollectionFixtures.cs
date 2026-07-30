@@ -1,4 +1,4 @@
-﻿using TestExtensions;
+using TestExtensions;
 using Xunit;
 
 namespace DefaultCluster.Tests

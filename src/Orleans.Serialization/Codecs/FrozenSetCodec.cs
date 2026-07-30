@@ -1,9 +1,9 @@
 #if NET8_0_OR_GREATER
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
-using System.Collections.Frozen;
-using System.Collections.Generic;
 
 #nullable disable
 namespace Orleans.Serialization.Codecs

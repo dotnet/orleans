@@ -16,7 +16,7 @@ namespace Orleans.TestingHost
     {
         private bool isActive = true;
         private int disposed;
-        
+
         /// <summary>Gets a reference to the silo host.</summary>
         public IHost SiloHost { get; init; }
 

@@ -1,7 +1,7 @@
-using Orleans.Streams;
-using Orleans.Runtime;
-using Orleans.Streams.PubSub;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
+using Orleans.Streams;
+using Orleans.Streams.PubSub;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
 {

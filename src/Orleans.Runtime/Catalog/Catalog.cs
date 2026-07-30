@@ -1,10 +1,10 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
-using System.Diagnostics;
-using Orleans.Diagnostics;
 
 #nullable disable
 namespace Orleans.Runtime
@@ -285,7 +285,7 @@ namespace Orleans.Runtime
                 }
 
                 activation.Deactivate(reason, cancellationToken);
-                return new (activation.Deactivated);
+                return new(activation.Deactivated);
             }).WaitAsync(cancellationToken);
         }
 
@@ -308,7 +308,7 @@ namespace Orleans.Runtime
 
                 var activation = kv.Value;
                 activation.Deactivate(reason, cancellationToken);
-                return new (activation.Deactivated);
+                return new(activation.Deactivated);
             }).WaitAsync(cancellationToken);
         }
 

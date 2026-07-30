@@ -1,8 +1,8 @@
-using Xunit.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.LeaseProviders;
 using TestExtensions.Runners;
-using Orleans.Configuration;
-using Microsoft.Extensions.Options;
+using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Lease
 {
@@ -10,7 +10,7 @@ namespace Tester.AzureUtils.Lease
     public class AzureBlobLeaseProviderTests : GoldenPathLeaseProviderTestRunner
     {
         public AzureBlobLeaseProviderTests(ITestOutputHelper output)
-            :base(CreateLeaseProvider(), output)
+            : base(CreateLeaseProvider(), output)
         {
         }
 

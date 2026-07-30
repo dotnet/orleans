@@ -188,7 +188,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
 
         public bool Acquire(string name)
         {
-            var result = new [] { 0 };
+            var result = new[] { 0 };
             var signal = new ManualResetEventSlim(initialState: false);
             _workItems.Add(() =>
             {

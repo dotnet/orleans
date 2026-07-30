@@ -1,10 +1,10 @@
+using System.Diagnostics;
 using System.Net;
 using System.Threading;
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using static Orleans.Persistence.Cosmos.CosmosIdSanitizer;
-using Orleans.Serialization.Serializers;
 
 namespace Orleans.Persistence.Cosmos;
 

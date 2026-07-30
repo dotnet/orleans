@@ -75,7 +75,7 @@ namespace Orleans.Transactions
             return participant.SupportsRoles(ParticipantId.Role.PriorityManager);
         }
 
-        public static IEnumerable<KeyValuePair<ParticipantId,AccessCounter>> SelectResources(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants)
+        public static IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> SelectResources(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants)
         {
             return participants.Where(p => p.Key.IsResource());
         }

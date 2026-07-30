@@ -1,4 +1,4 @@
-﻿namespace Orleans.Transactions.Abstractions
+namespace Orleans.Transactions.Abstractions
 {
     public interface ITransactionCommitterFactory
     {

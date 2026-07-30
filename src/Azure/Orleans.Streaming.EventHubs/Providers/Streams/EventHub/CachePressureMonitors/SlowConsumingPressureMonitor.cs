@@ -1,6 +1,6 @@
-using Orleans.Providers.Streams.Common;
 using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Providers.Streams.Common;
 
 #nullable disable
 namespace Orleans.Streaming.EventHubs

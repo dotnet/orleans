@@ -1,10 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting.Developer;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ServiceBus.Tests
 {
@@ -36,7 +36,7 @@ namespace ServiceBus.Tests
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddEventDataGeneratorStreams(
                             StreamProviderName,
-                            b=>
+                            b =>
                             {
                                 b.Configure<EventDataGeneratorStreamOptions>(ob => ob.Configure(
                                 options =>

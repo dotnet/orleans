@@ -260,7 +260,8 @@ namespace Tester.AzureUtils
                 AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true);
                 Assert.Equal(HttpStatusCode.Conflict, httpStatusCode);
                 Assert.Equal("EntityAlreadyExists", restStatus);
-            };
+            }
+            ;
         }
 
         [SkippableFact, TestCategory("Functional")]

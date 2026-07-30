@@ -1,7 +1,7 @@
 using System.Diagnostics;
+using BenchmarkGrainInterfaces.GrainStorage;
 using Orleans.TestingHost;
 using TestExtensions;
-using BenchmarkGrainInterfaces.GrainStorage;
 
 namespace Benchmarks.GrainStorage;
 
@@ -105,7 +105,7 @@ public class GrainStorageBenchmark : IDisposable
         await Task.WhenAny(waitTasks);
         running = false;
         var runResults = await runTask;
-        sw.Stop(); 
+        sw.Stop();
         var reports = runResults.SelectMany(r => r).ToList();
 
         var stored = reports.Count(r => r.Success);

@@ -1,10 +1,10 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
-using Orleans.CodeGenerator.Diagnostics;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
 
 #nullable disable
 namespace Orleans.CodeGenerator
@@ -112,7 +112,7 @@ namespace Orleans.CodeGenerator
 
         public string Name { get; }
         public INamedTypeSymbol InterfaceType { get; }
-        public List<ProxyMethodDescription> Methods => _methods ??= GetMethods(); 
+        public List<ProxyMethodDescription> Methods => _methods ??= GetMethods();
         public SemanticModel SemanticModel { get; }
         public string GeneratedNamespace { get; }
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
@@ -196,7 +196,7 @@ namespace Orleans.CodeGenerator
                     throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
                 }
             }
-            
+
             static void ValidateNonGenericInvokeAsync(LibraryTypes l, INamedTypeSymbol baseClass)
             {
                 var found = false;

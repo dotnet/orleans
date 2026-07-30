@@ -171,15 +171,13 @@ namespace UnitTests
             var fontResourceName = assembly
                 .GetManifestResourceNames()
                 .FirstOrDefault(name =>
-                    name.EndsWith(".woff2", StringComparison.Ordinal) ||
-                    name.EndsWith(".woff", StringComparison.Ordinal));
+                    name.StartsWith($"{ResourcePrefix}fonts.", StringComparison.Ordinal) &&
+                    (name.EndsWith(".woff2", StringComparison.Ordinal) ||
+                     name.EndsWith(".woff", StringComparison.Ordinal)));
 
             Assert.NotNull(fontResourceName);
 
-            var resourcePrefix = typeof(EmbeddedAssetProvider).Namespace + ".";
-            var assetName = fontResourceName.StartsWith(resourcePrefix, StringComparison.Ordinal)
-                ? fontResourceName.Substring(resourcePrefix.Length)
-                : fontResourceName;
+            var assetName = fontResourceName.Substring(ResourcePrefix.Length);
 
             var result = provider.ServeAsset(assetName, httpContext);
             Assert.IsNotType<NotFound>(result);

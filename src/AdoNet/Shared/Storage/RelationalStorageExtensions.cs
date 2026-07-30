@@ -54,12 +54,12 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>The rows affected.</returns>
         public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true, CancellationToken cancellationToken = default)
         {
-            if(string.IsNullOrWhiteSpace(tableName))
+            if (string.IsNullOrWhiteSpace(tableName))
             {
                 throw new ArgumentException("The name must be a legal SQL table name", nameof(tableName));
             }
 
-            if(parameters == null)
+            if (parameters == null)
             {
                 throw new ArgumentNullException(nameof(parameters));
             }
@@ -76,7 +76,7 @@ namespace Orleans.Tests.SqlUtils
             const string insertIntoValuesTemplate = "INSERT INTO {0} ({1}) SELECT {2};";
             var columns = string.Empty;
             var values = new List<string>();
-            if(parameters.Any())
+            if (parameters.Any())
             {
                 //Type and property information are the same for all of the objects.
                 //The following assumes the property names will be retrieved in the same
@@ -88,11 +88,11 @@ namespace Orleans.Tests.SqlUtils
                 {
                     var onlyOnceProperties = properties.Where(pn => onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
                     var onlyOnceData = parameters.First();
-                    for(int i = 0; i < onlyOnceProperties.Length; ++i)
+                    for (int i = 0; i < onlyOnceProperties.Length; ++i)
                     {
                         var currentProperty = onlyOnceProperties[i];
                         var parameterValue = currentProperty.GetValue(onlyOnceData, null);
-                        if(useSqlParams)
+                        if (useSqlParams)
                         {
                             var parameterName = string.Format("@{0}", (nameMap.TryGetValue(onlyOnceProperties[i].Name, out var parameter) ? parameter : onlyOnceProperties[i].Name));
                             onlyOnceRow.Add(parameterName);
@@ -108,13 +108,13 @@ namespace Orleans.Tests.SqlUtils
                 var dataRows = new List<string>();
                 var multiProperties = onlyOnceColumns == null ? properties : properties.Where(pn => !onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
                 int parameterCount = 0;
-                foreach(var row in parameters)
+                foreach (var row in parameters)
                 {
-                    for(int i = 0; i < multiProperties.Length; ++i)
+                    for (int i = 0; i < multiProperties.Length; ++i)
                     {
                         var currentProperty = multiProperties[i];
                         var parameterValue = currentProperty.GetValue(row, null);
-                        if(useSqlParams)
+                        if (useSqlParams)
                         {
                             var parameterName = string.Format(indexedParameterTemplate, parameterCount);
                             dataRows.Add(parameterName);
@@ -159,9 +159,18 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="parameterProvider"></param>
         /// <typeparam name="TResult"></typeparam>
         /// <returns></returns>
-        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, Func<IDataRecord, TResult> selector, Action<IDbCommand> parameterProvider)
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(
+            this IRelationalStorage storage,
+            string query,
+            Func<IDataRecord, TResult> selector,
+            Action<IDbCommand> parameterProvider,
+            CancellationToken cancellationToken = default)
         {
-            return storage.ReadAsync(query, parameterProvider, (record, i, cancellationToken) => Task.FromResult(selector(record)));
+            return storage.ReadAsync(
+                query,
+                parameterProvider,
+                (record, i, token) => Task.FromResult(selector(record)),
+                cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -266,7 +275,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         public static Stream GetStream(this DbDataReader reader, int ordinal, IRelationalStorage storage)
         {
-            if(storage.SupportsStreamNatively())
+            if (storage.SupportsStreamNatively())
             {
                 return reader.GetStream(ordinal);
             }

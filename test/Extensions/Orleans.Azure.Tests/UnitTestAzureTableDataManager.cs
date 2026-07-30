@@ -1,10 +1,10 @@
 using System.Text;
-using Microsoft.Extensions.Logging;
-using Orleans.Internal;
-using Orleans.Clustering.AzureStorage;
-using Microsoft.Extensions.Logging.Abstractions;
-using Azure.Data.Tables;
 using Azure;
+using Azure.Data.Tables;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Clustering.AzureStorage;
+using Orleans.Internal;
 
 namespace Tester.AzureUtils
 {

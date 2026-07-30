@@ -1,18 +1,18 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO.Pipelines;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using Orleans;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.Utilities;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO.Pipelines;
-using Xunit;
-using System.Linq;
 using UnitTests.SerializerExternalModels;
-using Orleans;
+using Xunit;
 
 [assembly: GenerateCodeForDeclaringAssembly(typeof(Person2ExternalStruct))]
 #if NET6_0_OR_GREATER
@@ -348,7 +348,7 @@ public class GeneratedSerializerTests : IDisposable
         // Note that this only works because we are serializing each object using the "expected type" optimization and
         // therefore omitting the concrete type names.
         var originalAsArray = _serializer.SerializeToArray(original);
-        var classVersion = new Person5_Class { Age = 2,  Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
+        var classVersion = new Person5_Class { Age = 2, Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
         var classAsArray = _serializer.SerializeToArray(classVersion);
         Assert.Equal(originalAsArray, classAsArray);
     }
@@ -379,7 +379,7 @@ public class GeneratedSerializerTests : IDisposable
     public void GeneratedSerializersRoundTripThroughSerializer_ImmutableStruct()
     {
         var original = new ImmutableStruct(30, 2);
-         var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
+        var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
 
         Assert.Equal(original.GetIntField(), result.GetIntField());
         Assert.Equal(original.IntProperty, result.IntProperty);

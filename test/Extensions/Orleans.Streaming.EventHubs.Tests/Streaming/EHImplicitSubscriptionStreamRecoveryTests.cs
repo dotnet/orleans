@@ -41,7 +41,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
@@ -64,7 +64,7 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.AddEventHubStreams(StreamProviderName, b=>
+                    clientBuilder.AddEventHubStreams(StreamProviderName, b =>
                     {
                         b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                         b.ConfigureEventHub(ob => ob.Configure(options =>

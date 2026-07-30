@@ -54,7 +54,7 @@ namespace UnitTests.Directory
             grainDirectoryOptions = Options.Create(new GrainDirectoryOptions());
             this.grainLocator = new CachedGrainLocator(
                 services,
-                this.grainDirectoryResolver, 
+                this.grainDirectoryResolver,
                 this.mockMembershipService.Target,
                 CreateDirectoryInstruments(),
                 grainDirectoryOptions);
@@ -680,7 +680,7 @@ namespace UnitTests.Directory
 
         [Fact]
         public async Task UnregisterRemovesFromCacheFirst()
-        {            
+        {
             var expectedSilo = GenerateSiloAddress();
 
             // Setup membership service
@@ -691,7 +691,7 @@ namespace UnitTests.Directory
             var expectedAddr = GenerateGrainAddress(expectedSilo);
 
             // Give up control then Run forever
-            this.grainDirectory.Unregister(expectedAddr).Returns(async (t) => { await Task.Yield();  while (true) { } });
+            this.grainDirectory.Unregister(expectedAddr).Returns(async (t) => { await Task.Yield(); while (true) { } });
 
             this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(expectedAddr);
 

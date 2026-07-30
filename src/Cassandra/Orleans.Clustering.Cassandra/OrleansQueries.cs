@@ -1,8 +1,8 @@
 using System;
-using Cassandra;
-using Orleans.Runtime;
 using System.Linq;
 using System.Threading.Tasks;
+using Cassandra;
+using Orleans.Runtime;
 
 namespace Orleans.Clustering.Cassandra;
 
@@ -163,7 +163,7 @@ internal sealed class OrleansQueries
           WITH compression = { 'class' : 'LZ4Compressor', 'enabled' : true }
             AND default_time_to_live = {{defaultTimeToLiveSeconds.GetValueOrDefault(0)}};
           """);
-    
+
     public IStatement EnsureIndexExists => new SimpleStatement("""
             CREATE INDEX IF NOT EXISTS ix_membership_status ON membership(status);
             """);

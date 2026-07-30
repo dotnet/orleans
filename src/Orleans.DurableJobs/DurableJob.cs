@@ -16,31 +16,31 @@ public sealed class DurableJob
     /// </summary>
     [Id(0)]
     public required string Id { get; init; }
-    
+
     /// <summary>
     /// Gets the name of the durable job.
     /// </summary>
     [Id(1)]
     public required string Name { get; init; }
-    
+
     /// <summary>
     /// Gets the time when this job is due to be executed.
     /// </summary>
     [Id(2)]
     public DateTimeOffset DueTime { get; init; }
-    
+
     /// <summary>
     /// Gets the identifier of the target grain that will handle this job.
     /// </summary>
     [Id(3)]
     public GrainId TargetGrainId { get; init; }
-    
+
     /// <summary>
     /// Gets the identifier of the shard that manages this durable job.
     /// </summary>
     [Id(4)]
     public required string ShardId { get; init; }
-    
+
     /// <summary>
     /// Gets optional metadata associated with this durable job.
     /// </summary>
@@ -60,4 +60,10 @@ public sealed class DurableJob
     /// </summary>
     [Id(7)]
     public string? TraceState { get; init; }
+
+    /// <summary>
+    /// Gets the priority used to order this job relative to other jobs with the same due time.
+    /// </summary>
+    [Id(8)]
+    public int Priority { get; init; }
 }

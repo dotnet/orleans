@@ -50,18 +50,18 @@ namespace UnitTests
         internal static async Task<TResult> RetryOnExceptionAsync<TResult>(int maxAttempts, Func<int, TimeSpan> retryFunction, Func<Task<TResult>> operation, CancellationToken cancellation = default)
         {
             const int MinAttempts = 1;
-            if(maxAttempts <= MinAttempts)
+            if (maxAttempts <= MinAttempts)
             {
                 throw new ArgumentOutOfRangeException(nameof(maxAttempts), $"The count of {maxAttempts} needs to be at least {MinAttempts}.");
             }
 
-            if(operation == null)
+            if (operation == null)
             {
                 throw new ArgumentNullException(nameof(operation));
             }
 
             var attempts = 0;
-            while(true)
+            while (true)
             {
                 try
                 {
@@ -70,9 +70,9 @@ namespace UnitTests
                     attempts++;
                     return await operation().ConfigureAwait(false);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
-                    if(attempts == maxAttempts)
+                    if (attempts == maxAttempts)
                     {
                         throw;
                     }

@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
-using Orleans.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;

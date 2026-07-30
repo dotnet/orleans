@@ -37,8 +37,8 @@ namespace UnitTests.Directory
         [Fact]
         public async Task SingleDeactivation()
         {
-            foreach (var cause in (UnregistrationCause[]) Enum.GetValues(typeof(UnregistrationCause)))
-             {
+            foreach (var cause in (UnregistrationCause[])Enum.GetValues(typeof(UnregistrationCause)))
+            {
                 var activationAddress = GenerateActivationAddress();
 
                 await this.target.Unregister(activationAddress, cause);

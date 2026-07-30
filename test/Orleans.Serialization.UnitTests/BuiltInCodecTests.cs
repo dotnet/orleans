@@ -611,7 +611,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string,string, string, string, string>, TupleCodec<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Tuple<string, string, string, string, string, string>, TupleCodec<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override Tuple<string, string, string, string, string, string> CreateValue() => Tuple.Create(
             Guid.NewGuid().ToString(),
@@ -631,7 +631,7 @@ namespace Orleans.Serialization.UnitTests
         ];
     }
 
-    public class Tuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string,string, string, string, string>, TupleCopier<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class Tuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Tuple<string, string, string, string, string, string>, TupleCopier<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override Tuple<string, string, string, string, string, string> CreateValue() => Tuple.Create(
             Guid.NewGuid().ToString(),
@@ -747,14 +747,14 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override ValueTuple CreateValue() => default;
 
-        protected override ValueTuple[] TestValues => [ default ];
+        protected override ValueTuple[] TestValues => [default];
     }
 
     public class ValueTupleCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple, ValueTupleCopier>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override ValueTuple CreateValue() => default;
 
-        protected override ValueTuple[] TestValues => [ default ];
+        protected override ValueTuple[] TestValues => [default];
     }
 
     public class ValueTuple1Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string>, ValueTupleCodec<string>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -919,7 +919,7 @@ namespace Orleans.Serialization.UnitTests
         ];
     }
 
-    public class ValueTuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string,string, string, string, string>, ValueTupleCodec<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple6Tests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ValueTuple<string, string, string, string, string, string>, ValueTupleCodec<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override ValueTuple<string, string, string, string, string, string> CreateValue() => ValueTuple.Create(
             Guid.NewGuid().ToString(),
@@ -939,7 +939,7 @@ namespace Orleans.Serialization.UnitTests
         ];
     }
 
-    public class ValueTuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string,string, string, string, string>, ValueTupleCopier<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
+    public class ValueTuple6CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ValueTuple<string, string, string, string, string, string>, ValueTupleCopier<string, string, string, string, string, string>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         protected override ValueTuple<string, string, string, string, string, string> CreateValue() => ValueTuple.Create(
             Guid.NewGuid().ToString(),
@@ -1320,7 +1320,7 @@ namespace Orleans.Serialization.UnitTests
 #if NET7_0_OR_GREATER
     public class UInt128CodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<UInt128, UInt128Codec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override UInt128 CreateValue() => new (unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override UInt128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override UInt128[] TestValues =>
         [
@@ -1338,12 +1338,12 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         ];
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.Item1, value.Item2)));
     }
 
     public class UInt128CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<UInt128, IDeepCopier<UInt128>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override UInt128 CreateValue() => new (unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override UInt128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override UInt128[] TestValues =>
         [
@@ -1361,14 +1361,14 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         ];
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.Item1, value.Item2)));
     }
 #endif
 
     public class BigIntegerCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<BigInteger, BigIntegerCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         // New behavior in .NET 9: https://learn.microsoft.com/en-us/dotnet/core/compatibility/core-libraries/9.0/biginteger-limit#new-behavior
-        protected override int[] MaxSegmentSizes => [(2^31)-1];
+        protected override int[] MaxSegmentSizes => [(2 ^ 31) - 1];
 
         protected override BigInteger CreateValue()
         {
@@ -1626,7 +1626,7 @@ namespace Orleans.Serialization.UnitTests
 #if NET7_0_OR_GREATER
     public class Int128CodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<Int128, Int128Codec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
-        protected override Int128 CreateValue() => new (unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override Int128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override Int128[] TestValues =>
         [
@@ -1644,7 +1644,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         ];
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.Item1, value.Item2)));
     }
 
     public class Int128CopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Int128, IDeepCopier<Int128>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -1667,7 +1667,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         ];
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.Item1, value.Item2)));
     }
 #endif
 

@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 
@@ -228,14 +228,14 @@ namespace Orleans.Transactions
                         : throw new ArgumentOutOfRangeException(nameof(participants), "Only one priority transaction manager allowed in transaction");
                 }
                 // resource
-                if(id.IsResource())
+                if (id.IsResource())
                 {
-                    if(resources == null)
+                    if (resources == null)
                     {
                         resources = new List<KeyValuePair<ParticipantId, AccessCounter>>();
                     }
                     resources.Add(participant);
-                    if(participant.Value.Writes > 0)
+                    if (participant.Value.Writes > 0)
                     {
                         if (writers == null)
                         {

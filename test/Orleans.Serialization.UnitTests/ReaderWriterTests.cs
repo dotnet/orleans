@@ -1,18 +1,18 @@
-using CsCheck;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
-using Orleans.Serialization.Session;
-using Orleans.Serialization.TestKit;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
+using CsCheck;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.TestKit;
+using Orleans.Serialization.WireProtocol;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.WireProtocol;
-using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.UnitTests
 {

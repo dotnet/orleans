@@ -26,4 +26,14 @@ public interface IDurableJobGrain : IGrainWithStringKey
     Task<bool> WasCancellationTokenCancelled(string jobId);
 
     Task<string> GetJobTraceId(string jobId);
+
+    Task<DurableJob> ScheduleBlockingJobAsync(DateTimeOffset scheduledTime);
+
+    [AlwaysInterleave]
+    Task WaitForBlockingJobToStart();
+
+    Task<bool> EnterNormalTurn();
+
+    [AlwaysInterleave]
+    Task ReleaseBlockingJob();
 }

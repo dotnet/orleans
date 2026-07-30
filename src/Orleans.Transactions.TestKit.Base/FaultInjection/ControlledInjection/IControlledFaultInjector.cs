@@ -1,4 +1,4 @@
-﻿namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit
 {
     public interface IControlledTransactionFaultInjector : ITransactionFaultInjector
     {

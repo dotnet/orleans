@@ -8,7 +8,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    #nullable disable
+#nullable disable
     [DebuggerDisplay("{MethodDescription}")]
     internal sealed class GeneratedInvokableDescription : ISerializableTypeDescription
     {

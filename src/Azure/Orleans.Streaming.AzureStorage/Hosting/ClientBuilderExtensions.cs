@@ -25,7 +25,7 @@ namespace Orleans.Hosting
         public static IClientBuilder AddAzureQueueStreams(this IClientBuilder builder,
             string name, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
         {
-            builder.AddAzureQueueStreams(name, b=>
+            builder.AddAzureQueueStreams(name, b =>
                  b.ConfigureAzureQueue(configureOptions));
             return builder;
         }

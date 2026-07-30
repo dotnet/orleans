@@ -1,10 +1,10 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
-using System;
 
 #nullable disable
 namespace Orleans.Serialization;
@@ -14,7 +14,7 @@ namespace Orleans.Serialization;
 /// </summary>
 public static class SerializationHostingExtensions
 {
-    private static readonly ServiceDescriptor ServiceDescriptor = new (typeof(NewtonsoftJsonCodec), typeof(NewtonsoftJsonCodec));
+    private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(NewtonsoftJsonCodec), typeof(NewtonsoftJsonCodec));
 
     /// <summary>
     /// Adds support for serializing and deserializing values using <see cref="JsonSerializer"/>.

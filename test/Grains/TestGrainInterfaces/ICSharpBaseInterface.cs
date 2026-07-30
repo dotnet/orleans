@@ -1,4 +1,4 @@
-﻿namespace UnitTests.Interfaces
+namespace UnitTests.Interfaces
 {
     public interface ICSharpBaseInterface
     {

@@ -318,7 +318,7 @@ namespace UnitTests.Serialization
             {
                 _grainAddressCodec = grainAddressCodec;
             }
-            
+
             internal List<GrainAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
             {
                 var n = (int)reader.ReadVarUInt32();

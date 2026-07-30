@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Scheduler;
 using Orleans.Internal;
+using Orleans.Runtime.Scheduler;
 using Xunit;
 using Xunit.Abstractions;
 

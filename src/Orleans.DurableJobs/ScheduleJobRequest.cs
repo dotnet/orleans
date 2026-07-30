@@ -10,6 +10,12 @@ namespace Orleans.DurableJobs;
 public readonly struct ScheduleJobRequest
 {
     /// <summary>
+    /// Gets an optional caller-defined idempotency key. Repeating an equivalent request with the same target and key
+    /// returns the existing job instead of scheduling a duplicate.
+    /// </summary>
+    public string? IdempotencyKey { get; init; }
+
+    /// <summary>
     /// Gets the grain identifier of the target grain that will receive the durable job.
     /// </summary>
     public required GrainId Target { get; init; }
@@ -23,6 +29,11 @@ public readonly struct ScheduleJobRequest
     /// Gets the date and time when the job should be executed.
     /// </summary>
     public required DateTimeOffset DueTime { get; init; }
+
+    /// <summary>
+    /// Gets the priority used to order jobs which have the same due time. Higher values run first.
+    /// </summary>
+    public int Priority { get; init; }
 
     /// <summary>
     /// Gets optional metadata associated with the job.

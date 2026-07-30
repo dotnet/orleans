@@ -1,10 +1,10 @@
-using DistributedTests.Server.Configurator;
-using Microsoft.Extensions.Hosting;
-using Orleans.Configuration;
-using DistributedTests.Common.MessageChannel;
-using Microsoft.Extensions.Logging;
 using Azure.Identity;
 using DistributedTests.Common;
+using DistributedTests.Common.MessageChannel;
+using DistributedTests.Server.Configurator;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace DistributedTests.Server
 {

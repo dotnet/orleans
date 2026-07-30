@@ -4,7 +4,7 @@ namespace Orleans.CodeGenerator.Diagnostics;
 
 public static class IncorrectProxyBaseClassSpecificationDiagnostic
 {
-    public const string RuleId = DiagnosticRuleId.IncorrectProxyBaseClassSpecification; 
+    public const string RuleId = DiagnosticRuleId.IncorrectProxyBaseClassSpecification;
     private const string Category = "Usage";
     private static readonly LocalizableString Title = "The proxy base class specified is not a valid proxy base class";
     private static readonly LocalizableString MessageFormat = "Proxy base class {0} does not conform to requirements: {1}";

@@ -18,7 +18,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class PromiseForwardGrain : Grain<SimpleGrainState>, IPromiseForwardGrain
     {
-        protected  ISimpleGrain MySimpleGrain { get; set; }
+        protected ISimpleGrain MySimpleGrain { get; set; }
         protected int b = 0;
         public Task<int> GetAxB_Async()
         {
@@ -69,10 +69,10 @@ namespace UnitTests.Grains
         {
             return GetSimpleGrain().GetA();
         }
-        
+
         private ISimpleGrain GetSimpleGrain()
         {
-            if( MySimpleGrain == null )
+            if (MySimpleGrain == null)
                 MySimpleGrain = GrainFactory.GetGrain<ISimpleGrain>((new Random()).Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             return MySimpleGrain;

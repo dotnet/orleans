@@ -1,6 +1,6 @@
 using Orleans.TestingHost;
-using TestExtensions;
 using Tester.AzureUtils;
+using TestExtensions;
 using UnitTests.Grains.Directories;
 
 namespace Tester.Directories

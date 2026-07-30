@@ -6,8 +6,8 @@ using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
-using Orleans.Serialization.WireProtocol;
 using Orleans.Serialization.Serializers;
+using Orleans.Serialization.WireProtocol;
 
 #nullable disable
 namespace Orleans.Serialization.Codecs;

@@ -1,14 +1,14 @@
-using BenchmarkDotNet.Attributes;
-using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
 using System.Globalization;
 using System.IO.Pipelines;
+using BenchmarkDotNet.Attributes;
+using Benchmarks.Serialization.Utilities;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Session;
 using Xunit;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
-using Benchmarks.Serialization.Utilities;
 
 namespace Benchmarks.Serialization;
 
@@ -32,7 +32,7 @@ public class MegaGraphBenchmark
         {
             Value[i.ToString(CultureInfo.InvariantCulture)] = i;
         }
-        
+
         var services = new ServiceCollection()
             .AddSerializer()
             .BuildServiceProvider();

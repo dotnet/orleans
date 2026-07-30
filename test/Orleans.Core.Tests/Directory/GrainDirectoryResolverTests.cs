@@ -6,8 +6,8 @@ using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Hosting;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Hosting;
 using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
 using UnitTests.Grains.Directories;
@@ -64,7 +64,7 @@ namespace NonSilo.Tests.Directory
         [Fact]
         public void ListAllDirectories()
         {
-            
+
             var expected = new[] { this.azureDirectory, this.otherDirectory, this.againAnotherDirectory };
             Assert.Equal(expected, this.target.Directories.ToArray());
         }

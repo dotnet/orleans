@@ -28,8 +28,8 @@ namespace Orleans.Runtime.Versions.Compatibility
         public ICompatibilityDirector GetDirector(GrainInterfaceType interfaceType)
         {
             ICompatibilityDirector director;
-            return compatibilityDirectors.TryGetValue(interfaceType, out director) 
-                ? director 
+            return compatibilityDirectors.TryGetValue(interfaceType, out director)
+                ? director
                 : Default;
         }
         public void SetStrategy(CompatibilityStrategy strategy)

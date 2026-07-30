@@ -205,11 +205,11 @@ public static class StreamingEvents
     }
 
     /// <summary>
-     /// Event payload for when a stream subscription is removed.
-     /// </summary>
-     /// <param name="streamProvider">The name of the stream provider.</param>
-     /// <param name="streamId">The stream ID.</param>
-     /// <param name="subscriptionId">The subscription ID.</param>
+    /// Event payload for when a stream subscription is removed.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="subscriptionId">The subscription ID.</param>
     /// <param name="siloAddress">The address of the silo that handled this subscription.</param>
     public sealed class SubscriptionRemoved(
         string streamProvider,
@@ -349,8 +349,8 @@ public static class StreamingEvents
     }
 
     /// <summary>
-     /// Event payload for when an individual item from a stream batch is delivered to a consumer.
-     /// </summary>
+    /// Event payload for when an individual item from a stream batch is delivered to a consumer.
+    /// </summary>
     /// <param name="streamProvider">The name of the stream provider.</param>
     /// <param name="streamId">The stream ID.</param>
     /// <param name="subscriptionId">The subscription ID of the consumer.</param>

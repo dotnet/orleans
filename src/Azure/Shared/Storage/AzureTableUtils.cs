@@ -12,6 +12,8 @@ using Azure.Data.Tables.Models;
 #nullable disable
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
+#elif ADVANCED_REMINDERS_AZURE
+namespace Orleans.AdvancedReminders.AzureStorage
 #elif ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.AzureStorage
 #elif ORLEANS_REMINDERS

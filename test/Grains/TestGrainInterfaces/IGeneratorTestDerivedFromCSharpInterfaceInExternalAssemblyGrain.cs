@@ -1,4 +1,4 @@
-﻿using UnitTests.Interfaces;
+using UnitTests.Interfaces;
 
 namespace UnitTests.GrainInterfaces
 {

@@ -1,12 +1,12 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal interface IPropertyDescription : IMemberDescription 
+    internal interface IPropertyDescription : IMemberDescription
     {
     }
 

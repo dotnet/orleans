@@ -32,7 +32,7 @@ namespace Tester.StreamingTests
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b => b
                     .ConfigurePartitioning(partitionCount));
             }
 
@@ -40,7 +40,7 @@ namespace Tester.StreamingTests
             {
                 public void Configure(ISiloBuilder hostBuilder) => hostBuilder
                     .AddMemoryGrainStorage("PubSubStore")
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b => b
                     .ConfigurePartitioning(partitionCount));
             }
         }
@@ -65,7 +65,7 @@ namespace Tester.StreamingTests
                 .ToList();
 
             // subscribe to all streams
-            foreach(Guid streamId in streamIds)
+            foreach (Guid streamId in streamIds)
             {
                 IStreamProvider streamProvider = this.fixture.Client.GetStreamProvider(Fixture.StreamProviderName);
                 IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamId);

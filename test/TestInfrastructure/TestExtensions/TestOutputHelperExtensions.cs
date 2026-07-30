@@ -1,4 +1,4 @@
-﻿namespace Xunit.Abstractions
+namespace Xunit.Abstractions
 {
     public static class TestOutputHelperExtensions
     {

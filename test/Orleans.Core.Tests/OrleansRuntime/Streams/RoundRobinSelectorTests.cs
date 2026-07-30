@@ -1,7 +1,7 @@
+using System.Data;
+using Orleans.Streams;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Streams;
-using System.Data;
 
 namespace UnitTests.OrleansRuntime.Streams
 {

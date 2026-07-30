@@ -1,13 +1,13 @@
-using Orleans.Providers;
-using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
-using StackExchange.Redis;
 using System;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Providers;
+using StackExchange.Redis;
 
 #nullable disable
 [assembly: RegisterProvider("Redis", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]

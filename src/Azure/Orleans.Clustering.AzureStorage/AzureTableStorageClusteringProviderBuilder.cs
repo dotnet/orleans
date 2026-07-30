@@ -25,7 +25,7 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
                 var tableName = configurationSection["TableName"];
                 if (!string.IsNullOrEmpty(tableName))
                 {
-                    options.TableName = tableName; 
+                    options.TableName = tableName;
                 }
 
                 var serviceKey = configurationSection["ServiceKey"];
@@ -68,7 +68,7 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
                 var tableName = configurationSection["TableName"];
                 if (!string.IsNullOrEmpty(tableName))
                 {
-                    options.TableName = tableName; 
+                    options.TableName = tableName;
                 }
 
                 var serviceKey = configurationSection["ServiceKey"];

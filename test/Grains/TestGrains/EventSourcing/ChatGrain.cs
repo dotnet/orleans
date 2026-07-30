@@ -1,6 +1,6 @@
+using System.Xml.Linq;
 using Orleans.EventSourcing;
 using Orleans.Providers;
-using System.Xml.Linq;
 using TestGrainInterfaces;
 
 namespace TestGrains
@@ -70,7 +70,7 @@ namespace TestGrains
 
         public Task Edit(Guid guid, string text)
         {
-            RaiseEvent(new EditedEvent() { Guid = guid, Text = text});
+            RaiseEvent(new EditedEvent() { Guid = guid, Text = text });
             return Task.CompletedTask;
         }
     }

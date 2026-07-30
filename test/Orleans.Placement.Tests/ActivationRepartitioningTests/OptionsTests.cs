@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
 using Orleans.Configuration;
+using Orleans.Runtime;
 using Xunit;
 
 namespace UnitTests.ActivationRepartitioningTests;

@@ -1,11 +1,11 @@
-using Orleans.Providers;
+using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.Providers;
 using StackExchange.Redis;
-using System;
-using Microsoft.Extensions.DependencyInjection;
-using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "Streaming", "Silo", typeof(RedisStreamingProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Streaming", "Silo", typeof(RedisStreamingProviderBuilder))]

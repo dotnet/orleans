@@ -1,4 +1,4 @@
-﻿namespace DistributedTests.GrainInterfaces;
+namespace DistributedTests.GrainInterfaces;
 
 public interface ITreeGrain : IGrainWithIntegerCompoundKey
 {

@@ -65,7 +65,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>  options.ConfigureTestDefaults());
+                hostBuilder.UseAzureStorageClustering(options => options.ConfigureTestDefaults());
             }
         }
 

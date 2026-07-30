@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration.Internal;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
@@ -365,6 +366,99 @@ public class JournaledJobShardManagerTests
     }
 
     [Fact]
+    public async Task PoisonedShard_IsQuarantinedThenBecomesRecoverable()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var timeProvider = new FakeTimeProvider(now);
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider, timeProvider);
+        var membership = new TestClusterMembershipService();
+        var silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5032), 0);
+        var silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5033), 0);
+        membership.SetSiloStatus(silo1, SiloStatus.Active);
+        membership.SetSiloStatus(silo2, SiloStatus.Active);
+        var options = new DurableJobsOptions
+        {
+            MaxAdoptedCount = 0,
+            AdoptionFailureWindow = TimeSpan.FromMinutes(10),
+        };
+        var manager1 = CreateManager(services, membership, silo1, options);
+        var manager2 = CreateManager(services, membership, silo2, options);
+        var shard = await manager1.CreateShardAsync(
+            now.AddMinutes(-1),
+            now.AddHours(1),
+            new Dictionary<string, string> { ["Purpose"] = "TimedPoisonRecovery" },
+            CancellationToken.None);
+        _ = await shard.TryScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("type", "timed-poison-recovery"),
+            JobName = "timed-poison-recovery",
+            DueTime = now.AddSeconds(-1),
+        }, CancellationToken.None);
+        membership.SetSiloStatus(silo1, SiloStatus.Dead);
+
+        Assert.Empty(await manager2.AssignJobShardsAsync(now.AddHours(1), int.MaxValue, CancellationToken.None));
+        timeProvider.Advance(TimeSpan.FromMinutes(9));
+        Assert.Empty(await manager2.AssignJobShardsAsync(now.AddHours(1), int.MaxValue, CancellationToken.None));
+
+        timeProvider.Advance(TimeSpan.FromMinutes(2));
+        var recovered = Assert.Single(await manager2.AssignJobShardsAsync(now.AddHours(1), int.MaxValue, CancellationToken.None));
+
+        Assert.True(recovered.IsAddingCompleted);
+        Assert.Equal(silo2, await manager2.GetShardOwnerAsync(recovered.Id, CancellationToken.None));
+        await DrainAndUnregisterAsync(manager2, recovered);
+        await shard.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task AdoptionCount_ResetsWhenFailuresAreOutsideConfiguredWindow()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var timeProvider = new FakeTimeProvider(now);
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider, timeProvider);
+        var membership = new TestClusterMembershipService();
+        var silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5034), 0);
+        var silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5035), 0);
+        var silo3 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5036), 0);
+        membership.SetSiloStatus(silo1, SiloStatus.Active);
+        membership.SetSiloStatus(silo2, SiloStatus.Active);
+        membership.SetSiloStatus(silo3, SiloStatus.Active);
+        var options = new DurableJobsOptions
+        {
+            MaxAdoptedCount = 1,
+            AdoptionFailureWindow = TimeSpan.FromMinutes(10),
+        };
+        var manager1 = CreateManager(services, membership, silo1, options);
+        var manager2 = CreateManager(services, membership, silo2, options);
+        var manager3 = CreateManager(services, membership, silo3, options);
+        var shard = await manager1.CreateShardAsync(
+            now.AddMinutes(-1),
+            now.AddHours(1),
+            new Dictionary<string, string> { ["Purpose"] = "AdoptionWindowReset" },
+            CancellationToken.None);
+        _ = await shard.TryScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("type", "adoption-window-reset"),
+            JobName = "adoption-window-reset",
+            DueTime = now.AddSeconds(-1),
+        }, CancellationToken.None);
+
+        membership.SetSiloStatus(silo1, SiloStatus.Dead);
+        var firstAdoption = Assert.Single(await manager2.AssignJobShardsAsync(now.AddHours(1), int.MaxValue, CancellationToken.None));
+        membership.SetSiloStatus(silo2, SiloStatus.Dead);
+        timeProvider.Advance(TimeSpan.FromMinutes(11));
+
+        var secondAdoption = Assert.Single(await manager3.AssignJobShardsAsync(now.AddHours(1), int.MaxValue, CancellationToken.None));
+
+        Assert.Equal(firstAdoption.Id, secondAdoption.Id);
+        Assert.Equal(silo3, await manager3.GetShardOwnerAsync(secondAdoption.Id, CancellationToken.None));
+        await DrainAndUnregisterAsync(manager3, secondAdoption);
+        await firstAdoption.DisposeAsync();
+        await shard.DisposeAsync();
+    }
+
+    [Fact]
     public async Task LiveLocalShard_IsReturnedAndRemainsWritable()
     {
         var storageProvider = new VolatileJournalStorageProvider();
@@ -504,13 +598,13 @@ public class JournaledJobShardManagerTests
         }
     }
 
-    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider)
+    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider timeProvider = null)
     {
         var builder = new TestSiloBuilder();
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
-        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(timeProvider ?? TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
         builder.Services.AddSingleton((IJournalStorageCatalog)storageProvider);

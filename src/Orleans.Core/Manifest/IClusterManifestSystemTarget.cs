@@ -54,6 +54,6 @@ namespace Orleans.Runtime
         /// Gets a value indicating whether this update includes all active servers.
         /// </summary>
         [Id(2)]
-        public bool IncludesAllActiveServers { get; } 
+        public bool IncludesAllActiveServers { get; }
     }
 }

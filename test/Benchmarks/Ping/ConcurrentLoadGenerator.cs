@@ -1,5 +1,5 @@
-using System.Threading.Channels;
 using System.Diagnostics;
+using System.Threading.Channels;
 
 namespace Benchmarks.Ping;
 

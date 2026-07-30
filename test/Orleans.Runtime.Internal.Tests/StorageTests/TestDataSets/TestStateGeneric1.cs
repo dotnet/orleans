@@ -1,11 +1,11 @@
-﻿namespace UnitTests.StorageTests.Relational.TestDataSets
+namespace UnitTests.StorageTests.Relational.TestDataSets
 {
     /// <summary>
     /// A generic state used to test if saving, reading and clearing of the storage functions as expected.
     /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class TestStateGeneric1<T>: IEquatable<TestStateGeneric1<T>>
+    public class TestStateGeneric1<T> : IEquatable<TestStateGeneric1<T>>
     {
         [Orleans.Id(0)]
         public T SomeData { get; set; }
@@ -28,7 +28,7 @@
 
         public bool Equals(TestStateGeneric1<T> other)
         {
-            if(ReferenceEquals(other, null))
+            if (ReferenceEquals(other, null))
             {
                 return false;
             }

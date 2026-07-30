@@ -1,14 +1,14 @@
-using Microsoft.CodeAnalysis;
-using Orleans.CodeGenerator.SyntaxGeneration;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
+using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator
 {
-    #nullable disable
+#nullable disable
     /// <summary>
     /// Describes an invokable method.
     /// This is a method on the original interface which defined it.

@@ -1,13 +1,13 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
-using Orleans.Configuration;
-using Newtonsoft.Json;
-using System.Linq;
-using Microsoft.Extensions.Options;
-using System.Globalization;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Clustering.Redis
 {

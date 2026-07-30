@@ -14,7 +14,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// The ID for this grain.
         /// </summary>
-        GrainId GrainId { get;  }
+        GrainId GrainId { get; }
 
         /// <summary>
         /// Copies the provided argument.

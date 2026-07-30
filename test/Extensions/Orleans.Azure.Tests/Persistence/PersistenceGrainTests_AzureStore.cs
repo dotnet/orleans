@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
-using Xunit.Abstractions;
 using Orleans.TestingHost;
 using TestExtensions;
 using TestExtensions.Runners;
+using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Persistence
 {

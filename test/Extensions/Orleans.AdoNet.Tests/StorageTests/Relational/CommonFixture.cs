@@ -5,12 +5,12 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Tests.SqlUtils;
-using Orleans.Storage;
-using TestExtensions;
-using UnitTests.General;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
+using Orleans.Storage;
+using Orleans.Tests.SqlUtils;
+using TestExtensions;
+using UnitTests.General;
 
 namespace UnitTests.StorageTests.Relational
 {

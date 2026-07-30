@@ -1,11 +1,11 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Configuration;
 using Orleans.EventSourcing;
+using Orleans.EventSourcing.CustomStorage;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.EventSourcing.CustomStorage;
-using Orleans.Configuration;
 
 #nullable disable
 namespace Orleans.Hosting

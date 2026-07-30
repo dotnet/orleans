@@ -1,16 +1,16 @@
-using System.Globalization;
 using System.Collections.Concurrent;
-using Microsoft.Extensions.Options;
+using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
-using TestExtensions;
-using Orleans.Streams;
-using Orleans.Configuration;
-using Orleans.Streaming.NATS;
-using Orleans.Providers.Streams.Common;
-using Xunit;
+using Microsoft.Extensions.Options;
 using NATS.Client.Core;
-using Xunit.Abstractions;
 using NATS.Client.JetStream;
+using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
+using Orleans.Streaming.NATS;
+using Orleans.Streams;
+using TestExtensions;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace NATS.Tests;
 

@@ -273,9 +273,9 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
         [Obsolete]
-        #endif
+#endif
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

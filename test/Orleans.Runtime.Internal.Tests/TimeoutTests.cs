@@ -60,7 +60,7 @@ namespace UnitTests
         public async Task Timeout_LongMethod()
         {
             bool finished = false;
-            var grainName = typeof (ErrorGrain).FullName;
+            var grainName = typeof(ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             var errorGrainType = this.typeResolver.GetGrainInterfaceType(typeof(IErrorGrain));
             // Set a 1-second timeout for this test

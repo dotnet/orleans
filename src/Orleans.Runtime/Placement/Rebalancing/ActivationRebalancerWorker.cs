@@ -114,7 +114,7 @@ internal sealed partial class ActivationRebalancerWorker(
             new(_stagnantCycles, _failedSessions, _rebalancingCycle,
                 _previousEntropy, _entropyDeviation, RemainingSuspensionDuration, [.. _rebalancingStatistics.Values]));
     }
-    
+
     public void OnRehydrate(IRehydrationContext context)
     {
         if (context.TryGetValue<RebalancerState>(StateKey, out var rebalancerState) &&
@@ -169,7 +169,7 @@ internal sealed partial class ActivationRebalancerWorker(
     public async Task SuspendRebalancing(TimeSpan? duration)
     {
         StopSession(StopReason.RebalancerSuspended, duration);
-        
+
         if (duration.HasValue)
         {
             LogSuspendedFor(duration.Value);
@@ -186,7 +186,7 @@ internal sealed partial class ActivationRebalancerWorker(
     {
         var tasks = new List<Task>();
         var report = BuildReport();
-       
+
         foreach (var silo in siloStatusOracle.GetActiveSilos())
         {
             tasks.Add(grainFactory.GetSystemTarget<IActivationRebalancerMonitor>
@@ -212,7 +212,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
     private Task TriggerRebalancing()
     {
-        if (_sessionTimer != null) 
+        if (_sessionTimer != null)
         {
             return Task.CompletedTask;
         }

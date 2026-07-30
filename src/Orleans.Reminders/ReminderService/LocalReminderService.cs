@@ -36,7 +36,6 @@ namespace Orleans.Runtime.ReminderService
         private long localTableSequence;
         private uint initialReadCallCount = 0;
         private Task? runTask;
-        private readonly object _deliveryLock = new();
         private bool _isDeliveringReminders;
         private int _activeReminderDeliveries;
         private TaskCompletionSource? _deliveryQuiesced;
@@ -128,15 +127,12 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                lock (_deliveryLock)
+                if (_isDeliveringReminders)
                 {
-                    if (_isDeliveringReminders)
-                    {
-                        return;
-                    }
-
-                    _isDeliveringReminders = true;
+                    return;
                 }
+
+                _isDeliveringReminders = true;
 
                 foreach (var reminderData in localReminders.Values)
                 {
@@ -162,14 +158,11 @@ namespace Orleans.Runtime.ReminderService
         private async Task StopDeliveringReminders()
         {
             Task? deliveryQuiescedTask = null;
-            lock (_deliveryLock)
+            _isDeliveringReminders = false;
+            if (_activeReminderDeliveries > 0)
             {
-                _isDeliveringReminders = false;
-                if (_activeReminderDeliveries > 0)
-                {
-                    _deliveryQuiesced ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
-                    deliveryQuiescedTask = _deliveryQuiesced.Task;
-                }
+                _deliveryQuiesced ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+                deliveryQuiescedTask = _deliveryQuiesced.Task;
             }
 
             if (deliveryQuiescedTask is not null)
@@ -628,12 +621,9 @@ namespace Orleans.Runtime.ReminderService
                 LogDebugStartedReminder(entry);
             }
 
-            lock (_deliveryLock)
+            if (!_isDeliveringReminders)
             {
-                if (!_isDeliveringReminders)
-                {
-                    return;
-                }
+                return;
             }
 
             reminderData.TryStart();
@@ -641,29 +631,23 @@ namespace Orleans.Runtime.ReminderService
 
         private bool TryBeginSingleReminderDelivery()
         {
-            lock (_deliveryLock)
+            if (!_isDeliveringReminders)
             {
-                if (!_isDeliveringReminders)
-                {
-                    return false;
-                }
-
-                ++_activeReminderDeliveries;
-                return true;
+                return false;
             }
+
+            ++_activeReminderDeliveries;
+            return true;
         }
 
         private void CompleteSingleReminderDelivery()
         {
             TaskCompletionSource? quiesced = null;
-            lock (_deliveryLock)
+            --_activeReminderDeliveries;
+            if (_activeReminderDeliveries == 0)
             {
-                --_activeReminderDeliveries;
-                if (_activeReminderDeliveries == 0)
-                {
-                    quiesced = _deliveryQuiesced;
-                    _deliveryQuiesced = null;
-                }
+                quiesced = _deliveryQuiesced;
+                _deliveryQuiesced = null;
             }
 
             quiesced?.SetResult();
@@ -786,11 +770,6 @@ namespace Orleans.Runtime.ReminderService
         {
             private readonly LocalReminderService _shared;
             private IAsyncTimer _timer;
-#if NET10_0_OR_GREATER
-            private readonly System.Threading.Lock _lock = new();
-#else
-            private readonly object _lock = new();
-#endif
             private ReminderEntry _entry;
             private bool _isFirstTickPending;
             private long _scheduleVersion;
@@ -808,79 +787,37 @@ namespace Orleans.Runtime.ReminderService
                 _timer = CreateTimer(entry);
             }
 
-            public ReminderEntry Entry
-            {
-                get
-                {
-                    lock (_lock)
-                    {
-                        return _entry;
-                    }
-                }
-            }
+            public ReminderEntry Entry => _entry;
 
             /// <summary>
             /// Locally, we use this for resolving races between the periodic table reader, and any concurrent local register/unregister requests
             /// </summary>
             public long LocalSequenceNumber
             {
-                get
-                {
-                    lock (_lock)
-                    {
-                        return _localSequenceNumber;
-                    }
-                }
-                set
-                {
-                    lock (_lock)
-                    {
-                        _localSequenceNumber = value;
-                    }
-                }
+                get => _localSequenceNumber;
+                set => _localSequenceNumber = value;
             }
 
             /// <summary>
             /// Gets a value indicating whether this instance is running.
             /// </summary>
-            public bool IsRunning
-            {
-                get
-                {
-                    lock (_lock)
-                    {
-                        return _runTask is Task task && !task.IsCompleted;
-                    }
-                }
-            }
+            public bool IsRunning => _runTask is Task task && !task.IsCompleted;
 
-            public bool IsStopped
-            {
-                get
-                {
-                    lock (_lock)
-                    {
-                        return _stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown;
-                    }
-                }
-            }
+            public bool IsStopped => _stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown;
 
             public bool TryStart()
             {
                 GrainId grainId;
                 string reminderName;
-                lock (_lock)
+                if (_runTask is not null || IsStopped)
                 {
-                    if (_runTask is not null || _stopReason is not (int)ReminderEvents.LocalReminderStopReason.Unknown)
-                    {
-                        return false;
-                    }
-
-                    grainId = _entry.GrainId;
-                    reminderName = _entry.ReminderName;
-                    using var suppressExecutionContext = new ExecutionContextSuppressor();
-                    _runTask = RunAsync(grainId, reminderName);
+                    return false;
                 }
+
+                grainId = _entry.GrainId;
+                reminderName = _entry.ReminderName;
+                using var suppressExecutionContext = new ExecutionContextSuppressor();
+                _runTask = RunAsync(grainId, reminderName);
 
                 ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, this, _shared.Silo);
                 return true;
@@ -892,19 +829,16 @@ namespace Orleans.Runtime.ReminderService
 
                 long scheduleVersion;
                 IAsyncTimer timerToDispose;
-                lock (_lock)
+                if (_entry.GrainId != entry.GrainId || !StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName))
                 {
-                    if (_entry.GrainId != entry.GrainId || !StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName))
-                    {
-                        throw new InvalidOperationException($"Cannot update reminder {new ReminderIdentity(_entry.GrainId, _entry.ReminderName)} with {entry} because the reminder identity changed.");
-                    }
-
-                    _entry = entry;
-                    _isFirstTickPending = true;
-                    timerToDispose = _timer;
-                    _timer = CreateTimer(entry);
-                    scheduleVersion = ++_scheduleVersion;
+                    throw new InvalidOperationException($"Cannot update reminder {new ReminderIdentity(_entry.GrainId, _entry.ReminderName)} with {entry} because the reminder identity changed.");
                 }
+
+                _entry = entry;
+                _isFirstTickPending = true;
+                timerToDispose = _timer;
+                _timer = CreateTimer(entry);
+                scheduleVersion = ++_scheduleVersion;
 
                 ReminderEvents.EmitLocalReminderScheduleChanged(entry.GrainId, entry.ReminderName, this, scheduleVersion, _shared.Silo);
                 timerToDispose.Dispose();
@@ -915,17 +849,14 @@ namespace Orleans.Runtime.ReminderService
                 ReminderEntry entry;
                 IAsyncTimer timerToDispose;
                 Task? runTask;
-                lock (_lock)
+                entry = _entry;
+                if (!IsStopped)
                 {
-                    entry = _entry;
-                    if (_stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown)
-                    {
-                        _stopReason = (int)reason;
-                    }
-
-                    timerToDispose = _timer;
-                    runTask = _runTask;
+                    _stopReason = (int)reason;
                 }
+
+                timerToDispose = _timer;
+                runTask = _runTask;
 
                 _shared.LogDebugStoppingReminder(entry, reason);
                 timerToDispose.Dispose();
@@ -1013,20 +944,17 @@ namespace Orleans.Runtime.ReminderService
                     GrainId grainId;
                     string reminderName;
                     long scheduleVersion;
-                    lock (_lock)
+                    if (IsStopped)
                     {
-                        if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
-                        {
-                            return false;
-                        }
-
-                        _isFirstTickPending = false;
-                        overrideDelay = GetInitialDueTime(_entry);
-                        timer = _timer;
-                        grainId = _entry.GrainId;
-                        reminderName = _entry.ReminderName;
-                        scheduleVersion = _scheduleVersion;
+                        return false;
                     }
+
+                    _isFirstTickPending = false;
+                    overrideDelay = GetInitialDueTime(_entry);
+                    timer = _timer;
+                    grainId = _entry.GrainId;
+                    reminderName = _entry.ReminderName;
+                    scheduleVersion = _scheduleVersion;
 
                     var nextTick = timer.NextTick(overrideDelay);
                     if (IsCurrentSchedule(timer))
@@ -1045,29 +973,21 @@ namespace Orleans.Runtime.ReminderService
             }
 
             private bool IsCurrentSchedule(IAsyncTimer timer)
-            {
-                lock (_lock)
-                {
-                    return _stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown && ReferenceEquals(timer, _timer);
-                }
-            }
+                => !IsStopped && ReferenceEquals(timer, _timer);
 
             private ReminderEntry? PrepareTick()
             {
-                lock (_lock)
+                if (IsStopped)
                 {
-                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
-                    {
-                        return null;
-                    }
-
-                    if (_isFirstTickPending)
-                    {
-                        return null;
-                    }
-
-                    return _entry;
+                    return null;
                 }
+
+                if (_isFirstTickPending)
+                {
+                    return null;
+                }
+
+                return _entry;
             }
 
             private IAsyncTimer CreateTimer(ReminderEntry entry)
@@ -1093,11 +1013,8 @@ namespace Orleans.Runtime.ReminderService
 
             public override string ToString()
             {
-                lock (_lock)
-                {
-                    var isRunning = _runTask is Task task && !task.IsCompleted;
-                    return $"[{_entry.ReminderName}, {_entry.GrainId}, {_entry.Period}, {LogFormatter.PrintDate(_entry.StartAt)}, {_entry.ETag}, {_localSequenceNumber}, {(isRunning ? "Ticking" : "Stopped")}]";
-                }
+                var isRunning = _runTask is Task task && !task.IsCompleted;
+                return $"[{_entry.ReminderName}, {_entry.GrainId}, {_entry.Period}, {LogFormatter.PrintDate(_entry.StartAt)}, {_entry.ETag}, {_localSequenceNumber}, {(isRunning ? "Ticking" : "Stopped")}]";
             }
         }
 

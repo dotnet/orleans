@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using NonSilo.Tests.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
@@ -26,6 +27,126 @@ namespace NonSilo.Tests.DurableJobs;
 [TestCategory("BVT"), TestCategory("DurableJobs")]
 public class LocalDurableJobManagerTests
 {
+    [Theory]
+    [InlineData("target")]
+    [InlineData("name")]
+    [InlineData("idempotency-key")]
+    public async Task ScheduleJobAsync_InvalidRequiredValue_ThrowsBeforeCreatingShard(string invalidValue)
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var request = new ScheduleJobRequest
+        {
+            Target = invalidValue == "target" ? default : GrainId.Create("test", "target"),
+            JobName = invalidValue == "name" ? " " : "job",
+            IdempotencyKey = invalidValue == "idempotency-key" ? " " : null,
+            DueTime = timeProvider.GetUtcNow(),
+        };
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => manager.ScheduleJobAsync(request, CancellationToken.None));
+
+        Assert.Equal("request", exception.ParamName);
+        Assert.Equal(0, shardManager.CreateShardCallCount);
+    }
+
+    [Fact]
+    public async Task TryCancelDurableJobAsync_NullJob_Throws()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, CreateOptions());
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => manager.TryCancelDurableJobAsync(null!, CancellationToken.None));
+
+        Assert.Equal("job", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_WhenManagerStops_CancelsWritableShardFastPath()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var dueTime = timeProvider.GetUtcNow().AddMinutes(5);
+        var shardKey = new DateTimeOffset(
+            (dueTime.UtcTicks / options.ShardDuration.Ticks) * options.ShardDuration.Ticks,
+            TimeSpan.Zero);
+        var shard = new GateableSchedulingShard("stopping-writable-shard", shardKey, shardKey.Add(options.ShardDuration));
+        accessor.AddWritableShard(shardKey, shard);
+
+        var scheduleTask = manager.ScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("test", "target"),
+            JobName = "job",
+            DueTime = dueTime,
+        }, CancellationToken.None);
+        await shard.ScheduleStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        accessor.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => scheduleTask);
+    }
+
+    [Fact]
+    public async Task PeriodicShardCheck_TimerWinDoesNotLoseSubsequentMembershipSignal()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var loopTask = accessor.RunPeriodicShardCheckAsync();
+
+        try
+        {
+            await Task.Yield();
+            timeProvider.Advance(TimeSpan.FromMinutes(10));
+            await WaitUntilAsync(() => shardManager.AssignCallCount >= 1);
+
+            accessor.SignalShardCheck();
+            await WaitUntilAsync(() => shardManager.AssignCallCount >= 2);
+        }
+        finally
+        {
+            accessor.Cancel();
+            await loopTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        Assert.Equal(2, shardManager.AssignCallCount);
+    }
+
+    [Fact]
+    public async Task PeriodicShardCheck_ErrorBackoffUsesConfiguredTimeProvider()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
+        var shardManager = new TestJobShardManager();
+        shardManager.AssignShards = (_, _, _) => shardManager.AssignCallCount == 1
+            ? Task.FromException<List<IJobShard>>(new InvalidOperationException("injected assignment failure"))
+            : Task.FromResult(new List<IJobShard>());
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var loopTask = accessor.RunPeriodicShardCheckAsync();
+
+        try
+        {
+            accessor.SignalShardCheck();
+            await WaitUntilAsync(() => shardManager.AssignCallCount == 1);
+            accessor.SignalShardCheck();
+            await Task.Delay(50);
+            Assert.Equal(1, shardManager.AssignCallCount);
+
+            timeProvider.Advance(TimeSpan.FromSeconds(5));
+            await WaitUntilAsync(() => shardManager.AssignCallCount == 2);
+        }
+        finally
+        {
+            accessor.Cancel();
+            await loopTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
     [Fact]
     public async Task Stop_WhenActiveShardWaitsForQueueChange_CompletesAfterCleanupWithoutLifecycleError()
     {
@@ -57,6 +178,7 @@ public class LocalDurableJobManagerTests
         await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Same(shard, Assert.Single(shardManager.UnregisteredShards));
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
         Assert.DoesNotContain(
             lifecycleLogger.Entries,
@@ -68,7 +190,8 @@ public class LocalDurableJobManagerTests
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions();
-        var manager = CreateManager(new TestJobShardManager(), timeProvider, options);
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
         var accessor = new LocalDurableJobManager.TestAccessor(manager);
         var lifecycleLogger = new RecordingLogger<SiloLifecycleSubject>();
         var lifecycle = new SiloLifecycleSubject(lifecycleLogger);
@@ -85,11 +208,96 @@ public class LocalDurableJobManagerTests
         await lifecycle.OnStop().WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Same(shard, Assert.Single(shardManager.UnregisteredShards));
         Assert.Contains(
             lifecycleLogger.Entries,
             entry => entry.Level == LogLevel.Error
                 && entry.EventId.Id == (int)ErrorCode.LifecycleStartFailure
                 && entry.Exception is InvalidOperationException { Message: "Unexpected shard failure" });
+    }
+
+    [Fact]
+    public async Task RunShard_WhenProcessingFails_ReleasesOwnershipAndEvictsShard()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = new ImmediatelyFaultingShard("failed-shard", shardKey, shardKey.Add(options.ShardDuration));
+        accessor.AddWritableShard(shardKey, shard);
+
+        accessor.TryActivateShard(shard);
+        Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runTask!.WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal("Injected shard failure", exception.Message);
+        Assert.Same(shard, Assert.Single(shardManager.UnregisteredShards));
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.False(accessor.HasCachedShard(shard.Id));
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+    }
+
+    [Fact]
+    public async Task Stop_WhenShardIgnoresCancellation_CompletesAtLifecycleBudget()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = new NonCooperativeShard("non-cooperative-shard", shardKey, shardKey.Add(options.ShardDuration));
+
+        manager.Participate(lifecycle);
+        await lifecycle.OnStart();
+        accessor.AddWritableShard(shardKey, shard);
+        accessor.TryActivateShard(shard);
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
+
+        using var shutdown = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        await lifecycle.OnStop(shutdown.Token).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(runTask!.IsCompleted);
+        Assert.Empty(shardManager.UnregisteredShards);
+        Assert.Equal(0, shard.DisposeCallCount);
+
+        shard.AllowCompletion.TrySetResult();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Same(shard, Assert.Single(shardManager.UnregisteredShards));
+        Assert.Equal(1, shard.DisposeCallCount);
+    }
+
+    [Fact]
+    public async Task Stop_WhenFutureShardHasNotActivated_ReleasesOwnershipAndDisposesShard()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardActivationBufferPeriod = TimeSpan.FromMinutes(5);
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        var shard = new CompletingShard(
+            "pending-future-shard",
+            timeProvider.GetUtcNow().AddMinutes(30),
+            timeProvider.GetUtcNow().AddMinutes(31));
+        shardManager.AssignedShards.Add(shard);
+        manager.Participate(lifecycle);
+        await lifecycle.OnStart();
+
+        await new LocalDurableJobManager.TestAccessor(manager).ProcessShardCheckCycleAsync(CancellationToken.None);
+        Assert.False(shard.ConsumeStarted.Task.IsCompleted);
+
+        await lifecycle.OnStop().WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Same(shard, Assert.Single(shardManager.UnregisteredShards));
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.False(shard.ConsumeStarted.Task.IsCompleted);
     }
 
     [Fact]
@@ -110,6 +318,18 @@ public class LocalDurableJobManagerTests
         Assert.False(accessor.HasWritableShard(shardKey));
         await shard.Received(1).MarkAsCompleteAsync(Arg.Any<CancellationToken>());
         Assert.Equal(timeProvider.GetUtcNow().AddHours(1), shardManager.LastMaxDueTime);
+    }
+
+    [Fact]
+    public async Task ProcessShardCheckCycleAsync_AtMaximumDate_ClampsAssignmentHorizon()
+    {
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.MaxValue);
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+
+        await new LocalDurableJobManager.TestAccessor(manager).ProcessShardCheckCycleAsync(CancellationToken.None);
+
+        Assert.Equal(DateTimeOffset.MaxValue, shardManager.LastMaxDueTime);
     }
 
     [Fact]
@@ -184,7 +404,7 @@ public class LocalDurableJobManagerTests
     [Fact]
     public async Task AssignedShardActivation_UsesTimeProvider()
     {
-        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var timeProvider = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions();
         options.ShardActivationBufferPeriod = TimeSpan.FromMinutes(5);
         var shardManager = new TestJobShardManager();
@@ -199,16 +419,15 @@ public class LocalDurableJobManagerTests
         await accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
 
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        await timeProvider.WaitForCreatedTimerCountAsync(1);
 
-        timeProvider.Advance(TimeSpan.FromMinutes(11));
-
-        await accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
-
+        timeProvider.Advance(TimeSpan.FromMinutes(5));
+        await timeProvider.WaitForCreatedTimerCountAsync(2);
         Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
 
-        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await shard.MarkAsCompleteAsync(CancellationToken.None);
+        accessor.Cancel();
         await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(shard.ConsumeStarted.Task.IsCompleted);
     }
 
     [Fact]
@@ -418,6 +637,52 @@ public class LocalDurableJobManagerTests
         Assert.Equal(
             initialJobs.Select(static job => job.ShardId).OrderBy(static id => id).ToArray(),
             secondRoundJobs.Select(static job => job.ShardId).OrderBy(static id => id).ToArray());
+    }
+
+    [Fact]
+    public void IdempotentSchedule_UsesStableStripeAcrossCallsAndManagers()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardStripeCount = 7;
+        var first = new LocalDurableJobManager.TestAccessor(CreateManager(new TestJobShardManager(), timeProvider, options));
+        var second = new LocalDurableJobManager.TestAccessor(CreateManager(new TestJobShardManager(), timeProvider, options));
+        var request = new ScheduleJobRequest
+        {
+            IdempotencyKey = "stable-generation",
+            Target = GrainId.Create("test", "stable-stripe"),
+            JobName = "job",
+            DueTime = timeProvider.GetUtcNow().AddMinutes(5),
+        };
+
+        var expected = first.GetWritableShardStripe(request);
+
+        Assert.InRange(expected, 0, options.ShardStripeCount - 1);
+        Assert.All(Enumerable.Range(0, 10), _ => Assert.Equal(expected, first.GetWritableShardStripe(request)));
+        Assert.Equal(expected, second.GetWritableShardStripe(request));
+    }
+
+    [Fact]
+    public void IdempotentSchedule_WithSharedKey_DistributesTargetsAcrossStripes()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardStripeCount = 7;
+        var accessor = new LocalDurableJobManager.TestAccessor(CreateManager(new TestJobShardManager(), timeProvider, options));
+        var observedStripes = new HashSet<int>();
+
+        for (var i = 0; i < 10_000 && observedStripes.Count < options.ShardStripeCount; i++)
+        {
+            observedStripes.Add(accessor.GetWritableShardStripe(new ScheduleJobRequest
+            {
+                IdempotencyKey = "shared-generation",
+                Target = GrainId.Create("test", $"shared-key-target-{i}"),
+                JobName = "job",
+                DueTime = timeProvider.GetUtcNow().AddMinutes(5),
+            }));
+        }
+
+        Assert.Equal(options.ShardStripeCount, observedStripes.Count);
     }
 
     [Fact]
@@ -684,7 +949,8 @@ public class LocalDurableJobManagerTests
         messagingProcessingInstruments: CreateMessagingProcessingInstruments());
 
     private static SchedulerInstruments CreateSchedulerInstruments()
-    {        var services = new ServiceCollection();
+    {
+        var services = new ServiceCollection();
         services.AddMetrics();
         services.AddSingleton<OrleansInstruments>();
         services.AddSingleton<SchedulerInstruments>();
@@ -781,13 +1047,16 @@ public class LocalDurableJobManagerTests
         var grainContext = Substitute.For<IGrainContext>();
         grainContext.GrainInstance.Returns(handler);
         grainContext.GrainId.Returns(GrainId.Create("test", "target"));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
         var shared = new DurableJobReceiverExtensionShared(
             NullLogger<DurableJobReceiverExtension>.Instance,
             Options.Create(new DurableJobsOptions()),
             Options.Create(new SiloMessagingOptions()),
+            grainFactory,
             timeProvider);
+        var execution = new DurableJobExecutionExtension(grainContext, shared);
         var extension = new DurableJobReceiverExtension(grainContext, shared);
-        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory.GetGrain<IDurableJobExecutionExtension>(Arg.Any<GrainId>()).Returns(execution);
         grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
         return (grainFactory, handledJob, () => Volatile.Read(ref handleCount));
     }
@@ -799,6 +1068,16 @@ public class LocalDurableJobManagerTests
             await Task.Yield();
             timeProvider.Advance(advanceBy);
         }
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 100 && !condition(); attempt++)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(condition());
     }
 
     private sealed class BlockingQueueShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
@@ -893,6 +1172,92 @@ public class LocalDurableJobManagerTests
                 throw new InvalidOperationException("Unexpected shard failure");
             }
 
+            yield break;
+        }
+    }
+
+    private sealed class ImmediatelyFaultingShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
+    {
+        public int DisposeCallCount;
+
+        public string Id { get; } = id;
+
+        public DateTimeOffset StartTime { get; } = start;
+
+        public DateTimeOffset EndTime { get; } = end;
+
+        public IDictionary<string, string>? Metadata => null;
+
+        public bool IsAddingCompleted => false;
+
+        public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => ConsumeAsync();
+
+        public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
+
+        public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
+
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref DisposeCallCount);
+            return ValueTask.CompletedTask;
+        }
+
+        private static async IAsyncEnumerable<IJobRunContext> ConsumeAsync()
+        {
+            await Task.Yield();
+            throw new InvalidOperationException("Injected shard failure");
+#pragma warning disable CS0162 // Iterator declaration requires an unreachable yield.
+            yield break;
+#pragma warning restore CS0162
+        }
+    }
+
+    private sealed class NonCooperativeShard(string id, DateTimeOffset start, DateTimeOffset end) : IJobShard
+    {
+        public TaskCompletionSource ConsumeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowCompletion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DisposeCallCount;
+
+        public string Id { get; } = id;
+
+        public DateTimeOffset StartTime { get; } = start;
+
+        public DateTimeOffset EndTime { get; } = end;
+
+        public IDictionary<string, string>? Metadata => null;
+
+        public bool IsAddingCompleted => false;
+
+        public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => ConsumeAsync();
+
+        public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
+
+        public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
+
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref DisposeCallCount);
+            return ValueTask.CompletedTask;
+        }
+
+        private async IAsyncEnumerable<IJobRunContext> ConsumeAsync()
+        {
+            ConsumeStarted.TrySetResult();
+            await AllowCompletion.Task;
             yield break;
         }
     }
@@ -1186,14 +1551,20 @@ public class LocalDurableJobManagerTests
 
         public Func<DateTimeOffset, DateTimeOffset, IDictionary<string, string>, CancellationToken, Task<IJobShard>>? CreateShard { get; set; }
 
+        public Func<DateTimeOffset, int, CancellationToken, Task<List<IJobShard>>>? AssignShards { get; set; }
+
         public int CreateShardCallCount { get; private set; }
+
+        public int AssignCallCount { get; private set; }
 
         public DateTimeOffset LastMaxDueTime { get; private set; }
 
         public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
         {
+            AssignCallCount++;
             LastMaxDueTime = maxDueTime;
-            return Task.FromResult(AssignedShards.ToList());
+            return AssignShards?.Invoke(maxDueTime, maxNewClaims, cancellationToken)
+                ?? Task.FromResult(AssignedShards.ToList());
         }
 
         public override Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)

@@ -1,13 +1,13 @@
-using Orleans.TestingHost;
-using Tester.StreamingTests;
-using TestExtensions;
-using Xunit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using Orleans.Configuration;
 using Orleans.Streaming.NATS.Hosting;
+using Orleans.TestingHost;
+using Tester.StreamingTests;
+using TestExtensions;
+using Xunit;
 
 namespace NATS.Tests;
 

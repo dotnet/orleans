@@ -1,7 +1,7 @@
+using System.Xml.Linq;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
-using System.Xml.Linq;
 
 namespace TestGrainInterfaces
 {

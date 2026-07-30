@@ -1,19 +1,19 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Tester;
+using Tester.AzureUtils;
 using TestExtensions;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Configuration;
-using Tester;
-using Tester.AzureUtils;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -46,7 +46,7 @@ namespace ServiceBus.Tests.StreamingTests
                         {
                             options.ConfigureTestDefaults();
                         })
-                    .AddEventHubStreams(StreamProviderName, b=>
+                    .AddEventHubStreams(StreamProviderName, b =>
                     {
                         b.UseDynamicClusterConfigDeploymentBalancer();
                         b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
@@ -71,7 +71,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName, b=>
+                    .AddEventHubStreams(StreamProviderName, b =>
                     {
                         b.ConfigureEventHub(ob => ob.Configure(options =>
                         {

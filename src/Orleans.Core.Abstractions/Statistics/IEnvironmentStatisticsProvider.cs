@@ -1,7 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Orleans.Serialization;
-using System.Diagnostics;
 
 namespace Orleans.Statistics;
 

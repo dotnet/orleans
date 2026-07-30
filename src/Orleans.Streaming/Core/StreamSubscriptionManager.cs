@@ -1,13 +1,13 @@
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 #nullable disable
 namespace Orleans.Streams.Core
 {
-    internal class StreamSubscriptionManager: IStreamSubscriptionManager
+    internal class StreamSubscriptionManager : IStreamSubscriptionManager
     {
         private readonly string type;
         private readonly IStreamPubSub streamPubSub;

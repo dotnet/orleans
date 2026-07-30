@@ -1,6 +1,6 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Linq;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
@@ -18,7 +18,7 @@ namespace Orleans.CodeGenerator
             }
             else
             {
-                MetadataName =  $"{InterfaceDescription.GeneratedNamespace}.{GeneratedClassName}`{InterfaceDescription.TypeParameters.Count}";
+                MetadataName = $"{InterfaceDescription.GeneratedNamespace}.{GeneratedClassName}`{InterfaceDescription.TypeParameters.Count}";
             }
         }
 

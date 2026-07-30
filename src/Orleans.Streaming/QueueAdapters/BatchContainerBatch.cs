@@ -31,7 +31,7 @@ namespace Orleans.Streams
         /// </summary>
         [Id(2)]
         public List<IBatchContainer> BatchContainers { get; }
-                
+
         public BatchContainerBatch(List<IBatchContainer> batchContainers)
         {
             if ((batchContainers == null) || !batchContainers.Any())

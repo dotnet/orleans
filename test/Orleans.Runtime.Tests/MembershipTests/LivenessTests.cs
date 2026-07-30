@@ -119,7 +119,7 @@ namespace UnitTests.MembershipTests
             await TestTraffic();
 
             logger.LogInformation("\n\n\n\nAbout to re-start a first silo.\n\n\n");
-            
+
             await this.HostedCluster.RestartStoppedSecondarySiloAsync(siloToStop.Name);
 
             await TestTraffic();

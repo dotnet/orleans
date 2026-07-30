@@ -2,12 +2,12 @@
 
 //#define USE_SQL_SERVER
 
+using Orleans.Internal;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Internal;
 using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
 
 // ReSharper disable InconsistentNaming

@@ -49,7 +49,8 @@ namespace TestGrains
 
         public Task Deposit(uint amount, Guid guid, string description)
         {
-            RaiseEvent(new DepositTransaction() {
+            RaiseEvent(new DepositTransaction()
+            {
                 Guid = guid,
                 IssueTime = DateTime.UtcNow,
                 DepositAmount = amount,
@@ -86,7 +87,7 @@ namespace TestGrains
         }
     }
 
-    
+
     /// A variant of the same grain that does not persist the log, but only the latest grain state
     /// (so it does not do true event sourcing). 
     [LogConsistencyProvider(ProviderName = "StateStorage")]

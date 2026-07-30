@@ -2,10 +2,10 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using Microsoft.Extensions.Time.Testing;
 
 namespace Orleans.Journaling.Tests;
 

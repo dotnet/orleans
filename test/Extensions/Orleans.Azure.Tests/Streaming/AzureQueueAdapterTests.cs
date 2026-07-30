@@ -6,11 +6,11 @@ using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Serialization;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -88,7 +88,7 @@ namespace Tester.AzureUtils.Streaming
 
             // reader threads (at most 2 active queues because only two streams)
             var work = new List<Task>();
-            foreach( KeyValuePair<QueueId, IQueueAdapterReceiver> receiverKvp in receivers)
+            foreach (KeyValuePair<QueueId, IQueueAdapterReceiver> receiverKvp in receivers)
             {
                 QueueId queueId = receiverKvp.Key;
                 var receiver = receiverKvp.Value;

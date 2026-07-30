@@ -21,7 +21,7 @@ namespace DistributedTests.Client.LoadGeneratorScenario
     {
         public int NumWorkers { get; set; }
         public int BlocksPerWorker { get; set; }
-        public int RequestsPerBlock { get; set; } 
+        public int RequestsPerBlock { get; set; }
         public int Duration { get; set; }
     }
 

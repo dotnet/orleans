@@ -101,7 +101,7 @@ namespace DependencyInjection.Tests
 
             // the injected service will return the same value only if it's the same instance
             Assert.Equal(
-                await grain1.GetInjectedSingletonServiceValue(), 
+                await grain1.GetInjectedSingletonServiceValue(),
                 await grain2.GetInjectedSingletonServiceValue());
 
             await grain1.DoDeactivate();

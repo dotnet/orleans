@@ -1,15 +1,15 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Xunit;
-using Orleans.Dashboard;
-using Orleans.TestingHost;
-using TestGrains;
-using Orleans.Hosting;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
-using Orleans.Dashboard.Implementation.Helpers;
+using Orleans.Dashboard;
 using Orleans.Dashboard.Core;
+using Orleans.Dashboard.Implementation.Helpers;
+using Orleans.Hosting;
+using Orleans.TestingHost;
+using TestGrains;
+using Xunit;
 
 namespace UnitTests
 {

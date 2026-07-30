@@ -76,7 +76,7 @@ internal partial class SiloMetadataCache(
                             _metadata.TryAdd(membershipEntry.Key, metadata);
                             _negativeCache.Remove(membershipEntry.Key, out _);
                         }
-                        catch(Exception exception)
+                        catch (Exception exception)
                         {
                             _negativeCache.TryAdd(membershipEntry.Key, now + negativeCachePeriod);
                             LogErrorFetchingSiloMetadata(logger, exception, membershipEntry.Key);

@@ -1,5 +1,5 @@
-using Orleans.Runtime;
 using System;
+using Orleans.Runtime;
 using Orleans.Streams.Core;
 
 namespace Orleans.Streams
@@ -10,7 +10,7 @@ namespace Orleans.Streams
     public class StreamSubscriptionHandlerFactory : IStreamSubscriptionHandleFactory
     {
         private readonly IStreamProvider streamProvider;
-        
+
         /// <inheritdoc />
         public StreamId StreamId { get; }
 
@@ -19,7 +19,7 @@ namespace Orleans.Streams
 
         /// <inheritdoc />
         public GuidId SubscriptionId { get; }
-                        
+
         /// <summary>
         /// Initializes a new instance of the <see cref="StreamSubscriptionHandlerFactory"/> class.
         /// </summary>        

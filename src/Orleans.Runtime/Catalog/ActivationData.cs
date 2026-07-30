@@ -597,7 +597,7 @@ internal sealed partial class ActivationData :
     {
         var currentActivity = Activity.Current;
         var deactivateActivity = activityContext is { } parent
-            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext:parent)
+            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext: parent)
             : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain);
 
         lock (this)
@@ -1370,7 +1370,7 @@ internal sealed partial class ActivationData :
             {
                 context.TryAddValue(GrainAddressMigrationContextKey, Address);
             }
-            
+
             Activity? dehydrateSpan = null;
             try
             {
@@ -1654,7 +1654,7 @@ internal sealed partial class ActivationData :
                         PreviousRegistration is not null);
                     var previousRegistration = PreviousRegistration;
                     var verifiedRecoveryMembershipVersion = 0L;
-                    
+
                     try
                     {
                         while (true)
@@ -1943,7 +1943,7 @@ internal sealed partial class ActivationData :
                         // Start a span for OnDeactivateAsync execution
 
                         using var onDeactivateSpan = deactivateCommand.Activity is not null
-                            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal, parentContext:deactivateCommand.Activity.Context)
+                            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal, parentContext: deactivateCommand.Activity.Context)
                             : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal);
                         if (onDeactivateSpan is { IsAllDataRequested: true })
                         {
@@ -2492,7 +2492,7 @@ internal sealed partial class ActivationData :
     {
         public readonly MigrationContext MigrationContext = new(sessionPool);
         public readonly Dictionary<string, object>? RequestContext = requestContext;
-        
+
         /// <summary>
         /// The activity context from the grain call that initiated the migration.
         /// This is used to parent the dehydrate span to the migration request trace.

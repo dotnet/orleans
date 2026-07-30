@@ -2,8 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
-using Orleans.Journaling.Json;
 using Orleans.Hosting;
+using Orleans.Journaling.Json;
 using Xunit;
 
 namespace Tester.AzureUtils.DurableJobs;

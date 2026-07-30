@@ -1,5 +1,5 @@
-using Orleans.Runtime.Configuration;
 using System;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {

@@ -33,7 +33,7 @@ namespace Orleans.Runtime
             // Only return an updated manifest if it is newer than the provided version.
             if (manifest.Version <= version)
             {
-                return new (_noUpdate);
+                return new(_noUpdate);
             }
 
             // Maintain a cache of whether the current manifest contains all active servers so that it
@@ -59,7 +59,7 @@ namespace Orleans.Runtime
                 _cachedMembershipVersion = membershipSnapshot.Version;
             }
 
-            return new (_cachedUpdate);
+            return new(_cachedUpdate);
         }
 
         public ValueTask<GrainManifest> GetSiloManifest() => new(_siloManifest);

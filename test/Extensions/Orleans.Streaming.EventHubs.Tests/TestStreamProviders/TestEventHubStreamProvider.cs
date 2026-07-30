@@ -2,9 +2,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Serialization;
+using Orleans.Statistics;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using Orleans.Statistics;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {

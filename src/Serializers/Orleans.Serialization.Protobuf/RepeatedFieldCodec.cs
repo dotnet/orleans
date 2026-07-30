@@ -86,7 +86,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
                         ThrowInvalidSizeException(length);
                     }
 
-                    result = new RepeatedField<T>{ Capacity = length };
+                    result = new RepeatedField<T> { Capacity = length };
                     ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                     break;
                 case 1:

@@ -1,10 +1,10 @@
+using System;
+using System.Buffers;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
-using System;
-using System.Buffers;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Serializers;
 

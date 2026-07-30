@@ -1,4 +1,4 @@
-﻿namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     [Serializable]
     [Orleans.GenerateSerializer]

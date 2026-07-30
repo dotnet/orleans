@@ -1,6 +1,6 @@
-﻿using Orleans.Streams;
 using System;
 using System.Threading.Tasks;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs.Testing
 {

@@ -24,6 +24,9 @@ namespace Orleans.DurableJobs
         [Id(1)]
         public required string Name { get { throw null; } init { } }
 
+        [Id(8)]
+        public int Priority { get { throw null; } init { } }
+
         [Id(4)]
         public required string ShardId { get { throw null; } init { } }
 
@@ -140,7 +143,7 @@ namespace Orleans.DurableJobs
 
         public System.Threading.Tasks.Task MarkAsCompleteAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        protected abstract System.Threading.Tasks.Task PersistAddJobAsync(string jobId, string jobName, System.DateTimeOffset dueTime, Runtime.GrainId target, System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.Task PersistAddJobAsync(DurableJob job, System.Threading.CancellationToken cancellationToken);
         protected abstract System.Threading.Tasks.Task PersistRemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
         protected abstract System.Threading.Tasks.Task PersistRetryJobAsync(string jobId, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
         public System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken) { throw null; }
@@ -153,6 +156,8 @@ namespace Orleans.DurableJobs
     public abstract partial class JobShardManager
     {
         protected JobShardManager(Runtime.SiloAddress siloAddress) { }
+
+        public virtual bool IsDurableStorage { get { throw null; } }
 
         protected Runtime.SiloAddress SiloAddress { get { throw null; } }
 
@@ -167,9 +172,13 @@ namespace Orleans.DurableJobs
         private readonly int _dummyPrimitive;
         public required System.DateTimeOffset DueTime { get { throw null; } init { } }
 
+        public string? IdempotencyKey { get { throw null; } init { } }
+
         public required string JobName { get { throw null; } init { } }
 
         public System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get { throw null; } init { } }
+
+        public int Priority { get { throw null; } init { } }
 
         public required Runtime.GrainId Target { get { throw null; } init { } }
 
@@ -187,11 +196,15 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder AddDurableJobs(this ISiloBuilder builder) { throw null; }
 
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseInMemoryDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { throw null; }
+
         public static ISiloBuilder UseInMemoryDurableJobs(this ISiloBuilder builder) { throw null; }
     }
 
     public sealed partial class DurableJobsOptions
     {
+        public System.TimeSpan AdoptionFailureWindow { get { throw null; } set { } }
+
         public bool ConcurrencySlowStartEnabled { get { throw null; } set { } }
 
         public System.TimeSpan JobStatusPollInterval { get { throw null; } set { } }

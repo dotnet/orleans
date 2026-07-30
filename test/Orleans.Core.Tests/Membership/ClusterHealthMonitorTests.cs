@@ -553,7 +553,7 @@ namespace NonSilo.Tests.Membership
             }
 
             await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
-            
+
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
             table = await this.membershipTable.ReadAll();

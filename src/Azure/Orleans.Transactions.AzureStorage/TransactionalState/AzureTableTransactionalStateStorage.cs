@@ -258,7 +258,8 @@ namespace Orleans.Transactions.AzureStorage
             {
                 var state = new StateEntity(entity);
                 results.Add(new KeyValuePair<long, StateEntity>(state.SequenceId, state));
-            };
+            }
+            ;
             return results;
         }
 

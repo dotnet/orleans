@@ -1,5 +1,5 @@
-﻿using Xunit.Abstractions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests
 {

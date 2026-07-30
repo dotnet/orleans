@@ -36,7 +36,7 @@ namespace Orleans.TestingHost
 
         /// <inheritdoc />
         public override bool IsActive => isActive;
-        
+
         public StandaloneSiloHandle(string siloName, IConfiguration configuration, string executablePath)
         {
             if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
@@ -105,20 +105,20 @@ namespace Orleans.TestingHost
             _errorBuilder = new StringBuilder();
             _errorCloseEvent = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-           Process.ErrorDataReceived += (s, e) =>
-           {
+            Process.ErrorDataReceived += (s, e) =>
+            {
                 if (e.Data == null)
                 {
                     _errorCloseEvent.SetResult(true);
                 }
                 else
                 {
-                   lock (_errorBuilder)
-                   {
-                       _errorBuilder.AppendLine(e.Data);
-                   }
+                    lock (_errorBuilder)
+                    {
+                        _errorBuilder.AppendLine(e.Data);
+                    }
                 }
-           };
+            };
 
             var selfReference = new WeakReference<StandaloneSiloHandle>(this);
             _processExitHandler = (o, e) =>

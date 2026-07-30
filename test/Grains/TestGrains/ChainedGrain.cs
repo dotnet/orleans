@@ -32,7 +32,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 
+        Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); }
 
         Task<int> IChainedGrain.GetId() { return Task.FromResult(State.Id); }
 

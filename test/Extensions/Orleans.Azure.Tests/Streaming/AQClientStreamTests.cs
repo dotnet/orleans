@@ -47,7 +47,7 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(AQStreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConfigureTestDefaults();
@@ -61,7 +61,7 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(AQStreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConfigureTestDefaults();

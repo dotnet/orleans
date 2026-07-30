@@ -64,7 +64,7 @@ namespace Orleans.Transactions.TestKit
                 this.data.FaultInjectionControl.FaultInjectionPhase = faultInjectionControl.FaultInjectionPhase;
                 this.data.FaultInjectionControl.FaultInjectionType = faultInjectionControl.FaultInjectionType;
             }
-           
+
             return this.data.PerformUpdate(d =>
             {
                 LogInformationAddingValue(this.logger, numberToAdd, d.Value);

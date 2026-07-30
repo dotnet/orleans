@@ -3,8 +3,16 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+
+#if ADVANCED_REMINDERS_ADONET
+using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
+using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
+using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
+using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
+#endif
 
 #nullable disable
 
@@ -51,6 +59,26 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         private readonly DbStoredQueries dbStoredQueries;
 
+#if REMINDERS_ADONET || TESTER_SQLUTILS
+#if ADVANCED_REMINDERS_ADONET
+        private string ReadReminderRowsQuery => dbStoredQueries.AdvancedRemindersReadReminderRowsKey;
+        private string ReadRangeRows1Query => dbStoredQueries.AdvancedRemindersReadRangeRows1Key;
+        private string ReadRangeRows2Query => dbStoredQueries.AdvancedRemindersReadRangeRows2Key;
+        private string ReadReminderRowQuery => dbStoredQueries.AdvancedRemindersReadReminderRowKey;
+        private string UpsertReminderRowQuery => dbStoredQueries.AdvancedRemindersUpsertReminderRowKey;
+        private string DeleteReminderRowQuery => dbStoredQueries.AdvancedRemindersDeleteReminderRowKey;
+        private string DeleteReminderRowsQuery => dbStoredQueries.AdvancedRemindersDeleteReminderRowsKey;
+#else
+        private string ReadReminderRowsQuery => dbStoredQueries.ReadReminderRowsKey;
+        private string ReadRangeRows1Query => dbStoredQueries.ReadRangeRows1Key;
+        private string ReadRangeRows2Query => dbStoredQueries.ReadRangeRows2Key;
+        private string ReadReminderRowQuery => dbStoredQueries.ReadReminderRowKey;
+        private string UpsertReminderRowQuery => dbStoredQueries.UpsertReminderRowKey;
+        private string DeleteReminderRowQuery => dbStoredQueries.DeleteReminderRowKey;
+        private string DeleteReminderRowsQuery => dbStoredQueries.DeleteReminderRowsKey;
+#endif
+#endif
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -68,11 +96,18 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
-        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString)
+        internal static async Task<RelationalOrleansQueries> CreateInstance(
+            string invariantName,
+            string connectionString,
+            CancellationToken cancellationToken = default)
         {
             var storage = RelationalStorage.CreateInstance(invariantName, connectionString);
 
-            var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
+            var queries = await storage.ReadAsync(
+                DbStoredQueries.GetQueriesKey,
+                DbStoredQueries.Converters.GetQueryKeyAndValue,
+                null,
+                cancellationToken);
 
             return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)));
         }
@@ -99,11 +134,23 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="serviceId">The service ID.</param>
         /// <param name="grainId">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainId grainId)
+        internal Task<
+#if ADVANCED_REMINDERS_ADONET
+            Orleans.AdvancedReminders.ReminderTableData
+#else
+            ReminderTableData
+#endif
+            > ReadReminderRowsAsync(string serviceId, GrainId grainId)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, GetReminderEntry, command =>
+            return ReadAsync(ReadReminderRowsQuery, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
-                ret => new ReminderTableData(ret.ToList()));
+                ret => new
+#if ADVANCED_REMINDERS_ADONET
+                    Orleans.AdvancedReminders.ReminderTableData
+#else
+                    ReminderTableData
+#endif
+                    (ret.ToList()));
         }
 
         /// <summary>
@@ -113,13 +160,25 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="beginHash">The begin hash.</param>
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
+        internal Task<
+#if ADVANCED_REMINDERS_ADONET
+            Orleans.AdvancedReminders.ReminderTableData
+#else
+            ReminderTableData
+#endif
+            > ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
         {
-            var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
+            var query = (int)beginHash < (int)endHash ? ReadRangeRows1Query : ReadRangeRows2Query;
 
             return ReadAsync(query, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
-                ret => new ReminderTableData(ret.ToList()));
+                ret => new
+#if ADVANCED_REMINDERS_ADONET
+                    Orleans.AdvancedReminders.ReminderTableData
+#else
+                    ReminderTableData
+#endif
+                    (ret.ToList()));
         }
 
         internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
@@ -128,13 +187,29 @@ namespace Orleans.Tests.SqlUtils
                 record.GetValue<string>("QueryText"));
         }
 
-        internal static ReminderEntry GetReminderEntry(IDataRecord record)
+        internal static
+#if ADVANCED_REMINDERS_ADONET
+            Orleans.AdvancedReminders.ReminderEntry
+#else
+            ReminderEntry
+#endif
+            GetReminderEntry(IDataRecord record)
         {
             //Having non-null field, GrainId, means with the query filter options, an entry was found.
             string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
             if (grainId != null)
             {
-                return new ReminderEntry
+#if ADVANCED_REMINDERS_ADONET
+                var cronExpression = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronExpression));
+                var cronTimeZoneId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronTimeZoneId));
+#endif
+
+                return new
+#if ADVANCED_REMINDERS_ADONET
+                    Orleans.AdvancedReminders.ReminderEntry
+#else
+                    ReminderEntry
+#endif
                 {
                     GrainId = GrainId.Parse(grainId),
                     ReminderName = record.GetValue<string>(nameof(DbStoredQueries.Columns.ReminderName)),
@@ -143,6 +218,17 @@ namespace Orleans.Tests.SqlUtils
                     //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                     //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
                     Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(DbStoredQueries.Columns.Period))),
+#if ADVANCED_REMINDERS_ADONET
+                    CronExpression = cronExpression,
+                    CronTimeZoneId = cronTimeZoneId,
+                    NextDueUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.NextDueUtc)),
+                    LastFireUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.LastFireUtc)),
+                    Priority = ParsePriority(record.GetInt32(nameof(DbStoredQueries.Columns.Priority))),
+                    Action = ParseAction(record.GetInt32(nameof(DbStoredQueries.Columns.Action))),
+                    ScheduleId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.ScheduleId)) ?? string.Empty,
+                    JobId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.JobId)) ?? string.Empty,
+                    JobShardId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.JobShardId)) ?? string.Empty,
+#endif
                     ETag = DbStoredQueries.Converters.GetVersion(record).ToString()
                 };
             }
@@ -155,10 +241,16 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="grainId">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
-        internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainId grainId,
+        internal Task<
+#if ADVANCED_REMINDERS_ADONET
+            Orleans.AdvancedReminders.ReminderEntry
+#else
+            ReminderEntry
+#endif
+            > ReadReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowKey, GetReminderEntry, command =>
+            return ReadAsync(ReadReminderRowQuery, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -176,10 +268,64 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
+#if ADVANCED_REMINDERS_ADONET
+        internal Task<string> UpsertReminderRowAsync(
+            string serviceId,
+            GrainId grainId,
+            string reminderName,
+            DateTime startTime,
+            TimeSpan period,
+            string cronExpression,
+            string cronTimeZoneId,
+            DateTime? nextDueUtc,
+            DateTime? lastFireUtc,
+
+#if ADVANCED_REMINDERS_ADONET
+            Orleans.AdvancedReminders.Runtime.ReminderPriority
+#else
+            ReminderPriority
+#endif
+            priority,
+#if ADVANCED_REMINDERS_ADONET
+            Orleans.AdvancedReminders.Runtime.MissedReminderAction
+#else
+            MissedReminderAction
+#endif
+            action,
+            string scheduleId,
+            string jobId,
+            string jobShardId,
+            string eTag)
+        {
+            return ReadAsync(UpsertReminderRowQuery, DbStoredQueries.Converters.GetVersion, command =>
+                new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    GrainHash = grainId.GetUniformHashCode(),
+                    GrainId = grainId.ToString(),
+                    ReminderName = reminderName,
+                    StartTime = startTime,
+                    Period = period,
+                    CronExpression = cronExpression,
+                    CronTimeZoneId = cronTimeZoneId,
+                    NextDueUtc = nextDueUtc,
+                    LastFireUtc = lastFireUtc,
+                    Priority = (int)priority,
+                    Action = (int)action,
+                    ScheduleId = scheduleId,
+                    JobId = jobId,
+                    JobShardId = jobShardId,
+                    Version = string.IsNullOrEmpty(eTag) ? "-1" : eTag,
+                },
+                ret => ret.Select(version => version.ToString()).FirstOrDefault()
+                    ?? throw new Orleans.AdvancedReminders.Runtime.ReminderException(
+                        $"Could not upsert reminder '{reminderName}' for grain '{grainId}' due to ETag mismatch."));
+        }
+#else
         internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName, DateTime startTime, TimeSpan period)
         {
-            return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
+            return ReadAsync(UpsertReminderRowQuery, DbStoredQueries.Converters.GetVersion, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -188,8 +334,55 @@ namespace Orleans.Tests.SqlUtils
                     ReminderName = reminderName,
                     StartTime = startTime,
                     Period = period
-                }, ret => ret.First().ToString());
+                },
+                ret => ret.First().ToString());
         }
+#endif
+
+#if ADVANCED_REMINDERS_ADONET
+        private static
+            Orleans.AdvancedReminders.Runtime.ReminderPriority
+            ParsePriority(int value) => value switch
+            {
+                (int)
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .High =>
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .High,
+                (int)
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .Normal =>
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .Normal,
+                _ =>
+                    Orleans.AdvancedReminders.Runtime.ReminderPriority
+                    .Normal,
+            };
+
+        private static
+            Orleans.AdvancedReminders.Runtime.MissedReminderAction
+            ParseAction(int value) => value switch
+            {
+                (int)
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .FireImmediately =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .FireImmediately,
+                (int)
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Skip =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Skip,
+                (int)
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Notify =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Notify,
+                _ =>
+                    Orleans.AdvancedReminders.Runtime.MissedReminderAction
+                    .Skip,
+            };
+#endif
 
         /// <summary>
         /// Deletes a reminder
@@ -202,7 +395,7 @@ namespace Orleans.Tests.SqlUtils
         internal Task<bool> DeleteReminderRowAsync(string serviceId, GrainId grainId, string reminderName,
             string etag)
         {
-            return ReadAsync(dbStoredQueries.DeleteReminderRowKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
+            return ReadAsync(DeleteReminderRowQuery, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -219,7 +412,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         internal Task DeleteReminderRowsAsync(string serviceId)
         {
-            return ExecuteAsync(dbStoredQueries.DeleteReminderRowsKey, command =>
+            return ExecuteAsync(DeleteReminderRowsQuery, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId });
         }
 

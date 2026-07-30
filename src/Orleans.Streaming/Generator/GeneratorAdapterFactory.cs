@@ -106,7 +106,7 @@ namespace Orleans.Providers.Streams.Generator
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions, this.orleansInstruments);
             generatorConfig = this.serviceProvider.GetKeyedService<IStreamGeneratorConfig>(this.Name);
-            if(generatorConfig == null)
+            if (generatorConfig == null)
             {
                 LogInfoNoGeneratorConfigurationFound(this.Name);
             }
@@ -210,7 +210,7 @@ namespace Orleans.Providers.Streams.Generator
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             {
                 var watch = Stopwatch.StartNew();
-                await Task.Delay(Random.Shared.Next(1,MaxDelayMs));
+                await Task.Delay(Random.Shared.Next(1, MaxDelayMs));
                 List<IBatchContainer> batches;
                 if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {

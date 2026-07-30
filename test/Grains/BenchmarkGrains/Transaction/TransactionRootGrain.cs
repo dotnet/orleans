@@ -1,5 +1,5 @@
-﻿using Orleans.Concurrency;
 using BenchmarkGrainInterfaces.Transaction;
+using Orleans.Concurrency;
 
 namespace BenchmarkGrains.Transaction
 {
