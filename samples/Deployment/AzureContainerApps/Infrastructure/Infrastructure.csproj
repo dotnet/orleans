@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<OutputType>Library</OutputType>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+		<PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" />
+		<PackageReference Include="Microsoft.ApplicationInsights.WorkerService" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Grains\Grains.csproj" />
+	</ItemGroup>
+
+</Project>

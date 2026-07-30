@@ -1,0 +1,239 @@
+---
+import { Code } from '@astrojs/starlight/components';
+import {
+  findTypeTargetByDocId,
+  shortTypeName,
+  typePath,
+  withBase,
+} from '../../lib/api/packages';
+import type { ApiDocNode, PackageApiDocument } from '../../lib/api/types';
+
+interface Props {
+  content: ApiDocNode[] | string | undefined;
+  packages?: PackageApiDocument[];
+  packageName?: string;
+  tag?: 'span' | 'div';
+}
+
+const {
+  content,
+  packages = [],
+  packageName = '',
+  tag = 'span',
+} = Astro.props;
+const base = import.meta.env.BASE_URL;
+const Tag: 'span' | 'div' = tag;
+
+function crefLink(value: string) {
+  const target = findTypeTargetByDocId(packages, value, packageName);
+  return target
+    ? {
+        href: withBase(base, typePath(target.packageName, target.type)),
+        label: shortTypeName(target.type.fullName ?? target.type.name),
+      }
+    : undefined;
+}
+
+function cleanCref(value: string) {
+  return value.replace(/^[A-Z]:/, '').replace(/\(.*$/, '').replace(/``?\d+/g, '');
+}
+
+function dedent(value: string) {
+  const lines = value.replaceAll('\r\n', '\n').split('\n');
+  while (lines[0]?.trim() === '') lines.shift();
+  while (lines.at(-1)?.trim() === '') lines.pop();
+  const indentation = Math.min(
+    ...lines.filter((line) => line.trim()).map((line) => line.match(/^\s*/)?.[0].length ?? 0),
+  );
+  return Number.isFinite(indentation)
+    ? lines.map((line) => line.slice(indentation)).join('\n')
+    : lines.join('\n');
+}
+---
+
+{
+  !content ? null : typeof content === 'string' ? (
+    <Tag>{content}</Tag>
+  ) : (
+    <Tag class="api-doc-content">
+      {
+        content.map((node) => {
+          switch (node.kind) {
+            case 'text':
+              return <Fragment set:text={node.text ?? ''} />;
+            case 'code':
+              return <code>{node.text ?? ''}</code>;
+            case 'codeblock':
+              return (
+                <div class="api-doc-code">
+                  <Code code={dedent(node.text ?? '')} lang={node.language ?? 'csharp'} />
+                </div>
+              );
+            case 'cref': {
+              const link = crefLink(node.value ?? '');
+              return link ? (
+                <a href={link.href}>
+                  <code>{link.label}</code>
+                </a>
+              ) : (
+                <code>{cleanCref(node.value ?? '')}</code>
+              );
+            }
+            case 'href':
+            case 'a':
+              return (
+                <a href={node.value ?? ''} target="_blank" rel="noopener noreferrer">
+                  {node.text ?? node.value}
+                </a>
+              );
+            case 'langword':
+            case 'paramref':
+            case 'typeparamref':
+              return <code>{node.value ?? ''}</code>;
+            case 'para':
+              return (
+                <p>
+                  <Astro.self
+                    content={node.children}
+                    packages={packages}
+                    packageName={packageName}
+                    tag="span"
+                  />
+                </p>
+              );
+            case 'note':
+              return (
+                <aside class:list={['api-doc-note', `api-doc-note--${node.value ?? 'note'}`]}>
+                  <strong>{node.value ?? 'Note'}</strong>
+                  <Astro.self
+                    content={node.children}
+                    packages={packages}
+                    packageName={packageName}
+                    tag="div"
+                  />
+                </aside>
+              );
+            case 'list': {
+              if (node.style === 'table') {
+                return (
+                  <table>
+                    {node.header && (
+                      <thead>
+                        <tr>
+                          <th>
+                            <Astro.self
+                              content={node.header.term}
+                              packages={packages}
+                              packageName={packageName}
+                              tag="span"
+                            />
+                          </th>
+                          <th>
+                            <Astro.self
+                              content={node.header.description}
+                              packages={packages}
+                              packageName={packageName}
+                              tag="span"
+                            />
+                          </th>
+                        </tr>
+                      </thead>
+                    )}
+                    <tbody>
+                      {(node.items ?? []).map((item) => (
+                        <tr>
+                          <td>
+                            <Astro.self
+                              content={item.term}
+                              packages={packages}
+                              packageName={packageName}
+                              tag="span"
+                            />
+                          </td>
+                          <td>
+                            <Astro.self
+                              content={item.description}
+                              packages={packages}
+                              packageName={packageName}
+                              tag="span"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              }
+              const List = node.style === 'number' ? 'ol' : 'ul';
+              return (
+                <List>
+                  {(node.items ?? []).map((item) => (
+                    <li>
+                      {item.term && (
+                        <strong>
+                          <Astro.self
+                            content={item.term}
+                            packages={packages}
+                            packageName={packageName}
+                            tag="span"
+                          />
+                          {': '}
+                        </strong>
+                      )}
+                      <Astro.self
+                        content={item.description}
+                        packages={packages}
+                        packageName={packageName}
+                        tag="span"
+                      />
+                    </li>
+                  ))}
+                </List>
+              );
+            }
+            default:
+              return <Fragment set:text={node.text ?? node.value ?? ''} />;
+          }
+        })
+      }
+    </Tag>
+  )
+}
+
+<style>
+  .api-doc-content {
+    line-height: 1.55;
+  }
+
+  .api-doc-content :global(code) {
+    font-size: 0.9em;
+  }
+
+  .api-doc-code {
+    margin-block: 1rem;
+  }
+
+  .api-doc-note {
+    margin-block: 1rem;
+    padding: 0.75rem 1rem;
+    border-inline-start: 0.25rem solid var(--sl-color-accent);
+    border-radius: 0.35rem;
+    background: var(--sl-color-accent-low);
+  }
+
+  .api-doc-note > strong {
+    display: block;
+    margin-block-end: 0.35rem;
+    text-transform: capitalize;
+  }
+
+  .api-doc-note--warning,
+  .api-doc-note--caution {
+    border-inline-start-color: var(--sl-color-orange);
+  }
+
+  .api-doc-content :global(table) {
+    display: table;
+    width: 100%;
+  }
+</style>

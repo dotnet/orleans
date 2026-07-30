@@ -1,0 +1,129 @@
+---
+title: Microsoft Orleans
+description: Build scalable, resilient distributed applications with the familiar tools and patterns of .NET.
+template: splash
+editUrl: false
+prev: false
+next: false
+head:
+  - tag: title
+    content: Microsoft Orleans — Distributed systems, simplified
+hero:
+  tagline: Distributed systems, simplified. <p>Build scalable, resilient applications using virtual actors and the familiar tools and patterns of .NET.</p>
+  image:
+    alt: Microsoft Orleans
+    file: ../../assets/orleans-logo.svg
+  actions:
+    - text: Get started
+      link: /orleans/docs/quickstarts/build-your-first-orleans-app/
+    - text: Explore docs
+      link: /orleans/docs/
+      variant: secondary
+    - text: View samples
+      link: /orleans/samples/
+      variant: minimal
+---
+
+import { Card, CardGrid, Code, LinkCard } from '@astrojs/starlight/components';
+
+## Distributed systems, without distributed complexity
+
+<CardGrid>
+  <Card title="Virtual actors" icon="puzzle">
+    Model your application as grains with stable identities, behavior, and state. Orleans activates and locates them on demand.
+  </Card>
+  <Card title="Automatic lifecycle" icon="setting">
+    Let the runtime place, activate, deactivate, and recover grains while your code focuses on business behavior.
+  </Card>
+  <Card title="Elastic by design" icon="rocket">
+    Scale from one process to a resilient cluster without changing the programming model or managing actor placement.
+  </Card>
+  <Card title="Built for .NET" icon="laptop">
+    Use interfaces, dependency injection, async/await, generic hosting, and the libraries your team already knows.
+  </Card>
+</CardGrid>
+
+## Familiar code. Distributed by default.
+
+Define a grain contract, implement it as an ordinary .NET class, and call it from anywhere in the cluster.
+
+<div class="home-code-grid">
+  <div>
+    <p class="home-code-label">Define a grain</p>
+    <Code code={`public interface ICounter : IGrainWithStringKey
+{
+    Task<int> Add(int value);
+}
+
+public sealed class Counter : Grain, ICounter
+{
+    private int _value;
+
+    public Task<int> Add(int value) =>
+        Task.FromResult(_value += value);
+}`} lang="csharp" title="Counter.cs" />
+  </div>
+  <div>
+    <p class="home-code-label">Call it from a client or another grain</p>
+    <Code code={`var counter = client.GetGrain<ICounter>("orders");
+var total = await counter.Add(1);`} lang="csharp" title="Program.cs" />
+  </div>
+</div>
+
+## Production capabilities included
+
+<CardGrid>
+  <LinkCard
+    icon="database"
+    href="/orleans/docs/grains/grain-persistence/"
+    title="Persistence"
+    description="Keep grain state in Azure Storage, Cosmos DB, relational databases, Redis, DynamoDB, or custom stores."
+  />
+  <LinkCard
+    icon="random"
+    href="/orleans/docs/streaming/"
+    title="Streaming"
+    description="Build reliable producers and consumers over managed, persistent, or in-memory stream providers."
+  />
+  <LinkCard
+    icon="clock"
+    href="/orleans/docs/grains/timers-and-reminders/"
+    title="Timers and reminders"
+    description="Schedule transient work or durable callbacks which survive activations and failures."
+  />
+  <LinkCard
+    icon="approve-check"
+    href="/orleans/docs/grains/transactions/"
+    title="Distributed transactions"
+    description="Coordinate state changes across grains with decentralized ACID transactions."
+  />
+</CardGrid>
+
+## Start building
+
+<CardGrid>
+  <LinkCard
+    icon="rocket"
+    href="/orleans/docs/quickstarts/build-your-first-orleans-app/"
+    title="Build your first app"
+    description="Create a silo, define a grain, and make your first distributed call."
+  />
+  <LinkCard
+    icon="open-book"
+    href="/orleans/docs/"
+    title="Read the docs"
+    description="Explore grains, hosting, deployment, streaming, persistence, and runtime concepts."
+  />
+  <LinkCard
+    icon="puzzle"
+    href="/orleans/samples/"
+    title="Browse samples"
+    description="Learn from complete applications and focused examples maintained in this repository."
+  />
+  <LinkCard
+    icon="github"
+    href="https://github.com/dotnet/orleans"
+    title="Join the project"
+    description="Read the source, open an issue, or contribute to Orleans on GitHub."
+  />
+</CardGrid>

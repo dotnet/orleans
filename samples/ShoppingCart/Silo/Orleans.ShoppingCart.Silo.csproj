@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <IsTransformWebConfigDisabled>false</IsTransformWebConfigDisabled>
+    <UserSecretsId>98f9767c-ea86-409e-bde7-f6d352a55cce</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Blazor.Serialization" />
+    <PackageReference Include="Blazor.LocalStorage" />
+    <PackageReference Include="Bogus" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.Cosmos\Orleans.Clustering.Cosmos.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
+    <PackageReference Include="MudBlazor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Abstractions\Orleans.ShoppingCart.Abstractions.csproj" />
+    <ProjectReference Include="..\Grains\Orleans.ShoppingCart.Grains.csproj" />
+  </ItemGroup>
+
+  <Target Name="ZipPublishOutput" AfterTargets="Publish">
+    <Delete Files="$(ProjectDir)\..\silo.zip" />
+    <ZipDirectory SourceDirectory="$(PublishDir)" DestinationFile="$(ProjectDir)\..\silo.zip" />
+  </Target>
+
+</Project>

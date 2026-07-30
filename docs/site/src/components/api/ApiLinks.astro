@@ -1,0 +1,34 @@
+---
+interface Props {
+  nuget?: string;
+  source?: string;
+  markdown?: string;
+}
+
+const { nuget, source, markdown } = Astro.props;
+---
+
+<nav class="api-links" aria-label="API resources">
+  {nuget && <a href={nuget}>NuGet</a>}
+  {source && <a href={source}>Source</a>}
+  {markdown && <a href={markdown}>Markdown</a>}
+</nav>
+
+<style>
+  .api-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-block: 0.75rem 1.25rem;
+  }
+
+  .api-links a {
+    display: inline-flex;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.35rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+</style>

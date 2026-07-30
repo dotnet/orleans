@@ -1,0 +1,101 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import ApiBreadcrumbs from '../../../../components/api/ApiBreadcrumbs.astro';
+import ApiLinks from '../../../../components/api/ApiLinks.astro';
+import { getPackages } from '../../../../lib/api/collection';
+import {
+  packagePath,
+  packageSlug,
+  withBase,
+} from '../../../../lib/api/packages';
+import { buildApiSidebar } from '../../../../lib/api/sidebar';
+
+const packages = (await getPackages()).map((entry) => entry.data);
+const sidebar = buildApiSidebar(packages);
+const base = import.meta.env.BASE_URL;
+const headings = packages.map((pkg) => ({
+  depth: 2 as const,
+  slug: packageSlug(pkg.package.name),
+  text: pkg.package.name,
+}));
+---
+
+<StarlightPage
+  frontmatter={{
+    title: '.NET Orleans API reference',
+    description: 'Browse API documentation generated directly from Orleans packages.',
+    editUrl: false,
+    prev: false,
+    next: false,
+    tableOfContents: false,
+    pagefind: true,
+  }}
+  sidebar={sidebar}
+  headings={headings}
+>
+  <ApiBreadcrumbs items={[{ label: 'Documentation', href: withBase(base, '/docs/') }, { label: 'API reference' }]} />
+  <p>
+    Browse package, type, and member documentation generated directly from Orleans assemblies,
+    XML comments, and Source Link metadata.
+  </p>
+  <ApiLinks markdown={withBase(base, '/docs/api/csharp.md')} />
+  {
+    packages.length === 0 ? (
+      <aside class="api-empty">
+        <h2>API metadata has not been generated yet</h2>
+        <p>
+          Add PackageJsonGenerator output to <code>docs/site/src/data/pkgs</code>. Package, type,
+          member, sidebar, search, and Markdown routes are generated automatically.
+        </p>
+      </aside>
+    ) : (
+      <div class="api-package-grid">
+        {packages.map((pkg) => (
+          <article>
+            <h2 id={packageSlug(pkg.package.name)}>
+              <a href={withBase(base, packagePath(pkg.package.name))}>{pkg.package.name}</a>
+            </h2>
+            <p>
+              <strong>{pkg.package.version}</strong> · {pkg.package.targetFramework}
+            </p>
+            <p>{pkg.types.length} public types</p>
+          </article>
+        ))}
+      </div>
+    )
+  }
+</StarlightPage>
+
+<style>
+  .api-empty {
+    margin-block-start: 1.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem;
+    background: var(--sl-color-bg-nav);
+  }
+
+  .api-empty h2 {
+    margin-block-start: 0;
+  }
+
+  .api-package-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 1rem;
+    margin-block-start: 1.5rem;
+  }
+
+  .api-package-grid article {
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem;
+    background: var(--sl-color-bg-nav);
+  }
+
+  .api-package-grid h2 {
+    margin-block-start: 0;
+    font-size: 1.1rem;
+    overflow-wrap: anywhere;
+  }
+</style>

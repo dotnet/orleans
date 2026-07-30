@@ -1,0 +1,49 @@
+---
+interface Breadcrumb {
+  label: string;
+  href?: string;
+}
+
+interface Props {
+  items: Breadcrumb[];
+}
+
+const { items } = Astro.props;
+---
+
+<nav class="api-breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    {
+      items.map((item, index) => (
+        <li>
+          {item.href && index < items.length - 1 ? <a href={item.href}>{item.label}</a> : <span>{item.label}</span>}
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+
+<style>
+  .api-breadcrumbs {
+    margin-block-end: 1.25rem;
+    font-size: 0.875rem;
+  }
+
+  .api-breadcrumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .api-breadcrumbs li:not(:last-child)::after {
+    margin-inline-start: 0.4rem;
+    color: var(--sl-color-gray-3);
+    content: '/';
+  }
+
+  .api-breadcrumbs span {
+    color: var(--sl-color-gray-2);
+  }
+</style>

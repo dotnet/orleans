@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "HelloOrleans.Dashboard": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:8080",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "http://localhost:5001",
+      "dotnetRunMessages": true
+    }
+  }
+}
