@@ -1,8 +1,5 @@
-using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -14,6 +11,7 @@ namespace Orleans.CodeGenerator;
 
 internal class FieldIdAssignmentHelper
 {
+    private const string NoAssignedFieldIdsFailureReason = "no field ids were assigned to any candidate serializable members";
     private readonly GenerateFieldIds _implicitMemberSelectionStrategy;
     private readonly ImmutableArray<IParameterSymbol> _constructorParameters;
     private readonly LibraryTypes _libraryTypes;
@@ -30,14 +28,45 @@ internal class FieldIdAssignmentHelper
         _constructorParameters = constructorParameters;
         _implicitMemberSelectionStrategy = implicitMemberSelectionStrategy;
         _libraryTypes = libraryTypes;
-        _memberSymbols = GetMembers(typeSymbol).ToArray();
+        _memberSymbols = [.. GetMembers(typeSymbol)];
 
-        IsValidForSerialization = _implicitMemberSelectionStrategy != GenerateFieldIds.None && !HasMemberWithIdAnnotation() ? GenerateImplicitFieldIds() : ExtractFieldIdAnnotations();
+        var isValidForSerialization = _implicitMemberSelectionStrategy != GenerateFieldIds.None && !HasMemberWithIdAnnotation()
+            ? GenerateImplicitFieldIds()
+            : ExtractFieldIdAnnotations();
+        if (HasCandidateSerializableMembers() && _symbols.Count == 0)
+        {
+            FailureReason ??= NoAssignedFieldIdsFailureReason;
+            isValidForSerialization = false;
+        }
+
+        IsValidForSerialization = isValidForSerialization;
     }
 
     public bool TryGetSymbolKey(ISymbol symbol, out (uint, bool) key) => _symbols.TryGetValue(symbol, out key);
 
     private bool HasMemberWithIdAnnotation() => Array.Exists(_memberSymbols, member => member.HasAttribute(_libraryTypes.IdAttributeType));
+
+    private bool HasCandidateSerializableMembers()
+    {
+        foreach (var member in _memberSymbols)
+        {
+            if (member is IFieldSymbol)
+            {
+                return true;
+            }
+
+            if (member is IPropertySymbol property
+                && (_implicitMemberSelectionStrategy != GenerateFieldIds.None
+                    || property.HasAttribute(_libraryTypes.IdAttributeType)
+                    || PropertyUtility.GetMatchingPrimaryConstructorParameter(property, _constructorParameters) is not null
+                    || PropertyUtility.GetMatchingField(property, _memberSymbols) is not null))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private IEnumerable<ISymbol> GetMembers(INamedTypeSymbol symbol)
     {
@@ -68,48 +97,54 @@ internal class FieldIdAssignmentHelper
         {
             if (member is IPropertySymbol prop)
             {
-                var id = CodeGenerator.GetId(_libraryTypes, prop);
+                var constructorParameter = PropertyUtility.GetMatchingPrimaryConstructorParameter(prop, _constructorParameters);
+                var id = GeneratedCodeUtilities.GetId(_libraryTypes, prop);
 
                 if (id.HasValue)
                 {
                     _symbols[member] = (id.Value, false);
                 }
-                else if (PropertyUtility.GetMatchingPrimaryConstructorParameter(prop, _constructorParameters) is { } prm)
+                else if (constructorParameter is not null)
                 {
-                    id = CodeGenerator.GetId(_libraryTypes, prop);
+                    var matchingField = PropertyUtility.GetMatchingField(prop, _memberSymbols);
+                    if (matchingField is not null && GeneratedCodeUtilities.GetId(_libraryTypes, matchingField).HasValue)
+                    {
+                        continue;
+                    }
+
+                    id = GeneratedCodeUtilities.GetId(_libraryTypes, constructorParameter);
                     if (id.HasValue)
                     {
                         _symbols[member] = (id.Value, true);
                     }
                     else
                     {
-                        _symbols[member] = ((uint)_constructorParameters.IndexOf(prm), true);
+                        _symbols[member] = ((uint)_constructorParameters.IndexOf(constructorParameter), true);
                     }
                 }
             }
 
             if (member is IFieldSymbol field)
             {
-                var id = CodeGenerator.GetId(_libraryTypes, field);
+                var id = GeneratedCodeUtilities.GetId(_libraryTypes, field);
                 var isConstructorParameter = false;
+                IPropertySymbol? property = null;
+                IParameterSymbol? constructorParameter = null;
 
-                if (!id.HasValue)
+                property = PropertyUtility.GetMatchingProperty(field, _memberSymbols);
+                if (property is not null)
                 {
-                    var property = PropertyUtility.GetMatchingProperty(field, _memberSymbols);
-                    if (property is null)
-                    {
-                        continue;
-                    }
+                    constructorParameter = PropertyUtility.GetMatchingPrimaryConstructorParameter(property, _constructorParameters);
+                }
 
-                    id = CodeGenerator.GetId(_libraryTypes, property);
-                    if (!id.HasValue)
+                if (!id.HasValue && property is not null)
+                {
+                    id = GeneratedCodeUtilities.GetId(_libraryTypes, property);
+                    if (!id.HasValue && constructorParameter is not null)
                     {
-                        var constructorParameter = _constructorParameters.FirstOrDefault(x => x.Name.Equals(property.Name, StringComparison.OrdinalIgnoreCase));
-                        if (constructorParameter is not null)
-                        {
-                            id = (uint)_constructorParameters.IndexOf(constructorParameter);
-                            isConstructorParameter = true;
-                        }
+                        id = GeneratedCodeUtilities.GetId(_libraryTypes, constructorParameter)
+                            ?? (uint)_constructorParameters.IndexOf(constructorParameter);
+                        isConstructorParameter = true;
                     }
                 }
 

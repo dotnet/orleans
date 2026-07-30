@@ -1,30 +1,16 @@
 using Microsoft.CodeAnalysis;
 
-#nullable disable
-namespace Orleans.CodeGenerator
+namespace Orleans.CodeGenerator;
+
+internal sealed class WellKnownCodecDescription(ITypeSymbol? underlyingType, INamedTypeSymbol? codecType)
 {
-    internal sealed class WellKnownCodecDescription
-    {
-        public WellKnownCodecDescription(ITypeSymbol underlyingType, INamedTypeSymbol codecType)
-        {
-            UnderlyingType = underlyingType;
-            CodecType = codecType;
-        }
+    public readonly ITypeSymbol UnderlyingType = underlyingType!;
+    public readonly INamedTypeSymbol CodecType = codecType!;
+}
 
-        public readonly ITypeSymbol UnderlyingType;
-        public readonly INamedTypeSymbol CodecType;
-    }
+internal sealed class WellKnownCopierDescription(ITypeSymbol underlyingType, INamedTypeSymbol codecType) : ICopierDescription
+{
+    public ITypeSymbol UnderlyingType { get; } = underlyingType;
 
-    internal sealed class WellKnownCopierDescription : ICopierDescription
-    {
-        public WellKnownCopierDescription(ITypeSymbol underlyingType, INamedTypeSymbol codecType)
-        {
-            UnderlyingType = underlyingType;
-            CopierType = codecType;
-        }
-
-        public ITypeSymbol UnderlyingType { get; }
-
-        public INamedTypeSymbol CopierType { get; }
-    }
+    public INamedTypeSymbol CopierType { get; } = codecType;
 }

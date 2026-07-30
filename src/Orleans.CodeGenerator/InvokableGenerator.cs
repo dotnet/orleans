@@ -2,943 +2,917 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Orleans.CodeGenerator.Diagnostics;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Linq.Expressions;
 
-#nullable disable
-namespace Orleans.CodeGenerator
+namespace Orleans.CodeGenerator;
+
+/// <summary>
+/// Generates RPC stub objects called invokers.
+/// </summary>
+internal class InvokableGenerator(ProxyGenerationContext generationContext)
 {
-    /// <summary>
-    /// Generates RPC stub objects called invokers.
-    /// </summary>
-    internal class InvokableGenerator
-    {
-        private readonly CodeGenerator _codeGenerator;
+    private readonly ProxyGenerationContext _generationContext = generationContext;
 
-        public InvokableGenerator(CodeGenerator codeGenerator)
+    private LibraryTypes LibraryTypes => _generationContext.LibraryTypes;
+
+    public GeneratedInvokableDescription Generate(InvokableMethodDescription invokableMethodInfo)
+    {
+        var method = invokableMethodInfo.Method;
+        var generatedClassName = GetSimpleClassName(invokableMethodInfo);
+
+        var baseClassType = GetBaseClassType(invokableMethodInfo);
+        var fieldDescriptions = GetFieldDescriptions(invokableMethodInfo);
+        var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
+        var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
+        var accessibility = GetAccessibility(method);
+        var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
+
+        List<INamedTypeSymbol> serializationHooks = new();
+        if (baseClassType.GetAttributes(LibraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
         {
-            _codeGenerator = codeGenerator;
+            foreach (var hookAttribute in hookAttributes)
+            {
+                var hookType = (INamedTypeSymbol)hookAttribute.ConstructorArguments[0].Value!;
+                serializationHooks.Add(hookType);
+            }
         }
 
-        private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+        var targetField = fieldDescriptions.OfType<TargetFieldDescription>().Single();
 
-        public GeneratedInvokableDescription Generate(InvokableMethodDescription invokableMethodInfo)
+        var accessibilityKind = accessibility switch
         {
-            var method = invokableMethodInfo.Method;
-            var generatedClassName = GetSimpleClassName(invokableMethodInfo);
+            Accessibility.Public => SyntaxKind.PublicKeyword,
+            _ => SyntaxKind.InternalKeyword,
+        };
 
-            var baseClassType = GetBaseClassType(invokableMethodInfo);
-            var fieldDescriptions = GetFieldDescriptions(invokableMethodInfo);
-            var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
-            var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
-            var accessibility = GetAccessibility(method);
-            var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
+        var classDeclaration = GetClassDeclarationSyntax(
+            invokableMethodInfo,
+            generatedClassName,
+            baseClassType,
+            fieldDescriptions,
+            fields,
+            ctor,
+            compoundTypeAliases,
+            targetField,
+            accessibilityKind);
 
-            List<INamedTypeSymbol> serializationHooks = new();
-            if (baseClassType.GetAttributes(LibraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
+        string? returnValueInitializerMethod = null;
+        if (baseClassType.GetAttribute(LibraryTypes.ReturnValueProxyAttribute) is { ConstructorArguments: { Length: > 0 } attrArgs })
+        {
+            returnValueInitializerMethod = (string?)attrArgs[0].Value;
+        }
+
+        while (baseClassType.HasAttribute(LibraryTypes.SerializerTransparentAttribute))
+        {
+            baseClassType = baseClassType.BaseType!;
+        }
+
+        var invokerDescription = new GeneratedInvokableDescription(
+            invokableMethodInfo,
+            accessibility,
+            generatedClassName,
+            GeneratedCodeUtilities.GetGeneratedNamespaceName(invokableMethodInfo.ContainingInterface),
+            [.. fieldDescriptions.OfType<IMemberDescription>()],
+            serializationHooks,
+            baseClassType,
+            ctorArgs,
+            compoundTypeAliases,
+            returnValueInitializerMethod,
+            classDeclaration);
+        return invokerDescription;
+
+        static Accessibility GetAccessibility(IMethodSymbol methodSymbol)
+        {
+            Accessibility accessibility = methodSymbol.DeclaredAccessibility;
+            var t = methodSymbol.ContainingType;
+            while (t is not null)
             {
-                foreach (var hookAttribute in hookAttributes)
+                if ((int)t.DeclaredAccessibility < (int)accessibility)
                 {
-                    var hookType = (INamedTypeSymbol)hookAttribute.ConstructorArguments[0].Value;
-                    serializationHooks.Add(hookType);
+                    accessibility = t.DeclaredAccessibility;
                 }
+
+                t = t.ContainingType;
             }
 
-            var targetField = fieldDescriptions.OfType<TargetFieldDescription>().Single();
+            return accessibility;
+        }
+    }
 
-            var accessibilityKind = accessibility switch
+    private ClassDeclarationSyntax GetClassDeclarationSyntax(
+        InvokableMethodDescription method,
+        string generatedClassName,
+        INamedTypeSymbol baseClassType,
+        List<InvokerFieldDescription> fieldDescriptions,
+        MemberDeclarationSyntax[] fields,
+        ConstructorDeclarationSyntax? ctor,
+        List<CompoundTypeAliasComponent[]> compoundTypeAliases,
+        TargetFieldDescription targetField,
+        SyntaxKind accessibilityKind)
+    {
+        var classDeclaration = ClassDeclaration(generatedClassName)
+            .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
+            .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
+            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
+            .AddMembers(fields);
+
+        foreach (var alias in compoundTypeAliases)
+        {
+            classDeclaration = classDeclaration.AddAttributeLists(
+                AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(alias))));
+        }
+
+        if (ctor != null)
+        {
+            classDeclaration = classDeclaration.AddMembers(ctor);
+        }
+
+        if (method.ResponseTimeoutTicks.HasValue)
+        {
+            classDeclaration = classDeclaration.AddMembers(GenerateResponseTimeoutPropertyMembers(method.ResponseTimeoutTicks.Value));
+        }
+
+        classDeclaration = AddOptionalMembers(classDeclaration,
+                GenerateGetArgumentCount(method),
+                GenerateGetMethodName(method),
+                GenerateGetInterfaceName(method),
+                GenerateGetActivityName(method),
+                GenerateGetInterfaceType(method),
+                GenerateGetMethod(),
+                GenerateSetTargetMethod(method, targetField, fieldDescriptions),
+                GenerateGetTargetMethod(targetField),
+                GenerateDisposeMethod(fieldDescriptions, baseClassType),
+                GenerateGetArgumentMethod(method, fieldDescriptions),
+                GenerateSetArgumentMethod(method, fieldDescriptions),
+                GenerateInvokeInnerMethod(method, fieldDescriptions, targetField),
+                GenerateGetCancellationTokenMethod(method, fieldDescriptions),
+                GenerateTryCancelMethod(method, fieldDescriptions),
+                GenerateIsCancellableProperty(method));
+
+        if (method.AllTypeParameters.Count > 0)
+        {
+            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, method.AllTypeParameters);
+        }
+
+        return classDeclaration;
+    }
+
+    private MemberDeclarationSyntax[] GenerateResponseTimeoutPropertyMembers(long value)
+    {
+        var timespanField = FieldDeclaration(
+                    VariableDeclaration(
+                        LibraryTypes.TimeSpan.ToTypeSyntax(),
+                        SingletonSeparatedList(VariableDeclarator("_responseTimeoutValue")
+                        .WithInitializer(EqualsValueClause(
+                            InvocationExpression(
+                                IdentifierName("global::System.TimeSpan").Member("FromTicks"),
+                                ArgumentList(SeparatedList(
+                                [
+                                    Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(value)))
+                                ]))))))))
+                    .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+
+        var responseTimeoutProperty = MethodDeclaration(NullableType(LibraryTypes.TimeSpan.ToTypeSyntax()), "GetDefaultResponseTimeout")
+            .WithExpressionBody(ArrowExpressionClause(IdentifierName("_responseTimeoutValue")))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
+        return [timespanField, responseTimeoutProperty];
+    }
+
+    private static ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax?[] items)
+        => decl.WithMembers(decl.Members.AddRange(items.OfType<MemberDeclarationSyntax>()));
+
+    internal AttributeSyntax GetCompoundTypeAliasAttribute(CompoundTypeAliasComponent[] argValues)
+    {
+        var args = new AttributeArgumentSyntax[argValues.Length];
+        for (var i = 0; i < argValues.Length; i++)
+        {
+            ExpressionSyntax value;
+            value = argValues[i].Value switch
             {
-                Accessibility.Public => SyntaxKind.PublicKeyword,
-                _ => SyntaxKind.InternalKeyword,
+                string stringValue => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringValue)),
+                ITypeSymbol typeValue => TypeOfExpression(typeValue.ToOpenTypeSyntax()),
+                _ => throw new InvalidOperationException($"Unsupported value")
             };
 
-            var classDeclaration = GetClassDeclarationSyntax(
-                invokableMethodInfo,
-                generatedClassName,
-                baseClassType,
-                fieldDescriptions,
-                fields,
-                ctor,
-                compoundTypeAliases,
-                targetField,
-                accessibilityKind);
-
-            string returnValueInitializerMethod = null;
-            if (baseClassType.GetAttribute(LibraryTypes.ReturnValueProxyAttribute) is { ConstructorArguments: { Length: > 0 } attrArgs })
-            {
-                returnValueInitializerMethod = (string)attrArgs[0].Value;
-            }
-
-            while (baseClassType.HasAttribute(LibraryTypes.SerializerTransparentAttribute))
-            {
-                baseClassType = baseClassType.BaseType;
-            }
-
-            var invokerDescription = new GeneratedInvokableDescription(
-                invokableMethodInfo,
-                accessibility,
-                generatedClassName,
-                CodeGenerator.GetGeneratedNamespaceName(invokableMethodInfo.ContainingInterface),
-                fieldDescriptions.OfType<IMemberDescription>().ToList(),
-                serializationHooks,
-                baseClassType,
-                ctorArgs,
-                compoundTypeAliases,
-                returnValueInitializerMethod,
-                classDeclaration);
-            return invokerDescription;
-
-            static Accessibility GetAccessibility(IMethodSymbol methodSymbol)
-            {
-                Accessibility accessibility = methodSymbol.DeclaredAccessibility;
-                var t = methodSymbol.ContainingType;
-                while (t is not null)
-                {
-                    if ((int)t.DeclaredAccessibility < (int)accessibility)
-                    {
-                        accessibility = t.DeclaredAccessibility;
-                    }
-
-                    t = t.ContainingType;
-                }
-
-                return accessibility;
-            }
+            args[i] = AttributeArgument(value);
         }
 
-        private ClassDeclarationSyntax GetClassDeclarationSyntax(
-            InvokableMethodDescription method,
-            string generatedClassName,
-            INamedTypeSymbol baseClassType,
-            List<InvokerFieldDescription> fieldDescriptions,
-            MemberDeclarationSyntax[] fields,
-            ConstructorDeclarationSyntax ctor,
-            List<CompoundTypeAliasComponent[]> compoundTypeAliases,
-            TargetFieldDescription targetField,
-            SyntaxKind accessibilityKind)
+        return Attribute(LibraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
+    }
+
+    internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription, InvokableMethodId invokableId)
+    {
+        var result = new List<CompoundTypeAliasComponent[]>(2);
+        var containingInterface = methodDescription.ContainingInterface;
+        if (methodDescription.HasAlias)
         {
-            var classDeclaration = ClassDeclaration(generatedClassName)
-                .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
-                .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
-                .AddMembers(fields);
-
-            foreach (var alias in compoundTypeAliases)
-            {
-                classDeclaration = classDeclaration.AddAttributeLists(
-                    AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(alias))));
-            }
-
-            if (ctor != null)
-            {
-                classDeclaration = classDeclaration.AddMembers(ctor);
-            }
-
-            if (method.ResponseTimeoutTicks.HasValue)
-            {
-                classDeclaration = classDeclaration.AddMembers(GenerateResponseTimeoutPropertyMembers(method.ResponseTimeoutTicks.Value));
-            }
-
-            classDeclaration = AddOptionalMembers(classDeclaration,
-                    GenerateGetArgumentCount(method),
-                    GenerateGetMethodName(method),
-                    GenerateGetInterfaceName(method),
-                    GenerateGetActivityName(method),
-                    GenerateGetInterfaceType(method),
-                    GenerateGetMethod(),
-                    GenerateSetTargetMethod(method, targetField, fieldDescriptions),
-                    GenerateGetTargetMethod(targetField),
-                    GenerateDisposeMethod(fieldDescriptions, baseClassType),
-                    GenerateGetArgumentMethod(method, fieldDescriptions),
-                    GenerateSetArgumentMethod(method, fieldDescriptions),
-                    GenerateInvokeInnerMethod(method, fieldDescriptions, targetField),
-                    GenerateGetCancellationTokenMethod(method, fieldDescriptions),
-                    GenerateTryCancelMethod(method, fieldDescriptions),
-                    GenerateIsCancellableProperty(method));
-
-            if (method.AllTypeParameters.Count > 0)
-            {
-                classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, method.AllTypeParameters);
-            }
-
-            return classDeclaration;
+            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
         }
 
-        private MemberDeclarationSyntax[] GenerateResponseTimeoutPropertyMembers(long value)
-        {
-            var timespanField = FieldDeclaration(
-                        VariableDeclaration(
-                            LibraryTypes.TimeSpan.ToTypeSyntax(),
-                            SingletonSeparatedList(VariableDeclarator("_responseTimeoutValue")
-                            .WithInitializer(EqualsValueClause(
-                                InvocationExpression(
-                                    IdentifierName("global::System.TimeSpan").Member("FromTicks"),
-                                    ArgumentList(SeparatedList(new[]
-                                    {
-                                        Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(value)))
-                                    }))))))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+        result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
+        return result;
+    }
 
-            var responseTimeoutProperty = MethodDeclaration(NullableType(LibraryTypes.TimeSpan.ToTypeSyntax()), "GetDefaultResponseTimeout")
-                .WithExpressionBody(ArrowExpressionClause(IdentifierName("_responseTimeoutValue")))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
-            return new MemberDeclarationSyntax[] { timespanField, responseTimeoutProperty };
+    public static CompoundTypeAliasComponent[] GetCompoundTypeAliasComponents(
+        InvokableMethodId invokableId,
+        INamedTypeSymbol containingInterface,
+        string methodId)
+    {
+        var proxyBase = invokableId.ProxyBase;
+        var proxyBaseComponents = proxyBase.CompositeAliasComponents;
+        var extensionArgCount = proxyBase.IsExtension ? 1 : 0;
+        var alias = new CompoundTypeAliasComponent[1 + proxyBaseComponents.Length + extensionArgCount + 2];
+        alias[0] = new("inv");
+        for (var i = 0; i < proxyBaseComponents.Length; i++)
+        {
+            alias[i + 1] = proxyBaseComponents[i];
         }
 
-        private ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax[] items)
-            => decl.WithMembers(decl.Members.AddRange(items.Where(i => i != null)));
+        alias[1 + proxyBaseComponents.Length] = new(containingInterface);
 
-        internal AttributeSyntax GetCompoundTypeAliasAttribute(CompoundTypeAliasComponent[] argValues)
+        // For grain extensions, also explicitly include the method's containing type.
+        // This is to distinguish between different extension methods with the same id (eg, alias) but different containing types.
+        if (proxyBase.IsExtension)
         {
-            var args = new AttributeArgumentSyntax[argValues.Length];
-            for (var i = 0; i < argValues.Length; i++)
-            {
-                ExpressionSyntax value;
-                value = argValues[i].Value switch
-                {
-                    string stringValue => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringValue)),
-                    ITypeSymbol typeValue => TypeOfExpression(typeValue.ToOpenTypeSyntax()),
-                    _ => throw new InvalidOperationException($"Unsupported value")
-                };
-
-                args[i] = AttributeArgument(value);
-            }
-
-            return Attribute(LibraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
+            alias[1 + proxyBaseComponents.Length + 1] = new(invokableId.Method.ContainingType);
         }
 
-        internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription, InvokableMethodId invokableId)
+        alias[1 + proxyBaseComponents.Length + extensionArgCount + 1] = new(methodId);
+        return alias;
+    }
+
+    private static INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
+    {
+        var methodReturnType = method.Method.ReturnType;
+        if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
         {
-            var result = new List<CompoundTypeAliasComponent[]>(2);
-            var containingInterface = methodDescription.ContainingInterface;
-            if (methodDescription.HasAlias)
-            {
-                result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
-            }
-
-            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
-            return result;
-        }
-
-        public static CompoundTypeAliasComponent[] GetCompoundTypeAliasComponents(
-            InvokableMethodId invokableId,
-            INamedTypeSymbol containingInterface,
-            string methodId)
-        {
-            var proxyBase = invokableId.ProxyBase;
-            var proxyBaseComponents = proxyBase.CompositeAliasComponents;
-            var extensionArgCount = proxyBase.IsExtension ? 1 : 0;
-            var alias = new CompoundTypeAliasComponent[1 + proxyBaseComponents.Length + extensionArgCount + 2];
-            alias[0] = new("inv");
-            for (var i = 0; i < proxyBaseComponents.Length; i++)
-            {
-                alias[i + 1] = proxyBaseComponents[i];
-            }
-
-            alias[1 + proxyBaseComponents.Length] = new(containingInterface);
-
-            // For grain extensions, also explicitly include the method's containing type.
-            // This is to distinguish between different extension methods with the same id (eg, alias) but different containing types.
-            if (proxyBase.IsExtension)
-            {
-                alias[1 + proxyBaseComponents.Length + 1] = new(invokableId.Method.ContainingType);
-            }
-
-            alias[1 + proxyBaseComponents.Length + extensionArgCount + 1] = new(methodId);
-            return alias;
-        }
-
-        private INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
-        {
-            var methodReturnType = method.Method.ReturnType;
-            if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
-            {
-                throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));
-            }
-
-            if (method.InvokableBaseTypes.TryGetValue(namedMethodReturnType, out var baseClassType))
-            {
-                return baseClassType;
-            }
-
-            if (namedMethodReturnType.ConstructedFrom is { IsGenericType: true, IsUnboundGenericType: false } constructedFrom)
-            {
-                var unbound = constructedFrom.ConstructUnboundGenericType();
-                if (method.InvokableBaseTypes.TryGetValue(unbound, out baseClassType))
-                {
-                    return baseClassType.ConstructedFrom.Construct(namedMethodReturnType.TypeArguments.ToArray());
-                }
-            }
-
             throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));
         }
 
-        private MemberDeclarationSyntax GenerateSetTargetMethod(
-            InvokableMethodDescription methodDescription,
-            TargetFieldDescription targetField,
-            List<InvokerFieldDescription> fieldDescriptions)
+        if (method.InvokableBaseTypes.TryGetValue(namedMethodReturnType, out var baseClassType))
         {
-            var holder = IdentifierName("holder");
-            var holderParameter = holder.Identifier;
+            return baseClassType;
+        }
 
-            var containingInterface = methodDescription.ContainingInterface;
-            var targetType = containingInterface.ToTypeSyntax();
-            var isExtension = methodDescription.Key.ProxyBase.IsExtension;
-            var (name, args) = isExtension switch
+        if (namedMethodReturnType.ConstructedFrom is { IsGenericType: true, IsUnboundGenericType: false } constructedFrom)
+        {
+            var unbound = constructedFrom.ConstructUnboundGenericType();
+            if (method.InvokableBaseTypes.TryGetValue(unbound, out baseClassType))
             {
-                true => ("GetComponent", SingletonSeparatedList(Argument(TypeOfExpression(targetType)))),
-                _ => ("GetTarget", SeparatedList<ArgumentSyntax>())
-            };
-            var getTarget = CastExpression(
-                targetType,
-                InvocationExpression(
-                    MemberAccessExpression(
-                        SyntaxKind.SimpleMemberAccessExpression,
-                        holder,
-                        IdentifierName(name)),
-                    ArgumentList(args)));
-
-            var member =
-            MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetTarget")
-                .WithParameterList(ParameterList(SingletonSeparatedList(Parameter(holderParameter).WithType(LibraryTypes.ITargetHolder.ToTypeSyntax()))))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
-
-            var assignmentExpression = AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(targetField.FieldName), getTarget);
-            if (!methodDescription.IsCancellable)
-            {
-                return member.WithExpressionBody(ArrowExpressionClause(assignmentExpression)).WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-            }
-            else
-            {
-                var ctsField = fieldDescriptions.First(f => f is CancellationTokenSourceFieldDescription);
-                var cancellationTokenType = LibraryTypes.CancellationToken.ToTypeSyntax();
-                var ctField = fieldDescriptions.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
-                return member.WithBody(Block(
-                    new List<StatementSyntax>()
-                    {
-                        ExpressionStatement(assignmentExpression),
-                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(ctsField.FieldName), ImplicitObjectCreationExpression())),
-                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(ctField.FieldName), IdentifierName(ctsField.FieldName).Member("Token")))
-                    }));
+                return baseClassType.ConstructedFrom.Construct([.. namedMethodReturnType.TypeArguments]);
             }
         }
 
-        private static MethodDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
+        throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));
+    }
+
+    private MemberDeclarationSyntax GenerateSetTargetMethod(
+        InvokableMethodDescription methodDescription,
+        TargetFieldDescription targetField,
+        List<InvokerFieldDescription> fieldDescriptions)
+    {
+        var holder = IdentifierName("holder");
+        var holderParameter = holder.Identifier;
+
+        var containingInterface = methodDescription.ContainingInterface;
+        var targetType = containingInterface.ToTypeSyntax();
+        var isExtension = methodDescription.Key.ProxyBase.IsExtension;
+        var (name, args) = isExtension switch
         {
-            return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetTarget")
-                .WithParameterList(ParameterList())
-                .WithExpressionBody(ArrowExpressionClause(IdentifierName(targetField.FieldName)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+            true => ("GetComponent", SingletonSeparatedList(Argument(TypeOfExpression(targetType)))),
+            _ => ("GetTarget", SeparatedList<ArgumentSyntax>())
+        };
+        var getTarget = CastExpression(
+            targetType,
+            InvocationExpression(
+                MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    holder,
+                    IdentifierName(name)),
+                ArgumentList(args)));
+
+        var member =
+        MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetTarget")
+            .WithParameterList(ParameterList(SingletonSeparatedList(Parameter(holderParameter).WithType(LibraryTypes.ITargetHolder.ToTypeSyntax()))))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+
+        var assignmentExpression = AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(targetField.FieldName), getTarget);
+        if (!methodDescription.IsCancellable)
+        {
+            return member.WithExpressionBody(ArrowExpressionClause(assignmentExpression)).WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
-
-        private MemberDeclarationSyntax GenerateGetCancellationTokenMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
+        else
         {
-            if (!method.IsCancellable)
-            {
-                return null;
-            }
-
-            // Method to get the cancellationToken argument
-            // C#: CancellationToken GetCancellationToken() => <fieldName>
+            var ctsField = fieldDescriptions.First(f => f is CancellationTokenSourceFieldDescription);
             var cancellationTokenType = LibraryTypes.CancellationToken.ToTypeSyntax();
-            var cancellationTokenField = fields.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
-            var member = MethodDeclaration(cancellationTokenType, "GetCancellationToken")
-                .WithExpressionBody(ArrowExpressionClause(cancellationTokenField.FieldName.ToIdentifierName()))
-                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-            return member;
-        }
-
-        private MemberDeclarationSyntax GenerateIsCancellableProperty(InvokableMethodDescription method)
-        {
-            if (!method.IsCancellable)
-            {
-                return null;
-            }
-
-            // Property to indicate if the invokable is cancellable
-            // C#: public override bool IsCancellable => true;
-            var member = PropertyDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "IsCancellable")
-                .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.TrueLiteralExpression)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
-            return member;
-        }
-
-        private MemberDeclarationSyntax GenerateTryCancelMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
-        {
-            if (!method.IsCancellable)
-            {
-                return null;
-            }
-
-            // Method to set the CancellationToken argument.
-            // C#:
-            // TryCancel()
-            // {
-            //   if (_cts is { } cts)
-            //   {
-            //     cts.Cancel(false);
-            //     return true;
-            //   }
-            //   return false;
-            // }
-            var cancellationTokenField = fields.First(f => f is CancellationTokenSourceFieldDescription);
-            var member = MethodDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "TryCancel")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
-                .WithBody(Block(
-                    IfStatement(
-                        IsPatternExpression(
-                            IdentifierName(cancellationTokenField.FieldName),
-                            RecursivePattern()
-                                .WithPropertyPatternClause(PropertyPatternClause())
-                                .WithDesignation(SingleVariableDesignation(Identifier("cts")))),
-                        Block(
-                            ExpressionStatement(InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("cts"), IdentifierName("Cancel")))
-                                .WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))])))),
-                            ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression)))),
-                    ReturnStatement(LiteralExpression(SyntaxKind.FalseLiteralExpression))));
-            return member;
-        }
-
-        private MemberDeclarationSyntax GenerateGetArgumentMethod(
-            InvokableMethodDescription methodDescription,
-            List<InvokerFieldDescription> fields)
-        {
-            if (methodDescription.Method.Parameters.Length == 0)
-                return null;
-
-            var index = IdentifierName("index");
-
-            var cases = new List<SwitchSectionSyntax>();
-            foreach (var field in fields)
-            {
-                if (field is not MethodParameterFieldDescription parameter)
+            var ctField = fieldDescriptions.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
+            return member.WithBody(Block(
+                new List<StatementSyntax>()
                 {
-                    continue;
-                }
+                    ExpressionStatement(assignmentExpression),
+                    ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(ctsField.FieldName), ImplicitObjectCreationExpression())),
+                    ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(ctField.FieldName), IdentifierName(ctsField.FieldName).Member("Token")))
+                }));
+        }
+    }
 
-                // C#: case {index}: return {field}
-                var label = CaseSwitchLabel(
-                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
-                cases.Add(
-                    SwitchSection(
-                        SingletonList<SwitchLabelSyntax>(label),
-                        new SyntaxList<StatementSyntax>(
-                            ReturnStatement(
-                                IdentifierName(parameter.FieldName)))));
+    private static MethodDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
+    {
+        return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetTarget")
+            .WithParameterList(ParameterList())
+            .WithExpressionBody(ArrowExpressionClause(IdentifierName(targetField.FieldName)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+    }
+
+    private MemberDeclarationSyntax? GenerateGetCancellationTokenMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
+    {
+        if (!method.IsCancellable)
+        {
+            return null;
+        }
+
+        // Method to get the cancellationToken argument
+        // C#: CancellationToken GetCancellationToken() => <fieldName>
+        var cancellationTokenType = LibraryTypes.CancellationToken.ToTypeSyntax();
+        var cancellationTokenField = fields.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
+        var member = MethodDeclaration(cancellationTokenType, "GetCancellationToken")
+            .WithExpressionBody(ArrowExpressionClause(cancellationTokenField.FieldName.ToIdentifierName()))
+            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+        return member;
+    }
+
+    private static MemberDeclarationSyntax? GenerateIsCancellableProperty(InvokableMethodDescription method)
+    {
+        if (!method.IsCancellable)
+        {
+            return null;
+        }
+
+        // Property to indicate if the invokable is cancellable
+        // C#: public override bool IsCancellable => true;
+        var member = PropertyDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "IsCancellable")
+            .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.TrueLiteralExpression)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
+        return member;
+    }
+
+    private static MemberDeclarationSyntax? GenerateTryCancelMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
+    {
+        if (!method.IsCancellable)
+        {
+            return null;
+        }
+
+        // Method to set the CancellationToken argument.
+        // C#:
+        // TryCancel()
+        // {
+        //   if (_cts is { } cts)
+        //   {
+        //     cts.Cancel(false);
+        //     return true;
+        //   }
+        //   return false;
+        // }
+        var cancellationTokenField = fields.First(f => f is CancellationTokenSourceFieldDescription);
+        var member = MethodDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "TryCancel")
+            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
+            .WithBody(Block(
+                IfStatement(
+                    IsPatternExpression(
+                        IdentifierName(cancellationTokenField.FieldName),
+                        RecursivePattern()
+                            .WithPropertyPatternClause(PropertyPatternClause())
+                            .WithDesignation(SingleVariableDesignation(Identifier("cts")))),
+                    Block(
+                        ExpressionStatement(InvocationExpression(
+                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("cts"), IdentifierName("Cancel")))
+                            .WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))])))),
+                        ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression)))),
+                ReturnStatement(LiteralExpression(SyntaxKind.FalseLiteralExpression))));
+        return member;
+    }
+
+    private static MemberDeclarationSyntax? GenerateGetArgumentMethod(
+        InvokableMethodDescription methodDescription,
+        List<InvokerFieldDescription> fields)
+    {
+        if (methodDescription.Method.Parameters.Length == 0)
+            return null;
+
+        var index = IdentifierName("index");
+
+        var cases = new List<SwitchSectionSyntax>();
+        foreach (var field in fields)
+        {
+            if (field is not MethodParameterFieldDescription parameter)
+            {
+                continue;
             }
 
-            // C#: default: return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, {maxArgs})
-            var throwHelperMethod = MemberAccessExpression(
-                SyntaxKind.SimpleMemberAccessExpression,
-                IdentifierName("OrleansGeneratedCodeHelper"),
-                IdentifierName("InvokableThrowArgumentOutOfRange"));
+            // C#: case {index}: return {field}
+            var label = CaseSwitchLabel(
+                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
             cases.Add(
                 SwitchSection(
-                    SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
+                    SingletonList<SwitchLabelSyntax>(label),
                     new SyntaxList<StatementSyntax>(
                         ReturnStatement(
+                            IdentifierName(parameter.FieldName)))));
+        }
+
+        // C#: default: return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, {maxArgs})
+        var throwHelperMethod = MemberAccessExpression(
+            SyntaxKind.SimpleMemberAccessExpression,
+            IdentifierName("OrleansGeneratedCodeHelper"),
+            IdentifierName("InvokableThrowArgumentOutOfRange"));
+        cases.Add(
+            SwitchSection(
+                SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
+                new SyntaxList<StatementSyntax>(
+                    ReturnStatement(
+                        InvocationExpression(
+                            throwHelperMethod,
+                            ArgumentList(
+                                SeparatedList(
+                                    [
+                                        Argument(index),
+                                        Argument(
+                                            LiteralExpression(
+                                                SyntaxKind.NumericLiteralExpression,
+                                                Literal(
+                                                    Math.Max(0, methodDescription.Method.Parameters.Length - 1))))
+                                    ])))))));
+        var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
+        return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetArgument")
+            .WithParameterList(
+                ParameterList(
+                    SingletonSeparatedList(
+                        Parameter(Identifier("index")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword))))))
+            .WithBody(Block(body))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+    }
+
+    private static MemberDeclarationSyntax? GenerateSetArgumentMethod(
+        InvokableMethodDescription methodDescription,
+        List<InvokerFieldDescription> fields)
+    {
+        if (methodDescription.Method.Parameters.Length == 0)
+            return null;
+
+        var index = IdentifierName("index");
+        var value = IdentifierName("value");
+
+        var cases = new List<SwitchSectionSyntax>();
+        foreach (var field in fields)
+        {
+            if (field is not MethodParameterFieldDescription parameter)
+            {
+                continue;
+            }
+
+            // C#: case {index}: {field} = (TField)value; return;
+            var label = CaseSwitchLabel(
+                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
+            cases.Add(
+                SwitchSection(
+                    SingletonList<SwitchLabelSyntax>(label),
+                    new SyntaxList<StatementSyntax>(
+                        [
+                            ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    IdentifierName(parameter.FieldName),
+                                    CastExpression(parameter.FieldType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), value))),
+                            ReturnStatement()
+                        ])));
+        }
+
+        // C#: default: OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, {maxArgs})
+        var maxArgs = Math.Max(0, methodDescription.Method.Parameters.Length - 1);
+        var throwHelperMethod = MemberAccessExpression(
+            SyntaxKind.SimpleMemberAccessExpression,
+            IdentifierName("OrleansGeneratedCodeHelper"),
+            IdentifierName("InvokableThrowArgumentOutOfRange"));
+        cases.Add(
+            SwitchSection(
+                SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
+                new SyntaxList<StatementSyntax>(
+                    [
+                        ExpressionStatement(
                             InvocationExpression(
                                 throwHelperMethod,
                                 ArgumentList(
                                     SeparatedList(
-                                        new[]
-                                        {
+                                        [
                                             Argument(index),
                                             Argument(
                                                 LiteralExpression(
                                                     SyntaxKind.NumericLiteralExpression,
-                                                    Literal(
-                                                        Math.Max(0, methodDescription.Method.Parameters.Length - 1))))
-                                        })))))));
-            var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
-            return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetArgument")
-                .WithParameterList(
-                    ParameterList(
-                        SingletonSeparatedList(
-                            Parameter(Identifier("index")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword))))))
-                .WithBody(Block(body))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+                                                    Literal(maxArgs)))
+                                        ])))),
+                        ReturnStatement()
+                    ])));
+        var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
+        return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetArgument")
+            .WithParameterList(
+                ParameterList(
+                    SeparatedList(
+                        [
+                            Parameter(Identifier("index")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword))),
+                            Parameter(Identifier("value")).WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))
+                        ]
+                    )))
+            .WithBody(Block(body))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+    }
+
+    private static MemberDeclarationSyntax GenerateInvokeInnerMethod(
+        InvokableMethodDescription method,
+        List<InvokerFieldDescription> fields,
+        TargetFieldDescription target)
+    {
+        var resultTask = IdentifierName("resultTask");
+
+        // C# var resultTask = this.target.{Method}({params});
+        var args = SeparatedList(
+            fields.OfType<MethodParameterFieldDescription>()
+                .OrderBy(p => p.ParameterOrdinal)
+                .Select(p => Argument(IdentifierName(p.FieldName))));
+        ExpressionSyntax methodCall;
+        if (method.MethodTypeParameters.Count > 0)
+        {
+            methodCall = MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                IdentifierName(target.FieldName),
+                GenericName(
+                    Identifier(method.Method.Name),
+                    TypeArgumentList(
+                        SeparatedList<TypeSyntax>(
+                            method.MethodTypeParameters.Select(p => IdentifierName(p.Name))))));
+        }
+        else
+        {
+            methodCall = IdentifierName(target.FieldName).Member(method.Method.Name);
         }
 
-        private MemberDeclarationSyntax GenerateSetArgumentMethod(
-            InvokableMethodDescription methodDescription,
-            List<InvokerFieldDescription> fields)
+        return MethodDeclaration(method.Method.ReturnType.ToTypeSyntax(method.TypeParameterSubstitutions), "InvokeInner")
+            .WithParameterList(ParameterList())
+            .WithExpressionBody(ArrowExpressionClause(InvocationExpression(methodCall, ArgumentList(args))))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+            .WithModifiers(TokenList(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword)));
+    }
+
+    private static MemberDeclarationSyntax GenerateDisposeMethod(
+        List<InvokerFieldDescription> fields,
+        INamedTypeSymbol baseClassType)
+    {
+        var body = new List<StatementSyntax>();
+        foreach (var field in fields)
         {
-            if (methodDescription.Method.Parameters.Length == 0)
-                return null;
-
-            var index = IdentifierName("index");
-            var value = IdentifierName("value");
-
-            var cases = new List<SwitchSectionSyntax>();
-            foreach (var field in fields)
+            if (field is CancellationTokenSourceFieldDescription ctsField)
             {
-                if (field is not MethodParameterFieldDescription parameter)
-                {
-                    continue;
-                }
-
-                // C#: case {index}: {field} = (TField)value; return;
-                var label = CaseSwitchLabel(
-                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
-                cases.Add(
-                    SwitchSection(
-                        SingletonList<SwitchLabelSyntax>(label),
-                        new SyntaxList<StatementSyntax>(
-                            new StatementSyntax[]
-                            {
-                                ExpressionStatement(
-                                    AssignmentExpression(
-                                        SyntaxKind.SimpleAssignmentExpression,
-                                        IdentifierName(parameter.FieldName),
-                                        CastExpression(parameter.FieldType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), value))),
-                                ReturnStatement()
-                            })));
+                // C#
+                // _cts?.Dispose();
+                body.Add(
+                    ExpressionStatement(
+                        ConditionalAccessExpression(
+                            ctsField.FieldName.ToIdentifierName(),
+                            InvocationExpression(
+                                MemberBindingExpression(IdentifierName("Dispose"))))));
             }
 
-            // C#: default: OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, {maxArgs})
-            var maxArgs = Math.Max(0, methodDescription.Method.Parameters.Length - 1);
-            var throwHelperMethod = MemberAccessExpression(
-                SyntaxKind.SimpleMemberAccessExpression,
-                IdentifierName("OrleansGeneratedCodeHelper"),
-                IdentifierName("InvokableThrowArgumentOutOfRange"));
-            cases.Add(
-                SwitchSection(
-                    SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
-                    new SyntaxList<StatementSyntax>(
-                        new StatementSyntax[]
-                        {
-                            ExpressionStatement(
-                                InvocationExpression(
-                                    throwHelperMethod,
-                                    ArgumentList(
-                                        SeparatedList(
-                                            new[]
-                                            {
-                                                Argument(index),
-                                                Argument(
-                                                    LiteralExpression(
-                                                        SyntaxKind.NumericLiteralExpression,
-                                                        Literal(maxArgs)))
-                                            })))),
-                            ReturnStatement()
-                        })));
-            var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
-            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetArgument")
-                .WithParameterList(
-                    ParameterList(
-                        SeparatedList(
-                            new[]
-                            {
-                                Parameter(Identifier("index")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword))),
-                                Parameter(Identifier("value")).WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))
-                            }
-                        )))
-                .WithBody(Block(body))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+            if (field.IsInstanceField)
+            {
+                body.Add(
+                    ExpressionStatement(
+                        AssignmentExpression(
+                            SyntaxKind.SimpleAssignmentExpression,
+                            IdentifierName(field.FieldName),
+                            LiteralExpression(SyntaxKind.DefaultLiteralExpression))));
+            }
         }
 
-        private MemberDeclarationSyntax GenerateInvokeInnerMethod(
-            InvokableMethodDescription method,
-            List<InvokerFieldDescription> fields,
-            TargetFieldDescription target)
+        // C# base.Dispose();
+        if (baseClassType is { }
+            && baseClassType.AllInterfaces.Any(i => i.SpecialType == SpecialType.System_IDisposable)
+            && baseClassType.GetAllMembers<IMethodSymbol>("Dispose").FirstOrDefault(m => !m.IsAbstract && m.DeclaredAccessibility != Accessibility.Private) is { })
         {
-            var resultTask = IdentifierName("resultTask");
+            body.Add(ExpressionStatement(InvocationExpression(BaseExpression().Member("Dispose")).WithArgumentList(ArgumentList())));
+        }
 
-            // C# var resultTask = this.target.{Method}({params});
-            var args = SeparatedList(
-                fields.OfType<MethodParameterFieldDescription>()
-                    .OrderBy(p => p.ParameterOrdinal)
-                    .Select(p => Argument(IdentifierName(p.FieldName))));
-            ExpressionSyntax methodCall;
-            if (method.MethodTypeParameters.Count > 0)
+        return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Dispose")
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithBody(Block(body));
+    }
+
+    private static MemberDeclarationSyntax? GenerateGetArgumentCount(InvokableMethodDescription methodDescription)
+        => methodDescription.Method.Parameters.Length is var count and not 0 ?
+        MethodDeclaration(PredefinedType(Token(SyntaxKind.IntKeyword)), "GetArgumentCount")
+            .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(count))))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)) : null;
+
+    private static MemberDeclarationSyntax GenerateGetActivityName(InvokableMethodDescription methodDescription)
+    {
+        // This property is intended to contain a value suitable for use as an OpenTelemetry Span Name for RPC calls.
+        // Therefore, the interface name and method name components must not include periods or slashes.
+        // In order to avoid that, we omit the namespace from the interface name.
+        // See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
+
+        var interfaceName = methodDescription.Method.ContainingType.ToDisplayName(methodDescription.TypeParameterSubstitutions, includeGlobalSpecifier: false, includeNamespace: false);
+        var methodName = methodDescription.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var activityName = $"{interfaceName}/{methodName}";
+        return MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetActivityName")
+            .WithExpressionBody(
+                ArrowExpressionClause(
+                    LiteralExpression(
+                        SyntaxKind.NumericLiteralExpression,
+                        Literal(activityName))))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+    }
+
+    private static MemberDeclarationSyntax GenerateGetMethodName(
+        InvokableMethodDescription methodDescription) =>
+        MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetMethodName")
+            .WithExpressionBody(
+                ArrowExpressionClause(
+                    LiteralExpression(
+                        SyntaxKind.NumericLiteralExpression,
+                        Literal(methodDescription.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+
+    private static MemberDeclarationSyntax GenerateGetInterfaceName(
+        InvokableMethodDescription methodDescription) =>
+        MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetInterfaceName")
+            .WithExpressionBody(
+                ArrowExpressionClause(
+                    LiteralExpression(
+                        SyntaxKind.NumericLiteralExpression,
+                        Literal(methodDescription.Method.ContainingType.ToDisplayName(methodDescription.TypeParameterSubstitutions, includeGlobalSpecifier: false)))))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+
+    private MemberDeclarationSyntax GenerateGetInterfaceType(
+        InvokableMethodDescription methodDescription) =>
+        MethodDeclaration(LibraryTypes.Type.ToTypeSyntax(), "GetInterfaceType")
+            .WithExpressionBody(
+                ArrowExpressionClause(
+                    TypeOfExpression(methodDescription.Method.ContainingType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions))))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+
+    private MemberDeclarationSyntax GenerateGetMethod()
+        => MethodDeclaration(LibraryTypes.MethodInfo.ToTypeSyntax(), "GetMethod")
+            .WithExpressionBody(ArrowExpressionClause(IdentifierName("MethodBackingField")))
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+
+    public static string GetSimpleClassName(InvokableMethodDescription method)
+    {
+        var genericArity = method.AllTypeParameters.Count;
+        var typeArgs = genericArity > 0 ? "_" + genericArity : string.Empty;
+        var proxyKey = method.ProxyBase.Key.GeneratedClassNameComponent;
+        return $"Invokable_{method.ContainingInterface.Name}_{proxyKey}_{method.GeneratedMethodId}{typeArgs}";
+    }
+
+    private MemberDeclarationSyntax[] GetFieldDeclarations(
+        InvokableMethodDescription method,
+        List<InvokerFieldDescription> fieldDescriptions)
+    {
+        return [.. fieldDescriptions.Select(GetFieldDeclaration)];
+
+        MemberDeclarationSyntax GetFieldDeclaration(InvokerFieldDescription description)
+        {
+            FieldDeclarationSyntax field;
+            if (description is MethodInfoFieldDescription methodInfo)
             {
-                methodCall = MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
-                    IdentifierName(target.FieldName),
-                    GenericName(
-                        Identifier(method.Method.Name),
-                        TypeArgumentList(
-                            SeparatedList<TypeSyntax>(
-                                method.MethodTypeParameters.Select(p => IdentifierName(p.Name))))));
+                var methodTypeArguments = GetTypesArray(method, method.MethodTypeParameters.Select(p => p.Parameter));
+                var parameterTypes = GetTypesArray(method, method.Method.Parameters.Select(p => p.Type));
+
+                field = FieldDeclaration(
+                    VariableDeclaration(
+                        LibraryTypes.MethodInfo.ToTypeSyntax(),
+                        SingletonSeparatedList(VariableDeclarator(description.FieldName)
+                        .WithInitializer(EqualsValueClause(
+                            InvocationExpression(
+                                IdentifierName("OrleansGeneratedCodeHelper").Member("GetMethodInfoOrDefault"),
+                                ArgumentList(SeparatedList(
+                                [
+                                    Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
+                                    Argument(method.Method.Name.GetLiteralExpression()),
+                                    Argument(methodTypeArguments),
+                                    Argument(parameterTypes),
+                                ]))))))))
+                    .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
             }
             else
             {
-                methodCall = IdentifierName(target.FieldName).Member(method.Method.Name);
+                field = FieldDeclaration(
+                    VariableDeclaration(
+                        description.FieldType.ToTypeSyntax(method.TypeParameterSubstitutions),
+                        SingletonSeparatedList(VariableDeclarator(description.FieldName))));
             }
 
-            return MethodDeclaration(method.Method.ReturnType.ToTypeSyntax(method.TypeParameterSubstitutions), "InvokeInner")
-                .WithParameterList(ParameterList())
-                .WithExpressionBody(ArrowExpressionClause(InvocationExpression(methodCall, ArgumentList(args))))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                .WithModifiers(TokenList(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword)));
-        }
-
-        private MemberDeclarationSyntax GenerateDisposeMethod(
-            List<InvokerFieldDescription> fields,
-            INamedTypeSymbol baseClassType)
-        {
-            var body = new List<StatementSyntax>();
-            foreach (var field in fields)
+            switch (description)
             {
-                if (field is CancellationTokenSourceFieldDescription ctsField)
-                {
-                    // C#
-                    // _cts?.Dispose();
-                    body.Add(
-                        ExpressionStatement(
-                            ConditionalAccessExpression(
-                                ctsField.FieldName.ToIdentifierName(),
-                                InvocationExpression(
-                                    MemberBindingExpression(IdentifierName("Dispose"))))));
-                }
-
-                if (field.IsInstanceField)
-                {
-                    body.Add(
-                        ExpressionStatement(
-                            AssignmentExpression(
-                                SyntaxKind.SimpleAssignmentExpression,
-                                IdentifierName(field.FieldName),
-                                LiteralExpression(SyntaxKind.DefaultLiteralExpression))));
-                }
-            }
-
-            // C# base.Dispose();
-            if (baseClassType is { }
-                && baseClassType.AllInterfaces.Any(i => i.SpecialType == SpecialType.System_IDisposable)
-                && baseClassType.GetAllMembers<IMethodSymbol>("Dispose").FirstOrDefault(m => !m.IsAbstract && m.DeclaredAccessibility != Accessibility.Private) is { })
-            {
-                body.Add(ExpressionStatement(InvocationExpression(BaseExpression().Member("Dispose")).WithArgumentList(ArgumentList())));
-            }
-
-            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Dispose")
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithBody(Block(body));
-        }
-
-        private MemberDeclarationSyntax GenerateGetArgumentCount(InvokableMethodDescription methodDescription)
-            => methodDescription.Method.Parameters.Length is var count and not 0 ?
-            MethodDeclaration(PredefinedType(Token(SyntaxKind.IntKeyword)), "GetArgumentCount")
-                .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(count))))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)) : null;
-
-        private MemberDeclarationSyntax GenerateGetActivityName(InvokableMethodDescription methodDescription)
-        {
-            // This property is intended to contain a value suitable for use as an OpenTelemetry Span Name for RPC calls.
-            // Therefore, the interface name and method name components must not include periods or slashes.
-            // In order to avoid that, we omit the namespace from the interface name.
-            // See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
-
-            var interfaceName = methodDescription.Method.ContainingType.ToDisplayName(methodDescription.TypeParameterSubstitutions, includeGlobalSpecifier: false, includeNamespace: false);
-            var methodName = methodDescription.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var activityName = $"{interfaceName}/{methodName}";
-            return MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetActivityName")
-                .WithExpressionBody(
-                    ArrowExpressionClause(
-                        LiteralExpression(
-                            SyntaxKind.NumericLiteralExpression,
-                            Literal(activityName))))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-        }
-
-        private MemberDeclarationSyntax GenerateGetMethodName(
-            InvokableMethodDescription methodDescription) =>
-            MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetMethodName")
-                .WithExpressionBody(
-                    ArrowExpressionClause(
-                        LiteralExpression(
-                            SyntaxKind.NumericLiteralExpression,
-                            Literal(methodDescription.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-
-        private MemberDeclarationSyntax GenerateGetInterfaceName(
-            InvokableMethodDescription methodDescription) =>
-            MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetInterfaceName")
-                .WithExpressionBody(
-                    ArrowExpressionClause(
-                        LiteralExpression(
-                            SyntaxKind.NumericLiteralExpression,
-                            Literal(methodDescription.Method.ContainingType.ToDisplayName(methodDescription.TypeParameterSubstitutions, includeGlobalSpecifier: false)))))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-
-        private MemberDeclarationSyntax GenerateGetInterfaceType(
-            InvokableMethodDescription methodDescription) =>
-            MethodDeclaration(LibraryTypes.Type.ToTypeSyntax(), "GetInterfaceType")
-                .WithExpressionBody(
-                    ArrowExpressionClause(
-                        TypeOfExpression(methodDescription.Method.ContainingType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions))))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-
-        private MemberDeclarationSyntax GenerateGetMethod()
-            => MethodDeclaration(LibraryTypes.MethodInfo.ToTypeSyntax(), "GetMethod")
-                .WithExpressionBody(ArrowExpressionClause(IdentifierName("MethodBackingField")))
-                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-
-        public static string GetSimpleClassName(InvokableMethodDescription method)
-        {
-            var genericArity = method.AllTypeParameters.Count;
-            var typeArgs = genericArity > 0 ? "_" + genericArity : string.Empty;
-            var proxyKey = method.ProxyBase.Key.GeneratedClassNameComponent;
-            return $"Invokable_{method.ContainingInterface.Name}_{proxyKey}_{method.GeneratedMethodId}{typeArgs}";
-        }
-
-        private MemberDeclarationSyntax[] GetFieldDeclarations(
-            InvokableMethodDescription method,
-            List<InvokerFieldDescription> fieldDescriptions)
-        {
-            return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
-
-            MemberDeclarationSyntax GetFieldDeclaration(InvokerFieldDescription description)
-            {
-                FieldDeclarationSyntax field;
-                if (description is MethodInfoFieldDescription methodInfo)
-                {
-                    var methodTypeArguments = GetTypesArray(method, method.MethodTypeParameters.Select(p => p.Parameter));
-                    var parameterTypes = GetTypesArray(method, method.Method.Parameters.Select(p => p.Type));
-
-                    field = FieldDeclaration(
-                        VariableDeclaration(
-                            LibraryTypes.MethodInfo.ToTypeSyntax(),
-                            SingletonSeparatedList(VariableDeclarator(description.FieldName)
-                            .WithInitializer(EqualsValueClause(
-                                InvocationExpression(
-                                    IdentifierName("OrleansGeneratedCodeHelper").Member("GetMethodInfoOrDefault"),
-                                    ArgumentList(SeparatedList(new[]
-                                    {
-                                        Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
-                                        Argument(method.Method.Name.GetLiteralExpression()),
-                                        Argument(methodTypeArguments),
-                                        Argument(parameterTypes),
-                                    }))))))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                }
-                else
-                {
-                    field = FieldDeclaration(
-                        VariableDeclaration(
-                            description.FieldType.ToTypeSyntax(method.TypeParameterSubstitutions),
-                            SingletonSeparatedList(VariableDeclarator(description.FieldName))));
-                }
-
-                switch (description)
-                {
-                    case MethodParameterFieldDescription _:
-                        field = field.AddModifiers(Token(SyntaxKind.PublicKeyword));
-                        break;
-                }
-
-                return field;
-            }
-        }
-
-        private ExpressionSyntax GetTypesArray(InvokableMethodDescription method, IEnumerable<ITypeSymbol> typeSymbols)
-        {
-            var types = typeSymbols.ToArray();
-            return types.Length == 0 ? LiteralExpression(SyntaxKind.NullLiteralExpression)
-                : ImplicitArrayCreationExpression(InitializerExpression(SyntaxKind.ArrayInitializerExpression, SeparatedList<ExpressionSyntax>(
-                    types.Select(t => TypeOfExpression(t.ToTypeSyntax(method.TypeParameterSubstitutions))))));
-        }
-
-        private (ConstructorDeclarationSyntax Constructor, List<TypeSyntax> ConstructorArguments) GenerateConstructor(
-            string simpleClassName,
-            InvokableMethodDescription method,
-            INamedTypeSymbol baseClassType)
-        {
-            var parameters = new List<ParameterSyntax>();
-
-            var body = new List<StatementSyntax>();
-
-            List<TypeSyntax> constructorArgumentTypes = new();
-            List<ArgumentSyntax> baseConstructorArguments = new();
-            foreach (var constructor in baseClassType.GetAllMembers<IMethodSymbol>())
-            {
-                if (constructor.MethodKind != MethodKind.Constructor || constructor.DeclaredAccessibility == Accessibility.Private || constructor.IsImplicitlyDeclared)
-                {
-                    continue;
-                }
-
-                if (constructor.HasAttribute(LibraryTypes.GeneratedActivatorConstructorAttribute))
-                {
-                    var index = 0;
-                    foreach (var parameter in constructor.Parameters)
-                    {
-                        var identifier = $"base{index}";
-
-                        var argumentType = parameter.Type.ToTypeSyntax(method.TypeParameterSubstitutions);
-                        constructorArgumentTypes.Add(argumentType);
-                        parameters.Add(Parameter(identifier.ToIdentifier()).WithType(argumentType));
-                        baseConstructorArguments.Add(Argument(identifier.ToIdentifierName()));
-                        index++;
-                    }
+                case MethodParameterFieldDescription _:
+                    field = field.AddModifiers(Token(SyntaxKind.PublicKeyword));
                     break;
-                }
             }
 
-            foreach (var (methodName, methodArgument) in method.CustomInitializerMethods)
+            return field;
+        }
+    }
+
+    private static ExpressionSyntax GetTypesArray(InvokableMethodDescription method, IEnumerable<ITypeSymbol> typeSymbols)
+    {
+        var types = typeSymbols.ToArray();
+        return types.Length == 0 ? LiteralExpression(SyntaxKind.NullLiteralExpression)
+            : ImplicitArrayCreationExpression(InitializerExpression(SyntaxKind.ArrayInitializerExpression, SeparatedList<ExpressionSyntax>(
+                types.Select(t => TypeOfExpression(t.ToTypeSyntax(method.TypeParameterSubstitutions))))));
+    }
+
+    private (ConstructorDeclarationSyntax? Constructor, List<TypeSyntax> ConstructorArguments) GenerateConstructor(
+        string simpleClassName,
+        InvokableMethodDescription method,
+        INamedTypeSymbol baseClassType)
+    {
+        var parameters = new List<ParameterSyntax>();
+
+        var body = new List<StatementSyntax>();
+
+        List<TypeSyntax> constructorArgumentTypes = new();
+        List<ArgumentSyntax> baseConstructorArguments = new();
+        foreach (var constructor in baseClassType.GetAllMembers<IMethodSymbol>())
+        {
+            if (constructor.MethodKind != MethodKind.Constructor || constructor.DeclaredAccessibility == Accessibility.Private || constructor.IsImplicitlyDeclared)
             {
-                var argumentExpression = methodArgument.ToExpression();
-                body.Add(ExpressionStatement(InvocationExpression(IdentifierName(methodName), ArgumentList(SeparatedList(new[] { Argument(argumentExpression) })))));
+                continue;
             }
 
-            if (body.Count == 0 && parameters.Count == 0)
-                return default;
-
-            var constructorDeclaration = ConstructorDeclaration(simpleClassName)
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .AddParameterListParameters(parameters.ToArray())
-                .WithInitializer(
-                    ConstructorInitializer(
-                        SyntaxKind.BaseConstructorInitializer,
-                        ArgumentList(SeparatedList(baseConstructorArguments))))
-                .AddBodyStatements(body.ToArray());
-
-            return (constructorDeclaration, constructorArgumentTypes);
-        }
-
-        private List<InvokerFieldDescription> GetFieldDescriptions(InvokableMethodDescription method)
-        {
-            var fields = new List<InvokerFieldDescription>();
-            uint fieldId = 0;
-
-            foreach (var parameter in method.Method.Parameters)
+            if (constructor.HasAttribute(LibraryTypes.GeneratedActivatorConstructorAttribute))
             {
-                var isSerializable = !SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, parameter.Type);
-                fields.Add(new MethodParameterFieldDescription(method.CodeGenerator, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions, isSerializable));
-                fieldId++;
-            }
-
-            fields.Add(new TargetFieldDescription(method.Method.ContainingType));
-            fields.Add(new MethodInfoFieldDescription(LibraryTypes.MethodInfo, "MethodBackingField"));
-
-            if (method.IsCancellable)
-            {
-                fields.Add(new CancellationTokenSourceFieldDescription(LibraryTypes));
-            }
-
-            return fields;
-        }
-
-        internal abstract class InvokerFieldDescription
-        {
-            protected InvokerFieldDescription(ITypeSymbol fieldType, string fieldName)
-            {
-                FieldType = fieldType;
-                FieldName = fieldName;
-            }
-
-            public ITypeSymbol FieldType { get; }
-            public string FieldName { get; }
-            public abstract bool IsSerializable { get; }
-            public abstract bool IsInstanceField { get; }
-        }
-
-        internal sealed class TargetFieldDescription : InvokerFieldDescription
-        {
-            public TargetFieldDescription(ITypeSymbol fieldType) : base(fieldType, "_target") { }
-
-            public override bool IsSerializable => false;
-            public override bool IsInstanceField => true;
-        }
-
-        internal sealed class CancellationTokenSourceFieldDescription(LibraryTypes libraryTypes) : InvokerFieldDescription(libraryTypes.CancellationTokenSource, "_cts")
-        {
-            public override bool IsSerializable => false;
-            public override bool IsInstanceField => true;
-        }
-
-        internal sealed class CancellationTokenFieldDescription(LibraryTypes libraryTypes) : InvokerFieldDescription(libraryTypes.CancellationToken, "_ct")
-        {
-            public override bool IsSerializable => false;
-            public override bool IsInstanceField => true;
-        }
-
-        internal class MethodParameterFieldDescription : InvokerFieldDescription, IMemberDescription
-        {
-            public MethodParameterFieldDescription(
-                CodeGenerator codeGenerator,
-                IParameterSymbol parameter,
-                string fieldName,
-                uint fieldId,
-                Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions,
-                bool isSerializable)
-                : base(parameter.Type, fieldName)
-            {
-                TypeParameterSubstitutions = typeParameterSubstitutions;
-                FieldId = fieldId;
-                CodeGenerator = codeGenerator;
-                Parameter = parameter;
-                if (parameter.Type.TypeKind == TypeKind.Dynamic)
+                var index = 0;
+                foreach (var parameter in constructor.Parameters)
                 {
-                    TypeSyntax = PredefinedType(Token(SyntaxKind.ObjectKeyword));
-                    TypeName = "dynamic";
-                }
-                else
-                {
-                    TypeName = Type.ToDisplayName(TypeParameterSubstitutions);
-                    TypeSyntax = Type.ToTypeSyntax(TypeParameterSubstitutions);
-                }
+                    var identifier = $"base{index}";
 
-                Symbol = parameter;
-                IsSerializable = isSerializable;
+                    var argumentType = parameter.Type.ToTypeSyntax(method.TypeParameterSubstitutions);
+                    constructorArgumentTypes.Add(argumentType);
+                    parameters.Add(Parameter(identifier.ToIdentifier()).WithType(argumentType));
+                    baseConstructorArguments.Add(Argument(identifier.ToIdentifierName()));
+                    index++;
+                }
+                break;
             }
-
-            public CodeGenerator CodeGenerator { get; }
-            public ISymbol Symbol { get; }
-            public Dictionary<ITypeParameterSymbol, string> TypeParameterSubstitutions { get; }
-            public int ParameterOrdinal => Parameter.Ordinal;
-            public uint FieldId { get; }
-            public ISymbol Member => Parameter;
-            public ITypeSymbol Type => FieldType;
-            public INamedTypeSymbol ContainingType => Parameter.ContainingType;
-            public TypeSyntax TypeSyntax { get; }
-            public IParameterSymbol Parameter { get; }
-            public override bool IsSerializable { get; }
-            public bool IsCopyable => true;
-            public override bool IsInstanceField => true;
-
-            public string AssemblyName => Parameter.Type.ContainingAssembly.ToDisplayName();
-            public string TypeName { get; }
-
-            public string TypeNameIdentifier
-            {
-                get
-                {
-                    if (Type is ITypeParameterSymbol tp && TypeParameterSubstitutions.TryGetValue(tp, out var name))
-                    {
-                        return name;
-                    }
-
-                    return Type.GetValidIdentifier();
-                }
-            }
-
-            public bool IsPrimaryConstructorParameter => false;
-
-            public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax(TypeParameterSubstitutions);
         }
 
-        internal sealed class MethodInfoFieldDescription : InvokerFieldDescription
+        foreach (var (methodName, methodArgument) in method.CustomInitializerMethods)
         {
-            public MethodInfoFieldDescription(ITypeSymbol fieldType, string fieldName) : base(fieldType, fieldName) { }
-
-            public override bool IsSerializable => false;
-            public override bool IsInstanceField => false;
+            var argumentExpression = methodArgument.ToExpression();
+            body.Add(ExpressionStatement(InvocationExpression(IdentifierName(methodName), ArgumentList(SeparatedList([Argument(argumentExpression)])))));
         }
+
+        if (body.Count == 0 && parameters.Count == 0)
+            return default;
+
+        var constructorDeclaration = ConstructorDeclaration(simpleClassName)
+            .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            .AddParameterListParameters([.. parameters])
+            .WithInitializer(
+                ConstructorInitializer(
+                    SyntaxKind.BaseConstructorInitializer,
+                    ArgumentList(SeparatedList(baseConstructorArguments))))
+            .AddBodyStatements([.. body]);
+
+        return (constructorDeclaration, constructorArgumentTypes);
+    }
+
+    private List<InvokerFieldDescription> GetFieldDescriptions(InvokableMethodDescription method)
+    {
+        var fields = new List<InvokerFieldDescription>();
+        uint fieldId = 0;
+
+        foreach (var parameter in method.Method.Parameters)
+        {
+            var isSerializable = !SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, parameter.Type);
+            fields.Add(new MethodParameterFieldDescription(LibraryTypes, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions, isSerializable));
+            fieldId++;
+        }
+
+        fields.Add(new TargetFieldDescription(method.Method.ContainingType));
+        fields.Add(new MethodInfoFieldDescription(LibraryTypes.MethodInfo, "MethodBackingField"));
+
+        if (method.IsCancellable)
+        {
+            fields.Add(new CancellationTokenSourceFieldDescription(LibraryTypes));
+        }
+
+        return fields;
+    }
+
+    internal abstract class InvokerFieldDescription(ITypeSymbol fieldType, string fieldName)
+    {
+        public ITypeSymbol FieldType { get; } = fieldType;
+        public string FieldName { get; } = fieldName;
+        public abstract bool IsSerializable { get; }
+        public abstract bool IsInstanceField { get; }
+    }
+
+    internal sealed class TargetFieldDescription(ITypeSymbol fieldType) : InvokerFieldDescription(fieldType, "_target")
+    {
+        public override bool IsSerializable => false;
+        public override bool IsInstanceField => true;
+    }
+
+    internal sealed class CancellationTokenSourceFieldDescription(LibraryTypes libraryTypes) : InvokerFieldDescription(libraryTypes.CancellationTokenSource, "_cts")
+    {
+        public override bool IsSerializable => false;
+        public override bool IsInstanceField => true;
+    }
+
+    internal sealed class CancellationTokenFieldDescription(LibraryTypes libraryTypes) : InvokerFieldDescription(libraryTypes.CancellationToken, "_ct")
+    {
+        public override bool IsSerializable => false;
+        public override bool IsInstanceField => true;
+    }
+
+    internal class MethodParameterFieldDescription : InvokerFieldDescription, IMemberDescription
+    {
+        public MethodParameterFieldDescription(
+            LibraryTypes libraryTypes,
+            IParameterSymbol parameter,
+            string fieldName,
+            uint fieldId,
+            Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions,
+            bool isSerializable)
+            : base(parameter.Type, fieldName)
+        {
+            TypeParameterSubstitutions = typeParameterSubstitutions;
+            FieldId = fieldId;
+            LibraryTypes = libraryTypes;
+            Parameter = parameter;
+            if (parameter.Type.TypeKind == TypeKind.Dynamic)
+            {
+                TypeSyntax = PredefinedType(Token(SyntaxKind.ObjectKeyword));
+                TypeName = "dynamic";
+            }
+            else
+            {
+                TypeName = Type.ToDisplayName(TypeParameterSubstitutions);
+                TypeSyntax = Type.ToTypeSyntax(TypeParameterSubstitutions);
+            }
+
+            Symbol = parameter;
+            IsSerializable = isSerializable;
+        }
+
+        public ISymbol Symbol { get; }
+        public LibraryTypes LibraryTypes { get; }
+        public Dictionary<ITypeParameterSymbol, string> TypeParameterSubstitutions { get; }
+        public int ParameterOrdinal => Parameter.Ordinal;
+        public uint FieldId { get; }
+        public ISymbol Member => Parameter;
+        public ITypeSymbol Type => FieldType;
+        public INamedTypeSymbol ContainingType => Parameter.ContainingType;
+        public TypeSyntax TypeSyntax { get; }
+        public IParameterSymbol Parameter { get; }
+        public override bool IsSerializable { get; }
+        public bool IsCopyable => true;
+        public override bool IsInstanceField => true;
+
+        public string AssemblyName => Parameter.Type.ContainingAssembly.ToDisplayName();
+        public string TypeName { get; }
+
+        public string TypeNameIdentifier
+        {
+            get
+            {
+                if (Type is ITypeParameterSymbol tp && TypeParameterSubstitutions.TryGetValue(tp, out var name))
+                {
+                    return name;
+                }
+
+                return Type.GetValidIdentifier();
+            }
+        }
+
+        public bool IsPrimaryConstructorParameter => false;
+
+        public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax(TypeParameterSubstitutions);
+    }
+
+    internal sealed class MethodInfoFieldDescription(ITypeSymbol fieldType, string fieldName) : InvokerFieldDescription(fieldType, fieldName)
+    {
+        public override bool IsSerializable => false;
+        public override bool IsInstanceField => false;
     }
 }
