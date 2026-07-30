@@ -8,6 +8,7 @@ namespace Orleans.Streams
     /// Represents a stream item within a sequence.
     /// </summary>
     /// <typeparam name="T">The item type.</typeparam>
+    [GenerateSerializer]
     public class SequentialItem<T>
     {
         /// <summary>
@@ -25,12 +26,14 @@ namespace Orleans.Streams
         /// Gets the item.
         /// </summary>
         /// <value>The item.</value>
+        [Id(0)]
         public T Item { get; }
 
         /// <summary>
         /// Gets the token.
         /// </summary>
         /// <value>The token.</value>
+        [Id(1)]
         public StreamSequenceToken Token { get; }
     }
 
