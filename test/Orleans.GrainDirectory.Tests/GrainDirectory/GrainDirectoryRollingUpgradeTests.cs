@@ -1318,6 +1318,13 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             return true;
         }
 
+        if (string.Equals(entry.Category, typeof(GrainCallCancellationManager).FullName, StringComparison.Ordinal)
+            && entry.Message.StartsWith("Error while cancelling", StringComparison.Ordinal)
+            && string.Equals(entry.ExceptionType, typeof(SiloUnavailableException).FullName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         if (!string.Equals(entry.Category, "Orleans.Messaging", StringComparison.Ordinal)
             || !entry.Message.StartsWith("Failed to address message", StringComparison.Ordinal))
         {
