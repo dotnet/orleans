@@ -168,6 +168,43 @@ public class ReminderEventsTests
         Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
     }
 
+    [Fact, TestCategory("BVT")]
+    public async Task ReminderDiagnosticObserver_WaitsForCurrentOwnerSchedule_AfterOwnershipChange()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var grainId = GrainId.Create("test", "grain");
+        const string reminderName = "reminder";
+        var previousOwner = new object();
+        var currentOwner = new object();
+        var previousSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14007), 8);
+        var currentSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14008), 9);
+        var now = DateTime.UtcNow;
+
+        ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, previousOwner, previousSilo);
+        ReminderEvents.EmitLocalReminderScheduleChanged(grainId, reminderName, previousOwner, 2, previousSilo);
+        ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, previousOwner, 2, previousSilo);
+        ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, currentOwner, currentSilo);
+        ReminderEvents.EmitLocalReminderTickWaitArmed(grainId, reminderName, currentOwner, 0, currentSilo);
+        ReminderEvents.EmitTickFiring(
+            grainId,
+            reminderName,
+            new TickStatus(now, TimeSpan.FromSeconds(5), now),
+            previousSilo);
+
+        var waitTask = observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+        Assert.False(waitTask.IsCompleted);
+
+        ReminderEvents.EmitLocalReminderStopped(
+            grainId,
+            reminderName,
+            previousOwner,
+            ReminderEvents.LocalReminderStopReason.RemovedFromRange,
+            previousSilo);
+
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+    }
+
     private sealed class Observer : IObserver<ReminderEvents.ReminderEvent>, IDisposable
     {
         private readonly IDisposable _subscription;
