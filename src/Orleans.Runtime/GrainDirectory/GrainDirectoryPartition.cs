@@ -128,8 +128,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return null;
     }
 
-    ValueTask<bool> IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion rangeVersion)
+    ValueTask<bool> IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync(
+        SiloAddress silo,
+        int partitionIndex,
+        MembershipVersion rangeVersion,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RemoveSnapshotTransferPartner(
             (silo, partitionIndex, rangeVersion),
             snapshotFilter: (state, snapshot) => snapshot.DirectoryMembershipVersion == state.rangeVersion,
@@ -584,7 +589,11 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
             InvokeOnClusterMember(
                 previousOwner,
-                async () => await partition.AcknowledgeSnapshotTransferAsync(_id, _partitionIndex, previousVersion),
+                async cancellationToken => await partition.AcknowledgeSnapshotTransferAsync(
+                    _id,
+                    _partitionIndex,
+                    previousVersion,
+                    cancellationToken),
                 false,
                 nameof(IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync)).Ignore();
 
@@ -667,17 +676,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             var client = _grainFactory.GetSystemTarget<IGrainDirectoryClient>(Constants.GrainDirectoryType, siloAddress);
             var result = await InvokeOnClusterMember(
                 siloAddress,
-                async () =>
+                async cancellationToken =>
                 {
                     var innerSw = ValueStopwatch.StartNew();
                     Immutable<List<GrainAddress>> result = default;
                         if (isValidation)
                         {
-                            result = await client.GetRegisteredActivations(version, range, isValidation: true);
+                            result = await client.GetRegisteredActivations(version, range, isValidation: true, cancellationToken);
                         }
                         else
                         {
-                            result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
+                            result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex, cancellationToken);
                         }
 
                     return result;
@@ -757,20 +766,24 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    private async Task<T> InvokeOnClusterMember<T>(SiloAddress siloAddress, Func<Task<T>> func, T defaultValue, string operationName)
+    private async Task<T> InvokeOnClusterMember<T>(
+        SiloAddress siloAddress,
+        Func<CancellationToken, Task<T>> func,
+        T defaultValue,
+        string operationName)
     {
         GrainRuntime.CheckRuntimeContext(this);
+        var memberCancellationToken = _owner.GetClusterMemberCancellationToken(siloAddress);
         var attempt = 0;
-        while (!ShutdownToken.IsCancellationRequested)
+        while (!memberCancellationToken.IsCancellationRequested)
         {
-            if (!DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
-            {
-                break;
-            }
-
             try
             {
-                return await func();
+                return await func(memberCancellationToken);
+            }
+            catch (OperationCanceledException) when (memberCancellationToken.IsCancellationRequested)
+            {
+                break;
             }
             catch (Exception ex)
             {
@@ -780,7 +793,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 }
 
                 await _owner.RefreshViewAsync(default, ShutdownToken);
-                if (!DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
+                if (memberCancellationToken.IsCancellationRequested
+                    || !DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
                 {
                     break;
                 }

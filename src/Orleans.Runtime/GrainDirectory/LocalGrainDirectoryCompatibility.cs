@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
@@ -22,12 +23,18 @@ internal sealed class LocalGrainDirectoryClientCompatibility : SystemTarget, IGr
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
-    public ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
+    public ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        bool isValidation,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var grainDirectoryResolver = _grainDirectoryResolver ??= ActivationServices.GetRequiredService<GrainDirectoryResolver>();
         List<GrainAddress> result = [];
         foreach (var (_, activation) in _localActivations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!UsesLocalGrainDirectory(activation, grainDirectoryResolver))
             {
                 continue;
@@ -66,8 +73,13 @@ internal sealed class LocalGrainDirectoryClientCompatibility : SystemTarget, IGr
         return false;
     }
 
-    public ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionId)
-        => GetRegisteredActivations(membershipVersion, range, isValidation: false);
+    public ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        SiloAddress siloAddress,
+        int partitionId,
+        CancellationToken cancellationToken)
+        => GetRegisteredActivations(membershipVersion, range, isValidation: false, cancellationToken);
 }
 
 internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, IGrainDirectoryPartition
@@ -106,5 +118,13 @@ internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, 
         return new((GrainDirectoryPartitionSnapshot?)null);
     }
 
-    public ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion version) => new(true);
+    public ValueTask<bool> AcknowledgeSnapshotTransferAsync(
+        SiloAddress silo,
+        int partitionIndex,
+        MembershipVersion version,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(true);
+    }
 }

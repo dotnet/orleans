@@ -76,7 +76,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
         TaskScheduler = TaskScheduler.Current,
     };
 
-    private CancellationTokenSource CreateTimeoutCts() => new(OperationTimeout);
+    private CancellationTokenSource CreateTimeoutCts() => CreateTimeoutCts(CancellationToken.None);
 
     private CancellationTokenSource CreateTimeoutCts(CancellationToken cancellationToken)
     {
