@@ -17,9 +17,9 @@ namespace TestExtensions
         protected DefaultClusterFixture Fixture { get; private set; }
         protected TestCluster HostedCluster => this.Fixture.HostedCluster;
 
-        protected IGrainFactory GrainFactory => this.HostedCluster.GrainFactory!; // The default fixture deploys the client.
+        protected IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
 
-        protected IClusterClient Client => this.HostedCluster.Client!; // The default fixture deploys the client.
+        protected IClusterClient Client => this.HostedCluster.Client;
         protected ILogger Logger => this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
 
         protected HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)

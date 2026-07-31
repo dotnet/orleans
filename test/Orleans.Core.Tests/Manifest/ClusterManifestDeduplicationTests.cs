@@ -371,7 +371,7 @@ namespace UnitTests.Manifest
 
             public bool Equals(GrainType x, GrainType y) => string.Equals(x.ToString(), y.ToString(), StringComparison.OrdinalIgnoreCase);
 
-            public int GetHashCode(GrainType obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ToString()!);
+            public int GetHashCode(GrainType obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ToString());
         }
 
         private sealed class CaseInsensitiveGrainInterfaceTypeComparer : IEqualityComparer<GrainInterfaceType>

@@ -47,8 +47,10 @@ namespace Orleans.Configuration
         [DisallowNull]
         public BlobServiceClient? BlobServiceClient
         {
-            get => _blobServiceClient; set
+            get => _blobServiceClient;
+            set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _blobServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }

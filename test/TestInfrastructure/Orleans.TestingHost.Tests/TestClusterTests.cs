@@ -264,7 +264,7 @@ namespace Orleans.TestingHost.Tests
 
             await _testCluster.DeployAsync();
 
-            var grain = _testCluster.Client!.GetGrain<ISimpleGrain>(1); // DeployAsync initializes the client.
+            var grain = _testCluster.Client.GetGrain<ISimpleGrain>(1);
 
             await grain.SetA(2);
             Assert.Equal(2, await grain.GetA());
@@ -285,7 +285,7 @@ namespace Orleans.TestingHost.Tests
 
             await _testCluster.DeployAsync();
 
-            var grain = _testCluster.Client!.GetGrain<ISimpleGrain>(1); // DeployAsync initializes the client.
+            var grain = _testCluster.Client.GetGrain<ISimpleGrain>(1);
 
             await grain.SetA(2);
             Assert.Equal(2, await grain.GetA());

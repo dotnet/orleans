@@ -107,12 +107,15 @@ namespace Orleans.TestingHost
         /// <summary>
         /// The client.
         /// </summary>
-        public IClusterClient? Client => this.InternalClient;
+        /// <exception cref="InvalidOperationException">The cluster has not been deployed or the client has been stopped.</exception>
+        public IClusterClient Client => this.InternalClient ?? throw new InvalidOperationException(
+            "The test cluster client is unavailable because the cluster has not been deployed or has been stopped.");
 
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        public IGrainFactory? GrainFactory => this.Client;
+        /// <exception cref="InvalidOperationException">The cluster has not been deployed or the client has been stopped.</exception>
+        public IGrainFactory GrainFactory => this.Client;
 
         /// <summary>
         /// GrainFactory to use in the tests
@@ -122,7 +125,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Client-side <see cref="IServiceProvider"/> to use in the tests.
         /// </summary>
-        public IServiceProvider ServiceProvider => this.Client!.ServiceProvider; // Service access requires an initialized client.
+        public IServiceProvider ServiceProvider => this.Client.ServiceProvider;
 
         /// <summary>
         /// Delegate used to create and start an individual silo.
@@ -231,7 +234,7 @@ namespace Orleans.TestingHost
         public async Task DeactivateAsync(GrainId grainId)
         {
             var deactivated = WaitForDeactivationAsync(grainId);
-            await GrainFactory!.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle(); // Deactivation requires an initialized client.
+            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle();
             await deactivated;
         }
 
@@ -256,7 +259,7 @@ namespace Orleans.TestingHost
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
             }
 
-            await GrainFactory!.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle(); // Migration requires an initialized client.
+            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
             await deactivated;
         }
 
@@ -785,7 +788,7 @@ namespace Orleans.TestingHost
 
             var configuration = configurationBuilder.Build();
 
-            this.ClientHost = TestClusterHostFactory.CreateClusterClient(
+            var clientHost = TestClusterHostFactory.CreateClusterClient(
                 "MainClient",
                 configuration,
                 hostBuilder =>
@@ -808,7 +811,16 @@ namespace Orleans.TestingHost
                         }
                     });
                 });
-            await this.ClientHost.StartAsync();
+            try
+            {
+                await clientHost.StartAsync();
+                this.ClientHost = clientHost;
+            }
+            catch
+            {
+                await DisposeAsync(clientHost);
+                throw;
+            }
         }
 
         /// <summary>

@@ -36,7 +36,7 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override bool IsActive => isActive;
         
-        public StandaloneSiloHandle(string siloName, IConfiguration configuration, string? executablePath)
+        public StandaloneSiloHandle(string siloName, IConfiguration configuration, string executablePath)
         {
             if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
             {
@@ -145,7 +145,7 @@ namespace Orleans.TestingHost
             IConfiguration configuration)
         {
             var executablePath = configuration[ExecutablePathConfigKey];
-            var result = new StandaloneSiloHandle(siloName, configuration, executablePath);
+            var result = new StandaloneSiloHandle(siloName, configuration, executablePath!);
             await result.StartAsync();
             return result;
         }

@@ -400,7 +400,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
         _subscription?.Dispose();
     }
 
-    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString()!;
+    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString();
 }
 
 /// <summary>

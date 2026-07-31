@@ -27,7 +27,7 @@ namespace Orleans.TestingHost.Tests
             await cluster.DeployAsync();
 
             var key = Guid.NewGuid();
-            var blocker = cluster.Client!.GetGrain<IRemoteBlockerGrain>(key); // DeployAsync initializes the client.
+            var blocker = cluster.Client.GetGrain<IRemoteBlockerGrain>(key);
 
             // Start (but do not await) a call to a grain that blocks and never responds.
             var pending = blocker.BlockUntilReleased();

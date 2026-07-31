@@ -431,7 +431,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
         _subscription?.Dispose();
     }
 
-    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString()!;
+    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString();
 
     private static TaskCompletionSource CreateCompletionSource() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 

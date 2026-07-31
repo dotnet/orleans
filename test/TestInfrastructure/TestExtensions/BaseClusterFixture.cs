@@ -42,9 +42,9 @@ namespace TestExtensions
 
         public TestCluster HostedCluster { get; private set; } = null!;
 
-        public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory!;
+        public IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
 
-        public IClusterClient Client => this.HostedCluster?.Client!;
+        public IClusterClient Client => this.HostedCluster.Client;
 
         public ILogger Logger { get; private set; } = null!;
         

@@ -52,6 +52,7 @@ namespace Orleans.Configuration
 
             set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _queueServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }

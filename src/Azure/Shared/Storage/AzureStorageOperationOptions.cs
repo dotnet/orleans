@@ -60,6 +60,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             get => _tableServiceClient;
             set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _tableServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }

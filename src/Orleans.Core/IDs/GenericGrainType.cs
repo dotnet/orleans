@@ -85,7 +85,7 @@ namespace Orleans.Runtime
         public Type[] GetArguments(TypeConverter converter) => converter.GetArguments(this.GrainType.Value);
 
         /// <inheritdoc/>
-        public override string? ToString() => this.GrainType.ToString();
+        public override string ToString() => this.GrainType.ToString();
 
         /// <inheritdoc/>
         public bool Equals(GenericGrainType other) => this.GrainType.Equals(other.GrainType);

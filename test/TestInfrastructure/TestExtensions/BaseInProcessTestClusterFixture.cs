@@ -44,7 +44,7 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
 
     public IGrainFactory GrainFactory => Client;
 
-    public IClusterClient Client => HostedCluster?.Client!;
+    public IClusterClient Client => HostedCluster.Client;
 
     public ILogger Logger { get; private set; } = null!;
 

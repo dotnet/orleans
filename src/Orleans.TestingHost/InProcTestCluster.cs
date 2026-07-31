@@ -78,7 +78,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The client.
     /// </summary>
-    public IClusterClient? Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    /// <exception cref="InvalidOperationException">The cluster has not been deployed or the client has been stopped.</exception>
+    public IClusterClient Client => InternalClient ?? throw new InvalidOperationException(
+        "The test cluster client is unavailable because the cluster has not been deployed or has been stopped.");
 
     /// <summary>
     /// The port allocator.
@@ -208,7 +210,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
         }
 
-        await Client!.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle(); // Migration requires a deployed client.
+        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
         await deactivated;
     }
 
@@ -700,8 +702,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
 
-        ClientHost = hostBuilder.Build();
-        await ClientHost.StartAsync();
+        var clientHost = hostBuilder.Build();
+        try
+        {
+            await clientHost.StartAsync();
+            ClientHost = clientHost;
+        }
+        catch
+        {
+            await DisposeAsync(clientHost);
+            throw;
+        }
     }
 
     private async Task InitializeAsync()
@@ -941,6 +952,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
 
         ClientHost?.Dispose();
+        ClientHost = null;
         PortAllocator?.Dispose();
         _grainDirectoryObserver.Dispose();
 

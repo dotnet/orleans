@@ -41,6 +41,7 @@ namespace Orleans.Configuration
             get => _blobServiceClient;
             set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _blobServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }

@@ -669,7 +669,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             private static bool MatchesGrainType(GrainId grainId, string grainTypeName)
             {
-                var eventGrainTypeName = grainId.Type.ToString()!;
+                var eventGrainTypeName = grainId.Type.ToString();
                 return eventGrainTypeName.Contains(grainTypeName, StringComparison.OrdinalIgnoreCase)
                     || grainTypeName.Contains(eventGrainTypeName, StringComparison.OrdinalIgnoreCase);
             }
