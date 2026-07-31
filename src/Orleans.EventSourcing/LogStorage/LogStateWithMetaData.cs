@@ -13,11 +13,18 @@ namespace Orleans.EventSourcing.LogStorage
     [GenerateSerializer]
     public sealed class LogStateWithMetaDataAndETag<TEntry> : IGrainState<LogStateWithMetaData<TEntry>> where TEntry : class
     {
+        [NonSerialized]
+        private LogStateWithMetaData<TEntry> stateAndMetaData;
+
         /// <summary>
         /// Gets and Sets StateAndMetaData
         /// </summary>
         [Id(0)]
-        public LogStateWithMetaData<TEntry>? StateAndMetaData { get; set; }
+        public LogStateWithMetaData<TEntry> StateAndMetaData
+        {
+            get => stateAndMetaData;
+            set => stateAndMetaData = value ?? throw new ArgumentNullException(nameof(value));
+        }
 
         /// <summary>
         /// Gets and Sets Etag
@@ -28,14 +35,20 @@ namespace Orleans.EventSourcing.LogStorage
         [Id(2)]
         public bool RecordExists { get; set; }
 
-        public LogStateWithMetaData<TEntry>? State { get => StateAndMetaData; set => StateAndMetaData = value; }
+        public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value; }
+
+        LogStateWithMetaData<TEntry>? IGrainState<LogStateWithMetaData<TEntry>>.State
+        {
+            get => State;
+            set => State = value ?? throw new ArgumentNullException(nameof(value));
+        }
 
         /// <summary>
         /// Initializes a new instance of GrainStateWithMetaDataAndETag class
         /// </summary>
         public LogStateWithMetaDataAndETag()
         {
-            StateAndMetaData = new LogStateWithMetaData<TEntry>();
+            stateAndMetaData = new LogStateWithMetaData<TEntry>();
         }
 
         /// <summary>
@@ -43,7 +56,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         public override string ToString()
         {
-            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData!.GlobalVersion, StateAndMetaData!.WriteVector, ETag, StateAndMetaData!.Log); // Preserve the legacy failure if state was explicitly set to null.
+            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData.GlobalVersion, StateAndMetaData.WriteVector, ETag, StateAndMetaData.Log);
         }
     }
 

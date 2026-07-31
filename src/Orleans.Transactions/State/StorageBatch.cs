@@ -87,7 +87,7 @@ namespace Orleans.Transactions
         {
         }
 
-        public async Task<string?> Store(ITransactionalStateStorage<TState> storage)
+        public async Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
             List<PendingTransactionState<TState>> list = this.prepares.Values.ToList();
             return await storage.Store(ETag, this.MetaData, list,

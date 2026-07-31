@@ -13,7 +13,11 @@ namespace Orleans.Transactions.Abstractions
     {
         Task<TransactionalStorageLoadResponse<TState>> Load();
 
-        Task<string?> Store(
+        /// <summary>
+        /// Stores transactional state changes.
+        /// </summary>
+        /// <returns>A task whose result is the ETag assigned to the stored state.</returns>
+        Task<string> Store(
 
             string? expectedETag,
             TransactionalStateMetaData metadata,

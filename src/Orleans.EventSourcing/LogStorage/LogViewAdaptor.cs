@@ -72,18 +72,18 @@ namespace Orleans.EventSourcing.LogStorage
 
         private void UpdateConfirmedView()
         {
-            for (int i = ConfirmedVersionInternal; i < GlobalLog.StateAndMetaData!.Log.Count; i++)
+            for (int i = ConfirmedVersionInternal; i < GlobalLog.StateAndMetaData.Log.Count; i++)
             {
                 try
                 {
-                    Host.UpdateView(ConfirmedViewInternal, GlobalLog.StateAndMetaData!.Log[i]);
+                    Host.UpdateView(ConfirmedViewInternal, GlobalLog.StateAndMetaData.Log[i]);
                 }
                 catch (Exception e)
                 {
                     Services.CaughtUserCodeException("UpdateView", nameof(UpdateConfirmedView), e);
                 }
             }
-            ConfirmedVersionInternal = GlobalLog.StateAndMetaData!.GlobalVersion;
+            ConfirmedVersionInternal = GlobalLog.StateAndMetaData.GlobalVersion;
         }
 
 
@@ -92,7 +92,7 @@ namespace Orleans.EventSourcing.LogStorage
         {
 
             // make a copy of the entries in the range asked for
-            IReadOnlyList<TLogEntry> segment = GlobalLog.StateAndMetaData!.Log.GetRange(fromVersion, (toVersion - fromVersion));
+            IReadOnlyList<TLogEntry> segment = GlobalLog.StateAndMetaData.Log.GetRange(fromVersion, (toVersion - fromVersion));
 
             return Task.FromResult(segment);
         }
@@ -149,9 +149,9 @@ namespace Orleans.EventSourcing.LogStorage
             var updates = GetCurrentBatchOfUpdates();
             bool batchsuccessfullywritten = false;
 
-            var writebit = GlobalLog.StateAndMetaData!.FlipBit(Services.MyClusterId);
+            var writebit = GlobalLog.StateAndMetaData.FlipBit(Services.MyClusterId);
             foreach (var x in updates)
-                GlobalLog.StateAndMetaData!.Log.Add(x.Entry!);
+                GlobalLog.StateAndMetaData.Log.Add(x.Entry!);
 
             try
             {
@@ -321,14 +321,14 @@ namespace Orleans.EventSourcing.LogStorage
         protected override void ProcessNotifications()
         {
             // discard notifications that are behind our already confirmed state
-            while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalLog.StateAndMetaData!.GlobalVersion)
+            while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalLog.StateAndMetaData.GlobalVersion)
             {
                 Services.Log(LogLevel.Debug, "discarding notification {0}", notifications.ElementAt(0).Value);
                 notifications.RemoveAt(0);
             }
 
             // process notifications that reflect next global version
-            while (notifications.Count > 0 && notifications.ElementAt(0).Key == GlobalLog.StateAndMetaData!.GlobalVersion)
+            while (notifications.Count > 0 && notifications.ElementAt(0).Key == GlobalLog.StateAndMetaData.GlobalVersion)
             {
                 var updateNotification = notifications.ElementAt(0).Value;
                 notifications.RemoveAt(0);

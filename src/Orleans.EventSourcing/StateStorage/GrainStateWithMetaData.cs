@@ -12,11 +12,18 @@ namespace Orleans.EventSourcing.StateStorage
     [GenerateSerializer]
     public sealed class GrainStateWithMetaDataAndETag<TView> : IGrainState<GrainStateWithMetaData<TView>> where TView : class, new()
     {
+        [NonSerialized]
+        private GrainStateWithMetaData<TView> stateAndMetaData;
+
         /// <summary>
         /// Gets and Sets StateAndMetaData
         /// </summary>
         [Id(0)]
-        public GrainStateWithMetaData<TView>? StateAndMetaData { get; set; }
+        public GrainStateWithMetaData<TView> StateAndMetaData
+        {
+            get => stateAndMetaData;
+            set => stateAndMetaData = value ?? throw new ArgumentNullException(nameof(value));
+        }
 
         /// <summary>
         /// Gets and Sets Etag
@@ -27,14 +34,20 @@ namespace Orleans.EventSourcing.StateStorage
         [Id(2)]
         public bool RecordExists { get; set; }
 
-        public GrainStateWithMetaData<TView>? State { get => StateAndMetaData; set => StateAndMetaData = value; }
+        public GrainStateWithMetaData<TView> State { get => StateAndMetaData; set => StateAndMetaData = value; }
+
+        GrainStateWithMetaData<TView>? IGrainState<GrainStateWithMetaData<TView>>.State
+        {
+            get => State;
+            set => State = value ?? throw new ArgumentNullException(nameof(value));
+        }
 
         /// <summary>
         /// Initialize a new instance of GrainStateWithMetaDataAndETag class with an initialView
         /// </summary>
         public GrainStateWithMetaDataAndETag(TView initialview)
         {
-            StateAndMetaData = new GrainStateWithMetaData<TView>(initialview);
+            stateAndMetaData = new GrainStateWithMetaData<TView>(initialview);
         }
 
         /// <summary>
@@ -42,7 +55,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         public GrainStateWithMetaDataAndETag()
         {
-            StateAndMetaData = new GrainStateWithMetaData<TView>();
+            stateAndMetaData = new GrainStateWithMetaData<TView>();
         }
 
         /// <summary>
@@ -50,7 +63,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         public override string ToString()
         {
-            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData!.GlobalVersion, StateAndMetaData!.WriteVector, ETag, StateAndMetaData!.State); // Preserve the legacy failure if state was explicitly set to null.
+            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData.GlobalVersion, StateAndMetaData.WriteVector, ETag, StateAndMetaData.State);
         }
     }
 

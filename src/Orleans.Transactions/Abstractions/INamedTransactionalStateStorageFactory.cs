@@ -12,7 +12,10 @@ namespace Orleans.Transactions.Abstractions
         /// <typeparam name="TState"></typeparam>
         /// <param name="storageName">Name of transaction state storage to create.</param>
         /// <param name="stateName">Name of transaction state.</param>
-        /// <returns>ITransactionalStateStorage, null if not found.</returns>
-        ITransactionalStateStorage<TState>? Create<TState>(string? storageName, string stateName) where TState : class, new();
+        /// <returns>The transactional state storage.</returns>
+        /// <exception cref="System.InvalidOperationException">
+        /// No transactional state storage factory or grain storage provider is configured with the requested name.
+        /// </exception>
+        ITransactionalStateStorage<TState> Create<TState>(string? storageName, string stateName) where TState : class, new();
     }
 }

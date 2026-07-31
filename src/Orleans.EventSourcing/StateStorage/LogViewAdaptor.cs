@@ -40,13 +40,13 @@ namespace Orleans.EventSourcing.StateStorage
         /// <inheritdoc/>
         protected override TLogView LastConfirmedView()
         {
-            return GlobalStateCache.StateAndMetaData!.State;
+            return GlobalStateCache.StateAndMetaData.State;
         }
 
         /// <inheritdoc/>
         protected override int GetConfirmedVersion()
         {
-            return GlobalStateCache.StateAndMetaData!.GlobalVersion;
+            return GlobalStateCache.StateAndMetaData.GlobalVersion;
         }
 
         /// <inheritdoc/>
@@ -117,7 +117,7 @@ namespace Orleans.EventSourcing.StateStorage
             bool batchsuccessfullywritten = false;
 
             var nextglobalstate = new GrainStateWithMetaDataAndETag<TLogView>(state);
-            nextglobalstate.StateAndMetaData!.WriteVector = GlobalStateCache.StateAndMetaData!.WriteVector;
+            nextglobalstate.StateAndMetaData.WriteVector = GlobalStateCache.StateAndMetaData.WriteVector;
             nextglobalstate.StateAndMetaData.GlobalVersion = GlobalStateCache.StateAndMetaData.GlobalVersion + updates.Length;
             nextglobalstate.ETag = GlobalStateCache.ETag;
 
@@ -172,7 +172,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                 // check if last apparently failed write was in fact successful
 
-                if (writebit == GlobalStateCache.StateAndMetaData!.GetBit(Services.MyClusterId))
+                if (writebit == GlobalStateCache.StateAndMetaData.GetBit(Services.MyClusterId))
                 {
                     GlobalStateCache = nextglobalstate;
 
@@ -291,14 +291,14 @@ namespace Orleans.EventSourcing.StateStorage
         protected override void ProcessNotifications()
         {
             // discard notifications that are behind our already confirmed state
-            while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalStateCache.StateAndMetaData!.GlobalVersion)
+            while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalStateCache.StateAndMetaData.GlobalVersion)
             {
                 Services.Log(LogLevel.Debug, "discarding notification {0}", notifications.ElementAt(0).Value);
                 notifications.RemoveAt(0);
             }
 
             // process notifications that reflect next global version
-            while (notifications.Count > 0 && notifications.ElementAt(0).Key == GlobalStateCache.StateAndMetaData!.GlobalVersion)
+            while (notifications.Count > 0 && notifications.ElementAt(0).Key == GlobalStateCache.StateAndMetaData.GlobalVersion)
             {
                 var updateNotification = notifications.ElementAt(0).Value;
                 notifications.RemoveAt(0);

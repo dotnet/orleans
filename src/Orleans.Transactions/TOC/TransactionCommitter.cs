@@ -121,8 +121,7 @@ namespace Orleans.Transactions
             this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            // TODO: Consider surfacing a configuration error if a custom factory returns null.
-            ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName)!; // Validated transaction configuration resolves storage.
+            ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);
 
             // setup transaction processing pipe
             void deactivate() => grainRuntime.DeactivateOnIdle(context);

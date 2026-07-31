@@ -60,6 +60,7 @@ namespace Orleans.Transactions.TestKit
 
             // store without any changes
             var etag1 = await stateStorage.Store(loadresponse.ETag, loadresponse.Metadata, emptyPendingStates, null, null);
+            etag1.Should().NotBeNullOrEmpty();
 
             // load again
             loadresponse = await stateStorage.Load();
@@ -76,6 +77,7 @@ namespace Orleans.Transactions.TestKit
             var cr = MakeCommitRecords(2, 2);
             var metadata = new TransactionalStateMetaData() { TimeStamp = now, CommitRecords = cr };
             var etag2 = await stateStorage.Store(etag1, metadata, emptyPendingStates, null, null);
+            etag2.Should().NotBeNullOrEmpty();
 
             // load again, check content
             loadresponse = await stateStorage.Load();
@@ -117,6 +119,7 @@ namespace Orleans.Transactions.TestKit
             var cr = MakeCommitRecords(2,2);
             var metadata = new TransactionalStateMetaData() { TimeStamp = now, CommitRecords = cr };
             var etag2 = await stateStorage.Store(null, metadata, emptyPendingStates, null, null);
+            etag2.Should().NotBeNullOrEmpty();
 
             // update timestamp in metadata, then write back with wrong e-tag, must fail
             try

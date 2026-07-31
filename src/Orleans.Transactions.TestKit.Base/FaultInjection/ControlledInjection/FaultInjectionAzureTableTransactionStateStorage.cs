@@ -27,7 +27,7 @@ namespace Orleans.Transactions.TestKit
             return this.stateStorage.Load();
         }
 
-        public async Task<string?> Store(
+        public async Task<string> Store(
 
             string? expectedETag,
             TransactionalStateMetaData metadata,
