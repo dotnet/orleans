@@ -76,8 +76,11 @@ public class DiagnosticInfrastructureRegressionTests
 
         ActivationRebalancerEvents.EmitCycleStop(siloAddress, 1, 1, 0.1, TimeSpan.FromMilliseconds(1), false);
 
-        var waitTask = observer.WaitForCycleAsync(TimeSpan.FromSeconds(1));
+        var waitTask = observer.WaitForCycleAsync();
+        Assert.False(waitTask.IsCompleted);
+
         ActivationRebalancerEvents.EmitCycleStop(siloAddress, 2, 2, 0.2, TimeSpan.FromMilliseconds(1), false);
+        Assert.True(waitTask.IsCompletedSuccessfully);
 
         var result = await waitTask;
         Assert.Equal(2, result.CycleNumber);
@@ -92,12 +95,31 @@ public class DiagnosticInfrastructureRegressionTests
 
         ActivationRebalancerEvents.EmitSessionStop(siloAddress, "existing", 1);
 
-        var waitTask = observer.WaitForSessionStopAsync(TimeSpan.FromSeconds(1));
+        var waitTask = observer.WaitForSessionStopAsync();
+        Assert.False(waitTask.IsCompleted);
+
         ActivationRebalancerEvents.EmitSessionStop(siloAddress, "latest", 2);
+        Assert.True(waitTask.IsCompletedSuccessfully);
 
         var result = await waitTask;
         Assert.Equal("latest", result.Reason);
         Assert.Equal(2, result.TotalCycles);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task RebalancerDiagnosticObserver_WaitAfterTimeout_CanObserveLaterEvent()
+    {
+        using var observer = RebalancerDiagnosticObserver.Create();
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12002), 3);
+
+        await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForSessionStopAsync(TimeSpan.Zero));
+
+        var waitTask = observer.WaitForSessionStopAsync();
+        ActivationRebalancerEvents.EmitSessionStop(siloAddress, "latest", 1);
+        Assert.True(waitTask.IsCompletedSuccessfully);
+
+        var result = await waitTask;
+        Assert.Equal("latest", result.Reason);
     }
 
     [Fact, TestCategory("BVT")]
