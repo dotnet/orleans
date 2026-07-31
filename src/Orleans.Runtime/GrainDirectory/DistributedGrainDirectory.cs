@@ -229,18 +229,29 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     internal CancellationToken GetClusterMemberCancellationToken(SiloAddress siloAddress) =>
         _clusterMemberCancellationTokens.GetToken(siloAddress);
 
-    public async ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionIndex)
+    public async ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        SiloAddress siloAddress,
+        int partitionIndex,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         foreach (var partition in _partitions)
         {
             partition.OnRecoveringPartition(membershipVersion, range, siloAddress, partitionIndex).Ignore();
         }
 
-        return await GetRegisteredActivations(membershipVersion, range, false);
+        return await GetRegisteredActivations(membershipVersion, range, false, cancellationToken);
     }
 
-    public ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
+    public ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        bool isValidation,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!isValidation)
         {
             LogDebugCollectingRegisteredActivations(_logger, range, membershipVersion);
@@ -259,6 +270,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         foreach (var (grainId, activation) in _localActivations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var directory = GetGrainDirectory(activation, _grainDirectoryResolver!);
             if (directory == this)
             {

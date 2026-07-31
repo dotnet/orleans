@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 
@@ -20,17 +21,30 @@ internal interface IGrainDirectoryPartition : ISystemTarget
     ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
 
     [Alias("AcknowledgeSnapshotTransferAsync")]
-    ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion version);
+    ValueTask<bool> AcknowledgeSnapshotTransferAsync(
+        SiloAddress silo,
+        int partitionIndex,
+        MembershipVersion version,
+        CancellationToken cancellationToken = default);
 }
 
 [Alias("IGrainDirectoryClient")]
 internal interface IGrainDirectoryClient : ISystemTarget
 {
     [Alias("GetRegisteredActivations")]
-    ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation);
+    ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        bool isValidation,
+        CancellationToken cancellationToken = default);
 
     [Alias("RecoverRegisteredActivations")]
-    ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionId);
+    ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        SiloAddress siloAddress,
+        int partitionId,
+        CancellationToken cancellationToken = default);
 }
 
 [Alias("IGrainDirectoryTestHooks")]
