@@ -33,7 +33,39 @@ namespace Orleans.Streaming.EventHubs.Testing
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
             IEnvironmentStatisticsProvider environmentStatisticsProvider)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatisticsProvider)
+            : this(
+                name,
+                options,
+                ehOptions,
+                receiverOptions,
+                cacheOptions,
+                new EventHubStreamCacheMemoryOptions(),
+                evictionOptions,
+                statisticOptions,
+                dataAdapter,
+                serviceProvider,
+                loggerFactory,
+                environmentStatisticsProvider)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventDataGeneratorAdapterFactory"/> class.
+        /// </summary>
+        public EventDataGeneratorAdapterFactory(
+            string name,
+            EventDataGeneratorStreamOptions options,
+            EventHubOptions ehOptions,
+            EventHubReceiverOptions receiverOptions,
+            EventHubStreamCachePressureOptions cacheOptions,
+            EventHubStreamCacheMemoryOptions cacheMemoryOptions,
+            StreamCacheEvictionOptions evictionOptions,
+            StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdapter,
+            IServiceProvider serviceProvider,
+            ILoggerFactory loggerFactory,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider)
+            : base(name, ehOptions, receiverOptions, cacheOptions, cacheMemoryOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatisticsProvider)
         {
             this.ehGeneratorOptions = options;
         }
@@ -182,12 +214,13 @@ namespace Orleans.Streaming.EventHubs.Testing
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
+            var cacheMemoryOptions = services.GetOptionsByName<EventHubStreamCacheMemoryOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions,
+            var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, cacheMemoryOptions,
                 evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;

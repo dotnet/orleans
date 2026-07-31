@@ -45,6 +45,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         private readonly EventHubOptions ehOptions;
         private readonly EventHubStreamCachePressureOptions cacheOptions;
+        private readonly EventHubStreamCacheMemoryOptions cacheMemoryOptions;
         private readonly EventHubReceiverOptions receiverOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly StreamCacheEvictionOptions cacheEvictionOptions;
@@ -115,12 +116,43 @@ namespace Orleans.Streaming.EventHubs
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
             IEnvironmentStatisticsProvider environmentStatisticsProvider)
+            : this(
+                name,
+                ehOptions,
+                receiverOptions,
+                cacheOptions,
+                new EventHubStreamCacheMemoryOptions(),
+                cacheEvictionOptions,
+                statisticOptions,
+                dataAdapter,
+                serviceProvider,
+                loggerFactory,
+                environmentStatisticsProvider)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubAdapterFactory"/> class.
+        /// </summary>
+        public EventHubAdapterFactory(
+            string name,
+            EventHubOptions ehOptions,
+            EventHubReceiverOptions receiverOptions,
+            EventHubStreamCachePressureOptions cacheOptions,
+            EventHubStreamCacheMemoryOptions cacheMemoryOptions,
+            StreamCacheEvictionOptions cacheEvictionOptions,
+            StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdapter,
+            IServiceProvider serviceProvider,
+            ILoggerFactory loggerFactory,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             this.Name = name;
             this.cacheEvictionOptions = cacheEvictionOptions ?? throw new ArgumentNullException(nameof(cacheEvictionOptions));
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.ehOptions = ehOptions ?? throw new ArgumentNullException(nameof(ehOptions));
             this.cacheOptions = cacheOptions?? throw new ArgumentNullException(nameof(cacheOptions));
+            this.cacheMemoryOptions = cacheMemoryOptions ?? throw new ArgumentNullException(nameof(cacheMemoryOptions));
             this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
@@ -266,7 +298,7 @@ namespace Orleans.Streaming.EventHubs
         {
            var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions, this.orleansInstruments);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, this.cacheMemoryOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, sharedDimensions, this.orleansInstruments);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
@@ -310,12 +342,13 @@ namespace Orleans.Streaming.EventHubs
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
+            var cacheMemoryOptions = services.GetOptionsByName<EventHubStreamCacheMemoryOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);
+            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, cacheMemoryOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;
         }
