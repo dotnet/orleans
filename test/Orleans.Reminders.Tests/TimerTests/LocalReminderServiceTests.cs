@@ -42,6 +42,19 @@ public class LocalReminderServiceTests
         Assert.Equal(startAt + TimeSpan.FromMinutes(30), nextTick);
     }
 
+    [Fact, TestCategory("BVT")]
+    public void CalculateNextTickTime_TreatsPersistedUnspecifiedTimestampAsUtc()
+    {
+        var persistedStartAt = new DateTime(2026, 1, 1, 0, 10, 0, DateTimeKind.Unspecified);
+        var entry = CreateReminderEntry(persistedStartAt, TimeSpan.FromMinutes(10));
+        var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var nextTick = LocalReminderService.CalculateNextTickTime(entry, now);
+
+        Assert.Equal(DateTimeKind.Utc, nextTick.Kind);
+        Assert.Equal(persistedStartAt.Ticks, nextTick.Ticks);
+    }
+
     [Theory, TestCategory("BVT")]
     [InlineData(-1, false)]
     [InlineData(0, true)]

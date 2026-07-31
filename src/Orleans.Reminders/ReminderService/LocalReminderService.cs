@@ -839,19 +839,20 @@ namespace Orleans.Runtime.ReminderService
         internal static DateTime CalculateNextTickTime(ReminderEntry entry, DateTime now)
         {
             ArgumentNullException.ThrowIfNull(entry);
-            Debug.Assert(entry.StartAt.Kind == DateTimeKind.Utc);
             Debug.Assert(now.Kind == DateTimeKind.Utc);
             if (entry.Period <= TimeSpan.Zero)
             {
                 throw new ArgumentOutOfRangeException(nameof(entry), entry.Period, "Reminder period must be greater than zero.");
             }
 
-            if (now <= entry.StartAt)
+            // Reminder timestamps represent UTC even if a storage provider loses DateTimeKind.
+            var startAt = DateTime.SpecifyKind(entry.StartAt, DateTimeKind.Utc);
+            if (now <= startAt)
             {
-                return entry.StartAt;
+                return startAt;
             }
 
-            var sinceFirstTick = now.Ticks - entry.StartAt.Ticks;
+            var sinceFirstTick = now.Ticks - startAt.Ticks;
             var sinceLastTick = sinceFirstTick % entry.Period.Ticks;
             if (sinceLastTick == 0)
             {
