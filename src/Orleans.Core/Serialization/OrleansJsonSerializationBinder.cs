@@ -13,7 +13,7 @@ namespace Orleans.Serialization
     public class OrleansJsonSerializationBinder : DefaultSerializationBinder
     {
         private readonly TypeResolver _typeResolver;
-        private readonly TypeConverter _typeConverter;
+        private readonly TypeConverter? _typeConverter;
         private readonly bool _allowAllTypes;
 
         /// <summary>

@@ -24,7 +24,7 @@ public class OrleansJsonSerializationBinderTests
         {
             foreach (var type in allowedTypes)
             {
-                options.AllowedTypes.Add(type.FullName);
+                options.AllowedTypes.Add(type.FullName!);
             }
         }));
 
@@ -50,7 +50,7 @@ public class OrleansJsonSerializationBinderTests
         using var services = BuildServiceProvider(typeof(AllowedState));
         var binder = CreateStrictBinder(services);
 
-        var type = binder.BindToType(typeof(AllowedState).Assembly.GetName().Name, typeof(AllowedState).FullName);
+        var type = binder.BindToType(typeof(AllowedState).Assembly.GetName().Name, typeof(AllowedState).FullName!);
 
         Assert.Equal(typeof(AllowedState), type);
     }
@@ -62,7 +62,7 @@ public class OrleansJsonSerializationBinderTests
         var binder = CreateStrictBinder(services);
 
         var exception = Assert.Throws<JsonSerializationException>(() =>
-            binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName));
+            binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!));
 
         Assert.Contains(nameof(OrleansJsonSerializerOptions.AllowAllTypes), exception.Message);
     }
@@ -73,7 +73,7 @@ public class OrleansJsonSerializationBinderTests
         using var services = BuildServiceProvider(typeof(AllowedState));
         var binder = CreateStrictBinder(services, allowAllTypes: true);
 
-        var type = binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName);
+        var type = binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!);
 
         Assert.Equal(typeof(DisallowedState), type);
     }
@@ -84,7 +84,7 @@ public class OrleansJsonSerializationBinderTests
         using var services = BuildServiceProvider(typeof(AllowedState));
         var binder = new OrleansJsonSerializationBinder(services.GetRequiredService<TypeResolver>());
 
-        var type = binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName);
+        var type = binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!);
 
         Assert.Equal(typeof(DisallowedState), type);
     }
@@ -97,7 +97,7 @@ public class OrleansJsonSerializationBinderTests
         using var provider = services.BuildServiceProvider();
         var binder = CreateStrictBinder(provider);
 
-        var type = binder.BindToType(typeof(GeneratedState).Assembly.GetName().Name, typeof(GeneratedState).FullName);
+        var type = binder.BindToType(typeof(GeneratedState).Assembly.GetName().Name, typeof(GeneratedState).FullName!);
 
         Assert.Equal(typeof(GeneratedState), type);
     }
@@ -110,7 +110,7 @@ public class OrleansJsonSerializationBinderTests
         var payload = new AllowedState { Name = "orleans", Value = 42 };
 
         var json = JsonConvert.SerializeObject(payload, settings);
-        var result = (AllowedState)JsonConvert.DeserializeObject(json, typeof(object), settings);
+        var result = Assert.IsType<AllowedState>(JsonConvert.DeserializeObject(json, typeof(object), settings));
 
         Assert.Equal(payload.Name, result.Name);
         Assert.Equal(payload.Value, result.Value);
@@ -148,19 +148,19 @@ public class OrleansJsonSerializationBinderTests
 
 public sealed class AllowedState
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
     public int Value { get; set; }
 }
 
 public sealed class DisallowedState
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
     public int Value { get; set; }
 }
 
 [GenerateSerializer]
 public sealed class GeneratedState
 {
-    [Id(0)] public string Name { get; set; }
+    [Id(0)] public string Name { get; set; } = null!;
     [Id(1)] public int Value { get; set; }
 }
