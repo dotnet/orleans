@@ -13,17 +13,14 @@ namespace Orleans.EventSourcing.LogStorage
     [GenerateSerializer]
     public sealed class LogStateWithMetaDataAndETag<TEntry> : IGrainState<LogStateWithMetaData<TEntry>> where TEntry : class
     {
-        [NonSerialized]
-        private LogStateWithMetaData<TEntry> stateAndMetaData;
-
         /// <summary>
         /// Gets and Sets StateAndMetaData
         /// </summary>
         [Id(0)]
         public LogStateWithMetaData<TEntry> StateAndMetaData
         {
-            get => stateAndMetaData;
-            set => stateAndMetaData = value ?? throw new ArgumentNullException(nameof(value));
+            get => field ??= new LogStateWithMetaData<TEntry>();
+            set => field = value ?? new LogStateWithMetaData<TEntry>();
         }
 
         /// <summary>
@@ -40,7 +37,7 @@ namespace Orleans.EventSourcing.LogStorage
         LogStateWithMetaData<TEntry>? IGrainState<LogStateWithMetaData<TEntry>>.State
         {
             get => State;
-            set => State = value ?? throw new ArgumentNullException(nameof(value));
+            set => StateAndMetaData = value ?? new LogStateWithMetaData<TEntry>();
         }
 
         /// <summary>
@@ -48,7 +45,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         public LogStateWithMetaDataAndETag()
         {
-            stateAndMetaData = new LogStateWithMetaData<TEntry>();
+            StateAndMetaData = new LogStateWithMetaData<TEntry>();
         }
 
         /// <summary>

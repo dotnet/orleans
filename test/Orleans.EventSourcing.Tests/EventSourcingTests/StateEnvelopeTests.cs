@@ -1,5 +1,6 @@
 using Orleans.EventSourcing.LogStorage;
 using Orleans.EventSourcing.StateStorage;
+using System.Reflection;
 using Xunit;
 
 namespace Tester.EventSourcingTests;
@@ -12,9 +13,13 @@ public class StateEnvelopeTests
         var envelope = new LogStateWithMetaDataAndETag<TestLogEntry>();
 
         Assert.Same(envelope.StateAndMetaData, envelope.State);
-        Assert.Throws<ArgumentNullException>(() => envelope.StateAndMetaData = null!);
-        Assert.Throws<ArgumentNullException>(() => envelope.State = null!);
-        Assert.Throws<ArgumentNullException>(() => ((IGrainState<LogStateWithMetaData<TestLogEntry>>)envelope).State = null);
+        envelope.StateAndMetaData = null!;
+        Assert.NotNull(envelope.StateAndMetaData);
+        envelope.State = null!;
+        Assert.NotNull(envelope.State);
+        ((IGrainState<LogStateWithMetaData<TestLogEntry>>)envelope).State = null;
+        Assert.NotNull(envelope.State);
+        AssertLegacyBackingFieldIsSerialized(envelope);
     }
 
     [Fact]
@@ -23,9 +28,23 @@ public class StateEnvelopeTests
         var envelope = new GrainStateWithMetaDataAndETag<TestView>();
 
         Assert.Same(envelope.StateAndMetaData, envelope.State);
-        Assert.Throws<ArgumentNullException>(() => envelope.StateAndMetaData = null!);
-        Assert.Throws<ArgumentNullException>(() => envelope.State = null!);
-        Assert.Throws<ArgumentNullException>(() => ((IGrainState<GrainStateWithMetaData<TestView>>)envelope).State = null);
+        envelope.StateAndMetaData = null!;
+        Assert.NotNull(envelope.StateAndMetaData);
+        envelope.State = null!;
+        Assert.NotNull(envelope.State);
+        ((IGrainState<GrainStateWithMetaData<TestView>>)envelope).State = null;
+        Assert.NotNull(envelope.State);
+        AssertLegacyBackingFieldIsSerialized(envelope);
+    }
+
+    private static void AssertLegacyBackingFieldIsSerialized<T>(T envelope)
+    {
+        var backingField = typeof(T).GetField("<StateAndMetaData>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(backingField);
+        Assert.Null(backingField.GetCustomAttribute<NonSerializedAttribute>());
+
+        backingField.SetValue(envelope, null);
+        Assert.NotNull(typeof(T).GetProperty("StateAndMetaData")!.GetValue(envelope));
     }
 
     private sealed class TestLogEntry;

@@ -12,17 +12,14 @@ namespace Orleans.EventSourcing.StateStorage
     [GenerateSerializer]
     public sealed class GrainStateWithMetaDataAndETag<TView> : IGrainState<GrainStateWithMetaData<TView>> where TView : class, new()
     {
-        [NonSerialized]
-        private GrainStateWithMetaData<TView> stateAndMetaData;
-
         /// <summary>
         /// Gets and Sets StateAndMetaData
         /// </summary>
         [Id(0)]
         public GrainStateWithMetaData<TView> StateAndMetaData
         {
-            get => stateAndMetaData;
-            set => stateAndMetaData = value ?? throw new ArgumentNullException(nameof(value));
+            get => field ??= new GrainStateWithMetaData<TView>();
+            set => field = value ?? new GrainStateWithMetaData<TView>();
         }
 
         /// <summary>
@@ -39,7 +36,7 @@ namespace Orleans.EventSourcing.StateStorage
         GrainStateWithMetaData<TView>? IGrainState<GrainStateWithMetaData<TView>>.State
         {
             get => State;
-            set => State = value ?? throw new ArgumentNullException(nameof(value));
+            set => StateAndMetaData = value ?? new GrainStateWithMetaData<TView>();
         }
 
         /// <summary>
@@ -47,7 +44,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         public GrainStateWithMetaDataAndETag(TView initialview)
         {
-            stateAndMetaData = new GrainStateWithMetaData<TView>(initialview);
+            StateAndMetaData = new GrainStateWithMetaData<TView>(initialview);
         }
 
         /// <summary>
@@ -55,7 +52,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         public GrainStateWithMetaDataAndETag()
         {
-            stateAndMetaData = new GrainStateWithMetaData<TView>();
+            StateAndMetaData = new GrainStateWithMetaData<TView>();
         }
 
         /// <summary>
