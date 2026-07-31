@@ -30,6 +30,21 @@ internal sealed class RedisJournalStorageOptionsValidator(RedisJournalStorageOpt
                 $"Invalid configuration for {nameof(RedisJournalStorageProvider)}. {nameof(RedisJournalStorageOptions)}.{nameof(options.GetKeyName)} is required.");
         }
 
+        if (options.KeyPrefix is { } keyPrefix)
+        {
+            if (string.IsNullOrWhiteSpace(keyPrefix))
+            {
+                throw new OrleansConfigurationException(
+                    $"Invalid configuration for {nameof(RedisJournalStorageProvider)}. {nameof(RedisJournalStorageOptions)}.{nameof(options.KeyPrefix)} must not be empty or whitespace.");
+            }
+
+            if (keyPrefix.IndexOf('\0') >= 0)
+            {
+                throw new OrleansConfigurationException(
+                    $"Invalid configuration for {nameof(RedisJournalStorageProvider)}. {nameof(RedisJournalStorageOptions)}.{nameof(options.KeyPrefix)} must not contain null characters.");
+            }
+        }
+
         if (options.CompactionThresholdBytes < 0)
         {
             throw new OrleansConfigurationException(

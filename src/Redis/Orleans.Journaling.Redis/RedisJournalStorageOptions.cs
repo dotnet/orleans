@@ -48,7 +48,7 @@ public sealed class RedisJournalStorageOptions
     public long CompactionThresholdBytes { get; set; } = DEFAULT_COMPACTION_THRESHOLD_BYTES;
 
     /// <summary>
-    /// Gets or sets the maximum number of bytes read from Redis in each recovery chunk.
+    /// Gets or sets the maximum number of bytes supplied to the journal consumer in each recovery segment.
     /// </summary>
     public int ReadChunkSize { get; set; } = 1024 * 1024;
 
