@@ -112,7 +112,13 @@ public class DiagnosticInfrastructureRegressionTests
         using var observer = RebalancerDiagnosticObserver.Create();
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12002), 3);
 
-        await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForSessionStopAsync(TimeSpan.Zero));
+        var timedOutWaitTask = observer.WaitForSessionStopAsync(TimeSpan.Zero);
+        Assert.True(timedOutWaitTask.IsCompleted);
+        await Assert.ThrowsAsync<TimeoutException>(() => timedOutWaitTask);
+
+        var timedOutCountWaitTask = observer.WaitForSessionStopCountAsync(1, TimeSpan.Zero);
+        Assert.True(timedOutCountWaitTask.IsCompleted);
+        await Assert.ThrowsAsync<TimeoutException>(() => timedOutCountWaitTask);
 
         var waitTask = observer.WaitForSessionStopAsync();
         ActivationRebalancerEvents.EmitSessionStop(siloAddress, "latest", 1);
@@ -120,6 +126,18 @@ public class DiagnosticInfrastructureRegressionTests
 
         var result = await waitTask;
         Assert.Equal("latest", result.Reason);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task RebalancerDiagnosticObserver_Dispose_CompletesOutstandingWaiters()
+    {
+        var observer = RebalancerDiagnosticObserver.Create();
+        var waitTask = observer.WaitForSessionStopAsync();
+
+        observer.Dispose();
+
+        Assert.True(waitTask.IsCompleted);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => waitTask);
     }
 
     [Fact, TestCategory("BVT")]
