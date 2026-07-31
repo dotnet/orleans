@@ -20,7 +20,7 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     private readonly ConcurrentQueue<ActivationRebalancerEvents.SessionStart> _sessionStartEvents = new();
     private readonly ConcurrentQueue<ActivationRebalancerEvents.SessionStop> _sessionStopEvents = new();
     private readonly object _waitersLock = new();
-    private readonly List<IWaiter> _waiters = [];
+    private readonly List<Waiter> _waiters = [];
     private IDisposable? _subscription;
 
     /// <summary>
@@ -236,7 +236,8 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
             var waiter = new ConditionWaiter(predicate);
             _waiters.Add(waiter);
-            return WaitWithTimeoutAsync(waiter, timeout, timeoutMessage);
+            waiter.StartTimeout(timeout, () => TimeoutWaiter(waiter, timeoutMessage));
+            return waiter.Task;
         }
     }
 
@@ -250,55 +251,35 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
         {
             var waiter = new EventWaiter<TEvent>(predicate);
             _waiters.Add(waiter);
-            return WaitWithTimeoutAsync(waiter, timeout, timeoutMessage);
+            waiter.StartTimeout(timeout, () => TimeoutWaiter(waiter, timeoutMessage));
+            return waiter.Task;
         }
     }
 
-    private async Task WaitWithTimeoutAsync(ConditionWaiter waiter, TimeSpan timeout, Func<string> timeoutMessage)
-    {
-        try
-        {
-            await waiter.Task.WaitAsync(timeout);
-        }
-        catch (TimeoutException)
-        {
-            RemoveWaiter(waiter);
-            throw new TimeoutException(timeoutMessage());
-        }
-    }
-
-    private async Task<TEvent> WaitWithTimeoutAsync<TEvent>(
-        EventWaiter<TEvent> waiter,
-        TimeSpan timeout,
-        Func<string> timeoutMessage)
-        where TEvent : ActivationRebalancerEvents.RebalancerEvent
-    {
-        try
-        {
-            return await waiter.Task.WaitAsync(timeout);
-        }
-        catch (TimeoutException)
-        {
-            RemoveWaiter(waiter);
-            throw new TimeoutException(timeoutMessage());
-        }
-    }
-
-    private void RemoveWaiter(IWaiter waiter)
+    private void TimeoutWaiter(Waiter waiter, Func<string> timeoutMessage)
     {
         lock (_waitersLock)
         {
-            _waiters.Remove(waiter);
+            if (!_waiters.Remove(waiter))
+            {
+                return;
+            }
+
+            waiter.TrySetException(new TimeoutException(timeoutMessage()));
         }
+
+        waiter.StopTimeout();
     }
 
     private void SignalWaiters(ActivationRebalancerEvents.RebalancerEvent value)
     {
         for (var i = _waiters.Count - 1; i >= 0; i--)
         {
-            if (_waiters[i].TryComplete(value))
+            var waiter = _waiters[i];
+            if (waiter.TryComplete(value))
             {
                 _waiters.RemoveAt(i);
+                waiter.StopTimeout();
             }
         }
     }
@@ -340,18 +321,36 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
         _subscription?.Dispose();
     }
 
-    private interface IWaiter
+    private abstract class Waiter
     {
-        bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value);
+        private System.Threading.Timer? _timeoutTimer;
+
+        public abstract bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value);
+
+        public abstract bool TrySetException(Exception exception);
+
+        public void StartTimeout(TimeSpan timeout, Action callback)
+        {
+            _timeoutTimer = new System.Threading.Timer(
+                static state => ((Action)state!).Invoke(),
+                callback,
+                timeout,
+                System.Threading.Timeout.InfiniteTimeSpan);
+        }
+
+        public void StopTimeout()
+        {
+            Interlocked.Exchange(ref _timeoutTimer, null)?.Dispose();
+        }
     }
 
-    private sealed class ConditionWaiter(Func<bool> predicate) : IWaiter
+    private sealed class ConditionWaiter(Func<bool> predicate) : Waiter
     {
         private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task Task => _completion.Task;
 
-        public bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value)
+        public override bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value)
         {
             if (!predicate())
             {
@@ -360,16 +359,18 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
             return _completion.TrySetResult();
         }
+
+        public override bool TrySetException(Exception exception) => _completion.TrySetException(exception);
     }
 
-    private sealed class EventWaiter<TEvent>(Func<TEvent, bool> predicate) : IWaiter
+    private sealed class EventWaiter<TEvent>(Func<TEvent, bool> predicate) : Waiter
         where TEvent : ActivationRebalancerEvents.RebalancerEvent
     {
         private readonly TaskCompletionSource<TEvent> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<TEvent> Task => _completion.Task;
 
-        public bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value)
+        public override bool TryComplete(ActivationRebalancerEvents.RebalancerEvent value)
         {
             if (value is not TEvent evt || !predicate(evt))
             {
@@ -378,5 +379,7 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
             return _completion.TrySetResult(evt);
         }
+
+        public override bool TrySetException(Exception exception) => _completion.TrySetException(exception);
     }
 }
