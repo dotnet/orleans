@@ -360,7 +360,7 @@ namespace Orleans.Runtime.ReminderService
 
             var remindersOutOfRange = 0;
 
-            foreach (var r in localReminders)
+            foreach (var r in localReminders.ToArray())
             {
                 if (RingRange.InRange(r.Key.GrainId)) continue;
                 remindersOutOfRange++;
