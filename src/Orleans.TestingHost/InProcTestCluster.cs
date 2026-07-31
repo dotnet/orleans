@@ -38,6 +38,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly List<InProcessSiloHandle> _silos = [];
     private readonly StringBuilder _log = new();
     private readonly InMemoryTransportConnectionHub _transportHub = new();
+    private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
     private bool _disposed;
@@ -365,8 +366,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
         var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
+        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
+            GrainDirectoryObserver.CanObserve(activeSilos)
+                ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, timeout)
+                : null;
         WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
-        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(activeSilos, testHooks, gatewayManager, stabilizationTime))
+        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
+            activeSilos,
+            testHooks,
+            gatewayManager,
+            stabilizationTime,
+            waitForGrainDirectoryConvergence))
         {
             WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
         }
@@ -918,6 +928,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             ClientHost = null;
 
             PortAllocator?.Dispose();
+            _grainDirectoryObserver.Dispose();
         });
 
         _disposed = true;
@@ -938,6 +949,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
         ClientHost?.Dispose();
         PortAllocator?.Dispose();
+        _grainDirectoryObserver.Dispose();
 
         _disposed = true;
     }

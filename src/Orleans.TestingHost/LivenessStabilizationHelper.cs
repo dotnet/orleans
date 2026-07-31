@@ -17,7 +17,8 @@ internal static class LivenessStabilizationHelper
         IReadOnlyCollection<SiloHandle> activeSilos,
         IReadOnlyCollection<ITestHooks> testHooks,
         GatewayManager gatewayManager,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence = null)
     {
         ArgumentNullException.ThrowIfNull(gatewayManager);
 
@@ -27,10 +28,15 @@ internal static class LivenessStabilizationHelper
             return false;
         }
 
-        var remaining = timeout - stopwatch.Elapsed;
-        return remaining <= TimeSpan.Zero
-            ? ActiveGatewaysMatch(gatewayManager, activeSilos)
-            : await WaitForExpectedActiveGatewaysAsync(activeSilos, gatewayManager, remaining);
+        var remaining = GetRemainingTime(timeout, stopwatch.Elapsed);
+        if (waitForGrainDirectoryConvergence is not null
+            && !await waitForGrainDirectoryConvergence(remaining))
+        {
+            return false;
+        }
+
+        remaining = GetRemainingTime(timeout, stopwatch.Elapsed);
+        return await WaitForExpectedActiveGatewaysAsync(activeSilos, gatewayManager, remaining);
     }
 
     public static async Task<bool> WaitForExpectedActiveSilosAsync(
@@ -58,6 +64,12 @@ internal static class LivenessStabilizationHelper
         {
             return false;
         }
+    }
+
+    private static TimeSpan GetRemainingTime(TimeSpan timeout, TimeSpan elapsed)
+    {
+        var remaining = timeout - elapsed;
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 
     private static async Task<bool> WaitForExpectedActiveGatewaysAsync(
@@ -95,11 +107,6 @@ internal static class LivenessStabilizationHelper
         {
             return GatewaysMatch(gatewayManager.GetLiveGateways(), expectedGateways);
         }
-    }
-
-    private static bool ActiveGatewaysMatch(GatewayManager gatewayManager, IReadOnlyCollection<SiloHandle> activeSilos)
-    {
-        return GatewaysMatch(gatewayManager.GetLiveGateways(), GetExpectedGatewayAddresses(activeSilos));
     }
 
     private static HashSet<SiloAddress> GetExpectedGatewayAddresses(IReadOnlyCollection<SiloHandle> activeSilos)

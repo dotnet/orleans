@@ -351,6 +351,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
 
         _viewUpdates.Publish(current);
+        GrainDirectoryEvents.EmitMembershipVersionObserved(_id, _partitionIndex, current.Version);
     }
 
     private async Task ReleaseRangeAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRange removedRange)

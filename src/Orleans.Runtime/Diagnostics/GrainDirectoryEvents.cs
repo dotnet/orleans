@@ -56,6 +56,52 @@ internal static class GrainDirectoryEvents
         public readonly bool Canceled = canceled;
     }
 
+    internal sealed class MembershipVersionApplied(
+        SiloAddress siloAddress,
+        MembershipVersion version) : GrainDirectoryEvent(siloAddress, partitionIndex: -1, version, RingRange.Empty);
+
+    internal sealed class MembershipVersionObserved(
+        SiloAddress siloAddress,
+        int partitionIndex,
+        MembershipVersion version) : GrainDirectoryEvent(siloAddress, partitionIndex, version, RingRange.Empty);
+
+    internal static void EmitMembershipVersionApplied(
+        SiloAddress siloAddress,
+        MembershipVersion version)
+    {
+        if (!Listener.IsEnabled(nameof(MembershipVersionApplied)))
+        {
+            return;
+        }
+
+        Emit(siloAddress, version);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(SiloAddress siloAddress, MembershipVersion version)
+        {
+            Listener.Write(nameof(MembershipVersionApplied), new MembershipVersionApplied(siloAddress, version));
+        }
+    }
+
+    internal static void EmitMembershipVersionObserved(
+        SiloAddress siloAddress,
+        int partitionIndex,
+        MembershipVersion version)
+    {
+        if (!Listener.IsEnabled(nameof(MembershipVersionObserved)))
+        {
+            return;
+        }
+
+        Emit(siloAddress, partitionIndex, version);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(SiloAddress siloAddress, int partitionIndex, MembershipVersion version)
+        {
+            Listener.Write(nameof(MembershipVersionObserved), new MembershipVersionObserved(siloAddress, partitionIndex, version));
+        }
+    }
+
     internal static void EmitRangeOperationStarted(
         SiloAddress siloAddress,
         int partitionIndex,

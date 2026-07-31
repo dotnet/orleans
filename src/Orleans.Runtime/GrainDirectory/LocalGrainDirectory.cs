@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -259,6 +260,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 appliedClusterMembershipSnapshot = snapshot;
                 hasAppliedClusterMembershipSnapshot = true;
+                GrainDirectoryEvents.EmitMembershipVersionApplied(MyAddress, snapshot.Version);
             }
         }
 
