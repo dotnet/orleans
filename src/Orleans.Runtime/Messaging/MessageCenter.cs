@@ -98,8 +98,9 @@ namespace Orleans.Runtime.Messaging
         /// Indicates that application messages should be blocked from being sent or received.
         /// This method is used by the "fast stop" process.
         /// <para>
-        /// Specifically, all outbound application messages are dropped, except for rejections and messages to the membership table grain.
-        /// Inbound application requests are rejected, and other inbound application messages are dropped.
+        /// Specifically, all outbound application requests and one-way messages are rejected or dropped,
+        /// while responses and messages to the membership table grain are allowed to complete.
+        /// Inbound application requests are rejected with cache invalidation, and other inbound application messages are dropped.
         /// </para>
         /// </summary>
         public void BlockApplicationMessages()
@@ -145,10 +146,27 @@ namespace Orleans.Runtime.Messaging
             Debug.Assert(!msg.IsLocalOnly);
 
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
+            var isBlockedApplicationMessage = IsBlockingApplicationMessages
+                && !msg.IsSystemMessage
+                && msg.Direction is not Message.Directions.Response
+                && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain);
+            if (isBlockedApplicationMessage)
             {
-                // Drop the message on the floor if it's an application message that isn't a rejection
-                this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                if (msg.Direction == Message.Directions.Request)
+                {
+                    ProcessRequestToInvalidActivation(
+                        msg,
+                        new GrainAddress { GrainId = msg.TargetGrain, SiloAddress = msg.TargetSilo },
+                        forwardingAddress: null,
+                        failedOperation: "Silo stopping",
+                        rejectMessages: true);
+                }
+                else
+                {
+                    this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                }
+
+                return;
             }
             else
             {
@@ -315,7 +333,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void ProcessRequestToInvalidActivation(
+        internal void ProcessRequestToInvalidActivation(
             Message message,
             GrainAddress? oldAddress,
             SiloAddress? forwardingAddress,
@@ -334,6 +352,11 @@ namespace Orleans.Runtime.Messaging
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
             if (rejectMessages)
             {
+                if (oldAddress != null)
+                {
+                    message.AddToCacheInvalidationHeader(oldAddress, validAddress: null);
+                }
+
                 this.RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
             }
             else

@@ -63,6 +63,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly IServiceProvider _serviceProvider;
     private readonly ImmutableArray<GrainDirectoryPartition> _partitions;
     private readonly CancellationTokenSource _stoppedCts = new();
+    private readonly ClusterMemberCancellationTokens _clusterMemberCancellationTokens;
     private readonly DirectoryInstruments _directoryInstruments;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
@@ -96,6 +97,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _membershipService = membershipService;
         _logger = logger;
         _directoryInstruments = directoryInstruments;
+        _clusterMemberCancellationTokens = new(_stoppedCts.Token);
         var partitionsPerSilo = membershipService.PartitionsPerSilo;
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
         for (var i = 0; i < partitionsPerSilo; i++)
@@ -224,6 +226,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     internal static bool CanInvokeClusterMember(ClusterMembershipSnapshot snapshot, SiloAddress siloAddress)
         => snapshot.GetSiloStatus(siloAddress) is SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown;
 
+    internal CancellationToken GetClusterMemberCancellationToken(SiloAddress siloAddress) =>
+        _clusterMemberCancellationTokens.GetToken(siloAddress);
+
     public async ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionIndex)
     {
         foreach (var partition in _partitions)
@@ -345,7 +350,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 tasks.Add(partition.OnShuttingDown(token));
             }
-
             await Task.WhenAll(tasks).SuppressThrowing();
         }
     }
@@ -364,6 +368,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 await foreach (var update in _membershipService.ViewUpdates.WithCancellation(_stoppedCts.Token))
                 {
                     tasks.RemoveAll(t => t.IsCompleted);
+                    _clusterMemberCancellationTokens.Update(update.ClusterMembershipSnapshot);
                     var changes = update.ClusterMembershipSnapshot.CreateUpdate(previousUpdate);
 
                     foreach (var change in changes.Changes)
@@ -405,6 +410,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
 
         await Task.WhenAll(tasks).SuppressThrowing();
+        _clusterMemberCancellationTokens.Dispose();
     }
 
     private async Task ObserveMembershipUpdateTask(Task task)
@@ -487,4 +493,76 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         Message = "Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'."
     )]
     private static partial void LogTraceInvokingOperation(ILogger logger, string operation, SiloAddress owner, GrainId grainId);
+}
+
+internal sealed class ClusterMemberCancellationTokens(CancellationToken shutdownToken) : IDisposable
+{
+    private static readonly CancellationToken CanceledToken = new(canceled: true);
+    private Dictionary<SiloAddress, Entry> _entries = [];
+
+    internal int Count => Volatile.Read(ref _entries).Count;
+
+    public CancellationToken GetToken(SiloAddress siloAddress)
+    {
+        var entries = Volatile.Read(ref _entries);
+        return entries.TryGetValue(siloAddress, out var entry) ? entry.Token : CanceledToken;
+    }
+
+    public void Update(ClusterMembershipSnapshot snapshot)
+    {
+        var previous = Volatile.Read(ref _entries);
+        var updated = new Dictionary<SiloAddress, Entry>(snapshot.Members.Count);
+        foreach (var (siloAddress, _) in snapshot.Members)
+        {
+            if (!DistributedGrainDirectory.CanInvokeClusterMember(snapshot, siloAddress))
+            {
+                continue;
+            }
+
+            updated.Add(
+                siloAddress,
+                previous.TryGetValue(siloAddress, out var entry) ? entry : new Entry(shutdownToken));
+        }
+
+        Volatile.Write(ref _entries, updated);
+        DisposeRemoved(previous, updated);
+    }
+
+    public void Dispose()
+    {
+        var previous = Interlocked.Exchange(ref _entries, []);
+        DisposeRemoved(previous, []);
+    }
+
+    private static void DisposeRemoved(
+        Dictionary<SiloAddress, Entry> previous,
+        Dictionary<SiloAddress, Entry> updated)
+    {
+        foreach (var (siloAddress, entry) in previous)
+        {
+            if (!updated.ContainsKey(siloAddress))
+            {
+                entry.Dispose();
+            }
+        }
+    }
+
+    private sealed class Entry : IDisposable
+    {
+        private readonly CancellationTokenSource _source;
+
+        public Entry(CancellationToken shutdownToken)
+        {
+            _source = CancellationTokenSource.CreateLinkedTokenSource(shutdownToken);
+            Token = _source.Token;
+        }
+
+        public CancellationToken Token { get; }
+
+        public void Dispose()
+        {
+            _source.Cancel();
+            _source.Dispose();
+        }
+    }
 }

@@ -84,20 +84,23 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            // If we've stopped application message processing, then filter those out now
+            // If we've stopped application message processing, then reject requests and filter out other messages.
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (messageCenter.IsBlockingApplicationMessages && !msg.IsSystemMessage)
             {
-                // We reject new requests, and drop all other messages
+                // We reject new requests with targeted cache invalidation and drop all other messages.
                 if (msg.Direction != Message.Directions.Request)
                 {
                     this.MessagingTrace.OnDropBlockedApplicationMessage(msg);
                     return;
                 }
 
-                MessagingInstrumentation.OnRejectedMessage(msg);
-                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping", new SiloUnavailableException());
-                this.Send(rejection);
+                messageCenter.ProcessRequestToInvalidActivation(
+                    msg,
+                    new GrainAddress { GrainId = msg.TargetGrain, SiloAddress = msg.TargetSilo },
+                    forwardingAddress: null,
+                    failedOperation: "Silo stopping",
+                    rejectMessages: true);
                 return;
             }
 

@@ -762,14 +762,34 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         var attempt = 0;
         while (!ShutdownToken.IsCancellationRequested)
         {
-            if (!DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
+            var memberCancellationToken = _owner.GetClusterMemberCancellationToken(siloAddress);
+            if (memberCancellationToken.IsCancellationRequested)
             {
                 break;
             }
 
             try
             {
-                return await func();
+                var operationTask = func();
+                try
+                {
+                    if (operationTask.IsCompleted)
+                    {
+                        return await operationTask;
+                    }
+
+                    return await operationTask.WaitAsync(memberCancellationToken);
+                }
+                catch (OperationCanceledException) when (memberCancellationToken.IsCancellationRequested)
+                {
+                    if (operationTask.IsCompleted)
+                    {
+                        return await operationTask;
+                    }
+
+                    operationTask.Ignore();
+                    break;
+                }
             }
             catch (Exception ex)
             {
@@ -779,7 +799,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 }
 
                 await _owner.RefreshViewAsync(default, ShutdownToken);
-                if (!DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
+                if (memberCancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
