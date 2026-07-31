@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Core.Diagnostics;
@@ -21,18 +22,21 @@ internal static class LivenessStabilizationHelper
     {
         ArgumentNullException.ThrowIfNull(gatewayManager);
 
+        var stopwatch = Stopwatch.StartNew();
         if (!await WaitForExpectedActiveSilosAsync(activeSilos, testHooks, timeout))
         {
             return false;
         }
 
+        var remaining = GetRemainingTime(timeout, stopwatch.Elapsed);
         if (waitForGrainDirectoryConvergence is not null
-            && !await waitForGrainDirectoryConvergence(timeout))
+            && !await waitForGrainDirectoryConvergence(remaining))
         {
             return false;
         }
 
-        return await WaitForExpectedActiveGatewaysAsync(activeSilos, gatewayManager, timeout);
+        remaining = GetRemainingTime(timeout, stopwatch.Elapsed);
+        return await WaitForExpectedActiveGatewaysAsync(activeSilos, gatewayManager, remaining);
     }
 
     public static async Task<bool> WaitForExpectedActiveSilosAsync(
@@ -45,6 +49,7 @@ internal static class LivenessStabilizationHelper
 
         if (activeSilos.Count == 0)
         {
+            await Task.Delay(timeout);
             return false;
         }
 
@@ -59,6 +64,12 @@ internal static class LivenessStabilizationHelper
         {
             return false;
         }
+    }
+
+    private static TimeSpan GetRemainingTime(TimeSpan timeout, TimeSpan elapsed)
+    {
+        var remaining = timeout - elapsed;
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 
     private static async Task<bool> WaitForExpectedActiveGatewaysAsync(
