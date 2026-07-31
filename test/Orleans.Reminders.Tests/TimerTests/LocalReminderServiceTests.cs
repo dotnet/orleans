@@ -1,4 +1,6 @@
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
@@ -87,6 +89,43 @@ public class LocalReminderServiceTests
         var exception = Record.Exception(() => Validate(options));
 
         Assert.Equal(throws, exception is OrleansConfigurationException);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void AddReminders_RegistersReminderOptionsValidatorOnce_AndValidatesInvalidConfigurationThroughDI()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.Configure<ReminderOptions>(options =>
+        {
+            options.RefreshReminderListPeriod = TimeSpan.FromMinutes(5);
+            options.ReminderLoadingWindow = TimeSpan.FromMinutes(1);
+        });
+
+        // AddReminders must be idempotent: calling it twice must not register the validator twice.
+        services.AddReminders();
+        services.AddReminders();
+
+        var validatorRegistrations = services.Where(descriptor => descriptor.ServiceType == typeof(IConfigurationValidator)).ToList();
+        Assert.Single(validatorRegistrations);
+
+        using var serviceProvider = services.BuildServiceProvider();
+        var validators = serviceProvider.GetServices<IConfigurationValidator>().ToList();
+        Assert.Single(validators);
+        Assert.IsType<ReminderOptionsValidator>(validators[0]);
+
+        // The invalid configuration must be rejected via the resolved IConfigurationValidator, not by
+        // constructing ReminderOptionsValidator directly.
+        var exception = Assert.Throws<OrleansConfigurationException>(() =>
+        {
+            foreach (IConfigurationValidator resolvedValidator in validators)
+            {
+                resolvedValidator.ValidateConfiguration();
+            }
+        });
+
+        Assert.Contains(nameof(ReminderOptions.ReminderLoadingWindow), exception.Message);
+        Assert.Contains(nameof(ReminderOptions.RefreshReminderListPeriod), exception.Message);
     }
 
     private static void Validate(ReminderOptions options)
