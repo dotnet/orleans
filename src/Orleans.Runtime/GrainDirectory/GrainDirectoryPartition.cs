@@ -799,7 +799,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 }
 
                 await _owner.RefreshViewAsync(default, ShutdownToken);
-                if (memberCancellationToken.IsCancellationRequested)
+                if (memberCancellationToken.IsCancellationRequested
+                    || !DistributedGrainDirectory.CanInvokeClusterMember(_owner.LatestClusterMembershipSnapshot, siloAddress))
                 {
                     break;
                 }

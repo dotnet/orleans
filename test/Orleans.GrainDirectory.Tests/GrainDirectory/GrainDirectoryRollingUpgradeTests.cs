@@ -1318,10 +1318,16 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             return true;
         }
 
-        return string.Equals(entry.Category, "Orleans.Messaging", StringComparison.Ordinal)
-            && entry.Message.StartsWith("Failed to address message", StringComparison.Ordinal)
-            && entry.Message.Contains("IGrainDirectoryPartition.", StringComparison.Ordinal)
-            && entry.Message.Contains("not active on this silo", StringComparison.Ordinal);
+        if (!string.Equals(entry.Category, "Orleans.Messaging", StringComparison.Ordinal)
+            || !entry.Message.StartsWith("Failed to address message", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return (entry.Message.Contains("IGrainDirectoryPartition.", StringComparison.Ordinal)
+                && entry.Message.Contains("not active on this silo", StringComparison.Ordinal))
+            || (string.Equals(entry.ExceptionType, typeof(SiloUnavailableException).FullName, StringComparison.Ordinal)
+                && entry.ExceptionMessage?.Contains("is shutting down", StringComparison.Ordinal) == true);
     }
 
     private void WriteInPlacePhaseReport(
@@ -1902,7 +1908,7 @@ internal sealed class RollingUpgradeIdentityGrain : Grain, IRollingUpgradeIdenti
 internal sealed class TrackingGrainDirectoryCache : IGrainDirectoryCache
 {
     private readonly IGrainDirectoryCache _inner = new LruGrainDirectoryCache(
-        maxCacheSize: 1_000_000,
+        maxCacheSize: 4_096,
         maxCacheTTL: TimeSpan.FromMinutes(10),
         timeProvider: TimeProvider.System);
     private int _clearCount;
