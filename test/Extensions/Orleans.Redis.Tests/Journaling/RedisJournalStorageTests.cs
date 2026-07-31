@@ -456,10 +456,12 @@ public sealed class RedisJournalStorageTests
         public static async Task<RedisJournalStorageTestContext> CreateAsync(Action<RedisJournalStorageOptions>? configure = null)
         {
             var keyPrefix = $"orleans-tests/journaling/{Guid.NewGuid():N}";
-            var multiplexer = await ConnectionMultiplexer.ConnectAsync(TestDefaultConfiguration.RedisConnectionString);
+            var connectionString = TestDefaultConfiguration.RedisConnectionString
+                ?? throw new InvalidOperationException("Redis connection string is not configured.");
+            var multiplexer = await ConnectionMultiplexer.ConnectAsync(connectionString);
             var options = new RedisJournalStorageOptions
             {
-                ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString),
+                ConfigurationOptions = ConfigurationOptions.Parse(connectionString),
                 CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)multiplexer, true)),
                 KeyPrefix = keyPrefix,
                 ReadChunkSize = 2,
