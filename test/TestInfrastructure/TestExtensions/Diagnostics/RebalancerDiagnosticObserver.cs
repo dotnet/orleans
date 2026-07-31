@@ -21,6 +21,7 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     private readonly object _waitersLock = new();
     private readonly List<Waiter> _waiters = [];
     private IDisposable? _subscription;
+    private bool _disposed;
 
     /// <summary>
     /// Gets all captured cycle start events.
@@ -228,14 +229,21 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     {
         lock (_waitersLock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             if (predicate())
             {
                 return Task.CompletedTask;
             }
 
+            if (timeout == TimeSpan.Zero)
+            {
+                return Task.FromException(new TimeoutException(timeoutMessage()));
+            }
+
             var waiter = new ConditionWaiter(predicate);
-            _waiters.Add(waiter);
             waiter.StartTimeout(timeout, () => TimeoutWaiter(waiter, timeoutMessage));
+            _waiters.Add(waiter);
             return waiter.Task;
         }
     }
@@ -248,9 +256,16 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     {
         lock (_waitersLock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (timeout == TimeSpan.Zero)
+            {
+                return Task.FromException<TEvent>(new TimeoutException(timeoutMessage()));
+            }
+
             var waiter = new EventWaiter<TEvent>(predicate);
-            _waiters.Add(waiter);
             waiter.StartTimeout(timeout, () => TimeoutWaiter(waiter, timeoutMessage));
+            _waiters.Add(waiter);
             return waiter.Task;
         }
     }
@@ -317,7 +332,24 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
     public void Dispose()
     {
-        _subscription?.Dispose();
+        Interlocked.Exchange(ref _subscription, null)?.Dispose();
+
+        lock (_waitersLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            foreach (var waiter in _waiters)
+            {
+                waiter.TrySetException(new ObjectDisposedException(nameof(RebalancerDiagnosticObserver)));
+                waiter.StopTimeout();
+            }
+
+            _waiters.Clear();
+        }
     }
 
     private abstract class Waiter
@@ -330,13 +362,26 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
         public void StartTimeout(TimeSpan timeout, Action callback)
         {
-            var timer = new System.Threading.Timer(
+            if (timeout == System.Threading.Timeout.InfiniteTimeSpan)
+            {
+                return;
+            }
+
+            _timeoutTimer = new System.Threading.Timer(
                 static state => ((Action)state!).Invoke(),
                 callback,
                 System.Threading.Timeout.InfiniteTimeSpan,
                 System.Threading.Timeout.InfiniteTimeSpan);
-            Interlocked.Exchange(ref _timeoutTimer, timer)?.Dispose();
-            timer.Change(timeout, System.Threading.Timeout.InfiniteTimeSpan);
+
+            try
+            {
+                _timeoutTimer.Change(timeout, System.Threading.Timeout.InfiniteTimeSpan);
+            }
+            catch
+            {
+                StopTimeout();
+                throw;
+            }
         }
 
         public void StopTimeout()
