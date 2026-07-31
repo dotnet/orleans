@@ -55,6 +55,7 @@ public sealed class SequentialItemSerializationTests : IDisposable
         var result = _serializer.Deserialize<SequentialItem<Person2External>>(serialized);
 
         Assert.NotEmpty(serialized);
+        Assert.NotNull(result);
         Assert.NotSame(original, result);
         AssertSequentialItem(original, result);
         Assert.NotSame(original.Item, result.Item);
@@ -68,6 +69,7 @@ public sealed class SequentialItemSerializationTests : IDisposable
 
         var result = _deepCopier.Copy(original);
 
+        Assert.NotNull(result);
         Assert.NotSame(original, result);
         AssertSequentialItem(original, result);
         Assert.NotSame(original.Item, result.Item);

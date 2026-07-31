@@ -2570,6 +2570,24 @@ namespace OrleansCodeGen.Orleans.Streams
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_SequentialItem<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.SequentialItem<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Streams.SequentialItem<T>>, global::Orleans.Serialization.Serializers.IBaseCodec
+    {
+        public Codec_SequentialItem(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Streams.SequentialItem<T>> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Streams.SequentialItem<T> instance) { }
+
+        public global::Orleans.Streams.SequentialItem<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Streams.SequentialItem<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Streams.SequentialItem<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_StreamEventDeliveryFailureException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.StreamEventDeliveryFailureException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_StreamEventDeliveryFailureException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2677,6 +2695,18 @@ namespace OrleansCodeGen.Orleans.Streams
         public Copier_QueueCacheMissException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
 
         public override void DeepCopy(global::Orleans.Streams.QueueCacheMissException input, global::Orleans.Streams.QueueCacheMissException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_SequentialItem<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Streams.SequentialItem<T>>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Streams.SequentialItem<T>>, global::Orleans.Serialization.Cloning.IBaseCopier
+    {
+        public Copier_SequentialItem(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Streams.SequentialItem<T>> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Streams.SequentialItem<T> DeepCopy(global::Orleans.Streams.SequentialItem<T> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+
+        public void DeepCopy(global::Orleans.Streams.SequentialItem<T> input, global::Orleans.Streams.SequentialItem<T> output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

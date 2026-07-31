@@ -557,7 +557,7 @@ public class InterfaceCollectionRegressionTests
     public sealed class UnsupportedElementListContainer
     {
         [Id(0)]
-        public IList<UnsupportedElement> Values { get; set; }
+        public IList<UnsupportedElement> Values { get; set; } = null!;
     }
 
     [GenerateSerializer]
@@ -565,7 +565,7 @@ public class InterfaceCollectionRegressionTests
     public sealed class GeneratedUnsupportedElementReadOnlyList : IReadOnlyList<UnsupportedElement>
     {
         [Id(0)]
-        public string Marker { get; set; }
+        public string Marker { get; set; } = null!;
 
         public int Count => 0;
 

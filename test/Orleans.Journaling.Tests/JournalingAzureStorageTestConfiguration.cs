@@ -39,7 +39,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
         else
         {
-            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString!);
         }
 
         return options;
