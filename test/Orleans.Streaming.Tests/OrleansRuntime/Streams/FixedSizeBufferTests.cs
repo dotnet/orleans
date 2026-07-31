@@ -76,6 +76,29 @@ namespace UnitTests.OrleansRuntime.Streams
 #pragma warning restore xUnit2013 // Do not use equality check to check for collection size.
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void ObjectPoolBoundsRetainedObjects()
+        {
+            var created = 0;
+            var pool = new ObjectPool<FixedSizeBuffer>(
+                () =>
+                {
+                    created++;
+                    return new FixedSizeBuffer(TestBlockSize);
+                },
+                maxRetainedObjects: 1);
+
+            var first = pool.Allocate();
+            var second = pool.Allocate();
+            first.Dispose();
+            second.Dispose();
+
+            pool.Allocate();
+            pool.Allocate();
+
+            Assert.Equal(3, created);
+        }
+
         private void MyTestPurge(IDisposable resource, FixedSizeBuffer actualBuffer)
         {
             Assert.Equal<object>(resource, actualBuffer);
