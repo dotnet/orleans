@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Codecs;
 [RegisterSerializer]
 public sealed class DateOnlyCodec : IFieldCodec<DateOnly>
 {
-    void IFieldCodec<DateOnly>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DateOnly value)
+    void IFieldCodec<DateOnly>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] DateOnly value)
     {
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(DateOnly), WireType.Fixed32);
@@ -32,6 +32,7 @@ public sealed class DateOnlyCodec : IFieldCodec<DateOnly>
     }
 
     /// <inheritdoc/>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     DateOnly IFieldCodec<DateOnly>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
     /// <summary>
@@ -41,6 +42,7 @@ public sealed class DateOnlyCodec : IFieldCodec<DateOnly>
     /// <param name="reader">The reader.</param>
     /// <param name="field">The field.</param>
     /// <returns>The <see cref="DateOnly"/> value.</returns>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public static DateOnly ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         ReferenceCodec.MarkValueField(reader.Session);

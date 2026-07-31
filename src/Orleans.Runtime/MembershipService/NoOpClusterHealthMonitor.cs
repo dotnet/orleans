@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService;
@@ -50,7 +51,7 @@ internal sealed partial class NoOpClusterHealthMonitor : IClusterHealthMonitor
     }
 
     /// <inheritdoc/>
-    bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string? reason)
+    bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason)
     {
         // External failure detection is always considered healthy from Orleans' perspective.
         // The external system is responsible for health monitoring.

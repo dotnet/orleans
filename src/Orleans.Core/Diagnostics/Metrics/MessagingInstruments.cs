@@ -4,7 +4,6 @@ using System.Diagnostics.Metrics;
 using System.Threading;
 using Orleans.Messaging;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal sealed class MessagingInstruments
@@ -67,70 +66,70 @@ namespace Orleans.Runtime
 
         internal void OnMessageExpired(Phase phase)
         {
-            ExpiredMessagesCounter.Add(1, new KeyValuePair<string, object>("Phase", phase));
+            ExpiredMessagesCounter.Add(1, new KeyValuePair<string, object?>("Phase", phase));
         }
 
         internal void OnPingSend(SiloAddress destination)
         {
-            PingSendCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
+            PingSendCounter.Add(1, new KeyValuePair<string, object?>("Destination", destination.ToString()));
         }
 
         internal void OnPingReceive(SiloAddress destination)
         {
-            PingReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
+            PingReceivedCounter.Add(1, new KeyValuePair<string, object?>("Destination", destination.ToString()));
         }
 
         internal void OnPingReplyReceived(SiloAddress replier)
         {
-            PingReplyReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
+            PingReplyReceivedCounter.Add(1, new KeyValuePair<string, object?>("Destination", replier.ToString()));
         }
 
         internal void OnPingReplyMissed(SiloAddress replier)
         {
-            PingReplyMissedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
+            PingReplyMissedCounter.Add(1, new KeyValuePair<string, object?>("Destination", replier.ToString()));
         }
 
-        internal void OnFailedSentMessage(Message msg)
+        internal void OnFailedSentMessage(Message? msg)
         {
             if (msg == null || !msg.HasDirection) return;
-            FailedSentMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
+            FailedSentMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", msg.Direction.ToString()));
         }
 
-        internal void OnDroppedSentMessage(Message msg)
+        internal void OnDroppedSentMessage(Message? msg)
         {
             if (msg == null || !msg.HasDirection) return;
-            DroppedSentMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
+            DroppedSentMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", msg.Direction.ToString()));
         }
 
-        internal void OnRejectedMessage(Message msg)
+        internal void OnRejectedMessage(Message? msg)
         {
             if (msg == null || !msg.HasDirection) return;
-            RejectedMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
+            RejectedMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", msg.Direction.ToString()));
         }
 
         internal void OnMessageReRoute(Message msg)
         {
-            ReroutedMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
+            ReroutedMessagesCounter.Add(1, new KeyValuePair<string, object?>("Direction", msg.Direction.ToString()));
         }
 
-        internal void OnMessageReceive(Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection, SiloAddress remoteSiloAddress = null)
+        internal void OnMessageReceive(Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection, SiloAddress? remoteSiloAddress = null)
         {
             if (MessageReceivedSizeHistogram.Enabled)
             {
                 if (remoteSiloAddress != null)
                 {
-                    MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object>("silo", remoteSiloAddress));
+                    MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object?>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object?>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object?>("silo", remoteSiloAddress));
                 }
                 else
                 {
-                    MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()));
+                    MessageReceivedSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object?>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object?>("MessageDirection", msg.Direction.ToString()));
                 }
             }
 
             Interlocked.Add(ref _headerBytesReceived, headerBytes);
         }
 
-        internal void OnMessageSend(Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection, SiloAddress remoteSiloAddress = null)
+        internal void OnMessageSend(Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection, SiloAddress? remoteSiloAddress = null)
         {
             Debug.Assert(numTotalBytes >= 0, $"OnMessageSend(numTotalBytes={numTotalBytes})");
 
@@ -138,11 +137,11 @@ namespace Orleans.Runtime
             {
                 if (remoteSiloAddress != null)
                 {
-                    MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object>("silo", remoteSiloAddress));
+                    MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object?>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object?>("MessageDirection", msg.Direction.ToString()), new KeyValuePair<string, object?>("silo", remoteSiloAddress));
                 }
                 else
                 {
-                    MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object>("MessageDirection", msg.Direction.ToString()));
+                    MessageSentSizeHistogram.Record(numTotalBytes, new KeyValuePair<string, object?>("ConnectionDirection", connectionDirection.ToString()), new KeyValuePair<string, object?>("MessageDirection", msg.Direction.ToString()));
                 }
             }
 

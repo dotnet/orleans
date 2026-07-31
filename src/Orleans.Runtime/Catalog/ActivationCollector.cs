@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,7 +14,6 @@ using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Statistics;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -33,13 +33,13 @@ namespace Orleans.Runtime
         internal int _activationCount;
 
         private readonly PeriodicTimer _collectionTimer;
-        private Task _collectionLoopTask;
+        private Task? _collectionLoopTask;
 
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly GrainCollectionOptions _grainCollectionOptions;
         private readonly CatalogInstruments _catalogInstruments;
-        private readonly PeriodicTimer _memBasedDeactivationTimer;
-        private Task _memBasedDeactivationLoopTask;
+        private readonly PeriodicTimer? _memBasedDeactivationTimer;
+        private Task? _memBasedDeactivationLoopTask;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -133,7 +133,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="item">The grain context.</param>
         /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
-        public bool TryCancelCollection(ICollectibleGrainContext item)
+        public bool TryCancelCollection(ICollectibleGrainContext? item)
         {
             if (item is null) return false;
             if (item.IsExemptFromCollection) return false;
@@ -145,7 +145,7 @@ namespace Orleans.Runtime
                 if (IsExpired(ticket)) return false;
 
                 // first, we attempt to remove the ticket.
-                Bucket bucket;
+                Bucket? bucket;
                 if (!buckets.TryGetValue(ticket, out bucket) || !bucket.TryRemove(item)) return false;
             }
 
@@ -182,7 +182,7 @@ namespace Orleans.Runtime
             // if the ticket value doesn't change, then the source and destination bucket are the same and there's nothing to do.
             if (newTicket.Equals(oldTicket)) return true;
 
-            Bucket bucket;
+            Bucket? bucket;
             if (!buckets.TryGetValue(oldTicket, out bucket) || !bucket.TryRemove(item))
             {
                 // fail: item is not associated with currentKey.
@@ -194,7 +194,7 @@ namespace Orleans.Runtime
             return true;
         }
 
-        private bool DequeueQuantum(out List<ICollectibleGrainContext> items, DateTime now)
+        private bool DequeueQuantum([NotNullWhen(true)] out List<ICollectibleGrainContext>? items, DateTime now)
         {
             DateTime key;
             lock (buckets)
@@ -209,7 +209,7 @@ namespace Orleans.Runtime
                 nextTicket += _grainCollectionOptions.CollectionQuantum;
             }
 
-            Bucket bucket;
+            Bucket? bucket;
             if (!buckets.TryRemove(key, out bucket))
             {
                 items = nothing;
@@ -236,7 +236,7 @@ namespace Orleans.Runtime
         public List<ICollectibleGrainContext> ScanStale()
         {
             var now = DateTime.UtcNow;
-            List<ICollectibleGrainContext> condemned = null;
+            List<ICollectibleGrainContext>? condemned = null;
             while (DequeueQuantum(out var activations, now))
             {
                 // At this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently.
@@ -282,7 +282,7 @@ namespace Orleans.Runtime
         /// <returns>The grain activations which have been idle for at least the specified age limit.</returns>
         public List<ICollectibleGrainContext> ScanAll(TimeSpan ageLimit)
         {
-            List<ICollectibleGrainContext> condemned = null;
+            List<ICollectibleGrainContext>? condemned = null;
             var now = DateTime.UtcNow;
             foreach (var kv in buckets)
             {
@@ -603,7 +603,7 @@ namespace Orleans.Runtime
 
             try
             {
-                while (await _memBasedDeactivationTimer.WaitForNextTickAsync(cancellationToken))
+                while (await _memBasedDeactivationTimer!.WaitForNextTickAsync(cancellationToken))
                 {
                     try
                     {
@@ -743,7 +743,7 @@ namespace Orleans.Runtime
 
             public List<ICollectibleGrainContext> CancelAll()
             {
-                List<ICollectibleGrainContext> result = null;
+                List<ICollectibleGrainContext>? result = null;
                 foreach (var pair in Items)
                 {
                     // Attempt to cancel the item. if we succeed, it wasn't already cancelled and we can return it. otherwise, we silently ignore it.

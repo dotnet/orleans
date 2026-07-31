@@ -3,6 +3,7 @@
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
     <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
     <OutputType>Exe</OutputType>
     <DebugSymbols>true</DebugSymbols>
     <ServerGarbageCollection>true</ServerGarbageCollection>

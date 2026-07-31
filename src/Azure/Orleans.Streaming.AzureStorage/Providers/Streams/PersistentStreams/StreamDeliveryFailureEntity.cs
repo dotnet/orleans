@@ -4,7 +4,6 @@ using Azure.Data.Tables;
 using Orleans.Serialization;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Providers.Streams.PersistentStreams
 {
     /// <summary>
@@ -12,8 +11,8 @@ namespace Orleans.Providers.Streams.PersistentStreams
     /// </summary>
     public class StreamDeliveryFailureEntity : ITableEntity
     {
-        public string PartitionKey { get; set; }
-        public string RowKey { get; set; }
+        public string PartitionKey { get; set; } = null!;
+        public string RowKey { get; set; } = null!;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
@@ -25,22 +24,22 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <summary>
         /// Name of the stream provider generating this failure.
         /// </summary>
-        public string StreamProviderName { get; set; }
+        public string StreamProviderName { get; set; } = null!;
 
         /// <summary>
         /// Guid Id of the stream on which the failure occurred.
         /// </summary>
-        public string StreamGuid { get; set; }
+        public string StreamGuid { get; set; } = null!;
 
         /// <summary>
         /// Namespace of the stream on which the failure occurred.
         /// </summary>
-        public string StreamNamespace { get; set; }
+        public string? StreamNamespace { get; set; }
 
         /// <summary>
         /// Serialized sequence token of the event that failed delivery.
         /// </summary>
-        public byte[] SequenceToken { get; set; }
+        public byte[]? SequenceToken { get; set; }
 
         /// <summary>
         /// Sets the partition key before persist call.
@@ -71,7 +70,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         /// <param name="serializer"></param>
         /// <param name="token"></param>
-        public virtual void SetSequenceToken(Serializer<StreamSequenceToken> serializer, StreamSequenceToken token)
+        public virtual void SetSequenceToken(Serializer<StreamSequenceToken> serializer, StreamSequenceToken? token)
         {
             SequenceToken = token != null ? serializer.SerializeToArray(token) : null;
         }
@@ -80,7 +79,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// Gets sequence token by deserializing it from property.
         /// </summary>
         /// <returns></returns>
-        public virtual StreamSequenceToken GetSequenceToken(Serializer<StreamSequenceToken> serializer)
+        public virtual StreamSequenceToken? GetSequenceToken(Serializer<StreamSequenceToken> serializer)
         {
             return SequenceToken != null ? serializer.Deserialize(SequenceToken) : null;
         }

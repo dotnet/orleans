@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
 
-#nullable disable
 namespace Orleans.EventSourcing.StateStorage
 {
     /// <summary>
@@ -36,7 +35,7 @@ namespace Orleans.EventSourcing.StateStorage
         private const int maxEntriesInNotifications = 200;
         private readonly IGrainStorage globalGrainStorage;
         private readonly string grainTypeName;        // stores the confirmed state including metadata
-        private GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache;
+        private GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache = null!;
 
         /// <inheritdoc/>
         protected override TLogView LastConfirmedView()
@@ -235,15 +234,15 @@ namespace Orleans.EventSourcing.StateStorage
 
             /// <summary> The cluster that performed the update </summary>
             [Id(1)]
-            public string Origin { get; set; }
+            public string Origin { get; set; } = null!;
 
             /// <summary> The list of updates that were applied </summary>
             [Id(2)]
-            public List<TLogEntry> Updates { get; set; }
+            public List<TLogEntry> Updates { get; set; } = null!;
 
             /// <summary> The e-tag of the storage after applying the updates</summary>
             [Id(3)]
-            public string ETag { get; set; }
+            public string? ETag { get; set; }
 
             /// <inheritdoc/>
             public override string ToString()

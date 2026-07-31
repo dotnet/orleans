@@ -2,7 +2,6 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal static class Constants
@@ -64,4 +63,3 @@ namespace Orleans.Runtime
         public static bool IsSingletonSystemTarget(GrainType id) => SingletonSystemTargetNames.ContainsKey(id);
     }
 }
-

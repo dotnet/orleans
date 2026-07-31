@@ -3,7 +3,6 @@ using System.Globalization;
 using Newtonsoft.Json;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
@@ -69,13 +68,13 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc/>
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return Equals(obj as EventSequenceTokenV2);
         }
 
         /// <inheritdoc/>
-        public override bool Equals(StreamSequenceToken other)
+        public override bool Equals(StreamSequenceToken? other)
         {
             var token = other as EventSequenceTokenV2;
             return token != null && (token.SequenceNumber == SequenceNumber &&
@@ -83,7 +82,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc/>
-        public override int CompareTo(StreamSequenceToken other)
+        public override int CompareTo(StreamSequenceToken? other)
         {
             if (other == null)
                 return 1;

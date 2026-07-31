@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal static class RuntimeVersion
@@ -14,7 +13,7 @@ namespace Orleans.Runtime
             get
             {
                 Assembly thisProg = typeof(RuntimeVersion).Assembly;
-                var ApiVersion = thisProg.GetName().Version.ToString();
+                var ApiVersion = thisProg.GetName().Version!.ToString();
                 if (string.IsNullOrWhiteSpace(thisProg.Location))
                 {
                     return ApiVersion;

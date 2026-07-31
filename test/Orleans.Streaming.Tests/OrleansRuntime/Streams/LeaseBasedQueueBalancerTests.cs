@@ -113,15 +113,15 @@ public class LeaseBasedQueueBalancerTests
 
         public void Dispose() { }
 
-        public readonly record struct LogEntry(LogLevel Level, string Category, Exception Exception, string Message);
+        public readonly record struct LogEntry(LogLevel Level, string Category, Exception? Exception, string Message);
 
         private sealed class RecordingLogger(string category, ConcurrentQueue<LogEntry> entries) : ILogger
         {
-            public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
             public bool IsEnabled(LogLevel logLevel) => true;
 
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
                 => entries.Enqueue(new LogEntry(logLevel, category, exception, formatter(state, exception)));
         }
     }

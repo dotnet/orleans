@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using System.Threading.Tasks;
 
-#nullable disable
 [assembly: RegisterProvider("Redis", "Reminders", "Silo", typeof(RedisRemindersProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Reminders", "Silo", typeof(RedisRemindersProviderBuilder))]
 
@@ -16,7 +15,7 @@ namespace Orleans.Hosting;
 
 internal sealed class RedisRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseRedisReminderService(_ => { });
         builder.Services.AddOptions<RedisReminderTableOptions>()

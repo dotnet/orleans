@@ -7,7 +7,6 @@ using Orleans.Metadata;
 
 namespace Orleans.Serialization.Codecs;
 
-#nullable disable
 /// <summary>
 /// Defines common type filtering operations.
 /// </summary>
@@ -21,7 +20,7 @@ public class CommonCodecTypeFilter
     public static bool IsAbstractOrFrameworkType(Type type)
     {
         if (type.IsAbstract
-            || type.GetCustomAttributes<GeneratedCodeAttribute>().Any(a => a.Tool.Equals("OrleansCodeGen"))
+            || type.GetCustomAttributes<GeneratedCodeAttribute>().Any(a => a.Tool!.Equals("OrleansCodeGen"))
             || type.Assembly.GetCustomAttribute<FrameworkPartAttribute>() is not null)
         {
             return true;

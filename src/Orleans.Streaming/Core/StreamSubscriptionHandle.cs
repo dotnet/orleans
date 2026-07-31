@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -12,7 +11,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public abstract class StreamSubscriptionHandle<T> : IEquatable<StreamSubscriptionHandle<T>>
+    public abstract class StreamSubscriptionHandle<T> : IEquatable<StreamSubscriptionHandle<T>?>
     {
         /// <summary>
         /// Gets the stream identifier.
@@ -47,7 +46,7 @@ namespace Orleans.Streams
         /// <returns>
         /// The new stream subscription handle.
         /// </returns>
-        public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken token = null);
+        public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken? token = null);
 
         /// <summary>
         /// Resume batch consumption from a subscription to a stream.
@@ -57,9 +56,9 @@ namespace Orleans.Streams
         /// <returns>
         /// The new stream subscription handle.
         /// </returns>
-        public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken token = null);
+        public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken? token = null);
 
         /// <inheritdoc/>
-        public abstract bool Equals(StreamSubscriptionHandle<T> other);
+        public abstract bool Equals(StreamSubscriptionHandle<T>? other);
     }
 }

@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class DateTimeOffsetCodec : IFieldCodec<DateTimeOffset>
     {
-        void IFieldCodec<DateTimeOffset>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DateTimeOffset value)
+        void IFieldCodec<DateTimeOffset>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] DateTimeOffset value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(DateTimeOffset), WireType.TagDelimited);
@@ -35,9 +35,11 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         DateTimeOffset IFieldCodec<DateTimeOffset>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static DateTimeOffset ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);

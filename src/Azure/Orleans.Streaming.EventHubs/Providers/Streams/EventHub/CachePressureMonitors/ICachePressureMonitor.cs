@@ -25,6 +25,6 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Cache monitor which is used to report cache related metrics
         /// </summary>
-        ICacheMonitor CacheMonitor { set; }
+        ICacheMonitor? CacheMonitor { set; }
     }
 }

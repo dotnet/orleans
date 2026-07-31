@@ -96,14 +96,26 @@ namespace UnitTests.Serialization
             expected.SetObsoleteInt(38);
 
             var actual = (AnotherConcreteClass)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, expected);
+            var expectedClasses = expected.Classes;
+            var expectedInterfaces = expected.Interfaces;
+            var actualClasses = actual.Classes;
+            var actualInterfaces = actual.Interfaces;
+            Assert.NotNull(expectedClasses);
+            Assert.NotNull(expectedInterfaces);
+            Assert.NotNull(actualClasses);
+            Assert.NotNull(actualInterfaces);
+            var expectedNestedInterfaces = expectedClasses[1].Interfaces;
+            var actualNestedInterfaces = actualClasses[1].Interfaces;
+            Assert.NotNull(expectedNestedInterfaces);
+            Assert.NotNull(actualNestedInterfaces);
 
             Assert.Equal(expected.Int, actual.Int);
             Assert.Equal(expected.Enum, actual.Enum);
             Assert.Equal(expected.AnotherString, actual.AnotherString);
-            Assert.Equal(expected.Classes.Length, actual.Classes.Length);
-            Assert.Equal(expected.Classes[1].Interfaces[0].Int, actual.Classes[1].Interfaces[0].Int);
-            Assert.Equal(expected.Interfaces[0].Int, actual.Interfaces[0].Int);
-            Assert.Equal(actual.Interfaces[0], actual.Classes[1]);
+            Assert.Equal(expectedClasses.Length, actualClasses.Length);
+            Assert.Equal(expectedNestedInterfaces[0].Int, actualNestedInterfaces[0].Int);
+            Assert.Equal(expectedInterfaces[0].Int, actualInterfaces[0].Int);
+            Assert.Equal(actualInterfaces[0], actualClasses[1]);
             Assert.NotEqual(expected.NonSerializedInt, actual.NonSerializedInt);
             Assert.Equal(0, actual.NonSerializedInt);
             Assert.Equal(expected.GetObsoleteInt(), actual.GetObsoleteInt());
@@ -198,7 +210,7 @@ namespace UnitTests.Serialization
             source1["Goodbye"] = "No";
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateDictionary<string, string>(source1, deserialized, "case-insensitive string/string");
-            Dictionary<string, string> result1 = deserialized as Dictionary<string, string>;
+            Dictionary<string, string> result1 = (deserialized as Dictionary<string, string>)!;
             Assert.Equal(source1["Hello"], result1["hElLo"]); //Round trip for case insensitive string/string dictionary lost the custom comparer
 
             Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>(new Mod5IntegerComparer());
@@ -239,7 +251,7 @@ namespace UnitTests.Serialization
             source1.Add("three");
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string hash set with comparer
-            var result = deserialized as HashSet<string>;
+            var result = (deserialized as HashSet<string>)!;
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string hash set with comparer
 #pragma warning disable xUnit2017 // Do not use Contains() to check if a value exists in a collection
             foreach (var key in source1)
@@ -259,7 +271,7 @@ namespace UnitTests.Serialization
             source1.Push("three");
             object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string stack
-            var result = deserialized as Stack<string>;
+            var result = (deserialized as Stack<string>)!;
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string stack
 
             var srcIter = source1.GetEnumerator();
@@ -339,30 +351,30 @@ namespace UnitTests.Serialization
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source2);
             ValidateArrayOfArrays(source2, deserialized, "string");
 
-            var source3 = new HashSet<string>[3][];
-            source3[0] = new HashSet<string>[2];
-            source3[1] = new HashSet<string>[3];
-            source3[2] = new HashSet<string>[1];
+            var source3 = new HashSet<string>?[3][];
+            source3[0] = new HashSet<string>?[2];
+            source3[1] = new HashSet<string>?[3];
+            source3[2] = new HashSet<string>?[1];
             source3[0][0] = new HashSet<string>();
             source3[0][1] = new HashSet<string>();
             source3[1][0] = new HashSet<string>();
             source3[1][1] = null;
             source3[1][2] = new HashSet<string>();
             source3[2][0] = new HashSet<string>();
-            source3[0][0].Add("this");
-            source3[0][0].Add("that");
-            source3[1][0].Add("the other");
-            source3[1][2].Add("and another");
-            source3[2][0].Add("but not yet another");
+            source3[0][0]!.Add("this");
+            source3[0][0]!.Add("that");
+            source3[1][0]!.Add("the other");
+            source3[1][2]!.Add("and another");
+            source3[2][0]!.Add("but not yet another");
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source3);
-            var result = Assert.IsAssignableFrom<HashSet<string>[][]>(deserialized); //Array of arrays of hash sets type is wrong on deserialization
+            var result = Assert.IsAssignableFrom<HashSet<string>?[][]>(deserialized); //Array of arrays of hash sets type is wrong on deserialization
             Assert.Equal(3, result.Length); //Outer array size wrong on array of array of sets
-            Assert.Equal(2, result[0][0].Count); //Inner set size wrong on array of array of sets, element 0,0
-            Assert.Empty(result[0][1]); //Inner set size wrong on array of array of sets, element 0,1
-            Assert.Single(result[1][0]); //Inner set size wrong on array of array of sets, element 1,0
+            Assert.Equal(2, result[0][0]!.Count); //Inner set size wrong on array of array of sets, element 0,0
+            Assert.Empty(result[0][1]!); //Inner set size wrong on array of array of sets, element 0,1
+            Assert.Single(result[1][0]!); //Inner set size wrong on array of array of sets, element 1,0
             Assert.Null(result[1][1]); //Inner set not null on array of array of sets, element 1, 1
-            Assert.Single(result[1][2]); //Inner set size wrong on array of array of sets, element 1,2
-            Assert.Single(result[2][0]); //Inner set size wrong on array of array of sets, element 2,0
+            Assert.Single(result[1][2]!); //Inner set size wrong on array of array of sets, element 1,2
+            Assert.Single(result[2][0]!); //Inner set size wrong on array of array of sets, element 2,0
 
             var source4 = new GrainReference[3][];
             source4[0] = new GrainReference[2];
@@ -429,7 +441,7 @@ namespace UnitTests.Serialization
                 var result = _resolver.ResolveType(name);
                 if (_blockedTypes.Contains(result))
                 {
-                    result = null;
+                    result = null!;
                 }
 
                 return result;
@@ -441,7 +453,7 @@ namespace UnitTests.Serialization
                 {
                     if (_blockedTypes.Contains(type))
                     {
-                        type = null;
+                        type = null!;
                         return false;
                     }
 
@@ -469,16 +481,16 @@ namespace UnitTests.Serialization
             var result = Assert.IsAssignableFrom<Dictionary<string, List<string>>>(deserialized); //Type is wrong after round-trip of string/list dict
             Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of string/list dict
 
-            List<string> list1;
-            List<string> list2;
-            List<string> list3;
+            List<string>? list1;
+            List<string>? list2;
+            List<string>? list3;
             Assert.True(result.TryGetValue("one", out list1)); //Key 'one' not found after round trip of string/list dict
             Assert.True(result.TryGetValue("two", out list2)); //Key 'two' not found after round trip of string/list dict
             Assert.True(result.TryGetValue("three", out list3)); //Key 'three' not found after round trip of string/list dict
 
-            ValidateList<string>(val, list1, "string");
-            ValidateList<string>(val, list2, "string");
-            ValidateList<string>(val2, list3, "string");
+            ValidateList<string>(val, list1!, "string");
+            ValidateList<string>(val, list2!, "string");
+            ValidateList<string>(val2, list3!, "string");
 
             Assert.Same(list1, list2); //Object identity lost after round trip of string/list dict
             Assert.NotSame(list2, list3); //Object identity gained after round trip of string/list dict
@@ -514,9 +526,9 @@ namespace UnitTests.Serialization
         public void Serialize_Immutable()
         {
             var test1 = new ImmutableType(3, 27);
-            var raw = environment.DeepCopier.Copy<object>(test1);
-            Assert.IsAssignableFrom<ImmutableType>(raw); //Type is wrong after deep copy of [Immutable] type
-            Assert.Same(test1, raw); //Deep copy of [Immutable] object made a copy instead of just copying the pointer
+            object? raw = environment.DeepCopier.Copy<object>(test1);
+            var copiedTest1 = Assert.IsAssignableFrom<ImmutableType>(raw); //Type is wrong after deep copy of [Immutable] type
+            Assert.Same(test1, copiedTest1); //Deep copy of [Immutable] object made a copy instead of just copying the pointer
 
             var test2list = new List<int>();
             for (int i = 0; i < 3; i++)
@@ -525,25 +537,25 @@ namespace UnitTests.Serialization
             }
             var test2 = new Immutable<List<int>>(test2list);
             raw = environment.DeepCopier.Copy<object>(test2);
-            Assert.IsAssignableFrom<Immutable<List<int>>>(raw); //Type is wrong after round trip of array of Immutable<>
-            Assert.Same(test2.Value, ((Immutable<List<int>>)raw).Value); //Deep copy of Immutable<> object made a copy instead of just copying the pointer
+            var copiedTest2 = Assert.IsAssignableFrom<Immutable<List<int>>>(raw); //Type is wrong after round trip of array of Immutable<>
+            Assert.Same(test2.Value, copiedTest2.Value); //Deep copy of Immutable<> object made a copy instead of just copying the pointer
 
             var test3 = new EmbeddedImmutable("test", 1, 2, 3, 4);
             raw = environment.DeepCopier.Copy<object>(test3);
-            Assert.IsAssignableFrom<EmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
-            Assert.Same(test3.B.Value, ((EmbeddedImmutable)raw).B.Value); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            var copiedTest3 = Assert.IsAssignableFrom<EmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test3.B.Value, copiedTest3.B.Value); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
 
             var test4 = new ClassWithEmbeddedImmutable { Immutable = new byte[] { 1 }, Mutable = new byte[] { 2 } };
             raw = environment.DeepCopier.Copy<object>(test4);
-            Assert.IsAssignableFrom<ClassWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
-            Assert.Same(test4.Immutable, ((ClassWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
-            Assert.NotSame(test4.Mutable, ((ClassWithEmbeddedImmutable)raw).Mutable);
+            var copiedTest4 = Assert.IsAssignableFrom<ClassWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test4.Immutable, copiedTest4.Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            Assert.NotSame(test4.Mutable, copiedTest4.Mutable);
 
             var test5 = new StructWithEmbeddedImmutable { Immutable = new byte[] { 1 }, Mutable = new byte[] { 2 } };
             raw = environment.DeepCopier.Copy<object>(test5);
-            Assert.IsAssignableFrom<StructWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
-            Assert.Same(test5.Immutable, ((StructWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
-            Assert.NotSame(test5.Mutable, ((StructWithEmbeddedImmutable)raw).Mutable);
+            var copiedTest5 = Assert.IsAssignableFrom<StructWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test5.Immutable, copiedTest5.Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
+            Assert.NotSame(test5.Mutable, copiedTest5.Mutable);
         }
 
         [Fact, TestCategory("Functional")]
@@ -575,21 +587,25 @@ namespace UnitTests.Serialization
 
         internal static object OrleansSerializationLoop(Serializer serializer, DeepCopier copier, object input, bool includeWire = true)
         {
-            var copy = copier.Copy(input);
+            object? copy = copier.Copy(input);
             if (includeWire)
             {
                 copy = serializer.RoundTripSerializationForTesting(copy);
             }
+
+            Assert.NotNull(copy);
             return copy;
         }
 
         private void ValidateDictionary<K, V>(Dictionary<K, V> source, object deserialized, string type)
+            where K : notnull
         {
             var result = Assert.IsAssignableFrom<Dictionary<K, V>>(deserialized); //Type is wrong after round-trip of dict
             ValidateDictionaryContent(source, result, type);
         }
 
         private void ValidateDictionaryContent<K, V>(IDictionary<K, V> source, IDictionary<K, V> result, string type)
+            where K : notnull
         {
             Assert.Equal(source.Count, result.Count);  //Count is wrong after round-trip of " + type + " dict"
             foreach (var pair in source)
@@ -600,15 +616,17 @@ namespace UnitTests.Serialization
         }
 
         private void ValidateReadOnlyDictionary<K, V>(ReadOnlyDictionary<K, V> source, object deserialized, string type)
+            where K : notnull
         {
             var result = Assert.IsAssignableFrom<ReadOnlyDictionary<K, V>>(deserialized); //Type is wrong after round-trip
             ValidateDictionaryContent(source, result, type);
         }
 
         private void ValidateSortedDictionary<K, V>(SortedDictionary<K, V> source, object deserialized, string type)
+            where K : notnull
         {
             Assert.IsAssignableFrom<SortedDictionary<K, V>>(deserialized);
-            SortedDictionary<K, V> result = deserialized as SortedDictionary<K, V>;
+            SortedDictionary<K, V> result = (deserialized as SortedDictionary<K, V>)!;
             Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of " + type + " sorted dict
             foreach (var pair in source)
             {
@@ -625,9 +643,10 @@ namespace UnitTests.Serialization
         }
 
         private void ValidateSortedList<K, V>(SortedList<K, V> source, object deserialized, string type)
+            where K : notnull
         {
             Assert.IsAssignableFrom<SortedList<K, V>>(deserialized);
-            SortedList<K, V> result = deserialized as SortedList<K, V>;
+            SortedList<K, V> result = (deserialized as SortedList<K, V>)!;
             Assert.Equal(source.Count, result.Count);  //Count is wrong after round-trip of " + type + " sorted list"
             foreach (var pair in source)
             {
@@ -646,7 +665,7 @@ namespace UnitTests.Serialization
         private void ValidateReadOnlyCollectionList<T>(ReadOnlyCollection<T> expected, object deserialized, string type)
         {
             Assert.IsAssignableFrom<ReadOnlyCollection<T>>(deserialized); //Type is wrong after round-trip of " + type + " array
-            ValidateList(expected, deserialized as IList<T>, type);
+            ValidateList(expected, (deserialized as IList<T>)!, type);
         }
 
         private void ValidateList<T>(IList<T> expected, IList<T> result, string type)
@@ -697,12 +716,16 @@ namespace UnitTests.Serialization
             c1.CircularTest2 = c2;
 
             var deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  c1);
-            Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            var deserializedCircularTest2 = deserialized.CircularTest2;
+            Assert.NotNull(deserializedCircularTest2);
+            Assert.Equal(c2.CircularTest1List.Count, deserializedCircularTest2.CircularTest1List.Count);
+            Assert.Same(deserialized, deserializedCircularTest2.CircularTest1List[0]);
 
             deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  c1, true);
-            Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            deserializedCircularTest2 = deserialized.CircularTest2;
+            Assert.NotNull(deserializedCircularTest2);
+            Assert.Equal(c2.CircularTest1List.Count, deserializedCircularTest2.CircularTest1List.Count);
+            Assert.Same(deserialized, deserializedCircularTest2.CircularTest1List[0]);
         }
         
         [Fact, TestCategory("Functional")]

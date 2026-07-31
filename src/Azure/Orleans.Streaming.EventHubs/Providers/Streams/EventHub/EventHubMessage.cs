@@ -43,8 +43,8 @@ namespace Orleans.Streaming.EventHubs
         {
             int readOffset = 0;
             StreamId = cachedMessage.StreamId;
-            Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            PartitionKey = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
+            Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset)!;
+            PartitionKey = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset)!;
             SequenceNumber = cachedMessage.SequenceNumber;
             EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
             DequeueTimeUtc = cachedMessage.DequeueTimeUtc;

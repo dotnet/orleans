@@ -120,7 +120,9 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             {
                 while (receivedBatches < NumBatches)
                 {
-                    var messages = receiver.GetQueueMessagesAsync(50).Result.ToArray();
+                    var receivedMessages = receiver.GetQueueMessagesAsync(50).Result;
+                    Assert.NotNull(receivedMessages);
+                    var messages = receivedMessages.ToArray();
                     if (!messages.Any())
                     {
                         continue;
@@ -161,8 +163,8 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             .ToList()
             .ForEach(streamId =>
                 adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                    events.Take(NumMessagesPerBatch).ToArray(), null,
-                    RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
+                    events.Take(NumMessagesPerBatch).ToArray(), null!,
+                    RequestContextExtensions.Export(this.fixture.DeepCopier)!).Wait())));
         await Task.WhenAll(work);
 
         // Make sure we got back everything we sent
@@ -181,13 +183,14 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
                 // read all messages in cache for stream
                 IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
                 int messageCount = 0;
-                StreamSequenceToken tenthInCache = null;
+                StreamSequenceToken? tenthInCache = null;
                 StreamSequenceToken lastToken = firstInCache;
                 while (cursor.MoveNext())
                 {
-                    Exception ex;
                     messageCount++;
-                    IBatchContainer batch = cursor.GetCurrent(out ex);
+                    var batch = cursor.GetCurrent(out var ex);
+                    Assert.Null(ex);
+                    Assert.NotNull(batch);
                     output.WriteLine("Token: {0}", batch.SequenceToken);
                     Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                     lastToken = batch.SequenceToken;

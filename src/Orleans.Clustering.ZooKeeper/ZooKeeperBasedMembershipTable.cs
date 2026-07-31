@@ -12,7 +12,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Host;
 
-#nullable disable
 namespace Orleans.Runtime.Membership
 {
     /// <summary>
@@ -331,7 +330,7 @@ namespace Orleans.Runtime.Membership
 
         private static T Deserialize<T>(byte[] data)
         {
-            return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
+            return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance)!;
         }
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)

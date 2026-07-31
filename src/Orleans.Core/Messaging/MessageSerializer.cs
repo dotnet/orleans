@@ -127,17 +127,19 @@ namespace Orleans.Runtime.Messaging
         private void ReadBodyObject<TInput>(Message message, ref Reader<TInput> reader)
         {
             var field = reader.ReadFieldHeader();
+            // A non-empty message body always carries its concrete field type.
+            var fieldType = field.FieldType!;
 
             if (message.Result == ResponseTypes.Success)
             {
                 message.Result = ResponseTypes.None; // reset raw response indicator
-                if (!_rawResponseCodecs.TryGetValue(field.FieldType, out var rawCodec))
-                    rawCodec = GetRawCodec(field.FieldType);
+                if (!_rawResponseCodecs.TryGetValue(fieldType, out var rawCodec))
+                    rawCodec = GetRawCodec(fieldType);
                 message.BodyObject = rawCodec.ReadRaw(ref reader, ref field);
             }
             else
             {
-                var bodyCodec = _codecProvider.GetCodec(field.FieldType);
+                var bodyCodec = _codecProvider.GetCodec(fieldType);
                 message.BodyObject = bodyCodec.ReadValue(ref reader, field);
             }
         }
@@ -308,7 +310,8 @@ namespace Orleans.Runtime.Messaging
                 var list = new List<GrainAddressCacheUpdate>((int)count);
                 for (uint i = 0; i < n; i++)
                 {
-                    var update = _grainAddressCacheUpdateCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                    // Cache invalidation headers only contain non-null update records.
+                    var update = _grainAddressCacheUpdateCodec.ReadValue(ref reader, reader.ReadFieldHeader())!;
                     if (i < count)
                     {
                         list.Add(update);
@@ -391,7 +394,8 @@ namespace Orleans.Runtime.Messaging
             for (var i = 0; i < size; i++)
             {
                 var key = ReadString(ref reader);
-                var value = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                // Request context dictionaries do not contain null values.
+                var value = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader())!;
 
                 Debug.Assert(key is not null);
                 result.Add(key, value);

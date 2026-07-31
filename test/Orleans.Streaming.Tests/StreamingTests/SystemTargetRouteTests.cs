@@ -78,7 +78,7 @@ namespace Tester.StreamingTests
                 .ToList();
 
             // become producers
-            await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].BecomeProducer(streamIds[i], null, Fixture.StreamProviderName)));
+            await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].BecomeProducer(streamIds[i], null!, Fixture.StreamProviderName)));
 
             // produce some events
             await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].StartPeriodicProducing()));
@@ -91,7 +91,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(counts.Sum(), lastTry), Timeout);
         }
 
-        private Task OnNextAsync(int e, StreamSequenceToken token)
+        private Task OnNextAsync(int e, StreamSequenceToken? token)
         {
             Interlocked.Increment(ref this.eventsConsumed);
             return Task.CompletedTask;

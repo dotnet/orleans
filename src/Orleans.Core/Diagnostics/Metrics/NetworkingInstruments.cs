@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using Orleans.Messaging;
 
-#nullable disable
 namespace Orleans.Runtime;
 
 internal class NetworkingInstruments(OrleansInstruments instruments)
@@ -12,11 +11,11 @@ internal class NetworkingInstruments(OrleansInstruments instruments)
 
     internal void OnOpenedSocket(ConnectionDirection direction)
     {
-        _openedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
+        _openedSocketsCounter.Add(1, new KeyValuePair<string, object?>("Direction", direction.ToString()));
     }
 
     internal void OnClosedSocket(ConnectionDirection direction)
     {
-        _closedSocketsCounter.Add(1, new KeyValuePair<string, object>("Direction", direction.ToString()));
+        _closedSocketsCounter.Add(1, new KeyValuePair<string, object?>("Direction", direction.ToString()));
     }
 }

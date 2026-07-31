@@ -10,24 +10,24 @@ namespace Orleans.Hosting
 {
     public static partial class RedisGrainStorageServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
     }
 
     public static partial class RedisSiloBuilderExtensions
     {
-        public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptionsBuilder) { throw null; }
+        public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptionsBuilder) { throw null; }
 
         public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
 
         public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name) { throw null; }
 
-        public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptionsBuilder) { throw null; }
+        public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptionsBuilder) { throw null; }
 
         public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
 

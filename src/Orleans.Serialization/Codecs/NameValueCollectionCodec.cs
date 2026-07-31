@@ -3,7 +3,6 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -23,10 +22,18 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public override NameValueCollection ConvertFromSurrogate(ref NameValueCollectionSurrogate surrogate)
         {
-            var result = new NameValueCollection(surrogate.Values.Count);
-            foreach (var value in surrogate.Values)
+            var result = new NameValueCollection(surrogate.Values?.Count ?? 0);
+            if (surrogate.Values is { } values)
             {
-                result.Add(value.Key, value.Value);
+                foreach (var value in values)
+                {
+                    result.Add(value.Key, value.Value);
+                }
+            }
+
+            if (surrogate.HasNullKey)
+            {
+                result.Add(null, surrogate.NullKeyValue);
             }
 
             return result;
@@ -35,10 +42,21 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public override void ConvertToSurrogate(NameValueCollection value, ref NameValueCollectionSurrogate surrogate)
         {
-            var result = new Dictionary<string, string>(value.Count);
+            var result = new Dictionary<string, string?>(value.Count);
+            surrogate.HasNullKey = false;
+            surrogate.NullKeyValue = null;
             for (var i = 0; i < value.Count; i++)
             {
-                result.Add(value.GetKey(i), value.Get(i));
+                var key = value.GetKey(i);
+                if (key is null)
+                {
+                    surrogate.HasNullKey = true;
+                    surrogate.NullKeyValue = value.Get(i);
+                }
+                else
+                {
+                    result.Add(key, value.Get(i));
+                }
             }
 
             surrogate.Values = result;
@@ -56,7 +74,19 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public Dictionary<string, string> Values;
+        public Dictionary<string, string?>? Values;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the collection contains a null key.
+        /// </summary>
+        [Id(1)]
+        public bool HasNullKey;
+
+        /// <summary>
+        /// Gets or sets the value associated with the null key.
+        /// </summary>
+        [Id(2)]
+        public string? NullKeyValue;
     }
 
     /// <summary>
@@ -70,12 +100,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<NameValueCollection>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() != typeof(NameValueCollection))
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new NameValueCollection(input.Count);

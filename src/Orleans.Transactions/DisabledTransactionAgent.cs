@@ -10,7 +10,7 @@ namespace Orleans.Transactions
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task<(TransactionalStatus Status, Exception exception)> Resolve(TransactionInfo transactionInfo)
+        public Task<(TransactionalStatus Status, Exception? exception)> Resolve(TransactionInfo transactionInfo)
         {
             throw new OrleansTransactionsDisabledException();
         }

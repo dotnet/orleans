@@ -33,7 +33,7 @@ namespace Tester.AdoNet.Persistence
             {
                 var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
-                    new Dictionary<string, string>
+                    new Dictionary<string, string?>
                     {
                         {ConnectionStringKey, relationalStorage.CurrentConnectionString}
                     }));
@@ -44,7 +44,7 @@ namespace Tester.AdoNet.Persistence
             {
                 public void Configure(IHostBuilder hostBuilder)
                 {
-                    var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
+                    var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey]!;
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder

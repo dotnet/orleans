@@ -52,12 +52,12 @@ namespace Orleans.Transactions.TestKit
 
     public partial class CreateAttributionGrain : Grain, ICreateAttributionGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
     }
 
     public partial class CreateOrJoinAttributionGrain : Grain, ICreateOrJoinAttributionGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
     }
 
     public abstract partial class DisabledTransactionsTestRunner : TransactionTestRunnerBase
@@ -136,7 +136,7 @@ namespace Orleans.Transactions.TestKit
 
         public System.Threading.Tasks.Task<Abstractions.TransactionalStorageLoadResponse<TState>> Load() { throw null; }
 
-        public System.Threading.Tasks.Task<string> Store(string expectedETag, Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Abstractions.PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter) { throw null; }
+        public System.Threading.Tasks.Task<string> Store(string? expectedETag, Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Abstractions.PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter) { throw null; }
     }
 
     [GenerateSerializer]
@@ -152,11 +152,11 @@ namespace Orleans.Transactions.TestKit
     [System.AttributeUsage(System.AttributeTargets.Parameter)]
     public partial class FaultInjectionTransactionalStateAttribute : System.Attribute, IFacetMetadata, IFaultInjectionTransactionalStateConfiguration, Abstractions.ITransactionalStateConfiguration
     {
-        public FaultInjectionTransactionalStateAttribute(string stateName, string storageName = null) { }
+        public FaultInjectionTransactionalStateAttribute(string stateName, string? storageName = null) { }
 
         public string StateName { get { throw null; } }
 
-        public string StorageName { get { throw null; } }
+        public string? StorageName { get { throw null; } }
     }
 
     public partial class FaultInjectionTransactionalStateAttributeMapper : Runtime.IAttributeToFactoryMapper<FaultInjectionTransactionalStateAttribute>
@@ -174,7 +174,7 @@ namespace Orleans.Transactions.TestKit
 
     public partial class FaultInjectionTransactionCoordinatorGrain : Grain, IFaultInjectionTransactionCoordinatorGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task MultiGrainAddAndFaultInjection(System.Collections.Generic.List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, FaultInjectionControl faultInjection = null) { throw null; }
+        public System.Threading.Tasks.Task MultiGrainAddAndFaultInjection(System.Collections.Generic.List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, FaultInjectionControl? faultInjection = null) { throw null; }
 
         public System.Threading.Tasks.Task MultiGrainSet(System.Collections.Generic.List<IFaultInjectionTransactionTestGrain> grains, int newValue) { throw null; }
     }
@@ -243,13 +243,13 @@ namespace Orleans.Transactions.TestKit
     public partial interface ICreateAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOption.Create)]
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface ICreateOrJoinAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOption.CreateOrJoin)]
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface IExclusiveLockCoordinatorGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
@@ -289,7 +289,7 @@ namespace Orleans.Transactions.TestKit
     public partial interface IFaultInjectionTransactionCoordinatorGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOption.Create)]
-        System.Threading.Tasks.Task MultiGrainAddAndFaultInjection(System.Collections.Generic.List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, FaultInjectionControl faultInjection = null);
+        System.Threading.Tasks.Task MultiGrainAddAndFaultInjection(System.Collections.Generic.List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, FaultInjectionControl? faultInjection = null);
         [Transaction(TransactionOption.Create)]
         System.Threading.Tasks.Task MultiGrainSet(System.Collections.Generic.List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd);
     }
@@ -297,7 +297,7 @@ namespace Orleans.Transactions.TestKit
     public partial interface IFaultInjectionTransactionTestGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOption.CreateOrJoin)]
-        System.Threading.Tasks.Task Add(int numberToAdd, FaultInjectionControl faultInjectionControl = null);
+        System.Threading.Tasks.Task Add(int numberToAdd, FaultInjectionControl? faultInjectionControl = null);
         System.Threading.Tasks.Task Deactivate();
         [Transaction(TransactionOption.CreateOrJoin)]
         System.Threading.Tasks.Task<int> Get();
@@ -308,18 +308,18 @@ namespace Orleans.Transactions.TestKit
     public partial interface IJoinAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOptionAlias.Mandatory)]
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface INoAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface INotAllowedAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOption.NotAllowed)]
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface IRemoteCommitService
@@ -332,13 +332,13 @@ namespace Orleans.Transactions.TestKit
     public partial interface ISupportedAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOption.Supported)]
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface ISuppressAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
         [Transaction(TransactionOption.Suppress)]
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface ITestState
@@ -348,7 +348,7 @@ namespace Orleans.Transactions.TestKit
 
     public partial interface ITransactionAttributionGrain
     {
-        System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
     }
 
     public partial interface ITransactionCommitterTestGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
@@ -407,7 +407,7 @@ namespace Orleans.Transactions.TestKit
 
     public partial class JoinAttributionGrain : Grain, IJoinAttributionGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
     }
 
     public partial class MaxStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
@@ -438,7 +438,7 @@ namespace Orleans.Transactions.TestKit
 
     public partial class NoAttributionGrain : Grain, INoAttributionGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
     }
 
     public partial class NoStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
@@ -448,7 +448,7 @@ namespace Orleans.Transactions.TestKit
 
     public partial class NotAllowedAttributionGrain : Grain, INotAllowedAttributionGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
     }
 
     [GenerateSerializer]
@@ -559,7 +559,7 @@ namespace Orleans.Transactions.TestKit
     {
         public SingleStateFaultInjectionTransactionalGrain(IFaultInjectionTransactionalState<GrainData> data, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
 
-        public System.Threading.Tasks.Task Add(int numberToAdd, FaultInjectionControl faultInjectionControl = null) { throw null; }
+        public System.Threading.Tasks.Task Add(int numberToAdd, FaultInjectionControl? faultInjectionControl = null) { throw null; }
 
         public System.Threading.Tasks.Task Deactivate() { throw null; }
 
@@ -589,12 +589,12 @@ namespace Orleans.Transactions.TestKit
 
     public partial class SupportedAttributionGrain : Grain, ISupportedAttributionGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
     }
 
     public partial class SuppressAttributionGrain : Grain, ISuppressAttributionGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
     {
-        public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
     }
 
     [GenerateSerializer]
@@ -626,10 +626,10 @@ namespace Orleans.Transactions.TestKit
 
     public abstract partial class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase where TState : class, new()
     {
-        protected System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig;
+        protected System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>>? assertConfig;
         protected System.Func<int, TState> stateFactory;
         protected System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory;
-        protected TransactionalStateStorageTestRunner(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, System.Action<string> testOutput, System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig = null) : base(default!, default!) { }
+        protected TransactionalStateStorageTestRunner(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, System.Action<string> testOutput, System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>>? assertConfig = null) : base(default!, default!) { }
 
         public virtual System.Threading.Tasks.Task CancelMany(int count) { throw null; }
 
@@ -669,7 +669,7 @@ namespace Orleans.Transactions.TestKit
             public ICreateAttributionGrain grain;
             public CreateAttributionGrain(ICreateAttributionGrain grain) { }
 
-            public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+            public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
         }
 
         [GenerateSerializer]
@@ -679,7 +679,7 @@ namespace Orleans.Transactions.TestKit
             public ICreateOrJoinAttributionGrain grain;
             public CreateOrJoinAttributionGrain(ICreateOrJoinAttributionGrain grain) { }
 
-            public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+            public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
         }
 
         [GenerateSerializer]
@@ -689,7 +689,7 @@ namespace Orleans.Transactions.TestKit
             public IJoinAttributionGrain grain;
             public JoinAttributionGrain(IJoinAttributionGrain grain) { }
 
-            public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+            public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
         }
 
         [GenerateSerializer]
@@ -699,7 +699,7 @@ namespace Orleans.Transactions.TestKit
             public INoAttributionGrain grain;
             public NoAttributionGrain(INoAttributionGrain grain) { }
 
-            public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+            public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
         }
 
         [GenerateSerializer]
@@ -709,7 +709,7 @@ namespace Orleans.Transactions.TestKit
             public INotAllowedAttributionGrain grain;
             public NotAllowedAttributionGrain(INotAllowedAttributionGrain grain) { }
 
-            public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+            public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
         }
 
         [GenerateSerializer]
@@ -719,7 +719,7 @@ namespace Orleans.Transactions.TestKit
             public ISupportedAttributionGrain grain;
             public SupportedAttributionGrain(ISupportedAttributionGrain grain) { }
 
-            public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+            public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
         }
 
         [GenerateSerializer]
@@ -729,7 +729,7 @@ namespace Orleans.Transactions.TestKit
             public ISuppressAttributionGrain grain;
             public SuppressAttributionGrain(ISuppressAttributionGrain grain) { }
 
-            public System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
+            public System.Threading.Tasks.Task<System.Collections.Generic.List<string?>?[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers) { throw null; }
         }
     }
 
@@ -961,7 +961,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         protected bool Equals(BitArrayState other) { throw null; }
 
-        public override bool Equals(object obj) { throw null; }
+        public override bool Equals(object? obj) { throw null; }
 
         public System.Collections.Generic.IEnumerator<int> GetEnumerator() { throw null; }
 
@@ -971,11 +971,11 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         public static BitArrayState operator |(BitArrayState left, BitArrayState right) { throw null; }
 
-        public static bool operator ==(BitArrayState left, BitArrayState right) { throw null; }
+        public static bool operator ==(BitArrayState? left, BitArrayState? right) { throw null; }
 
         public static BitArrayState operator ^(BitArrayState left, BitArrayState right) { throw null; }
 
-        public static bool operator !=(BitArrayState left, BitArrayState right) { throw null; }
+        public static bool operator !=(BitArrayState? left, BitArrayState? right) { throw null; }
 
         public void Set(int index, bool value) { }
 

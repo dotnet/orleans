@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         /// <param name="request">The method description.</param>
         /// <param name="options">The invocation options.</param>
         /// <returns>The result of invocation.</returns>
-        ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options);
+        ValueTask<T?> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options);
 
         /// <summary>
         /// Invokes the specified method on the provided grain interface.

@@ -33,7 +33,7 @@ namespace UnitTests.MembershipTests
             public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
-                var connectionString = cfg["RelationalStorageConnectionString"];
+                var connectionString = cfg["RelationalStorageConnectionString"]!;
                 hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseAdoNetClustering(options =>
@@ -103,7 +103,7 @@ namespace UnitTests.MembershipTests
             public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
-                var connectionString = cfg["RelationalStorageConnectionString"];
+                var connectionString = cfg["RelationalStorageConnectionString"]!;
                 hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseAdoNetClustering(options =>
@@ -173,7 +173,7 @@ namespace UnitTests.MembershipTests
             public void Configure(IHostBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
-                var connectionString = cfg["RelationalStorageConnectionString"];
+                var connectionString = cfg["RelationalStorageConnectionString"]!;
                 hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder.UseAdoNetClustering(options =>

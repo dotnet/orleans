@@ -484,7 +484,7 @@ namespace Orleans.Runtime.GrainDirectory
             return existing.Count > 1 ? existing[(index + 1) % existing.Count] : null;
         }
 
-        private bool IsValidSilo(SiloAddress? silo) => siloStatusOracle.IsFunctionalDirectory(silo);
+        private bool IsValidSilo(SiloAddress? silo) => siloStatusOracle.IsFunctionalDirectory(silo!);
 
         /// <summary>
         /// Finds the silo that owns the directory information for the given grain ID.
@@ -631,7 +631,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var result = DirectoryPartition.AddSingleActivation(address, previousAddress);
 
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
-                DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
+                DirectoryCache.AddOrUpdate(result.Address!, result.VersionTag);
                 return result;
             }
             else

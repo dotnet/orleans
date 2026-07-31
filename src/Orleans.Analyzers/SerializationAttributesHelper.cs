@@ -22,7 +22,7 @@ namespace Orleans.Analyzers
         }
 
         public static TypeAnalysis AnalyzeTypeDeclaration(SemanticModel semanticModel, TypeDeclarationSyntax declaration,
-            INamedTypeSymbol idAttributeSymbol, INamedTypeSymbol generateSerializerAttributeSymbol, INamedTypeSymbol nonSerializedAttributeSymbol)
+            INamedTypeSymbol? idAttributeSymbol, INamedTypeSymbol? generateSerializerAttributeSymbol, INamedTypeSymbol? nonSerializedAttributeSymbol)
         {
             uint nextId = 0;
             var unannotatedSerializableMembers = new List<MemberDeclarationSyntax>();

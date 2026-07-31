@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
@@ -18,7 +17,7 @@ namespace Orleans.TestingHost
         private int disposed;
         
         /// <summary>Gets a reference to the silo host.</summary>
-        public IHost SiloHost { get; init; }
+        public IHost SiloHost { get; init; } = null!;
 
         /// <summary>
         /// Gets the silo's service provider.
@@ -38,7 +37,7 @@ namespace Orleans.TestingHost
         public static async Task<InProcessSiloHandle> CreateAsync(
             string siloName,
             IConfiguration configuration,
-            Action<IHostBuilder> postConfigureHostBuilder = null)
+            Action<IHostBuilder>? postConfigureHostBuilder = null)
         {
             var host = await Task.Run(async () =>
             {

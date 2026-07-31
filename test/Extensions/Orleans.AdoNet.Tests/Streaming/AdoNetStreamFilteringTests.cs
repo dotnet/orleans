@@ -43,7 +43,7 @@ public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAs
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
 
-    private static RelationalStorageForTesting _testing;
+    private static RelationalStorageForTesting _testing = null!;
 
     protected AdoNetStreamFilteringTests(Fixture fixture) : base(fixture)
     {
@@ -56,7 +56,7 @@ public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAs
 
     public class Fixture : BaseTestClusterFixture
     {
-        private static string _invariant;
+        private static string _invariant = null!;
 
         public Fixture(string invariant)
         {

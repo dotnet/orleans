@@ -33,7 +33,7 @@ namespace UnitTests.MembershipTests
         protected readonly string clusterId;
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
-        protected IOptions<SiloOptions> siloOptions;
+        protected IOptions<SiloOptions>? siloOptions;
         protected IOptions<ClusterOptions> _clusterOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly IOptions<GatewayOptions> _gatewayOptions;
@@ -44,7 +44,7 @@ namespace UnitTests.MembershipTests
         {
             this.environment = environment;
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
-            logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            logger = loggerFactory.CreateLogger(this.GetType().FullName!);
 
             this.clusterId = "test-" + Guid.NewGuid();
 
@@ -84,7 +84,7 @@ namespace UnitTests.MembershipTests
         protected abstract IMembershipTable CreateMembershipTable(ILogger logger);
         protected abstract Task<string> GetConnectionString();
 
-        protected virtual string GetAdoInvariant()
+        protected virtual string? GetAdoInvariant()
         {
             return null;
         }
@@ -287,7 +287,7 @@ namespace UnitTests.MembershipTests
                         siloEntry,
                         etagBefore,
                         tableVersion?.ToString() ?? "null");
-                    ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
+                    ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!);
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
                     tableData = await membershipTable.ReadAll();
                 }
@@ -300,7 +300,7 @@ namespace UnitTests.MembershipTests
                     etagBefore,
                     tableVersion?.ToString() ?? "null");
 
-                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
+                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!);
 
                 Assert.True(ok, $"UpdateRow failed - Table Data = {tableData}");
 
@@ -309,13 +309,14 @@ namespace UnitTests.MembershipTests
                     siloEntry,
                     etagBefore,
                     tableVersion?.ToString() ?? "null");
-                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
+                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion!);
                 Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
                 tableData = await membershipTable.ReadAll();
 
                 var tuple = tableData.TryGet(siloEntry.SiloAddress);
 
+                Assert.NotNull(tuple);
                 Assert.Equal(tuple.Item1.ToFullString(), siloEntry.ToFullString());
 
                 var etagAfter = tuple.Item2;
@@ -328,7 +329,7 @@ namespace UnitTests.MembershipTests
                         etagAfter,
                         tableVersion?.ToString() ?? "null");
 
-                    ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion);
+                    ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion!);
 
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
                 }
@@ -342,7 +343,7 @@ namespace UnitTests.MembershipTests
                 Assert.Equal(etagBefore, etagAfter);
                 Assert.NotNull(tableData.Version);
                 if (extendedProtocol)
-                    Assert.Equal(tableVersion.Version, tableData.Version.Version);
+                    Assert.Equal(tableVersion!.Version, tableData.Version.Version);
 
                 Assert.Equal(i, tableData.Members.Count);
             }

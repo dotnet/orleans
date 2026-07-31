@@ -176,7 +176,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
         }
 
         public Task Ping() => GrainFactory.GetGrain<IF>(this.GetPrimaryKeyLong()).Ping();
-        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress);
+        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress!);
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ServiceProvider.GetRequiredService<ILogger<E>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
@@ -194,7 +194,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
     {
         public Task Ping() => Task.CompletedTask;
 
-        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress);
+        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress!);
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -217,7 +217,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
     public class X : Grain, IX
     {
         public Task Ping() => Task.CompletedTask;
-        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress);
+        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress!);
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {

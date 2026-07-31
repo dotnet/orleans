@@ -88,6 +88,7 @@ public class RecordSerializationTests
         };
         var bytes = serializer.SerializeToArray(expected);
         var result = serializer.Deserialize<List<DerivedFromNonEmptyAbstractRecord>>(bytes);
+        Assert.NotNull(result);
         Assert.Equal(expected.Count, result.Count);
         Assert.Equal(expected[0], result[0]);
         Assert.Equal(expected[1], result[1]);
@@ -106,6 +107,7 @@ public class RecordSerializationTests
 
             var deserialized = _serializer.Deserialize<FooWithListOfObject>(bytes);
 
+            Assert.NotNull(deserialized);
             Assert.NotNull(deserialized.Bar);
             Assert.Equal(original.Bar, deserialized.Bar);
         }
@@ -123,6 +125,7 @@ public class RecordSerializationTests
 
             var deserialized = _serializer.Deserialize<TwoObjects>(bytes);
 
+            Assert.NotNull(deserialized);
             Assert.NotNull(deserialized.One);
             Assert.NotNull(deserialized.Two);
             Assert.Equal(original.One, deserialized.One);
@@ -142,6 +145,7 @@ public class RecordSerializationTests
 
             var deserialized = _serializer.Deserialize<FooWithListOfObject>(bytes);
 
+            Assert.NotNull(deserialized);
             Assert.NotNull(deserialized.Items);
             Assert.Equal(original.Items.Count, deserialized.Items.Count);
             Assert.Equal(original.Items[0], deserialized.Items[0]);
@@ -164,6 +168,7 @@ public class RecordSerializationTests
 
             var deserialized = _serializer.Deserialize<FooWithListOfFruit>(bytes);
 
+            Assert.NotNull(deserialized);
             Assert.NotNull(deserialized.Bar);
             Assert.Equal(original.Bar, deserialized.Bar);
         }
@@ -181,6 +186,7 @@ public class RecordSerializationTests
 
             var deserialized = _serializer.Deserialize<FooWithListOfFruit>(bytes);
 
+            Assert.NotNull(deserialized);
             Assert.NotNull(deserialized.Bar);
             Assert.Equal(original.Bar, deserialized.Bar);
         }
@@ -198,6 +204,7 @@ public class RecordSerializationTests
 
             var deserialized = _serializer.Deserialize<FooWithListOfApple>(bytes);
 
+            Assert.NotNull(deserialized);
             Assert.NotNull(deserialized.Bar);
             Assert.Equal(original.Bar, deserialized.Bar);
         }

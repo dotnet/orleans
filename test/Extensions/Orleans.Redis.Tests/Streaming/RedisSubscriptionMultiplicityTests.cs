@@ -12,7 +12,7 @@ public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
     public const string StreamProviderName = "RedisProvider";
     public const string StreamNamespace = "RedisSubscriptionMultiplicityTestsNamespace";
 
-    private SubscriptionMultiplicityTestRunner _runner;
+    private SubscriptionMultiplicityTestRunner _runner = null!;
 
     [SkippableFact]
     public async Task Redis_MultipleParallelSubscriptionTest() => await _runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);

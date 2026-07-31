@@ -23,7 +23,7 @@ public class EventHubCheckpointerTests
     private class TestCheckpointer : IStreamQueueCheckpointer<string>
     {
         public bool CheckpointExists => true;
-        public string LastOffset { get; private set; }
+        public string? LastOffset { get; private set; }
         public int UpdateCount { get; private set; }
         public int FlushCount { get; private set; }
 
@@ -60,26 +60,31 @@ public class EventHubCheckpointerTests
 
     private sealed class TestEventHubQueueCache : IEventHubQueueCache
     {
-        private readonly IStreamQueueCheckpointer<string> checkpointer;
+        private readonly IStreamQueueCheckpointer<string>? checkpointer;
 
-        public TestEventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer = null)
+        public TestEventHubQueueCache(IStreamQueueCheckpointer<string>? checkpointer = null)
         {
             this.checkpointer = checkpointer;
         }
 
         public int DisposeCount { get; private set; }
-        public string PurgeOffsetToReport { get; set; }
+        public int AddCount { get; private set; }
+        public string? PurgeOffsetToReport { get; set; }
         public object Cursor { get; } = new();
-        public object RefreshedCursor { get; private set; }
-        public StreamSequenceToken RefreshToken { get; private set; }
+        public object? RefreshedCursor { get; private set; }
+        public StreamSequenceToken? RefreshToken { get; private set; }
 
         public int GetMaxAddCount() => 1_000;
 
-        public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc) => [];
+        public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc)
+        {
+            AddCount++;
+            return [];
+        }
 
-        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken) => Cursor;
+        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken) => Cursor;
 
-        public void Refresh(object cursor, StreamSequenceToken sequenceToken)
+        public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
             RefreshedCursor = cursor;
             RefreshToken = sequenceToken;
@@ -87,7 +92,7 @@ public class EventHubCheckpointerTests
 
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
-            message = null;
+            message = null!;
             return false;
         }
 
@@ -125,6 +130,20 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class NullReturningEventHubReceiver : IEventHubReceiver
+    {
+        public int ReceiveCount { get; private set; }
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        {
+            ReceiveCount++;
+            // Simulate a receiver binary compiled before the return value was annotated as non-null.
+            return Task.FromResult<IEnumerable<EventData>>(null!);
+        }
+
+        public Task CloseAsync() => Task.CompletedTask;
+    }
+
     private sealed class BlockingEventHubReceiver : IEventHubReceiver
     {
         public int CloseCount { get; private set; }
@@ -155,13 +174,13 @@ public class EventHubCheckpointerTests
 
     private static void UpdateDeliveryProgressWithNoSubscriptions(EventHubAdapterReceiver receiver)
     {
-        receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
+        receiver.UpdateDeliveryProgress(null!, DateTime.UtcNow);
     }
 
     private static async Task<EventHubAdapterReceiver> CreateReceiver(
         TestCheckpointer checkpointer,
-        TestEventHubQueueCache cache = null,
-        IEventHubReceiver eventHubReceiver = null)
+        TestEventHubQueueCache? cache = null,
+        IEventHubReceiver? eventHubReceiver = null)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -194,6 +213,20 @@ public class EventHubCheckpointerTests
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         return receiver;
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_TreatsNullReceiverResultAsEmpty()
+    {
+        var cache = new TestEventHubQueueCache();
+        var eventHubReceiver = new NullReturningEventHubReceiver();
+        var receiver = await CreateReceiver(new TestCheckpointer(), cache, eventHubReceiver);
+
+        var messages = await receiver.GetQueueMessagesAsync(10);
+
+        Assert.Empty(messages);
+        Assert.Equal(1, eventHubReceiver.ReceiveCount);
+        Assert.Equal(0, cache.AddCount);
     }
 
     [Fact, TestCategory("BVT")]

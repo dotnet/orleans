@@ -89,7 +89,7 @@ public class CallbackDataTests
 
     private sealed class TestResponseCompletionSource : IResponseCompletionSource
     {
-        public Response Response { get; private set; }
+        public Response Response { get; private set; } = null!;
 
         public void Complete(Response value) => Response = value;
 

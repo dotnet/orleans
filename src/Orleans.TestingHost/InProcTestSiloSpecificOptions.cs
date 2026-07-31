@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>
@@ -22,7 +21,7 @@ public sealed class InProcessTestSiloSpecificOptions
     /// Gets or sets the name of the silo.
     /// </summary>
     /// <value>The name of the silo.</value>
-    public string SiloName { get; set; }
+    public string SiloName { get; set; } = null!;
 
     /// <summary>
     /// Creates an instance of the <see cref="TestSiloSpecificOptions"/> class.

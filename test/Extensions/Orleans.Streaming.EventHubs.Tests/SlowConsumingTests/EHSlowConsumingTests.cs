@@ -141,12 +141,12 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         private async Task<bool> IsBackPressureTriggered()
         {
-            IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
+            IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0); // The fixture deploys the client.
+            object?[] replies = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
                              StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null);
             foreach (var re in replies)
             {
-                if ((bool)re)
+                if ((bool)re!) // The command returns a Boolean result from each silo.
                     return true;
             }
             return false;

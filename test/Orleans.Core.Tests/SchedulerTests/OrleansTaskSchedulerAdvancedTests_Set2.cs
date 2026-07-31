@@ -213,9 +213,9 @@ namespace UnitTests.SchedulerTests
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
-            Task<int> task1 = null;
-            Task<int> task2 = null;
-            Task join = null;
+            Task<int> task1 = null!;
+            Task<int> task2 = null!;
+            Task join = null!;
             Task wrapper = new Task(() =>
             {
                 task1 = Task<int>.Factory.StartNew(() =>
@@ -268,9 +268,9 @@ namespace UnitTests.SchedulerTests
             ManualResetEvent pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
             var fakeTimeProvider = new FakeTimeProvider();
-            Task<int> task1 = null;
-            Task<int> task2 = null;
-            Task join = null;
+            Task<int> task1 = null!;
+            Task<int> task2 = null!;
+            Task join = null!;
             Task wrapper = new Task(() =>
             {
                 task1 = Task<int>.Factory.StartNew(() =>
@@ -329,9 +329,9 @@ namespace UnitTests.SchedulerTests
             var pause2 = new TaskCompletionSource<bool>();
             var finish = new TaskCompletionSource<bool>();
             var fakeTimeProvider = new FakeTimeProvider();
-            Task<int> task1 = null;
-            Task<int> task2 = null;
-            Task join = null;
+            Task<int> task1 = null!;
+            Task<int> task2 = null!;
+            Task join = null!;
             Task wrapper = new Task(() =>
             {
                 task1 = Task<int>.Factory.StartNew(() =>
@@ -390,9 +390,9 @@ namespace UnitTests.SchedulerTests
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
-            Task<int> task1 = null;
-            Task<int> task2 = null;
-            Task join = null;
+            Task<int> task1 = null!;
+            Task<int> task2 = null!;
+            Task join = null!;
             Task wrapper = new Task(() =>
             {
                 task1 = Task.Run(() =>
@@ -449,9 +449,9 @@ namespace UnitTests.SchedulerTests
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
-            Task<int> task1 = null;
-            Task<int> task2 = null;
-            Task join = null;
+            Task<int> task1 = null!;
+            Task<int> task2 = null!;
+            Task join = null!;
             Task wrapper = new Task(() =>
             {
                 task1 = Task.Run(() =>
@@ -678,7 +678,7 @@ namespace UnitTests.SchedulerTests
 
             await Task.Factory.StartNew(() => grain.OnActivateAsync(CancellationToken.None), CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
 
-            Task wrapped = null;
+            Task wrapped = null!;
             var wrapperDone = new TaskCompletionSource<bool>();
             var wrappedDone = new TaskCompletionSource<bool>();
             Task<Task> wrapper = new Task<Task>(() =>
@@ -759,11 +759,11 @@ namespace UnitTests.SchedulerTests
 
         private class MockSiloDetails : ILocalSiloDetails
         {
-            public string DnsHostName { get; }
-            public SiloAddress SiloAddress { get; set; }
-            public SiloAddress GatewayAddress { get; }
+            public string DnsHostName { get; } = null!;
+            public SiloAddress SiloAddress { get; set; } = null!;
+            public SiloAddress GatewayAddress { get; } = null!;
             public string Name { get; set; } = Guid.NewGuid().ToString();
-            public string ClusterId { get; }
+            public string ClusterId { get; } = null!;
         }
     }
 }

@@ -57,7 +57,7 @@ namespace Tester.AdoNet.Persistence
             {
                 ConnectionString = this.ConnectionString,
                 Invariant = AdoInvariant,
-                GrainStorageSerializer = new JsonGrainStorageSerializer(providerRuntime.ServiceProvider.GetService<OrleansJsonSerializer>())
+                GrainStorageSerializer = new JsonGrainStorageSerializer(providerRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!)
             };
 
             var storageProvider = new AdoNetGrainStorage(

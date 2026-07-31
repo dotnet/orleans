@@ -38,7 +38,7 @@ namespace UnitTests.MembershipTests
 
         private readonly ITestOutputHelper output;
 
-        private TestCluster hostedCluster;
+        private TestCluster hostedCluster = null!;
 
         public ClientIdPartitionDataRebuildTests(ITestOutputHelper output)
         {
@@ -52,7 +52,7 @@ namespace UnitTests.MembershipTests
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo3
             var grain = await SetupTestAndPickGrain<ISimpleObserverableGrain>(g => g.GetRuntimeInstanceId());
             var observer = new Observer();
-            var reference = this.hostedCluster.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var reference = this.hostedCluster.GrainFactory!.CreateObjectReference<ISimpleGrainObserver>(observer);
 
             await grain.Subscribe(reference);
 
@@ -93,14 +93,14 @@ namespace UnitTests.MembershipTests
             CreateAndDeployTestCluster();
             for (var i = 0; i < 100; i++)
             {
-                if (this.hostedCluster.Client == null)
+                if (this.hostedCluster.Client! == null)
                 {
                     await this.hostedCluster.InitializeClientAsync();
                 }
 
                 var client = this.hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
                 clientId = client.CurrentActivationAddress.GrainId;
-                var report = await TestUtils.GetDetailedGrainReport(this.hostedCluster.InternalGrainFactory, clientId, hostedCluster.Primary);
+                var report = await TestUtils.GetDetailedGrainReport(this.hostedCluster.InternalGrainFactory!, clientId, hostedCluster.Primary!);
                 if (this.hostedCluster.SecondarySilos[0].SiloAddress.Equals(report.PrimaryForGrain))
                 {
                     break;
@@ -111,10 +111,10 @@ namespace UnitTests.MembershipTests
             Assert.False(clientId.IsDefault);
 
             // Ensure grain is activated on Silo3
-            T grain = null;
+            T? grain = null;
             for (var i = 0; i < 100; i++)
             {
-                grain = this.hostedCluster.GrainFactory.GetGrain<T>(i);
+                grain = this.hostedCluster.GrainFactory!.GetGrain<T>(i);
                 var instanceId = await getRuntimeInstanceId(grain);
                 if (instanceId.Contains(hostedCluster.SecondarySilos[1].SiloAddress.Endpoint.ToString()))
                 {
@@ -169,7 +169,7 @@ namespace UnitTests.MembershipTests
             finally
             {
                 hostedCluster?.Dispose();
-                hostedCluster = null;
+                hostedCluster = null!;
             }
         }
     }

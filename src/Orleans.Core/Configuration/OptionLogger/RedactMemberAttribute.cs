@@ -14,7 +14,7 @@ namespace Orleans
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The redacted value.</returns>
-        public virtual string Redact(object value)
+        public virtual string Redact(object? value)
         {
             return "REDACTED";
         }
@@ -31,7 +31,7 @@ namespace Orleans
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The redacted value.</returns>
-        public override string Redact(object value)
+        public override string Redact(object? value)
         {
             return ConfigUtilities.RedactConnectionStringInfo(value as string);
         }

@@ -1,15 +1,15 @@
+using System.Reflection;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
-using System.Reflection;
 
 namespace Benchmarks.Serialization.Utilities;
 
 public class MethodResultColumn : IColumn
 {
-    private readonly Func<object, string> _formatter;
+    private readonly Func<object?, string> _formatter;
 
-    public MethodResultColumn(string columnName, Func<object, string> formatter, string legend = null)
+    public MethodResultColumn(string columnName, Func<object?, string> formatter, string? legend = null)
     {
         ColumnName = columnName;
         _formatter = formatter;
@@ -18,9 +18,9 @@ public class MethodResultColumn : IColumn
 
     public string GetValue(Summary summary, BenchmarkCase benchmarkCase) => GetValue(summary, benchmarkCase, null);
 
-    public string GetValue(Summary summary, BenchmarkCase benchmarkCase, SummaryStyle style) => _formatter(CallMethod(benchmarkCase));
+    public string GetValue(Summary summary, BenchmarkCase benchmarkCase, SummaryStyle? style) => _formatter(CallMethod(benchmarkCase));
 
-    private static object CallMethod(BenchmarkCase benchmarkCase)
+    private static object? CallMethod(BenchmarkCase benchmarkCase)
     {
         try
         {
@@ -34,7 +34,7 @@ public class MethodResultColumn : IColumn
 
             return result;
 
-            static void TryInvoke(object target, MethodInfo method)
+            static void TryInvoke(object? target, MethodInfo? method)
             {
                 try
                 {
@@ -62,5 +62,8 @@ public class MethodResultColumn : IColumn
     public int PriorityInCategory => 0;
     public bool IsNumeric => true;
     public UnitType UnitType => UnitType.Size;
-    public string Legend { get; }
+    // BenchmarkDotNet's contract is non-nullable, but its optional legend is null when not supplied.
+#pragma warning disable CS8766
+    public string? Legend { get; }
+#pragma warning restore CS8766
 }

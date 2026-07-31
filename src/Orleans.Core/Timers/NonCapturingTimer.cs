@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     /// <see href="https://github.com/dotnet/extensions/blob/a1389576a3bbc85a48bdcadce4f16bcf7cdfa088/src/Shared/src/NonCapturingTimer/NonCapturingTimer.cs"/>
     internal static class NonCapturingTimer
     {
-        public static Timer Create(TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
+        public static Timer Create(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             if (callback == null)
             {

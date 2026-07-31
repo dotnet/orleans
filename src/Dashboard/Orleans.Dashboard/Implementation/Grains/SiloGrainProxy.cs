@@ -1,4 +1,3 @@
-#nullable disable
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading.Tasks;
@@ -17,7 +16,7 @@ internal sealed class SiloGrainProxy : Grain, ISiloGrainProxy
     private readonly ISiloGrainService _siloGrainService;
     private readonly Dictionary<string, string> _siloMetadata;
 
-    public SiloGrainProxy(ISiloGrainClient siloGrainClient, ISiloMetadataCache siloMetadataCache = null)
+    public SiloGrainProxy(ISiloGrainClient siloGrainClient, ISiloMetadataCache? siloMetadataCache = null)
     {
         var siloAddress = SiloAddress.FromParsableString(this.GetPrimaryKeyString());
         _siloGrainService = siloGrainClient.GrainService(siloAddress);
@@ -30,11 +29,11 @@ internal sealed class SiloGrainProxy : Grain, ISiloGrainProxy
 
     public Task Enable(bool enabled) => _siloGrainService.Enable(enabled);
 
-    public Task<Immutable<Dictionary<string, string>>> GetExtendedProperties() => _siloGrainService.GetExtendedProperties();
+    public Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties() => _siloGrainService.GetExtendedProperties();
 
     public Task<Immutable<Dictionary<string, string>>> GetMetadata() => Task.FromResult(_siloMetadata.AsImmutable());
 
-    public Task<Immutable<SiloRuntimeStatistics[]>> GetRuntimeStatistics() => _siloGrainService.GetRuntimeStatistics();
+    public Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics() => _siloGrainService.GetRuntimeStatistics();
 
     public Task<Immutable<StatCounter[]>> GetCounters() => _siloGrainService.GetCounters();
 

@@ -68,6 +68,7 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
 
         // assert
         var container = serializer.Deserialize(payload);
+        Assert.NotNull(container);
         Assert.Equal(streamId, container.StreamId);
         Assert.Equal(events, container.Events);
         Assert.Equal(requestContext, container.RequestContext);

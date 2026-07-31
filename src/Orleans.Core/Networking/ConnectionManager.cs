@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +12,6 @@ using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class ConnectionManager
@@ -63,8 +63,7 @@ namespace Orleans.Runtime.Messaging
             // Start a new connection attempt since there are no suitable connections.
             return new(this.GetConnectionAsync(endpoint));
         }
-
-        public bool TryGetConnection(SiloAddress endpoint, out Connection connection)
+        public bool TryGetConnection(SiloAddress endpoint, [NotNullWhen(true)] out Connection? connection)
         {
             if (this.connections.TryGetValue(endpoint, out var entry) && entry.NextConnection() is { } c)
             {
@@ -125,7 +124,7 @@ namespace Orleans.Runtime.Messaging
 
         public void OnConnected(SiloAddress address, Connection connection) => OnConnected(address, connection, null);
 
-        private void OnConnected(SiloAddress address, Connection connection, ConnectionEntry entry)
+        private void OnConnected(SiloAddress address, Connection connection, ConnectionEntry? entry)
         {
             lock (this.lockObj)
             {
@@ -139,7 +138,7 @@ namespace Orleans.Runtime.Messaging
             LogInformationConnectionEstablished(this.logger, connection, address);
         }
 
-        public void OnConnectionTerminated(SiloAddress address, Connection connection, Exception exception)
+        public void OnConnectionTerminated(SiloAddress address, Connection connection, Exception? exception)
         {
             if (connection is null) return;
             ConnectionEvents.EmitTerminated(connection, exception);
@@ -177,7 +176,7 @@ namespace Orleans.Runtime.Messaging
         private async Task<Connection> ConnectAsync(SiloAddress address, ConnectionEntry entry)
         {
             await Task.Yield();
-            CancellationTokenSource openConnectionCancellation = default;
+            CancellationTokenSource? openConnectionCancellation = default;
 
             try
             {
@@ -312,14 +311,14 @@ namespace Orleans.Runtime.Messaging
         {
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                var (t, address, connection) = ((ConnectionManager, SiloAddress, Connection))state;
+                var (t, address, connection) = ((ConnectionManager, SiloAddress, Connection))state!;
                 t.RunConnectionAsync(address, connection).Ignore();
             }, (this, address, connection));
         }
 
         private async Task RunConnectionAsync(SiloAddress address, Connection connection)
         {
-            Exception error = default;
+            Exception? error = default;
             try
             {
                 using (this.BeginConnectionScope(connection))
@@ -337,7 +336,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private IDisposable BeginConnectionScope(Connection connection)
+        private IDisposable? BeginConnectionScope(Connection connection)
         {
             if (this.logger.IsEnabled(LogLevel.Critical))
             {
@@ -349,7 +348,7 @@ namespace Orleans.Runtime.Messaging
 
         private sealed class ConnectionEntry
         {
-            public Task PendingConnection { get; set; }
+            public Task? PendingConnection { get; set; }
             public DateTime LastFailure { get; set; }
             public ImmutableArray<Connection> Connections { get; set; } = ImmutableArray<Connection>.Empty;
 
@@ -371,7 +370,7 @@ namespace Orleans.Runtime.Messaging
 
             public bool HasSufficientConnections(ConnectionOptions options) => Connections.Length >= options.ConnectionsPerEndpoint;
 
-            public Connection NextConnection()
+            public Connection? NextConnection()
             {
                 var connections = this.Connections;
                 if (connections.IsEmpty)

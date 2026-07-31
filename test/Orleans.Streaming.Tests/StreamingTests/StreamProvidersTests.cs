@@ -21,7 +21,7 @@ namespace UnitTests.Streaming
     {
         public class Fixture : BaseTestClusterFixture
         {
-            public string ServiceId { get; set; }
+            public string ServiceId { get; set; } = null!;
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -63,8 +63,8 @@ namespace UnitTests.Streaming
             Guid streamId = Guid.NewGuid();
             var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
             // consumer joins first, producer later
-            IStreaming_ConsumerGrain consumer = this.HostedCluster.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => consumer.BecomeConsumer(streamId, STREAM_PROVIDER_NAME, null));
+            IStreaming_ConsumerGrain consumer = this.HostedCluster.GrainFactory!.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => consumer.BecomeConsumer(streamId, STREAM_PROVIDER_NAME, null!));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]

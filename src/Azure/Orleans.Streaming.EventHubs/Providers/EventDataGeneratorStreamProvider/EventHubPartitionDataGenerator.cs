@@ -9,7 +9,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>
@@ -21,7 +20,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         public StreamId StreamId { get; set; }
 
         /// <inheritdoc />
-        public IIntCounter SequenceNumberCounter { set; private get; }
+        public IIntCounter SequenceNumberCounter { set; private get; } = null!;
         /// <inheritdoc />
         public bool ShouldProduce { private get; set; }
 
@@ -39,7 +38,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         }
 
         /// <inheritdoc />
-        public bool TryReadEvents(int maxCount, out IEnumerable<EventData> events)
+        public bool TryReadEvents(int maxCount, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IEnumerable<EventData>? events)
         {
             if (!this.ShouldProduce)
             {
@@ -140,7 +139,7 @@ namespace Orleans.Streaming.EventHubs.Testing
             });
         }
         /// <inheritdoc />
-        public bool TryReadEvents(int maxCount, out IEnumerable<EventData> events)
+        public bool TryReadEvents(int maxCount, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IEnumerable<EventData>? events)
         {
             if (this.generators.Count == 0)
             {
@@ -159,7 +158,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                     iterator.Reset();
                     iterator.MoveNext();
                 }
-                IEnumerable<EventData> eventData;
+                IEnumerable<EventData>? eventData;
                 var remainingCount = maxCount - eventDataList.Count;
                 var count = remainingCount > batchCount ? batchCount : remainingCount;
                 if (iterator.Current.TryReadEvents(count, out eventData))

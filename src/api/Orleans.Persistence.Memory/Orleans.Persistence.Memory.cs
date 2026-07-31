@@ -31,11 +31,11 @@ namespace Orleans.Hosting
 {
     public static partial class MemoryGrainStorageSiloBuilderExtensions
     {
-        public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, System.Action<Configuration.MemoryGrainStorageOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Configuration.MemoryGrainStorageOptions> configureOptions) { throw null; }
     }

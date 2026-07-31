@@ -47,8 +47,10 @@ namespace UnitTests.MembershipTests
         {
             var options = new ZooKeeperClusteringSiloOptions();
             options.ConnectionString = this.connectionString;
-           
-            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this._clusterOptions);
+
+            var typedLogger = this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>();
+            Assert.NotNull(typedLogger);
+            return new ZooKeeperBasedMembershipTable(typedLogger, Options.Create(options), this._clusterOptions);
         }
 
         /// <summary>
@@ -67,7 +69,7 @@ namespace UnitTests.MembershipTests
         protected override async Task<string> GetConnectionString()
         {
             bool isReachable = await ZookeeperTestUtils.EnsureZooKeeperAsync();
-            return isReachable ? TestDefaultConfiguration.ZooKeeperConnectionString : null;
+            return isReachable ? TestDefaultConfiguration.ZooKeeperConnectionString! : null!;
         }
 
         [SkippableFact]

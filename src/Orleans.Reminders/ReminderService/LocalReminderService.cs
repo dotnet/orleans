@@ -323,8 +323,8 @@ namespace Orleans.Runtime.ReminderService
             return entry?.ToIGrainReminder();
         }
 
-        async Task<IGrainReminder> IReminderService.GetReminder(GrainId grainId, string reminderName)
-            => (await GetReminder(grainId, reminderName))!;
+        async Task<IGrainReminder?> IReminderService.GetReminder(GrainId grainId, string reminderName)
+            => await GetReminder(grainId, reminderName);
 
         public async Task<List<IGrainReminder>> GetReminders(GrainId grainId)
         {
@@ -489,7 +489,7 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                var table = await reminderTable.ReadRows(range.Begin, range.End); // get all reminders, even the ones we already have
+                ReminderTableData? table = await reminderTable.ReadRows(range.Begin, range.End); // get all reminders, even the ones we already have
 
                 if (rangeSerialNumberCopy < RangeSerialNumber)
                 {
@@ -499,7 +499,7 @@ namespace Orleans.Runtime.ReminderService
 
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
-                // If null is a valid value, it means that there's nothing to do.
+                // Providers built against older Orleans versions can still return null.
                 if (table is null) return;
 
                 var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>(); // shallow copy

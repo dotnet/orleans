@@ -1,12 +1,12 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -30,7 +30,7 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T? value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] T? value) where TBufferWriter : IBufferWriter<byte>
         {
             // If the value is null, write it as the null reference.
             if (value is null)
@@ -45,6 +45,7 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public T? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             // This will only be true if the value is null.
@@ -70,7 +71,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class NullableCopier<T> : IDeepCopier<T?>, IOptionalDeepCopier where T : struct
     {
-        private readonly IDeepCopier<T> _copier;
+        private readonly IDeepCopier<T>? _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="NullableCopier{T}"/> class.
@@ -80,7 +81,8 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier is null;
 
-        object IDeepCopier.DeepCopy(object input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input, context);
+        [return: NotNullIfNotNull(nameof(input))]
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input, context);
 
         /// <inheritdoc/>
         public T? DeepCopy(T? input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input.GetValueOrDefault(), context);

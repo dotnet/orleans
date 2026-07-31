@@ -270,7 +270,7 @@ namespace UnitTests.General
         public RangeBreakable()
         {
             ranges = new List<SingleRange>(1);
-            ranges.Add(RangeFactory.CreateFullRange() as SingleRange);
+            ranges.Add((RangeFactory.CreateFullRange() as SingleRange)!);
         }
 
         public bool Remove(IRingRange range)
@@ -287,7 +287,7 @@ namespace UnitTests.General
                         ranges.Remove(m);
                         if (s.Begin != s.End) // if s is full range as well, then end of story ... whole range is covered
                         {
-                            ranges.Add(RangeFactory.CreateRange(s.End, s.Begin) as SingleRange);
+                            ranges.Add((RangeFactory.CreateRange(s.End, s.Begin) as SingleRange)!);
                         }
                         break;
                     }
@@ -298,11 +298,11 @@ namespace UnitTests.General
                         ranges.Remove(m);
                         if (s.Begin != m.Begin)
                         {
-                            ranges.Add(RangeFactory.CreateRange(m.Begin, s.Begin) as SingleRange);
+                            ranges.Add((RangeFactory.CreateRange(m.Begin, s.Begin) as SingleRange)!);
                         }
                         if (s.End != m.End)
                         {
-                            ranges.Add(RangeFactory.CreateRange(s.End, m.End) as SingleRange);
+                            ranges.Add((RangeFactory.CreateRange(s.End, m.End) as SingleRange)!);
                         }
                         break;
                     }

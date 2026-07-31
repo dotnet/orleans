@@ -17,7 +17,7 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
 
     public class Fixture : IAsyncLifetime
     {
-        public InProcessTestCluster Cluster { get; private set; }
+        public InProcessTestCluster Cluster { get; private set; } = null!;
         public async Task DisposeAsync()
         {
             if (Cluster is { } cluster)
@@ -45,7 +45,7 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_GrainWithoutFilterCanBeCalled()
     {
-        var managementGrain = fixture.Cluster.Client.GetGrain<IManagementGrain>(0);
+        var managementGrain = fixture.Cluster.Client!.GetGrain<IManagementGrain>(0);
         var silos = await managementGrain.GetHosts(true);
         Assert.NotNull(silos);
     }
@@ -58,7 +58,7 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
         {
             triggered = await TestPlacementFilterDirector.Triggered.WaitAsync(TimeSpan.FromSeconds(1));
         });
-        var localOnlyGrain = fixture.Cluster.Client.GetGrain<ITestFilteredGrain>(0);
+        var localOnlyGrain = fixture.Cluster.Client!.GetGrain<ITestFilteredGrain>(0);
         await localOnlyGrain.Ping();
         await task;
         Assert.True(triggered);
@@ -68,9 +68,9 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
     public async Task PlacementFilter_OrderAB12()
     {
         var primaryKey = random.Next();
-        var testGrain = fixture.Cluster.Client.GetGrain<ITestAB12FilteredGrain>(primaryKey);
+        var testGrain = fixture.Cluster.Client!.GetGrain<ITestAB12FilteredGrain>(primaryKey);
         await testGrain.Ping();
-        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString());
+        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString()!);
         Assert.Equal(2, list.Count);
         Assert.Equal("A", list[0]);
         Assert.Equal("B", list[1]);
@@ -80,9 +80,9 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
     public async Task PlacementFilter_OrderAB21()
     {
         var primaryKey = random.Next();
-        var testGrain = fixture.Cluster.Client.GetGrain<ITestAB21FilteredGrain>(primaryKey);
+        var testGrain = fixture.Cluster.Client!.GetGrain<ITestAB21FilteredGrain>(primaryKey);
         await testGrain.Ping();
-        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString());
+        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString()!);
         Assert.Equal(2, list.Count);
         Assert.Equal("B", list[0]);
         Assert.Equal("A", list[1]);
@@ -92,9 +92,9 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
     public async Task PlacementFilter_OrderBA12()
     {
         var primaryKey = random.Next();
-        var testGrain = fixture.Cluster.Client.GetGrain<ITestBA12FilteredGrain>(primaryKey);
+        var testGrain = fixture.Cluster.Client!.GetGrain<ITestBA12FilteredGrain>(primaryKey);
         await testGrain.Ping();
-        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString());
+        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString()!);
         Assert.Equal(2, list.Count);
         Assert.Equal("B", list[0]);
         Assert.Equal("A", list[1]);
@@ -104,10 +104,10 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
     public async Task PlacementFilter_OrderBA21()
     {
         var primaryKey = random.Next();
-        var testGrain = fixture.Cluster.Client.GetGrain<ITestBA21FilteredGrain>(primaryKey);
+        var testGrain = fixture.Cluster.Client!.GetGrain<ITestBA21FilteredGrain>(primaryKey);
         await testGrain.Ping();
 
-        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString());
+        var list = FilterScratchpad.GetValueOrAddNew(testGrain.GetGrainId().Type.ToString()!);
         Assert.Equal(2, list.Count);
         Assert.Equal("A", list[0]);
         Assert.Equal("B", list[1]);
@@ -117,7 +117,7 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
     public async Task PlacementFilter_DuplicateOrder()
     {
         var primaryKey = random.Next();
-        var testGrain = fixture.Cluster.Client.GetGrain<ITestDuplicateOrderFilteredGrain>(primaryKey);
+        var testGrain = fixture.Cluster.Client!.GetGrain<ITestDuplicateOrderFilteredGrain>(primaryKey);
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
             await testGrain.Ping();
@@ -172,7 +172,7 @@ public class OrderAPlacementFilterDirector : IPlacementFilterDirector
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
     {
         var dict = GrainPlacementFilterTests.FilterScratchpad;
-        var list = dict.GetValueOrAddNew(target.GrainIdentity.Type.ToString());
+        var list = dict.GetValueOrAddNew(target.GrainIdentity.Type.ToString()!);
         list.Add("A");
         return silos;
     }
@@ -194,7 +194,7 @@ public class OrderBPlacementFilterDirector() : IPlacementFilterDirector
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
     {
         var dict = GrainPlacementFilterTests.FilterScratchpad;
-        var list = dict.GetValueOrAddNew(target.GrainIdentity.Type.ToString());
+        var list = dict.GetValueOrAddNew(target.GrainIdentity.Type.ToString()!);
         list.Add("B");
         return silos;
     }

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -62,7 +61,7 @@ namespace Orleans
                     {
                         try
                         {
-                            var value = (int)field.GetValue(null);
+                            var value = (int)field.GetValue(null)!;
                             result[value] = $"{field.Name} ({value})";
                         }
                         catch
@@ -222,7 +221,7 @@ namespace Orleans
             /// <summary>
             /// Gets the observer.
             /// </summary>
-            public ILifecycleObserver Observer { get; private set; }
+            public ILifecycleObserver? Observer { get; private set; }
 
             /// <summary>
             /// Gets the stage which the observer is participating in.

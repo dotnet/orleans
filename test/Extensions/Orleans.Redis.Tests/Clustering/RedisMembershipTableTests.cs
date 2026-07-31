@@ -27,7 +27,7 @@ namespace Tester.Redis.Clustering
             return filters;
         }
 
-        internal RedisMembershipTable membershipTable;
+        internal RedisMembershipTable membershipTable = null!;
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
@@ -52,7 +52,7 @@ namespace Tester.Redis.Clustering
                 this._gatewayOptions);
         }
 
-        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
+        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 
         [SkippableFact]
         public async Task GetGateways()

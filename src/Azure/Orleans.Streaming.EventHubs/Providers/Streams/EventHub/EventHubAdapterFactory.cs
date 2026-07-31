@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
@@ -13,7 +14,6 @@ using Orleans.Runtime;
 using Orleans.Statistics;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -33,7 +33,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Orleans logging
         /// </summary>
-        protected ILogger logger;
+        protected ILogger logger = null!;
 
         /// <summary>
         /// Framework service provider
@@ -48,10 +48,10 @@ namespace Orleans.Streaming.EventHubs
         private readonly EventHubReceiverOptions receiverOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly StreamCacheEvictionOptions cacheEvictionOptions;
-        private HashRingBasedPartitionedStreamQueueMapper streamQueueMapper;
-        private string[] partitionIds;
-        private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
-        private EventHubProducerClient client;
+        private HashRingBasedPartitionedStreamQueueMapper streamQueueMapper = null!;
+        private string[] partitionIds = null!;
+        private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers = null!;
+        private EventHubProducerClient client = null!;
 
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
@@ -73,34 +73,34 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Creates a message cache for an eventhub partition.
         /// </summary>
-        protected Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> CacheFactory { get; set; }
+        protected Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> CacheFactory { get; set; } = null!;
 
         /// <summary>
         /// Creates a partition checkpointer.
         /// </summary>
-        private IStreamQueueCheckpointerFactory checkpointerFactory;
+        private IStreamQueueCheckpointerFactory checkpointerFactory = null!;
 
         /// <summary>
         /// Creates a failure handler for a partition.
         /// </summary>
-        protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
+        protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; } = null!;
 
         /// <summary>
         /// Create a queue mapper to map EventHub partitions to queues
         /// </summary>
-        protected Func<string[], HashRingBasedPartitionedStreamQueueMapper> QueueMapperFactory { get; set; }
+        protected Func<string[], HashRingBasedPartitionedStreamQueueMapper> QueueMapperFactory { get; set; } = null!;
 
         /// <summary>
         /// Create a receiver monitor to report performance metrics.
         /// Factory function should return an IEventHubReceiverMonitor.
         /// </summary>
-        protected Func<EventHubReceiverMonitorDimensions, ILoggerFactory, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
+        protected Func<EventHubReceiverMonitorDimensions, ILoggerFactory, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; } = null!;
 
         //for testing purpose, used in EventHubGeneratorStreamProvider
         /// <summary>
         /// Factory to create a IEventHubReceiver
         /// </summary>
-        protected Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> EventHubReceiverFactory;
+        protected Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> EventHubReceiverFactory = null!;
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers => receivers;
         internal HashRingBasedPartitionedStreamQueueMapper EventHubQueueMapper => streamQueueMapper;
 
@@ -160,6 +160,7 @@ namespace Orleans.Streaming.EventHubs
         }
 
         //should only need checkpointer on silo side, so move its init logic when it is used
+        [MemberNotNull(nameof(checkpointerFactory))]
         private void InitCheckpointerFactory()
         {
             this.checkpointerFactory = this.serviceProvider.GetRequiredKeyedService<IStreamQueueCheckpointerFactory>(this.Name);
@@ -216,8 +217,8 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="token"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public virtual Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
-            Dictionary<string, object> requestContext)
+        public virtual Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token,
+            Dictionary<string, object>? requestContext)
         {
             EventData eventData = this.dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
             string partitionKey = this.dataAdapter.GetPartitionKey(streamId);

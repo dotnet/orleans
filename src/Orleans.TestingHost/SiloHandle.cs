@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
@@ -12,19 +11,19 @@ namespace Orleans.TestingHost
     public abstract class SiloHandle : IDisposable, IAsyncDisposable
     {
         /// <summary> Get or set configuration of the cluster </summary>
-        public TestClusterOptions ClusterOptions { get; set; }
+        public TestClusterOptions? ClusterOptions { get; set; }
 
         /// <summary> Gets or sets the instance number within the cluster.</summary>
         public short InstanceNumber { get; set; }
 
         /// <summary> Get or set the name of the silo </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
 
         /// <summary>Get or set the address of the silo</summary>
-        public SiloAddress SiloAddress { get; set; }
+        public SiloAddress SiloAddress { get; set; } = null!;
 
         ///// <summary>Get the proxy address of the silo</summary>
-        public SiloAddress GatewayAddress { get; set; }
+        public SiloAddress GatewayAddress { get; set; } = null!;
 
         /// <summary>Gets whether the remote silo is expected to be active</summary>
         public abstract bool IsActive { get; }

@@ -22,7 +22,7 @@ namespace Tester.AzureUtils.Streaming
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
         private readonly ITestOutputHelper output;
-        private ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner = null!;
 
         public AQClientStreamTests(ITestOutputHelper output)
         {
@@ -76,7 +76,7 @@ namespace Tester.AzureUtils.Streaming
             try
             {
                 TestUtils.CheckForAzureStorage();
-                var serviceId = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
+                var serviceId = this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId; // The fixture deploys the client.
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
                     new AzureQueueOptions().ConfigureTestDefaults());
                 await TestAzureTableStorageStreamFailureHandler.DeleteAll();

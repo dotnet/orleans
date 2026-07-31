@@ -10,7 +10,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Microsoft.Extensions.Hosting;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -83,23 +82,23 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
 
         /// <inheritdoc />
@@ -156,8 +155,8 @@ namespace Orleans
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
 
         /// <inheritdoc />
-        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
-            => _runtimeClient.InternalGrainFactory.GetGrain(interfaceType, grainKey, grainClassNamePrefix);
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string? grainClassNamePrefix)
+            => _runtimeClient.InternalGrainFactory.GetGrain(interfaceType, grainKey, grainClassNamePrefix!);
 
         /// <inheritdoc />
         public IAddressable GetGrain(Type interfaceType, IdSpan grainKey)

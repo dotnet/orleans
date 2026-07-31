@@ -4,7 +4,6 @@ using Orleans.GrainDirectory.Redis;
 using Orleans.Runtime;
 using StackExchange.Redis;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -16,7 +15,7 @@ namespace Orleans.Configuration
         /// Gets or sets the Redis client configuration.
         /// </summary>
         [RedactRedisConfigurationOptions]
-        public ConfigurationOptions ConfigurationOptions { get; set; }
+        public ConfigurationOptions? ConfigurationOptions { get; set; }
 
         /// <summary>
         /// The delegate used to create a Redis connection multiplexer and indicate whether it is shared.
@@ -36,12 +35,12 @@ namespace Orleans.Configuration
         /// The default multiplexer creation delegate.
         /// </summary>
         public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisGrainDirectoryOptions options)
-            => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions), IsShared: false);
+            => (Multiplexer: await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), IsShared: false);
     }
 
     internal class RedactRedisConfigurationOptions : RedactAttribute
     {
-        public override string Redact(object value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
+        public override string Redact(object? value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
     }
 
     /// <summary>

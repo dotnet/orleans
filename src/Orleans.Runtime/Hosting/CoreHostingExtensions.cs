@@ -98,7 +98,7 @@ namespace Orleans.Hosting
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, IPEndPoint primarySiloEndpoint)
+        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, IPEndPoint? primarySiloEndpoint)
         {
             return builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
         }

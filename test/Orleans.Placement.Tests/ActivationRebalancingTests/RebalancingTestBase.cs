@@ -30,7 +30,7 @@ public abstract class RebalancingTestBase<TFixture>
 
         Cluster = fixture.HostedCluster;
         OutputHelper = output;
-        GrainFactory = (IInternalGrainFactory)fixture.HostedCluster.Client;
+        GrainFactory = (IInternalGrainFactory)fixture.HostedCluster.Client!;
         MgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
     }
 

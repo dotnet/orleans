@@ -12,7 +12,7 @@ namespace UnitTests.StreamingTests
     {
         private readonly IClusterClient client;
         private readonly ConsumerObserver _consumer;
-        private string _providerToUse;
+        private string _providerToUse = null!;
 
         private Streaming_ConsumerClientObject(ILogger logger, IClusterClient client)
         {
@@ -25,7 +25,7 @@ namespace UnitTests.StreamingTests
             return new Streaming_ConsumerClientObject(logger, client);
         }
 
-        public Task OnNextAsync(StreamItem item, StreamSequenceToken token = null)
+        public Task OnNextAsync(StreamItem item, StreamSequenceToken? token = null)
         {
             return _consumer.OnNextAsync(item, token);
         }
@@ -43,13 +43,13 @@ namespace UnitTests.StreamingTests
         public Task BecomeConsumer(Guid streamId, string providerToUse)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), null);
+            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), null!);
         }
         
-        public Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
+        public Task BecomeConsumer(Guid streamId, string providerToUse, string? streamNamespace)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace!);
         }
 
         public Task StopBeingConsumer()
@@ -90,9 +90,9 @@ namespace UnitTests.StreamingTests
             return new Streaming_ProducerClientObject(logger, client);
         }
 
-        public Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
+        public Task BecomeProducer(Guid streamId, string providerToUse, string? streamNamespace)
         {
-            this.producer.BecomeProducer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            this.producer.BecomeProducer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace!);
             return Task.CompletedTask;
         }
 
@@ -122,7 +122,7 @@ namespace UnitTests.StreamingTests
                             {
                                 try
                                 {
-                                    await timerCallback(null);
+                                    await timerCallback(null!);
                                 }
                                 catch
                                 {
@@ -204,7 +204,7 @@ namespace UnitTests.StreamingTests
             return newObj;
         }
 
-        public static Task<ConsumerProxy> NewConsumerGrainsAsync(Guid streamId, string streamProvider, ILogger logger, IInternalGrainFactory grainFactory, Guid[] grainIds = null, int grainCount = 1)
+        public static Task<ConsumerProxy> NewConsumerGrainsAsync(Guid streamId, string streamProvider, ILogger logger, IInternalGrainFactory grainFactory, Guid[]? grainIds = null, int grainCount = 1)
         {
             grainCount = grainIds != null ? grainIds.Length : grainCount;
             if (grainCount < 1)
@@ -283,7 +283,7 @@ namespace UnitTests.StreamingTests
 
             if (string.IsNullOrEmpty(grainClassName)) 
             {
-                grainClassName = typeof(Streaming_ConsumerGrain).FullName;
+                grainClassName = typeof(Streaming_ConsumerGrain).FullName!;
             }
 
             var grains = new IStreaming_ConsumerGrain[1];
@@ -297,7 +297,7 @@ namespace UnitTests.StreamingTests
             List<Task> tasks = new List<Task>();
             foreach (var target in _targets)
             {
-                Task t = target.BecomeConsumer(streamId, providerToUse, null);
+                Task t = target.BecomeConsumer(streamId, providerToUse, null!);
                 // Consider: remove this await, let the calls go in parallel. 
                 // Have to do it for now to prevent multithreaded scheduler bug from happening.
                 // await t;
@@ -376,17 +376,17 @@ namespace UnitTests.StreamingTests
 
         public StreamId StreamId { get; }
 
-        private ProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string providerName, string streamNamespace, ILogger logger)
+        private ProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string providerName, string? streamNamespace, ILogger logger)
         {
             _targets = targets;
             _logger = logger;
             _streamId = streamId;
             _providerName = providerName;
             _cleanedUpFlag = new InterlockedFlag();
-            StreamId = StreamId.Create(streamNamespace, streamId);
+            StreamId = StreamId.Create(streamNamespace!, streamId);
         }
 
-        private static async Task<ProducerProxy> NewProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string streamProvider, string streamNamespace, ILogger logger)
+        private static async Task<ProducerProxy> NewProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string streamProvider, string? streamNamespace, ILogger logger)
         {
             if (targets == null)
                 throw new ArgumentNullException(nameof(targets));
@@ -400,7 +400,7 @@ namespace UnitTests.StreamingTests
             return newObj;
         }
 
-        public static Task<ProducerProxy> NewProducerGrainsAsync(Guid streamId, string streamProvider, string streamNamespace, ILogger logger, IInternalGrainFactory grainFactory, Guid[] grainIds = null, int grainCount = 1)
+        public static Task<ProducerProxy> NewProducerGrainsAsync(Guid streamId, string streamProvider, string? streamNamespace, ILogger logger, IInternalGrainFactory grainFactory, Guid[]? grainIds = null, int grainCount = 1)
         {
             grainCount = grainIds != null ? grainIds.Length : grainCount;
             if (grainCount < 1)
@@ -461,7 +461,7 @@ namespace UnitTests.StreamingTests
             return NewProducerProxy(grains, streamId, streamProvider, null, logger);
         }
 
-        public static Task<ProducerProxy> NewProducerClientObjectsAsync(Guid streamId, string streamProvider,  string streamNamespace, ILogger logger, IClusterClient client, int producersCount = 1)
+        public static Task<ProducerProxy> NewProducerClientObjectsAsync(Guid streamId, string streamProvider, string? streamNamespace, ILogger logger, IClusterClient client, int producersCount = 1)
         {            
             if (producersCount < 1)
                 throw new ArgumentOutOfRangeException(nameof(producersCount), "The producer count must be at least one");
@@ -472,13 +472,13 @@ namespace UnitTests.StreamingTests
             return NewProducerProxy(producers, streamId, streamProvider, streamNamespace, logger);
         }
 
-        private Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
+        private Task BecomeProducer(Guid streamId, string providerToUse, string? streamNamespace)
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             return Task.WhenAll(_targets.Select(
                 target => 
-                    target.BecomeProducer(streamId, providerToUse, streamNamespace)).ToArray());
+                    target.BecomeProducer(streamId, providerToUse, streamNamespace!)).ToArray());
         }
 
         public async Task ProduceSequentialSeries(int count)

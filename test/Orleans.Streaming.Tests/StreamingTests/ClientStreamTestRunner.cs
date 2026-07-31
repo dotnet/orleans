@@ -42,7 +42,7 @@ namespace Tester.StreamingTests
             await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
         }
 
-        public async Task StreamConsumerOnDroppedClientTest(string streamProviderName, string streamNamespace, ITestOutputHelper output, Func<Task<int>> getDeliveryFailureCount = null, bool waitForRetryTimeouts = false)
+        public async Task StreamConsumerOnDroppedClientTest(string streamProviderName, string streamNamespace, ITestOutputHelper? output, Func<Task<int>>? getDeliveryFailureCount = null, bool waitForRetryTimeouts = false)
         {
             var hasDeliveryFailureCounter = getDeliveryFailureCount is not null;
             getDeliveryFailureCount ??= DefaultDeliveryFailureCount;
@@ -79,9 +79,9 @@ namespace Tester.StreamingTests
         }
 
         private Task<StreamSubscriptionHandle<int>> SubscribeToStream(string streamProviderName, Guid streamGuid, string streamNamespace,
-            Func<int, StreamSequenceToken, Task> onNextAsync)
+            Func<int, StreamSequenceToken?, Task> onNextAsync)
         {
-            IStreamProvider streamProvider = this.testHost.Client.GetStreamProvider(streamProviderName);
+            IStreamProvider streamProvider = this.testHost.Client!.GetStreamProvider(streamProviderName); // The runner deploys the client.
             IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamNamespace, streamGuid);
             return stream.SubscribeAsync(onNextAsync);
         }
@@ -93,7 +93,7 @@ namespace Tester.StreamingTests
             var streamId = StreamId.Create(streamNamespace, streamGuid);
 
             // get reference to a consumer
-            var consumer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            var consumer = this.testHost.GrainFactory!.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid()); // The runner deploys the client.
 
             // subscribe
             await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
@@ -114,7 +114,7 @@ namespace Tester.StreamingTests
 
         private async Task GenerateEvents(string streamProviderName, Guid streamGuid, string streamNamespace, int produceCount)
         {
-            IStreamProvider streamProvider = this.testHost.Client.GetStreamProvider(streamProviderName);
+            IStreamProvider streamProvider = this.testHost.Client!.GetStreamProvider(streamProviderName); // The runner deploys the client.
             IAsyncObserver<int> observer = streamProvider.GetStream<int>(streamNamespace, streamGuid);
             for (int i = 0; i < produceCount; i++)
             {
@@ -135,7 +135,7 @@ namespace Tester.StreamingTests
                     return Task.CompletedTask;
                 });
 
-            var producer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.testHost.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid()); // The runner deploys the client.
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
             await ProduceExactCountAsync(producer, eventsProduced);

@@ -285,7 +285,7 @@ namespace NonSilo.Tests.Membership
 
             public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
             public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => Task.FromResult(false);
-            public Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress indirectProbingSilo, CancellationToken cancellationToken) => Task.FromResult(false);
+            public Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => Task.FromResult(false);
             public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
             public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
             public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -293,7 +293,7 @@ namespace NonSilo.Tests.Membership
 
             public bool CheckHealth(DateTime lastCheckTime, out string reason)
             {
-                reason = default;
+                reason = default!;
                 return true;
             }
         }

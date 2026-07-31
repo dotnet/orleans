@@ -49,8 +49,8 @@ public abstract class AdoNetGrainDirectoryClusterTests : MultipleGrainDirectorie
 {
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";
 
-    private static RelationalStorageForTesting _testing;
-    private static string _invariant;
+    private static RelationalStorageForTesting _testing = null!;
+    private static string _invariant = null!;
 
     public AdoNetGrainDirectoryClusterTests(string invariant)
     {

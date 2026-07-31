@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 
-#nullable disable
 [assembly: RegisterProvider("Redis", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
 
@@ -20,7 +19,7 @@ namespace Orleans.Clustering.Redis.Hosting;
 
 internal sealed class RedisClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseRedisClustering(_ => { });
         builder.Services.AddOptions<RedisClusteringOptions>()
@@ -53,7 +52,7 @@ internal sealed class RedisClusteringProviderBuilder : IProviderBuilder<ISiloBui
             });
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseRedisClustering(_ => { });
         builder.Services.AddOptions<RedisClusteringOptions>()

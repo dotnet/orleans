@@ -5,7 +5,7 @@ namespace UnitTests.Grains
 {
     internal class LivenessTestGrain : Grain, ILivenessTestGrain
     {
-        private string label;
+        private string label = null!;
         private readonly ILogger logger;
         private Guid uniqueId;
 

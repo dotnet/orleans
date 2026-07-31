@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Google.Protobuf;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -13,6 +14,7 @@ namespace Orleans.Serialization;
 public sealed class ByteStringCodec : IFieldCodec<ByteString>
 {
     /// <inheritdoc/>
+    [return: MaybeNull]
     ByteString IFieldCodec<ByteString>.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -28,7 +30,7 @@ public sealed class ByteStringCodec : IFieldCodec<ByteString>
     }
 
     /// <inheritdoc/>
-    void IFieldCodec<ByteString>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ByteString value)
+    void IFieldCodec<ByteString>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] ByteString value)
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {

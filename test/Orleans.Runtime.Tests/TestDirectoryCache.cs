@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
@@ -31,7 +32,7 @@ namespace UnitTests.General
             Operations.Enqueue(new CacheOperation.Clear());
         }
 
-        public bool LookUp(GrainId key, out GrainAddress result, out int version)
+        public bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version)
         {
             var exists = InnerCache.LookUp(key, out result, out version);
             Operations.Enqueue(new CacheOperation.Lookup(key, (exists, result, version)));
@@ -61,7 +62,7 @@ namespace UnitTests.General
         {
             public record RemoveActivation(GrainAddress Key, bool Result) : CacheOperation;
             public record Remove(GrainId Key, bool Result) : CacheOperation;
-            public record Lookup(GrainId Key, (bool Exists, GrainAddress Address, int Version) Result) : CacheOperation;
+            public record Lookup(GrainId Key, (bool Exists, GrainAddress? Address, int Version) Result) : CacheOperation;
             public record AddOrUpdate(GrainAddress Value, int Version) : CacheOperation;
             public record Clear() : CacheOperation;
         }

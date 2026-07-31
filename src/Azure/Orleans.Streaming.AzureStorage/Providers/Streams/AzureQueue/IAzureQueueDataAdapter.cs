@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
             var rawBytes = this.serializer.SerializeToArray(azureQueueBatchMessage);
@@ -41,7 +41,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// </summary>
         public IBatchContainer FromQueueMessage(string cloudMsg, long sequenceId)
         {
-            var azureQueueBatch = this.serializer.Deserialize(Convert.FromBase64String(cloudMsg));
+            // A valid queue message contains a serialized batch container.
+            var azureQueueBatch = this.serializer.Deserialize(Convert.FromBase64String(cloudMsg))!;
             azureQueueBatch.RealSequenceToken = new EventSequenceToken(sequenceId);
             return azureQueueBatch;
         }
@@ -72,7 +73,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamId, events.Cast<object>().ToList(), requestContext);
             var rawBytes = this.serializer.SerializeToArray(azureQueueBatchMessage);
@@ -84,7 +85,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// </summary>
         public IBatchContainer FromQueueMessage(string cloudMsg, long sequenceId)
         {
-            var azureQueueBatch = this.serializer.Deserialize(Convert.FromBase64String(cloudMsg));
+            // A valid queue message contains a serialized batch container.
+            var azureQueueBatch = this.serializer.Deserialize(Convert.FromBase64String(cloudMsg))!;
             azureQueueBatch.RealSequenceToken = new EventSequenceTokenV2(sequenceId);
             return azureQueueBatch;
         }

@@ -9,7 +9,7 @@ namespace UnitTests.Directory
         private readonly TimeSpan singleOperationDelay;
         private readonly TimeSpan batchOperationDelay;
 
-        public List<(GrainAddress activationAddress, UnregistrationCause cause)> UnregistrationReceived { get; private set; }
+        public List<(GrainAddress activationAddress, UnregistrationCause cause)> UnregistrationReceived { get; private set; } = null!;
 
         public int UnregistrationCounter { get; private set; }
 
@@ -88,7 +88,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress previousAddress, int hopCount = 0)
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount = 0)
         {
             throw new NotImplementedException();
         }

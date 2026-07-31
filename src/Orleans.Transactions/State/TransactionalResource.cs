@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.State
 {
     internal class TransactionalResource<TState> : ITransactionalResource

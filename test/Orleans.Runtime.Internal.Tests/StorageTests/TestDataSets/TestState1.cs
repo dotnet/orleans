@@ -8,7 +8,7 @@
     public class TestState1: IEquatable<TestState1>
     {
         [Orleans.Id(0)]
-        public string A { get; set; }
+        public string? A { get; set; }
 
         [Orleans.Id(1)]
         public int B { get; set; }
@@ -16,13 +16,13 @@
         [Orleans.Id(2)]
         public long C { get; set; }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return Equals(obj as TestState1);
         }
 
 
-        public bool Equals(TestState1 other)
+        public bool Equals(TestState1? other)
         {
             if(ReferenceEquals(other, null))
             {
@@ -37,7 +37,7 @@
             unchecked
             {
                 int hash = 17;
-                hash = hash * 23 + EqualityComparer<string>.Default.GetHashCode(A);
+                hash = hash * 23 + EqualityComparer<string?>.Default.GetHashCode(A!);
                 hash = hash * 23 + B.GetHashCode();
                 hash = hash * 23 + C.GetHashCode();
 

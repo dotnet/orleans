@@ -13,6 +13,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class IPAddressCodec : IFieldCodec<IPAddress>, IDerivedTypeCodec
     {
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         IPAddress IFieldCodec<IPAddress>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -22,6 +23,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static IPAddress ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
@@ -49,7 +51,7 @@ namespace Orleans.Serialization.Codecs
             return new(reader.ReadBytes(length));
         }
 
-        void IFieldCodec<IPAddress>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPAddress value)
+        void IFieldCodec<IPAddress>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] IPAddress value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, typeof(IPAddress), value))
             {

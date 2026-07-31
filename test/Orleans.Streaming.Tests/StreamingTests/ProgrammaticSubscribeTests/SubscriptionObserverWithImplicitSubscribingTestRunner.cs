@@ -34,7 +34,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             using var cts = new CancellationTokenSource(_timeout);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
             var rxStreamId = StreamId.Create(ImplicitSubscribeGrain.StreamNameSpace, streamId.Guid);
-            var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = this.fixture.HostedCluster.GrainFactory!.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             for (var i = 0; i< 10; i++)
@@ -43,7 +43,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             }
 
             await observer.WaitForItemDeliveryCountAsync(rxStreamId, 10, StreamProviderName, cts.Token);
-            var implicitConsumer = this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
+            var implicitConsumer = this.fixture.HostedCluster.GrainFactory!.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
             Assert.Equal(10, await implicitConsumer.GetNumberConsumed());
 
             //clean up test
@@ -80,7 +80,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
                 observer.WaitForItemDeliveryCountAsync(rxStreamId, 10, StreamProviderName, cts.Token),
                 observer.WaitForItemDeliveryCountAsync(rxStreamId2, 8, StreamProviderName, cts.Token));
 
-            var implicitConsumer = this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
+            var implicitConsumer = this.fixture.HostedCluster.GrainFactory!.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
             Assert.Equal(18, await implicitConsumer.GetNumberConsumed());
 
             //clean up test
@@ -119,7 +119,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
                 observer.WaitForItemDeliveryCountAsync(rxStreamId2, 8, StreamProviderName2, cts.Token));
 
             var implicitConsumer =
-                this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
+                this.fixture.HostedCluster.GrainFactory!.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
             Assert.Equal(18, await implicitConsumer.GetNumberConsumed());
 
             //clean up test

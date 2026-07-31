@@ -8,7 +8,7 @@ namespace Orleans.Streams.Core
         /// <summary>
         /// Gets the stream subscription manager.
         /// </summary>
-        /// <returns>The <see cref="IStreamSubscriptionManager"/>.</returns>
-        IStreamSubscriptionManager GetStreamSubscriptionManager();
+        /// <returns>The <see cref="IStreamSubscriptionManager"/>, or <see langword="null"/> if the stream provider has no configured subscription manager (e.g. an implicit-subscription-only provider).</returns>
+        IStreamSubscriptionManager? GetStreamSubscriptionManager();
     }
 }

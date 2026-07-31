@@ -26,13 +26,13 @@ namespace Orleans.AzureUtils
 
         public System.Threading.Tasks.Task<int> GetApproximateMessageCount() { throw null; }
 
-        public System.Threading.Tasks.Task<Azure.Storage.Queues.Models.QueueMessage> GetQueueMessage() { throw null; }
+        public System.Threading.Tasks.Task<Azure.Storage.Queues.Models.QueueMessage?> GetQueueMessage() { throw null; }
 
         public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Storage.Queues.Models.QueueMessage>> GetQueueMessages(int? count = null) { throw null; }
 
         public System.Threading.Tasks.Task InitQueueAsync() { throw null; }
 
-        public System.Threading.Tasks.Task<Azure.Storage.Queues.Models.PeekedMessage> PeekQueueMessage() { throw null; }
+        public System.Threading.Tasks.Task<Azure.Storage.Queues.Models.PeekedMessage?> PeekQueueMessage() { throw null; }
     }
 }
 
@@ -43,10 +43,10 @@ namespace Orleans.Configuration
         public const string DefaultBlobContainerName = "Leases";
         public string BlobContainerName { get { throw null; } set { } }
 
-        public Azure.Storage.Blobs.BlobServiceClient BlobServiceClient { get { throw null; } set { } }
+        public Azure.Storage.Blobs.BlobServiceClient? BlobServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the BlobServiceClient property directly.")]
-        public Azure.Storage.Blobs.BlobClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Storage.Blobs.BlobClientOptions? ClientOptions { get { throw null; } set { } }
 
         [System.Obsolete("Set the BlobServiceClient property directly.")]
         public void ConfigureBlobServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
@@ -85,7 +85,7 @@ namespace Orleans.Configuration
 
         public System.Collections.Generic.List<string> QueueNames { get { throw null; } set { } }
 
-        public Azure.Storage.Queues.QueueServiceClient QueueServiceClient { get { throw null; } set { } }
+        public Azure.Storage.Queues.QueueServiceClient? QueueServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the QueueServiceClient property directly.")]
         public void ConfigureQueueServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Storage.Queues.QueueServiceClient>> createClientCallback) { }
@@ -130,9 +130,9 @@ namespace Orleans.Hosting
 
     public sealed partial class AzureQueueStreamProviderBuilder : Providers.IProviderBuilder<ISiloBuilder>, Providers.IProviderBuilder<IClientBuilder>
     {
-        public void Configure(IClientBuilder builder, string name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+        public void Configure(IClientBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
 
-        public void Configure(ISiloBuilder builder, string name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+        public void Configure(ISiloBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
     }
 
     public static partial class ClientBuilderExtensions
@@ -227,7 +227,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         void Serialization.IOnDeserialized.OnDeserialized(Serialization.DeserializationContext context) { }
 
-        public string ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) { throw null; }
+        public string ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 
     [SerializationCallbacks(typeof(Runtime.OnDeserializedCallbacks))]
@@ -239,7 +239,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         void Serialization.IOnDeserialized.OnDeserialized(Serialization.DeserializationContext context) { }
 
-        public string ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) { throw null; }
+        public string ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 
     public partial class AzureQueueStreamProviderUtils
@@ -260,15 +260,15 @@ namespace Orleans.Providers.Streams.PersistentStreams
 {
     public partial class AzureTableStorageStreamFailureHandler<TEntity> : Orleans.Streams.IStreamFailureHandler where TEntity : StreamDeliveryFailureEntity, new()
     {
-        public AzureTableStorageStreamFailureHandler(Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, Streaming.AzureStorage.AzureStorageOperationOptions azureStorageOptions, System.Func<TEntity> createEntity = null) { }
+        public AzureTableStorageStreamFailureHandler(Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, Streaming.AzureStorage.AzureStorageOperationOptions azureStorageOptions, System.Func<TEntity>? createEntity = null) { }
 
         public bool ShouldFaultSubsriptionOnError { get { throw null; } }
 
         public System.Threading.Tasks.Task InitAsync() { throw null; }
 
-        public System.Threading.Tasks.Task OnDeliveryFailure(Runtime.GuidId subscriptionId, string streamProviderName, Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) { throw null; }
+        public System.Threading.Tasks.Task OnDeliveryFailure(Runtime.GuidId subscriptionId, string streamProviderName, Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
-        public System.Threading.Tasks.Task OnSubscriptionFailure(Runtime.GuidId subscriptionId, string streamProviderName, Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) { throw null; }
+        public System.Threading.Tasks.Task OnSubscriptionFailure(Runtime.GuidId subscriptionId, string streamProviderName, Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? sequenceToken) { throw null; }
     }
 
     public partial class StreamDeliveryFailureEntity : Azure.Data.Tables.ITableEntity
@@ -279,11 +279,11 @@ namespace Orleans.Providers.Streams.PersistentStreams
 
         public string RowKey { get { throw null; } set { } }
 
-        public byte[] SequenceToken { get { throw null; } set { } }
+        public byte[]? SequenceToken { get { throw null; } set { } }
 
         public string StreamGuid { get { throw null; } set { } }
 
-        public string StreamNamespace { get { throw null; } set { } }
+        public string? StreamNamespace { get { throw null; } set { } }
 
         public string StreamProviderName { get { throw null; } set { } }
 
@@ -291,7 +291,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
 
         public System.DateTimeOffset? Timestamp { get { throw null; } set { } }
 
-        public virtual Orleans.Streams.StreamSequenceToken GetSequenceToken(Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer) { throw null; }
+        public virtual Orleans.Streams.StreamSequenceToken? GetSequenceToken(Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer) { throw null; }
 
         public static string MakeDefaultPartitionKey(string streamProviderName, string deploymentId) { throw null; }
 
@@ -301,7 +301,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
 
         public virtual void SetRowkey() { }
 
-        public virtual void SetSequenceToken(Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer, Orleans.Streams.StreamSequenceToken token) { }
+        public virtual void SetSequenceToken(Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer, Orleans.Streams.StreamSequenceToken? token) { }
     }
 }
 
@@ -309,13 +309,13 @@ namespace Orleans.Streaming.AzureStorage
 {
     public partial class AzureStorageOperationOptions
     {
-        public Azure.Data.Tables.TableClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Data.Tables.TableClientOptions? ClientOptions { get { throw null; } set { } }
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get { throw null; } }
 
         public virtual string TableName { get { throw null; } set { } }
 
-        public Azure.Data.Tables.TableServiceClient TableServiceClient { get { throw null; } set { } }
+        public Azure.Data.Tables.TableServiceClient? TableServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the TableServiceClient property directly.")]
         public void ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) { }
@@ -338,9 +338,9 @@ namespace Orleans.Streaming.AzureStorage
 
     public partial class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null) { }
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null) { }
 
-        public string Name { get { throw null; } }
+        public string? Name { get { throw null; } }
 
         public TOptions Options { get { throw null; } }
 

@@ -10,9 +10,9 @@ namespace UnitTests.Grains
     public class TestGrain : Grain, ITestGrain
     {
         private readonly string _id = Guid.NewGuid().ToString();
-        private string label;
+        private string label = null!;
         private readonly ILogger logger;
-        private IDisposable timer;
+        private IDisposable? timer;
 
         public TestGrain(ILoggerFactory loggerFactory)
         {
@@ -76,24 +76,24 @@ namespace UnitTests.Grains
 
         public async Task<Tuple<string, string>> TestRequestContext()
         {
-            string bar1 = null;
+            string? bar1 = null;
             RequestContext.Set("jarjar", "binks");
 
             var task = Task.Factory.StartNew(() =>
             {
-                bar1 = (string) RequestContext.Get("jarjar");
+                bar1 = (string?) RequestContext.Get("jarjar");
                 logger.LogInformation("bar = {Bar}.", bar1);
             });
 
-            string bar2 = null;
+            string? bar2 = null;
             var ac = Task.Factory.StartNew(() =>
             {
-                bar2 = (string) RequestContext.Get("jarjar");
+                bar2 = (string?) RequestContext.Get("jarjar");
                 logger.LogInformation("bar = {Bar}.", bar2);
             });
 
             await Task.WhenAll(task, ac);
-            return new Tuple<string, string>(bar1, bar2);
+            return new Tuple<string, string>(bar1!, bar2!);
         }
 
         public Task<string> GetRuntimeInstanceId()
@@ -159,7 +159,7 @@ namespace UnitTests.Grains
     {
         private readonly string _id = Guid.NewGuid().ToString();
 
-        private string label;
+        private string label = null!;
         private readonly ILogger logger;
 
         public GuidTestGrain(ILoggerFactory loggerFactory)
@@ -212,7 +212,7 @@ namespace UnitTests.Grains
         private readonly string _id = Guid.NewGuid().ToString();
         private int count;
         private TaskCompletionSource<string> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private IOneWayGrain other;
+        private IOneWayGrain? other;
         private readonly GrainLocator grainLocator;
         private int _numSignals;
 
@@ -295,10 +295,10 @@ namespace UnitTests.Grains
                 return Task.FromResult(result.ToString());
             }
 
-            return Task.FromResult<string>(null);
+            return Task.FromResult<string>(null!);
         }
 
-        public Task NotifyOtherGrain() => this.other.Notify(this.AsReference<ISimpleGrainObserver>());
+        public Task NotifyOtherGrain() => this.other!.Notify(this.AsReference<ISimpleGrainObserver>());
 
         public Task<int> GetCount() => Task.FromResult(this.count);
 
@@ -327,13 +327,13 @@ namespace UnitTests.Grains
         {
             var grainId = (GrainId)this.GrainId;
             var primaryForGrain = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
-            return Task.FromResult(primaryForGrain);
+            return Task.FromResult(primaryForGrain!);
         }
 
         public void StateChanged(int a, int b)
         {
             _numSignals++;
-            this.tcs.TrySetResult(null);
+            this.tcs.TrySetResult(null!);
         }
 
         public async Task SendSignalTo(IOneWayGrain grain)
@@ -341,7 +341,7 @@ namespace UnitTests.Grains
             await grain.Signal(_id);
         }
 
-        public Task SignalSelfViaOther() => this.other.SendSignalTo(this.AsReference<IOneWayGrain>());
+        public Task SignalSelfViaOther() => this.other!.SendSignalTo(this.AsReference<IOneWayGrain>());
 
         public async Task<(int NumSignals, string SignallerId)> WaitForSignal()
         {

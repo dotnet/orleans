@@ -10,7 +10,7 @@ namespace Orleans.Configuration
 {
     public partial class RedisGrainDirectoryOptions
     {
-        public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
+        public StackExchange.Redis.ConfigurationOptions? ConfigurationOptions { get { throw null; } set { } }
 
         public System.Func<RedisGrainDirectoryOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get { throw null; } set { } }
 

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Streams
 {
     [Serializable]
@@ -21,7 +21,7 @@ namespace Orleans.Streams
 
         // Not serialized - runtime-only in-flight registration tracking.
         [NonSerialized]
-        public Task RegistrationTask;
+        public Task? RegistrationTask;
 
         public StreamConsumerCollection(DateTime now)
         {
@@ -29,7 +29,7 @@ namespace Orleans.Streams
             lastActivityTime = now;
         }
 
-        public StreamConsumerData AddConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData, DateTime now)
+        public StreamConsumerData AddConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData, DateTime now)
         {
             var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filterData);
             queueData.Add(subscriptionId, consumerData);
@@ -50,7 +50,7 @@ namespace Orleans.Streams
             return queueData.ContainsKey(subscriptionId);
         }
 
-        public bool TryGetConsumer(GuidId subscriptionId, out StreamConsumerData data)
+        public bool TryGetConsumer(GuidId subscriptionId, [MaybeNullWhen(false)] out StreamConsumerData data)
         {
             return queueData.TryGetValue(subscriptionId, out data);
         }

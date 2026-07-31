@@ -26,7 +26,7 @@ namespace TestGrains
 
         public Task<CounterState> GetCounterState()
         {
-            return Task.FromResult(_counter.State);
+            return Task.FromResult(_counter.State!); // Persistent state is initialized before grain calls are dispatched.
         }
 
         public async Task WriteCounterState(CounterState state)
@@ -38,8 +38,8 @@ namespace TestGrains
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
-            _counter.State.Counter = random.Next(100);
-            _counter.State.CurrentDateTime = DateTime.UtcNow;
+            _counter.State!.Counter = random.Next(100); // Persistent state is initialized before activation callbacks.
+            _counter.State!.CurrentDateTime = DateTime.UtcNow; // Persistent state is initialized before activation callbacks.
             await _counter.WriteStateAsync();
         }
     }

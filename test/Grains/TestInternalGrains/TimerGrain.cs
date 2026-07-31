@@ -52,12 +52,12 @@ namespace UnitTestGrains
         {
             public IDisposable Subscribe(IObserver<CallbackEvent> observer) => Listener.Subscribe(new Observer(observer));
 
-            private sealed class Observer(IObserver<CallbackEvent> observer) : IObserver<KeyValuePair<string, object>>
+            private sealed class Observer(IObserver<CallbackEvent> observer) : IObserver<KeyValuePair<string, object?>>
             {
                 public void OnCompleted() => observer.OnCompleted();
                 public void OnError(Exception error) => observer.OnError(error);
 
-                public void OnNext(KeyValuePair<string, object> value)
+                public void OnNext(KeyValuePair<string, object?> value)
                 {
                     if (value.Value is CallbackEvent evt)
                     {
@@ -72,11 +72,11 @@ namespace UnitTestGrains
     {
         private bool deactivating;
         private int counter = 0;
-        private Dictionary<string, IDisposable> allTimers;
-        private IDisposable defaultTimer;
+        private Dictionary<string, IDisposable> allTimers = null!;
+        private IDisposable defaultTimer = null!;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(50);
         private readonly string DefaultTimerName = "DEFAULT TIMER";
-        private IGrainContext context;
+        private IGrainContext context = null!;
 
         private readonly ILogger logger;
 
@@ -88,7 +88,7 @@ namespace UnitTestGrains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ThrowIfDeactivating();
-            context = RuntimeContext.Current;
+            context = RuntimeContext.Current!;
             defaultTimer = this.RegisterGrainTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
             return Task.CompletedTask;
@@ -192,11 +192,11 @@ namespace UnitTestGrains
     public class TimerCallGrain : Grain, ITimerCallGrain
     {
         private int tickCount;
-        private Exception tickException;
-        private IGrainTimer timer;
-        private string timerName;
-        private IGrainContext context;
-        private TaskScheduler activationTaskScheduler;
+        private Exception tickException = null!;
+        private IGrainTimer? timer;
+        private string? timerName;
+        private IGrainContext context = null!;
+        private TaskScheduler activationTaskScheduler = null!;
 
         private readonly ILogger logger;
         private readonly TimeProvider timeProvider;
@@ -212,7 +212,7 @@ namespace UnitTestGrains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            context = RuntimeContext.Current;
+            context = RuntimeContext.Current!;
             activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
         }
@@ -242,7 +242,7 @@ namespace UnitTestGrains
         {
             logger.LogInformation("RestartTimer Name={Name} Delay={Delay}", name, delay);
             this.timerName = name;
-            timer.Change(delay, Timeout.InfiniteTimeSpan);
+            timer!.Change(delay, Timeout.InfiniteTimeSpan);
 
             return Task.CompletedTask;
         }
@@ -251,7 +251,7 @@ namespace UnitTestGrains
         {
             logger.LogInformation("RestartTimer Name={Name} Delay={Delay} Period={Period}", name, delay, period);
             this.timerName = name;
-            timer.Change(delay, period);
+            timer!.Change(delay, period);
 
             return Task.CompletedTask;
         }
@@ -293,7 +293,7 @@ namespace UnitTestGrains
                 throw new ArgumentException($"Wrong timer name: Expected={this.timerName} Actual={name}");
             }
 
-            timer.Dispose();
+            timer!.Dispose();
             timer = null;
             timerName = null;
             return Task.CompletedTask;
@@ -355,7 +355,7 @@ namespace UnitTestGrains
                 if (operation == "update_period")
                 {
                     var newPeriod = TimeSpan.FromSeconds(100);
-                    timer.Change(newPeriod, newPeriod);
+                    timer!.Change(newPeriod, newPeriod);
                 }
                 else if (operation == "dispose_timer")
                 {
@@ -451,9 +451,9 @@ namespace UnitTestGrains
     {
         private readonly Dictionary<string, IGrainTimer> _timers = [];
         private int _tickCount;
-        private Exception _tickException;
-        private IGrainContext _context;
-        private TaskScheduler _activationTaskScheduler;
+        private Exception _tickException = null!;
+        private IGrainContext _context = null!;
+        private TaskScheduler _activationTaskScheduler = null!;
         private Guid _tickId;
 
         private readonly ILogger _logger;
@@ -475,7 +475,7 @@ namespace UnitTestGrains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            _context = RuntimeContext.Current;
+            _context = RuntimeContext.Current!;
             _activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
         }
@@ -613,8 +613,8 @@ namespace UnitTestGrains
 
     public class TimerRequestGrain : Grain, ITimerRequestGrain
     {
-        private TaskCompletionSource<int> completionSource;
-        private List<TaskCompletionSource<(object, CancellationToken)>> _allTimerCallsTasks;
+        private TaskCompletionSource<int> completionSource = null!;
+        private List<TaskCompletionSource<(object, CancellationToken)>> _allTimerCallsTasks = null!;
 
         public Task<string> GetRuntimeInstanceId()
         {
@@ -759,11 +759,11 @@ namespace UnitTestGrains
     {
         private bool deactivating;
         private int counter = 0;
-        private Dictionary<string, IDisposable> allTimers;
-        private IDisposable defaultTimer;
+        private Dictionary<string, IDisposable> allTimers = null!;
+        private IDisposable defaultTimer = null!;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(50);
         private readonly string DefaultTimerName = "DEFAULT TIMER";
-        private IGrainContext context;
+        private IGrainContext context = null!;
 
         private readonly ILogger logger;
 
@@ -778,7 +778,7 @@ namespace UnitTestGrains
         public Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ThrowIfDeactivating();
-            context = RuntimeContext.Current;
+            context = RuntimeContext.Current!;
             defaultTimer = this.RegisterGrainTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
             return Task.CompletedTask;
@@ -883,11 +883,11 @@ namespace UnitTestGrains
     public class PocoTimerCallGrain : IGrainBase, IPocoTimerCallGrain
     {
         private int tickCount;
-        private Exception tickException;
-        private IGrainTimer timer;
-        private string timerName;
-        private IGrainContext context;
-        private TaskScheduler activationTaskScheduler;
+        private Exception tickException = null!;
+        private IGrainTimer? timer;
+        private string? timerName;
+        private IGrainContext context = null!;
+        private TaskScheduler activationTaskScheduler = null!;
 
         private readonly ILogger logger;
         private readonly IGrainFactory _grainFactory;
@@ -908,7 +908,7 @@ namespace UnitTestGrains
 
         public Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            context = RuntimeContext.Current;
+            context = RuntimeContext.Current!;
             activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
         }
@@ -938,7 +938,7 @@ namespace UnitTestGrains
         {
             logger.LogInformation("RestartTimer Name={Name} Delay={Delay}", name, delay);
             this.timerName = name;
-            timer.Change(delay, Timeout.InfiniteTimeSpan);
+            timer!.Change(delay, Timeout.InfiniteTimeSpan);
 
             return Task.CompletedTask;
         }
@@ -947,7 +947,7 @@ namespace UnitTestGrains
         {
             logger.LogInformation("RestartTimer Name={Name} Delay={Delay} Period={Period}", name, delay, period);
             this.timerName = name;
-            timer.Change(delay, period);
+            timer!.Change(delay, period);
 
             return Task.CompletedTask;
         }
@@ -989,7 +989,7 @@ namespace UnitTestGrains
                 throw new ArgumentException($"Wrong timer name: Expected={this.timerName} Actual={name}");
             }
 
-            timer.Dispose();
+            timer!.Dispose();
             timer = null;
             timerName = null;
             return Task.CompletedTask;
@@ -1051,7 +1051,7 @@ namespace UnitTestGrains
                 if (operation == "update_period")
                 {
                     var newPeriod = TimeSpan.FromSeconds(100);
-                    timer.Change(newPeriod, newPeriod);
+                    timer!.Change(newPeriod, newPeriod);
                 }
                 else if (operation == "dispose_timer")
                 {
@@ -1145,8 +1145,8 @@ namespace UnitTestGrains
 
     public class PocoTimerRequestGrain : IGrainBase, IPocoTimerRequestGrain
     {
-        private TaskCompletionSource<int> completionSource;
-        private List<TaskCompletionSource<(object, CancellationToken)>> _allTimerCallsTasks;
+        private TaskCompletionSource<int> completionSource = null!;
+        private List<TaskCompletionSource<(object, CancellationToken)>> _allTimerCallsTasks = null!;
 
         public IGrainContext GrainContext { get; }
 
@@ -1298,9 +1298,9 @@ namespace UnitTestGrains
     {
         private readonly Dictionary<string, IGrainTimer> _timers = [];
         private int _tickCount;
-        private Exception _tickException;
-        private IGrainContext _context;
-        private TaskScheduler _activationTaskScheduler;
+        private Exception _tickException = null!;
+        private IGrainContext _context = null!;
+        private TaskScheduler _activationTaskScheduler = null!;
         private Guid _tickId;
 
         private readonly ILogger _logger;
@@ -1327,7 +1327,7 @@ namespace UnitTestGrains
 
         public Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            _context = RuntimeContext.Current;
+            _context = RuntimeContext.Current!;
             _activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
         }

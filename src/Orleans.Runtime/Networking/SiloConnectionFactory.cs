@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionFactory : ConnectionFactory
@@ -24,9 +23,9 @@ namespace Orleans.Runtime.Messaging
         private readonly object initializationLock = new();
 #endif
         private bool isInitialized;
-        private ConnectionManager connectionManager;
-        private MessageCenter messageCenter;
-        private ISiloStatusOracle siloStatusOracle;
+        private ConnectionManager connectionManager = null!;
+        private MessageCenter messageCenter = null!;
+        private ISiloStatusOracle siloStatusOracle = null!;
 
         public SiloConnectionFactory(
             IServiceProvider serviceProvider,

@@ -7,7 +7,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers
 {
-    #nullable disable
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzer : DiagnosticAnalyzer
     {
@@ -44,7 +43,7 @@ namespace Orleans.Analyzers
             });
 
 
-            static void AddIfNotNull(ImmutableHashSet<ITypeSymbol>.Builder builder, INamedTypeSymbol symbol)
+            static void AddIfNotNull(ImmutableHashSet<ITypeSymbol>.Builder builder, INamedTypeSymbol? symbol)
             {
                 if (symbol is not null)
                 {

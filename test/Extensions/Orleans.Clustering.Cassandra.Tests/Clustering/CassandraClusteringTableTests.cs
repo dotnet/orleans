@@ -212,7 +212,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 new Tuple<SiloAddress, DateTime>(CreateSiloAddressForTest(), GetUtcNowWithSecondsResolution().AddSeconds(2))
             ];
 
-            var tableVersion = tableData.Version.Next();
+            var tableVersion = Assert.IsType<TableVersion>(tableData.Version.Next());
 
             _testOutputHelper.WriteLine("Calling InsertRow with Entry = {0} TableVersion = {1}", siloEntry, tableVersion);
             var ok = await membershipTable.InsertRow(siloEntry, tableVersion);
@@ -228,18 +228,18 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 "Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}",
                 siloEntry,
                 etagBefore,
-                tableVersion?.ToString() ?? "null");
+                tableVersion.ToString());
             ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
             Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
             tableData = await membershipTable.ReadAll();
 
-            tableVersion = tableData.Version.Next();
+            tableVersion = Assert.IsType<TableVersion>(tableData.Version.Next());
 
             _testOutputHelper.WriteLine(
                 "Calling UpdateRow with Entry = {0} correct eTag = {1} correct version={2}",
                 siloEntry,
                 etagBefore,
-                tableVersion?.ToString() ?? "null");
+                tableVersion.ToString());
 
             ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
 
@@ -249,13 +249,14 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 "Calling UpdateRow with Entry = {0} old eTag = {1} old version={2}",
                 siloEntry,
                 etagBefore,
-                tableVersion?.ToString() ?? "null");
+                tableVersion.ToString());
             ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
             Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
             tableData = await membershipTable.ReadAll();
 
             var tuple = tableData.TryGet(siloEntry.SiloAddress);
+            Assert.NotNull(tuple);
 
             Assert.Equal(tuple.Item1.ToFullString(), siloEntry.ToFullString());
 
@@ -265,7 +266,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 "Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}",
                 siloEntry,
                 etagAfter,
-                tableVersion?.ToString() ?? "null");
+                tableVersion.ToString());
 
             ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion);
 

@@ -396,7 +396,7 @@ namespace UnitTests.Manifest
             {
             }
 
-            public bool Equals(T x, T y) => ReferenceEquals(x, y);
+            public bool Equals(T? x, T? y) => ReferenceEquals(x, y);
 
             public int GetHashCode(T obj) => RuntimeHelpers.GetHashCode(obj);
         }
@@ -409,7 +409,7 @@ namespace UnitTests.Manifest
             {
             }
 
-            public bool Equals(SiloAddress x, SiloAddress y) => EqualityComparer<SiloAddress>.Default.Equals(x, y);
+            public bool Equals(SiloAddress? x, SiloAddress? y) => EqualityComparer<SiloAddress>.Default.Equals(x, y);
 
             public int GetHashCode(SiloAddress obj) => EqualityComparer<SiloAddress>.Default.GetHashCode(obj);
         }

@@ -27,6 +27,7 @@ public abstract class MessageDequeuingBenchmark(string invariant, string databas
     private const int OperationsPerInvoke = 1000;
 
     private readonly Consumer _consumer = new();
+    // BenchmarkDotNet invokes GlobalSetup before any of these fields are read.
     private IRelationalStorage _storage = default!;
     private RelationalOrleansQueries _queries = default!;
     private byte[] _payload = [];

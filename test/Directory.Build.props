@@ -13,7 +13,6 @@
     <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
   </PropertyGroup>
 
   <PropertyGroup>

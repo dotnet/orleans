@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -152,7 +151,7 @@ namespace Orleans
         /// <summary>
         /// Gets or sets the value to pass to the custom initializer method.
         /// </summary>
-        public object MethodArgumentValue { get; }
+        public object? MethodArgumentValue { get; }
     }
 
     /// <summary>
@@ -185,7 +184,7 @@ namespace Orleans
         /// <summary>
         /// Gets or sets the name of the method on the proxy object which is used to invoke this method.
         /// </summary>
-        public string ProxyInvokeMethodName { get; init; }
+        public string? ProxyInvokeMethodName { get; init; }
     }
 
     /// <summary>
@@ -225,7 +224,7 @@ namespace Orleans
         /// <summary>
         /// Gets or sets the name of the method on the proxy object to invoke when this method is called.
         /// </summary>
-        public string ProxyInvokeMethodName { get; init; }
+        public string? ProxyInvokeMethodName { get; init; }
     }
 
     /// <summary>

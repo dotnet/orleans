@@ -5,7 +5,6 @@ using AwesomeAssertions;
 using AwesomeAssertions.Equivalency;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public abstract class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase
@@ -13,7 +12,7 @@ namespace Orleans.Transactions.TestKit
     {
         protected Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory;
         protected Func<int, TState> stateFactory;
-        protected Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>> assertConfig;
+        protected Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig;
 
         /// <summary>
         /// Constructor
@@ -28,7 +27,7 @@ namespace Orleans.Transactions.TestKit
         ///     are compared</param>
         protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory, 
             IGrainFactory grainFactory, Action<string> testOutput,
-            Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>> assertConfig = null)
+            Func<EquivalencyOptions<TState>, EquivalencyOptions<TState>>? assertConfig = null)
             :base(grainFactory, testOutput)
         {
             this.stateStorageFactory = stateStorageFactory;
@@ -61,6 +60,7 @@ namespace Orleans.Transactions.TestKit
 
             // store without any changes
             var etag1 = await stateStorage.Store(loadresponse.ETag, loadresponse.Metadata, emptyPendingStates, null, null);
+            etag1.Should().NotBeNullOrEmpty();
 
             // load again
             loadresponse = await stateStorage.Load();
@@ -77,6 +77,7 @@ namespace Orleans.Transactions.TestKit
             var cr = MakeCommitRecords(2, 2);
             var metadata = new TransactionalStateMetaData() { TimeStamp = now, CommitRecords = cr };
             var etag2 = await stateStorage.Store(etag1, metadata, emptyPendingStates, null, null);
+            etag2.Should().NotBeNullOrEmpty();
 
             // load again, check content
             loadresponse = await stateStorage.Load();
@@ -118,6 +119,7 @@ namespace Orleans.Transactions.TestKit
             var cr = MakeCommitRecords(2,2);
             var metadata = new TransactionalStateMetaData() { TimeStamp = now, CommitRecords = cr };
             var etag2 = await stateStorage.Store(null, metadata, emptyPendingStates, null, null);
+            etag2.Should().NotBeNullOrEmpty();
 
             // update timestamp in metadata, then write back with wrong e-tag, must fail
             try
@@ -166,7 +168,7 @@ namespace Orleans.Transactions.TestKit
         {
             return new ParticipantId(
                                     "tm",
-                                    null,
+                                    null!,
                                     // (GrainReference) grainFactory.GetGrain<ITransactionTestGrain>(Guid.NewGuid(), TransactionTestConstants.SingleStateTransactionalGrain),
                                     ParticipantId.Role.Resource | ParticipantId.Role.Manager);
         }

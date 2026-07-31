@@ -226,6 +226,11 @@ namespace UnitTests.Serialization
 
     public static class SerializerExtensions
     {
-        public static T RoundTripSerializationForTesting<T>(this Serializer serializer, T value) => serializer.Deserialize<T>(serializer.SerializeToArray(value));
+        public static T RoundTripSerializationForTesting<T>(this Serializer serializer, T value)
+        {
+            T? result = serializer.Deserialize<T>(serializer.SerializeToArray(value));
+            Assert.NotNull(result);
+            return result;
+        }
     }
 }

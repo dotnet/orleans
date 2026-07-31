@@ -38,7 +38,7 @@ namespace UnitTests.Grains
 
         public Task<IPEndPoint> GetEndpoint()
         {
-            return Task.FromResult(_grainContext.Address.SiloAddress.Endpoint);
+            return Task.FromResult(_grainContext.Address.SiloAddress!.Endpoint);
         }
 
         public Task<string> GetRuntimeInstanceId()
@@ -157,7 +157,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetLocation()
         {
-            return Task.FromResult(_grainContext.Address.SiloAddress);
+            return Task.FromResult(_grainContext.Address.SiloAddress!);
         }
     }
 
@@ -264,8 +264,8 @@ namespace UnitTests.Grains
     public class LocalContentGrain : Grain, ILocalContentGrain
     {
         private readonly ILogger logger;
-        private object cachedContent;
-        internal static ILocalContentGrain InstanceIdForThisSilo;
+        private object cachedContent = null!;
+        internal static ILocalContentGrain InstanceIdForThisSilo = null!;
 
         public LocalContentGrain(ILoggerFactory loggerFactory)
         {

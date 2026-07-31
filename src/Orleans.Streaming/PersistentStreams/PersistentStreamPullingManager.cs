@@ -14,7 +14,6 @@ using Orleans.Runtime.Scheduler;
 using System.Diagnostics.Metrics;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
-#nullable disable
 namespace Orleans.Streams
 {
     internal sealed partial class PersistentStreamPullingManager : SystemTarget, IPersistentStreamPullingManager, IStreamQueueBalanceListener
@@ -42,7 +41,7 @@ namespace Orleans.Streams
         private readonly TimeProvider _timeProvider;
         private readonly StreamInstruments _streamInstruments;
         private RunState managerState;
-        private IDisposable queuePrintTimer;
+        private IDisposable? queuePrintTimer;
         private int nextAgentId;
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
@@ -97,7 +96,7 @@ namespace Orleans.Streams
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = shared.LoggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
             LogInfoCreated(GetType().Name, streamProviderName);
-            _streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
+            _streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object?>("name", streamProviderName)));
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
@@ -129,7 +128,7 @@ namespace Orleans.Streams
                 queuePrintTimer.Dispose();
                 this.queuePrintTimer = null;
             }
-            this.queueBalancer = null;
+            this.queueBalancer = null!;
             await balancer.Shutdown();
         }
 
@@ -195,8 +194,9 @@ namespace Orleans.Streams
 
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
-            HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
-            IReadOnlyCollection<QueueId> previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
+            // GetMyQueues is non-null, so ToSet cannot return null.
+            HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet()!;
+            IReadOnlyCollection<QueueId>? previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
             LogInfoExecutingQueueChangeNotification(
                 notificationSeqNumber,
                 currentQueues.Count,
@@ -221,9 +221,9 @@ namespace Orleans.Streams
             }
         }
 
-        private QueueId[] CaptureAgentQueuesIfDiagnosticsEnabled() => StreamingEvents.IsBalancerChangedEnabled() ? queuesToAgentsMap.Keys.ToArray() : null;
+        private QueueId[]? CaptureAgentQueuesIfDiagnosticsEnabled() => StreamingEvents.IsBalancerChangedEnabled() ? queuesToAgentsMap.Keys.ToArray() : null;
 
-        private void EmitAgentQueueChange(IReadOnlyCollection<QueueId> previousQueues)
+        private void EmitAgentQueueChange(IReadOnlyCollection<QueueId>? previousQueues)
         {
             if (previousQueues is null || !StreamingEvents.IsBalancerChangedEnabled())
             {
@@ -404,7 +404,7 @@ namespace Orleans.Streams
             }
         }
 
-        public async Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg)
+        public async Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg)
         {
             latestCommandNumber++;
             int commandSeqNumber = latestCommandNumber;
@@ -471,7 +471,7 @@ namespace Orleans.Streams
         private static string PrintQueues(ICollection<QueueId> myQueues) => Utils.EnumerableToString(myQueues);
 
         // Just print our queue assignment periodicaly, for easy monitoring.
-        private Task AsyncTimerCallback(object state)
+        private Task AsyncTimerCallback(object? state)
         {
             LogInfoPeriodicPrint(NumberRunningAgents, streamProviderName, new(queuesToAgentsMap.Keys));
             return Task.CompletedTask;

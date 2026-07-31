@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.Utilities
 {
     internal static class AsyncEnumerable
@@ -14,7 +13,7 @@ namespace Orleans.Runtime.Utilities
         internal static readonly object DisposedValue = new();
     }
 
-    internal sealed class AsyncEnumerable<T> : IAsyncEnumerable<T>
+    internal sealed class AsyncEnumerable<T> : IAsyncEnumerable<T> where T : notnull
     {
 #if NET9_0_OR_GREATER
         private readonly Lock _updateLock = new();
@@ -215,7 +214,7 @@ namespace Orleans.Runtime.Utilities
                     if (IsInitial) ThrowInvalidInstance();
                     ObjectDisposedException.ThrowIf(IsDisposed, this);
                     if (_value is T typedValue) return typedValue;
-                    return default;
+                    return default!; // A null value is valid only when T itself admits null.
                 }
             }
 

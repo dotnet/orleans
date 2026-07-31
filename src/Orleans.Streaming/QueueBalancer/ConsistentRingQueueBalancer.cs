@@ -6,12 +6,11 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 
-#nullable disable
 namespace Orleans.Streams
 {
     internal class ConsistentRingQueueBalancer : QueueBalancerBase, IStreamQueueBalancer, IRingRangeListener
     {
-        private IConsistentRingStreamQueueMapper _streamQueueMapper;
+        private IConsistentRingStreamQueueMapper _streamQueueMapper = null!; // Initialized in Initialize.
         private IRingRange _myRange;
 
         public static IStreamQueueBalancer Create(IServiceProvider services, string name)

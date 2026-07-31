@@ -32,7 +32,7 @@ namespace UnitTests
         [Fact]
         public async Task TestGetGrainsTypes()
         {
-            var dashboardGrain = _cluster.GrainFactory.GetGrain<IDashboardGrain>(1);
+            var dashboardGrain = _cluster.GrainFactory!.GetGrain<IDashboardGrain>(1); // This fixture deploys the client.
             var types = await dashboardGrain.GetGrainTypes();
 
             Assert.Contains("TestGrains.TestStateInMemoryGrain", types.Value);
@@ -41,8 +41,8 @@ namespace UnitTests
         [Fact]
         public async Task TestWithGetStateMethod()
         {
-            var dashboardGrain = _cluster.GrainFactory.GetGrain<IDashboardGrain>(1);
-            var stateGrain = _cluster.GrainFactory.GetGrain<ITestStateInMemoryGrain>(123);
+            var dashboardGrain = _cluster.GrainFactory!.GetGrain<IDashboardGrain>(1); // This fixture deploys the client.
+            var stateGrain = _cluster.GrainFactory!.GetGrain<ITestStateInMemoryGrain>(123); // This fixture deploys the client.
 
             var immutableState = await dashboardGrain.GetGrainState("123", "TestGrains.TestStateInMemoryGrain");
 
@@ -56,8 +56,8 @@ namespace UnitTests
         [Fact]
         public async Task TestWithIStorageField()
         {
-            var dashboardGrain = _cluster.GrainFactory.GetGrain<IDashboardGrain>(1);
-            var stateGrain = _cluster.GrainFactory.GetGrain<ITestStateGrain>(123);
+            var dashboardGrain = _cluster.GrainFactory!.GetGrain<IDashboardGrain>(1); // This fixture deploys the client.
+            var stateGrain = _cluster.GrainFactory!.GetGrain<ITestStateGrain>(123); // This fixture deploys the client.
             await stateGrain.WriteCounterState(new CounterState
             {
                 Counter = 5,

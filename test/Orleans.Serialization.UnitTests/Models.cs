@@ -15,30 +15,30 @@ using Orleans;
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
 {
     [Id(2)]
-    public string FavouriteColor { get; init; }
+    public string? FavouriteColor { get; init; }
 
     [Id(3)]
-    public string StarSign { get; init; }
+    public string? StarSign { get; init; }
 }
 
 [GenerateSerializer]
 public record Person2(int Age, string Name)
 {
     [Id(0)]
-    public string FavouriteColor { get; init; }
+    public string? FavouriteColor { get; init; }
 
     [Id(1)]
-    public string StarSign { get; init; }
+    public string? StarSign { get; init; }
 }
 
 [GenerateSerializer(IncludePrimaryConstructorParameters = false)]
 public record Person3(int Age, string Name)
 {
     [Id(0)]
-    public string FavouriteColor { get; init; }
+    public string? FavouriteColor { get; init; }
 
     [Id(1)]
-    public string StarSign { get; init; }
+    public string? StarSign { get; init; }
 }
 
 [GenerateSerializer]
@@ -48,19 +48,19 @@ public record Person4(int Age, string Name);
 public record Person5([property: Id(0)] int Age, [property: Id(1)] string Name)
 {
     [Id(2)]
-    public string FavouriteColor { get; init; }
+    public string? FavouriteColor { get; init; }
 
     [Id(3)]
-    public string StarSign { get; init; }
+    public string? StarSign { get; init; }
 }
 
 [GenerateSerializer]
 public class Person5_Class
 {
     [Id(0)] public int Age { get; init; }
-    [Id(1)] public string Name { get; init; }
-    [Id(2)] public string FavouriteColor { get; init; }
-    [Id(3)] public string StarSign { get; init; }
+    [Id(1)] public string? Name { get; init; }
+    [Id(2)] public string? FavouriteColor { get; init; }
+    [Id(3)] public string? StarSign { get; init; }
 }
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
@@ -75,16 +75,16 @@ public sealed class MyNewtonsoftJsonSerializableAttribute : Attribute
 
 internal interface IMyBase
 {
-    MyValue BaseValue { get; set; }
+    MyValue? BaseValue { get; set; }
 }
 
 internal interface IMySub : IMyBase
 {
-    MyValue SubValue { get; set; }
+    MyValue? SubValue { get; set; }
 }
 
 [GenerateSerializer]
-public class MyValue : IEquatable<MyValue>
+public class MyValue : IEquatable<MyValue?>
 {
     [Id(0)]
     public int Value { get; set; }
@@ -94,12 +94,12 @@ public class MyValue : IEquatable<MyValue>
     public static implicit operator int(MyValue value) => value.Value;
     public static implicit operator MyValue(int value) => new(value);
 
-    public bool Equals(MyValue other)
+    public bool Equals(MyValue? other)
     {
         return other is not null && Value == other.Value;
     }
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         return Equals(obj as MyValue);
     }
@@ -112,14 +112,14 @@ public class MyValue : IEquatable<MyValue>
 public class MyImmutableBase : IMyBase
 {
     [Id(0)]
-    public MyValue BaseValue { get; set; }
+    public MyValue? BaseValue { get; set; }
 }
 
 [GenerateSerializer]
 public sealed class MyMutableSub : MyImmutableBase, IMySub
 {
     [Id(0)]
-    public MyValue SubValue { get; set; }
+    public MyValue? SubValue { get; set; }
 }
 
 [GenerateSerializer]
@@ -127,21 +127,21 @@ public sealed class MyMutableSub : MyImmutableBase, IMySub
 public sealed class MyImmutableSub : MyImmutableBase, IMySub
 {
     [Id(0)]
-    public MyValue SubValue { get; set; }
+    public MyValue? SubValue { get; set; }
 }
 
 [GenerateSerializer]
 public class MyMutableBase : IMyBase
 {
     [Id(0)]
-    public MyValue BaseValue { get; set; }
+    public MyValue? BaseValue { get; set; }
 }
 
 [GenerateSerializer]
 public sealed class MySealedSub : MyMutableBase, IMySub
 {
     [Id(0)]
-    public MyValue SubValue { get; set; }
+    public MyValue? SubValue { get; set; }
 }
 
 [GenerateSerializer]
@@ -149,7 +149,7 @@ public sealed class MySealedSub : MyMutableBase, IMySub
 public sealed class MySealedImmutableSub : MyMutableBase, IMySub
 {
     [Id(0)]
-    public MyValue SubValue { get; set; }
+    public MyValue? SubValue { get; set; }
 }
 
 [GenerateSerializer]
@@ -157,7 +157,7 @@ public sealed class MySealedImmutableSub : MyMutableBase, IMySub
 public class MyUnsealedImmutableSub : MyMutableBase, IMySub
 {
     [Id(0)]
-    public MyValue SubValue { get; set; }
+    public MyValue? SubValue { get; set; }
 }
 
 [GenerateSerializer]
@@ -244,7 +244,7 @@ namespace Orleans.Serialization.UnitTests
     {
         public MyForeignLibraryType() { }
 
-        public MyForeignLibraryType(int num, string str, DateTimeOffset dto)
+        public MyForeignLibraryType(int num, string? str, DateTimeOffset dto)
         {
             Num = num;
             String = str;
@@ -252,10 +252,10 @@ namespace Orleans.Serialization.UnitTests
         }
 
         public int Num { get; set; }
-        public string String { get; set; }
+        public string? String { get; set; }
         public DateTimeOffset DateTimeOffset { get; set; }
 
-        public override bool Equals(object obj) =>
+        public override bool Equals(object? obj) =>
             obj is MyForeignLibraryType type
             && Num == type.Num
             && string.Equals(String, type.String, StringComparison.Ordinal)
@@ -271,7 +271,7 @@ namespace Orleans.Serialization.UnitTests
         public int Num { get; set; }
 
         [Id(1)]
-        public string String { get; set; }
+        public string? String { get; set; }
 
         [Id(2)]
         public DateTimeOffset DateTimeOffset { get; set; }
@@ -300,12 +300,12 @@ namespace Orleans.Serialization.UnitTests
         public int IntValue { get; set; }
 
         [Id(1)]
-        public MyForeignLibraryType ForeignValue { get; set; }
+        public MyForeignLibraryType? ForeignValue { get; set; }
 
         [Id(2)]
         public int OtherIntValue { get; set; }
 
-        public override bool Equals(object obj) => obj is WrapsMyForeignLibraryType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
+        public override bool Equals(object? obj) => obj is WrapsMyForeignLibraryType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
         public override int GetHashCode() => HashCode.Combine(IntValue, ForeignValue, OtherIntValue);
     }
 
@@ -313,7 +313,7 @@ namespace Orleans.Serialization.UnitTests
     public class DerivedFromMyForeignLibraryType : MyForeignLibraryType
     {
         public DerivedFromMyForeignLibraryType() { }
-        public DerivedFromMyForeignLibraryType(int intValue, int num, string str, DateTimeOffset dto) : base(num, str, dto)
+        public DerivedFromMyForeignLibraryType(int intValue, int num, string? str, DateTimeOffset dto) : base(num, str, dto)
         {
             IntValue = intValue;
         }
@@ -321,7 +321,7 @@ namespace Orleans.Serialization.UnitTests
         [Id(0)]
         public int IntValue { get; set; }
 
-        public override bool Equals(object obj) => obj is DerivedFromMyForeignLibraryType type && base.Equals(obj) && Num == type.Num && String == type.String && DateTimeOffset.Equals(type.DateTimeOffset) && IntValue == type.IntValue;
+        public override bool Equals(object? obj) => obj is DerivedFromMyForeignLibraryType type && base.Equals(obj) && Num == type.Num && String == type.String && DateTimeOffset.Equals(type.DateTimeOffset) && IntValue == type.IntValue;
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), Num, String, DateTimeOffset, IntValue);
     }
 
@@ -338,7 +338,7 @@ namespace Orleans.Serialization.UnitTests
         public string String { get; }
         public DateTimeOffset DateTimeOffset { get; }
 
-        public override readonly bool Equals(object obj) =>
+        public override readonly bool Equals(object? obj) =>
             obj is MyForeignLibraryValueType type
             && Num == type.Num
             && string.Equals(String, type.String, StringComparison.Ordinal)
@@ -382,31 +382,31 @@ namespace Orleans.Serialization.UnitTests
         [Id(2)]
         public int OtherIntValue { get; set; }
 
-        public override readonly bool Equals(object obj) => obj is WrapsMyForeignLibraryValueType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryValueType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
+        public override readonly bool Equals(object? obj) => obj is WrapsMyForeignLibraryValueType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryValueType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
         public override readonly int GetHashCode() => HashCode.Combine(IntValue, ForeignValue, OtherIntValue);
     }
 
     [GenerateSerializer]
-    public class MyNonJsonBaseClass : IEquatable<MyNonJsonBaseClass>
+    public class MyNonJsonBaseClass : IEquatable<MyNonJsonBaseClass?>
     {
         [Id(0)]
         [JsonProperty]
         public int IntProperty { get; set; }
 
         public override string ToString() => $"{nameof(IntProperty)}: {IntProperty}";
-        public bool Equals(MyNonJsonBaseClass other) => other is not null && (ReferenceEquals(this, other) || other.IntProperty == IntProperty);
-        public override bool Equals(object obj) => Equals(obj as MyNonJsonBaseClass);
+        public bool Equals(MyNonJsonBaseClass? other) => other is not null && (ReferenceEquals(this, other) || other.IntProperty == IntProperty);
+        public override bool Equals(object? obj) => Equals(obj as MyNonJsonBaseClass);
         public override int GetHashCode() => HashCode.Combine(IntProperty);
     }
 
     [MyNewtonsoftJsonSerializable]
-    public class MyNewtonsoftJsonClass : MyNonJsonBaseClass, IEquatable<MyNewtonsoftJsonClass>
+    public class MyNewtonsoftJsonClass : MyNonJsonBaseClass, IEquatable<MyNewtonsoftJsonClass?>
     {
         [JsonProperty]
-        public string SubTypeProperty { get; set; }
+        public string? SubTypeProperty { get; set; }
 
         [JsonProperty]
-        public TestId Id { get; set; }
+        public TestId? Id { get; set; }
 
         [JsonProperty]
         public JArray JsonArray { get; set; } = new JArray(true, 42, "hello");
@@ -415,21 +415,21 @@ namespace Orleans.Serialization.UnitTests
         public JObject JsonObject { get; set; } = new() { ["foo"] = "bar" };
 
         public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
-        public bool Equals(MyNewtonsoftJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
+        public bool Equals(MyNewtonsoftJsonClass? other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
             && string.Equals(JsonConvert.SerializeObject(JsonArray), JsonConvert.SerializeObject(other.JsonArray))
             && string.Equals(JsonConvert.SerializeObject(JsonObject), JsonConvert.SerializeObject(other.JsonObject));
-        public override bool Equals(object obj) => Equals(obj as MyJsonClass);
+        public override bool Equals(object? obj) => Equals(obj as MyJsonClass);
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
     }
 
     [MyJsonSerializable]
-    public class MyJsonClass : MyNonJsonBaseClass, IEquatable<MyJsonClass>
+    public class MyJsonClass : MyNonJsonBaseClass, IEquatable<MyJsonClass?>
     {
         [JsonProperty]
-        public string SubTypeProperty { get; set; }
+        public string? SubTypeProperty { get; set; }
 
         [JsonProperty]
-        public TestId Id { get; set; }
+        public TestId? Id { get; set; }
 
         [JsonProperty]
         public JsonArray JsonArray { get; set; } = new JsonArray(true, 42, "hello");
@@ -438,10 +438,10 @@ namespace Orleans.Serialization.UnitTests
         public JsonObject JsonObject { get; set; } = new() { ["foo"] = "bar" };
 
         public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
-        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
+        public bool Equals(MyJsonClass? other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
             && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonArray), System.Text.Json.JsonSerializer.Serialize(other.JsonArray))
             && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonObject), System.Text.Json.JsonSerializer.Serialize(other.JsonObject));
-        public override bool Equals(object obj) => Equals(obj as MyJsonClass);
+        public override bool Equals(object? obj) => Equals(obj as MyJsonClass);
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
     }
 
@@ -458,7 +458,7 @@ namespace Orleans.Serialization.UnitTests
         where TStronglyTypedId : StronglyTypedId<TValue>
         where TValue : notnull
     {
-        public override TStronglyTypedId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override TStronglyTypedId? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType is JsonTokenType.Null)
             {
@@ -467,10 +467,11 @@ namespace Orleans.Serialization.UnitTests
 
             var value = System.Text.Json.JsonSerializer.Deserialize<TValue>(ref reader, options);
             var factory = StronglyTypedIdHelper.GetFactory<TValue>(typeToConvert);
-            return (TStronglyTypedId)factory(value);
+            // A non-null token and the notnull TValue contract guarantee a value for this converter.
+            return (TStronglyTypedId)factory(value!);
         }
 
-        public override void Write(Utf8JsonWriter writer, TStronglyTypedId value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, TStronglyTypedId? value, JsonSerializerOptions options)
         {
             if (value is null)
             {
@@ -517,7 +518,7 @@ namespace Orleans.Serialization.UnitTests
 
         public static bool IsStronglyTypedId(Type type) => IsStronglyTypedId(type, out _);
 
-        public static bool IsStronglyTypedId(Type type, out Type idType)
+        public static bool IsStronglyTypedId(Type type, [NotNullWhen(true)] out Type? idType)
         {
             if (type is null)
             {
@@ -553,7 +554,7 @@ namespace Orleans.Serialization.UnitTests
         public int IntProperty { get; set; }
 
         [Id(1)]
-        public RecursiveClass RecursiveProperty { get; set; }
+        public RecursiveClass? RecursiveProperty { get; set; }
     }
 
     [GenerateSerializer]
@@ -566,7 +567,7 @@ namespace Orleans.Serialization.UnitTests
         [Id(1)] public int IntField;
 
         [Id(2)]
-        public object OtherObject { get; set; }
+        public object? OtherObject { get; set; }
 
         [NonSerialized]
         public int UnmarkedField;
@@ -578,7 +579,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties)]
-    public class PocoWithAutogeneratedIds : IEquatable<PocoWithAutogeneratedIds>
+    public class PocoWithAutogeneratedIds : IEquatable<PocoWithAutogeneratedIds?>
     {
         public int A { get; set; }
         public int B { get; set; }
@@ -592,8 +593,8 @@ namespace Orleans.Serialization.UnitTests
         public int J { get; set; }
         public int K { get; set; }
 
-        public override bool Equals(object obj) => Equals(obj as PocoWithAutogeneratedIds);
-        public bool Equals(PocoWithAutogeneratedIds other) => other is not null
+        public override bool Equals(object? obj) => Equals(obj as PocoWithAutogeneratedIds);
+        public bool Equals(PocoWithAutogeneratedIds? other) => other is not null
             && A == other.A
             && B == other.B
             && C == other.C
@@ -653,7 +654,7 @@ namespace Orleans.Serialization.UnitTests
 #endif
 
     [GenerateSerializer]
-    public sealed class DerivedFromDictionary<TKey, TValue> : Dictionary<TKey, TValue>
+    public sealed class DerivedFromDictionary<TKey, TValue> : Dictionary<TKey, TValue> where TKey : notnull
     {
         public DerivedFromDictionary(IEqualityComparer<TKey> comparer) : base(comparer)
         {
@@ -668,10 +669,10 @@ namespace Orleans.Serialization.UnitTests
     public class GenericPoco<T>
     {
         [Id(0)]
-        public T Field { get; set; }
+        public T? Field { get; set; }
 
         [Id(1030)]
-        public T[] ArrayField { get; set; }
+        public T[]? ArrayField { get; set; }
     }
 
     [GenerateSerializer]
@@ -680,7 +681,7 @@ namespace Orleans.Serialization.UnitTests
         : GenericPoco<TStruct> where TClass : List<int>, new() where TStruct : struct
     {
         [Id(0)]
-        public new TClass Field { get; set; }
+        public new TClass? Field { get; set; }
 
         [Id(999)]
         public TStruct ValueField { get; set; }
@@ -705,22 +706,22 @@ namespace Orleans.Serialization.UnitTests
     public class ArrayPoco<T>
     {
         [Id(0)]
-        public T[] Array { get; set; }
+        public T[]? Array { get; set; }
 
         [Id(1)]
-        public T[,] Dim2 { get; set; }
+        public T[,]? Dim2 { get; set; }
 
         [Id(2)]
-        public T[,,] Dim3 { get; set; }
+        public T[,,]? Dim3 { get; set; }
 
         [Id(3)]
-        public T[,,,] Dim4 { get; set; }
+        public T[,,,]? Dim4 { get; set; }
 
         [Id(4)]
-        public T[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,] Dim32 { get; set; }
+        public T[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,]? Dim32 { get; set; }
 
         [Id(5)]
-        public T[][] Jagged { get; set; }
+        public T[][]? Jagged { get; set; }
     }
 
     [GenerateSerializer]
@@ -771,39 +772,39 @@ namespace Orleans.Serialization.UnitTests
     public class SystemCollectionsClass
     {
         [Id(0)]
-        public HashSet<string> hashSetField;
+        public HashSet<string>? hashSetField;
 
         [Id(1)]
-        public HashSet<string> HashSetProperty { get; set; }
+        public HashSet<string>? HashSetProperty { get; set; }
 
         [Id(2)]
-        public ConcurrentQueue<int> concurrentQueueField;
+        public ConcurrentQueue<int>? concurrentQueueField;
 
         [Id(3)]
-        public ConcurrentQueue<int> ConcurrentQueueProperty { get; set; }
+        public ConcurrentQueue<int>? ConcurrentQueueProperty { get; set; }
 
         [Id(4)]
-        public ConcurrentDictionary<string, int> concurrentDictField;
+        public ConcurrentDictionary<string, int>? concurrentDictField;
 
         [Id(5)]
-        public ConcurrentDictionary<string, int> ConcurrentDictProperty { get; set; }
+        public ConcurrentDictionary<string, int>? ConcurrentDictProperty { get; set; }
     }
 
     [GenerateSerializer]
     public class ClassWithLargeCollectionAndUri
     {
         [Id(0)]
-        public List<string> LargeCollection;
+        public List<string>? LargeCollection;
 
         [Id(1)]
-        public Uri Uri;
+        public Uri? Uri;
     }
 
     [GenerateSerializer]
     public class ClassWithManualSerializableProperty
     {
         [NonSerialized]
-        private string _stringPropertyValue;
+        private string? _stringPropertyValue;
 
         [Id(0)]
         public Guid GuidProperty { get; set; }
@@ -842,19 +843,19 @@ namespace Orleans.Serialization.UnitTests
     [GenerateSerializer]
     public sealed class ClassWithTypeFields
     {
-        [Id(1)] public Type Type1;
-        [Id(2)] public object UntypedValue;
-        [Id(3)] public Type Type2;
+        [Id(1)] public Type? Type1;
+        [Id(2)] public object? UntypedValue;
+        [Id(3)] public Type? Type2;
     }
 
     public class MyFirstForeignLibraryType
     {
 
         public int Num { get; set; }
-        public string String { get; set; }
+        public string? String { get; set; }
         public DateTimeOffset DateTimeOffset { get; set; }
 
-        public override bool Equals(object obj) =>
+        public override bool Equals(object? obj) =>
             obj is MyFirstForeignLibraryType type
             && Num == type.Num
             && string.Equals(String, type.String, StringComparison.Ordinal)
@@ -865,11 +866,11 @@ namespace Orleans.Serialization.UnitTests
 
     public class MySecondForeignLibraryType
     {
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public float Value { get; set; }
         public DateTimeOffset Timestamp { get; set; }
 
-        public override bool Equals(object obj) =>
+        public override bool Equals(object? obj) =>
             obj is MySecondForeignLibraryType type
             && string.Equals(Name, type.Name, StringComparison.Ordinal)
             && Value == type.Value
@@ -885,7 +886,7 @@ namespace Orleans.Serialization.UnitTests
         public int Num { get; set; }
 
         [Id(1)]
-        public string String { get; set; }
+        public string? String { get; set; }
 
         [Id(2)]
         public DateTimeOffset DateTimeOffset { get; set; }
@@ -896,7 +897,7 @@ namespace Orleans.Serialization.UnitTests
     public struct MySecondForeignLibraryTypeSurrogate
     {
         [Id(0)]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [Id(1)]
         public float Value { get; set; }
@@ -928,13 +929,13 @@ namespace Orleans.Serialization.UnitTests
         public int IntProperty { get; init; }
 
         [Key(1)]
-        public string StringProperty { get; init; }
+        public string? StringProperty { get; init; }
 
         [Key(2)]
-        public MyMessagePackSubClass SubClass { get; init; }
+        public MyMessagePackSubClass? SubClass { get; init; }
 
         [Key(3)]
-        public IMyMessagePackUnion Union { get; init; }
+        public IMyMessagePackUnion? Union { get; init; }
     }
 
     [MessagePackObject]
@@ -961,7 +962,7 @@ namespace Orleans.Serialization.UnitTests
     public sealed record MyMessagePackUnionVariant2 : IMyMessagePackUnion
     {
         [Key(0)]
-        public string StringProperty { get; init; }
+        public string? StringProperty { get; init; }
     }
 
 }

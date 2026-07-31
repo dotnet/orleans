@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -61,8 +60,8 @@ namespace Orleans.Runtime
         /// <see cref="object.GetHashCode"/>
         public override int GetHashCode() { return this.value.GetHashCode(); }
         /// <see cref="object.Equals(object)"/>
-        public override bool Equals(object obj) { var ss = obj as SystemStatus; return ss != null && this.Equals(ss); }
+        public override bool Equals(object? obj) { var ss = obj as SystemStatus; return ss != null && this.Equals(ss); }
         /// <see cref="IEquatable{T}.Equals(T)"/>
-        public bool Equals(SystemStatus other) { return (other != null) && this.value.Equals(other.value); }
+        public bool Equals(SystemStatus? other) { return (other != null) && this.value.Equals(other.value); }
     }
 }

@@ -341,7 +341,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             int expectedActivateCalls,
             int expectedDeactivateCalls,
             string forActivation,
-            string when = null)
+            string? when = null)
         {
             await CheckNumActivateDeactivateCalls(
                 expectedActivateCalls,
@@ -355,7 +355,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             int expectedActivateCalls, 
             int expectedDeactivateCalls,
             string[] forActivations,
-            string when = null)
+            string? when = null)
         {
             string[] activateCalls = await watcher.GetActivateCalls();
             Assert.Equal(expectedActivateCalls, activateCalls.Length);

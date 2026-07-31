@@ -52,6 +52,7 @@ namespace Orleans.Serialization.Invocation
         public abstract Exception? Exception { get; set; }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract T GetResult<T>();
 
         /// <inheritdoc />
@@ -79,7 +80,8 @@ namespace Orleans.Serialization.Invocation
         public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
 
         /// <inheritdoc/>
-        public override T GetResult<T>() => default!;
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public override T GetResult<T>() => default;
 
         /// <inheritdoc/>
         public override void Dispose() { }
@@ -121,6 +123,7 @@ namespace Orleans.Serialization.Invocation
         public override Exception? Exception { get; set; }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public override T GetResult<T>()
         {
             ExceptionDispatchInfo.Capture(Exception!).Throw();
@@ -196,7 +199,7 @@ namespace Orleans.Serialization.Invocation
         public PooledResponseCodec(ICodecProvider codecProvider)
             => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<TResult>>(this, codecProvider);
 
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Response<TResult> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Response<TResult> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -211,6 +214,7 @@ namespace Orleans.Serialization.Invocation
             writer.WriteEndObject();
         }
 
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Response<TResult> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
@@ -231,7 +235,7 @@ namespace Orleans.Serialization.Invocation
 
         public override void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, object value)
         {
-            writer.WriteStartObject(0, null, _resultType);
+            writer.WriteStartObject(0, null!, _resultType);
             var holder = (Response<TResult>)value;
             if (holder.TypedResult is not null)
                 _codec.WriteField(ref writer, 0, _resultType, holder.TypedResult);
@@ -261,10 +265,11 @@ namespace Orleans.Serialization.Invocation
         public PooledResponseCopier(ICodecProvider codecProvider)
             => _copier = OrleansGeneratedCodeHelper.GetService<IDeepCopier<TResult>>(this, codecProvider);
 
-        public Response<TResult> DeepCopy(Response<TResult>? input, CopyContext context)
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Response<TResult>? DeepCopy(Response<TResult> input, CopyContext context)
         {
             if (input is null)
-                return null!;
+                return null;
 
             var result = ResponsePool.Get<TResult>();
             result.TypedResult = _copier.DeepCopy(input.TypedResult!, context);

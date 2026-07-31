@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -375,7 +376,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public bool CheckHealth(DateTime lastCheckTime, out string reason) => _pingTimer.CheckHealth(lastCheckTime, out reason);
+        public bool CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason) => _pingTimer.CheckHealth(lastCheckTime, out reason);
 
         /// <summary>
         /// Represents the result of probing a silo.
@@ -457,7 +458,7 @@ namespace Orleans.Runtime.MembershipService
             Level = LogLevel.Warning,
             Message = "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} failed after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}. Failure message: {FailureMessage}. Intermediary health score: {IntermediaryHealthScore}."
         )]
-        private static partial void LogWarningIndirectProbeFailed(ILogger logger, int id, SiloAddress siloAddress, SiloAddress intermediarySiloAddress, TimeSpan roundTripTime, TimeSpan probeResponseTime, string failureMessage, int intermediaryHealthScore);
+        private static partial void LogWarningIndirectProbeFailed(ILogger logger, int id, SiloAddress siloAddress, SiloAddress intermediarySiloAddress, TimeSpan roundTripTime, TimeSpan probeResponseTime, string? failureMessage, int intermediaryHealthScore);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

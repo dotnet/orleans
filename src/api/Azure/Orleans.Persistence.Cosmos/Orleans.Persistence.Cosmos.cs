@@ -58,11 +58,11 @@ namespace Orleans.Persistence.Cosmos
         [System.Obsolete]
         protected CosmosConditionNotSatisfiedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
 
-        public CosmosConditionNotSatisfiedException(string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string currentEtag) { }
+        public CosmosConditionNotSatisfiedException(string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string? currentEtag) { }
 
         public CosmosConditionNotSatisfiedException(string msg, System.Exception exc) { }
 
-        public CosmosConditionNotSatisfiedException(string errorMsg, string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string currentEtag) { }
+        public CosmosConditionNotSatisfiedException(string errorMsg, string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string? currentEtag) { }
 
         public CosmosConditionNotSatisfiedException(string msg) { }
 

@@ -20,7 +20,7 @@ namespace Consul.Tests
         public void ThrowsArgumentNullExceptionIfCallbackIsNull()
         {            
             var  options = new ConsulClusteringOptions();
-            Func<IConsulClient> callback = null;
+            Func<IConsulClient> callback = null!;
 
             // ensure we check the callback.
             void shouldThrow() => options.ConfigureConsulClient(callback);
@@ -134,5 +134,4 @@ namespace Consul.Tests
         }       
     }
 }
-
 

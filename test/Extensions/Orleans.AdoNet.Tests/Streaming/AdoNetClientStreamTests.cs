@@ -49,14 +49,14 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
         _output = output;
     }
 
-    private static string _invariant;
+    private static string _invariant = null!;
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
     private const string StreamNamespace = "AdoNetSubscriptionMultiplicityTestsNamespace";
 
     private readonly ITestOutputHelper _output;
-    private static RelationalStorageForTesting _testing;
-    private ClientStreamTestRunner _runner;
+    private static RelationalStorageForTesting _testing = null!;
+    private ClientStreamTestRunner _runner = null!;
 
     public override async Task InitializeAsync()
     {

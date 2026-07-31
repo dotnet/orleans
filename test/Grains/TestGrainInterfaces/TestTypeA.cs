@@ -5,6 +5,6 @@
     public class TestTypeA
     {
         [Orleans.Id(0)]
-        public ICollection<TestTypeA> Collection { get; set; }
+        public ICollection<TestTypeA>? Collection { get; set; }
     }
 }

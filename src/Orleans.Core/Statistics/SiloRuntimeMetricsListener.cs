@@ -5,7 +5,6 @@ using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
 
-#nullable disable
 namespace Orleans.Runtime;
 
 // Can not use MetricsEventSource because it only supports single listener.
@@ -44,7 +43,7 @@ public static class SiloRuntimeMetricsListener
         MeterListener.Start();
     }
 
-    private static void OnMeasurementRecorded(Instrument instrument, int measurement, ReadOnlySpan<KeyValuePair<string, object>> tags, object state)
+    private static void OnMeasurementRecorded(Instrument instrument, int measurement, ReadOnlySpan<KeyValuePair<string, object?>> tags, object? state)
     {
         if (instrument.Name == InstrumentNames.GATEWAY_CONNECTED_CLIENTS)
         {

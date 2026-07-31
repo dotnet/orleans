@@ -29,7 +29,7 @@ namespace Tester.Redis.Persistence
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = true;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
-                    new Dictionary<string, string>
+                    new Dictionary<string, string?>
                     {
                         {ConnectionStringKey, TestDefaultConfiguration.RedisConnectionString}
                     }));
@@ -48,7 +48,7 @@ namespace Tester.Redis.Persistence
                         siloBuilder
                             .AddRedisGrainStorage("GrainStorageForTest", options =>
                             {
-                                options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
+                                options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString!);
                                 options.EntryExpiry = TimeSpan.FromHours(1);
                             })
                             .AddMemoryGrainStorage("MemoryStore");
@@ -59,7 +59,7 @@ namespace Tester.Redis.Persistence
             protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
         }
 
-        private readonly Fixture fixture;
+        private readonly Fixture fixture = null!;
 
         public RedisPersistenceGrainTests(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
@@ -71,7 +71,7 @@ namespace Tester.Redis.Persistence
 
             this.fixture.EnsurePreconditionsMet();
 
-            var redisOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+            var redisOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString!);
             var redis = ConnectionMultiplexer.ConnectAsync(redisOptions).Result;
             this.database = redis.GetDatabase();
 
@@ -125,7 +125,7 @@ namespace Tester.Redis.Persistence
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(1111);
 
-            var info = (string)await database.ExecuteAsync("INFO");
+            var info = (string)(await database.ExecuteAsync("INFO"))!;
             var versionString = Regex.Match(info, @"redis_version:[\s]*([^\s]+)").Groups[1].Value;
             var version = Version.Parse(versionString);
             if (version >= Version.Parse("6.2.0"))

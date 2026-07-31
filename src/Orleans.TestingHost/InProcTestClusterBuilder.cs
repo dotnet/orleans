@@ -6,7 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>Configuration builder for starting a <see cref="InProcessTestCluster"/>.</summary>
@@ -141,7 +140,7 @@ public sealed class InProcessTestClusterBuilder
         {
             hostBuilder.ConfigureServices((context, services) =>
             {
-                var initialSilos = int.Parse(context.Configuration[nameof(InProcessTestClusterOptions.InitialSilosCount)]);
+                var initialSilos = int.Parse(context.Configuration[nameof(InProcessTestClusterOptions.InitialSilosCount)]!);
                 var siloNames = Enumerable.Range(0, initialSilos).Select(GetSiloName).ToList();
                 services.Configure<StaticClusterDeploymentOptions>(options => options.SiloNames = siloNames);
             });

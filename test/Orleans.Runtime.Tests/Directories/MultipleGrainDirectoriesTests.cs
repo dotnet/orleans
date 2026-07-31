@@ -46,10 +46,10 @@ namespace Tester.Directories
         {
             while (true)
             {
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.Primary.SiloAddress);
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.Primary!.SiloAddress);
                 var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
-                if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
+                if (instanceId.Contains(HostedCluster.Primary!.SiloAddress.Endpoint.ToString()))
                     return grain;
             }
         }

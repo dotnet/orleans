@@ -26,7 +26,7 @@ namespace ServiceBus.Tests.StreamingTests
         private const string EHConsumerGroup = "orleansnightly";
 
         private readonly ITestOutputHelper output;
-        private ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner = null!;
         public EHClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;

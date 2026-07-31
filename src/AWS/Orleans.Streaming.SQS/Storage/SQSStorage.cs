@@ -10,7 +10,6 @@ using Orleans;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
 
-#nullable disable
 namespace OrleansAWSUtils.Storage
 {
     /// <summary>
@@ -26,11 +25,11 @@ namespace OrleansAWSUtils.Storage
         private const string SecretKeyPropertyName = "SecretKey";
         private const string ServicePropertyName = "Service";
         private readonly ILogger Logger;
-        private string accessKey;
-        private string secretKey;
-        private string service;
-        private string queueUrl;
-        private AmazonSQSClient sqsClient;
+        private string? accessKey;
+        private string? secretKey;
+        private string service = null!;
+        private string? queueUrl;
+        private AmazonSQSClient sqsClient = null!;
 
         /// <summary>
         /// The queue Name
@@ -103,7 +102,7 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        private async Task<string> GetQueueUrl()
+        private async Task<string?> GetQueueUrl()
         {
             try
             {
@@ -201,7 +200,7 @@ namespace OrleansAWSUtils.Storage
             {
                 ReportErrorAndRethrow(exc, "GetMessages");
             }
-            return null;
+            throw new InvalidOperationException("Unable to retrieve messages from the queue.");
         }
 
         /// <summary>

@@ -20,7 +20,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         public async Task ChangeCompatibilityStrategy()
         {
             await StartSiloV1();
-            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
+            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>()!;
             var ifaceId = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
 
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);
@@ -51,7 +51,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
             
             // Fallback to AllVersionsCompatible
-            await ManagementGrain.SetCompatibilityStrategy(ifaceId, null);
+            await ManagementGrain.SetCompatibilityStrategy(ifaceId, null!);
 
             // Now we should activate only v2
             for (var i = 102; i < 202; i++)
@@ -65,7 +65,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         public async Task ChangeVersionSelectorStrategy()
         {
             await StartSiloV1();
-            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
+            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>()!;
             var ifaceId = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
 
             // Only V1 exists
@@ -127,7 +127,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             Assert.Equal(2, await grainV1[0].GetVersion());
 
             // Change default to backward compatible
-            await ManagementGrain.SetCompatibilityStrategy(null);
+            await ManagementGrain.SetCompatibilityStrategy(null!);
 
             // Should not provoke upgrade
             Assert.Equal(1, await grainV2.ProxyGetVersion(grainV1[1]));
@@ -158,7 +158,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
 
             // Change default to latest version
-            await ManagementGrain.SetSelectorStrategy(null);
+            await ManagementGrain.SetSelectorStrategy(null!);
 
             // Don't touch to existing activation
             for (int i = 0; i < 100; i++)

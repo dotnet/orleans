@@ -18,7 +18,7 @@ namespace Tester.AzureUtils.Streaming
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 #pragma warning disable 618
-        private readonly string adapterType = typeof(PersistentStreamProvider).FullName;
+        private readonly string adapterType = typeof(PersistentStreamProvider).FullName!;
 #pragma warning restore 618
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);
@@ -103,7 +103,7 @@ namespace Tester.AzureUtils.Streaming
         {
             var mgmt = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
+            object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
             Assert.Equal(numExpectedSilos, results.Length);
 
             // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.

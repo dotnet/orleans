@@ -19,7 +19,7 @@ public class TreeGrain : Grain, ITreeGrain
         var childBase = (id + 1) * FanOutFactor;
         for (var i = 1; i <= numChildren; i++)
         {
-            var child = GrainFactory.GetGrain<ITreeGrain>(childBase + i, keyExtension: forestName);
+            var child = GrainFactory.GetGrain<ITreeGrain>(childBase + i, keyExtension: forestName!);
             _children.Add(child);
         }
     }

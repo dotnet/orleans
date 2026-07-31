@@ -13,7 +13,7 @@ namespace Orleans.Journaling.Tests;
 public class IntegrationTestFixture : IAsyncLifetime
 {
     public InProcessTestCluster Cluster { get; }
-    public IClusterClient Client => Cluster.Client;
+    public IClusterClient Client => Cluster.Client!; // Fixture initialization deploys the client.
 
     public IntegrationTestFixture()
     {

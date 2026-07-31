@@ -4,7 +4,6 @@ using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 
-#nullable disable
 namespace Orleans.Metadata
 {
     /// <summary>
@@ -32,10 +31,10 @@ namespace Orleans.Metadata
         /// <param name="grainType">Type of the grain.</param>
         /// <param name="grainClass">The grain class.</param>
         /// <returns><see langword="true"/> if a corresponding grain class was found, <see langword="false"/> otherwise.</returns>
-        public bool TryGetGrainClass(GrainType grainType, [NotNullWhen(true)] out Type grainClass)
+        public bool TryGetGrainClass(GrainType grainType, [NotNullWhen(true)] out Type? grainClass)
         {
             GrainType lookupType;
-            Type[] args;
+            Type[]? args;
             if (GenericGrainType.TryParse(grainType, out var genericId))
             {
                 lookupType = genericId.GetUnconstructedGrainType().GrainType;

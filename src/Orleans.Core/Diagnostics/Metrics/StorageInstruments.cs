@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
-#nullable disable
 namespace Orleans.Runtime;
 
 internal sealed class StorageInstruments(OrleansInstruments instruments)
@@ -21,9 +20,9 @@ internal sealed class StorageInstruments(OrleansInstruments instruments)
             _storageReadHistogram.Record(
                 latency.TotalMilliseconds,
                 [
-                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
-                    new KeyValuePair<string, object>("state_name", stateName),
-                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                    new KeyValuePair<string, object?>("provider_type_name", providerTypeName),
+                    new KeyValuePair<string, object?>("state_name", stateName),
+                    new KeyValuePair<string, object?>("state_type", stateTypeName)
                 ]);
         }
     }
@@ -35,9 +34,9 @@ internal sealed class StorageInstruments(OrleansInstruments instruments)
             _storageWriteHistogram.Record(
                 latency.TotalMilliseconds,
                 [
-                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
-                    new KeyValuePair<string, object>("state_name", stateName),
-                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                    new KeyValuePair<string, object?>("provider_type_name", providerTypeName),
+                    new KeyValuePair<string, object?>("state_name", stateName),
+                    new KeyValuePair<string, object?>("state_type", stateTypeName)
                 ]);
         }
     }
@@ -48,9 +47,9 @@ internal sealed class StorageInstruments(OrleansInstruments instruments)
         {
             _storageReadErrorsCounter.Add(1,
                 [
-                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
-                    new KeyValuePair<string, object>("state_name", stateName),
-                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                    new KeyValuePair<string, object?>("provider_type_name", providerTypeName),
+                    new KeyValuePair<string, object?>("state_name", stateName),
+                    new KeyValuePair<string, object?>("state_type", stateTypeName)
                 ]);
         }
     }
@@ -61,9 +60,9 @@ internal sealed class StorageInstruments(OrleansInstruments instruments)
         {
             _storageWriteErrorsCounter.Add(1,
                 [
-                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
-                    new KeyValuePair<string, object>("state_name", stateName),
-                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                    new KeyValuePair<string, object?>("provider_type_name", providerTypeName),
+                    new KeyValuePair<string, object?>("state_name", stateName),
+                    new KeyValuePair<string, object?>("state_type", stateTypeName)
                 ]);
         }
     }
@@ -74,9 +73,9 @@ internal sealed class StorageInstruments(OrleansInstruments instruments)
         {
             _storageClearHistogram.Record(latency.TotalMilliseconds,
                 [
-                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
-                    new KeyValuePair<string, object>("state_name", stateName),
-                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                    new KeyValuePair<string, object?>("provider_type_name", providerTypeName),
+                    new KeyValuePair<string, object?>("state_name", stateName),
+                    new KeyValuePair<string, object?>("state_type", stateTypeName)
                 ]);
         }
     }
@@ -87,9 +86,9 @@ internal sealed class StorageInstruments(OrleansInstruments instruments)
         {
             _storageClearErrorsCounter.Add(1,
                 [
-                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
-                    new KeyValuePair<string, object>("state_name", stateName),
-                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                    new KeyValuePair<string, object?>("provider_type_name", providerTypeName),
+                    new KeyValuePair<string, object?>("state_name", stateName),
+                    new KeyValuePair<string, object?>("state_type", stateTypeName)
                 ]);
         }
     }

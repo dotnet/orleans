@@ -8,7 +8,7 @@ namespace UnitTests.Grains
     public class FilteredImplicitSubscriptionGrain : Grain, IFilteredImplicitSubscriptionGrain
     {
         private readonly ILogger logger;
-        private Dictionary<string, int> counters;
+        private Dictionary<string, int> counters = null!;
 
         public FilteredImplicitSubscriptionGrain(ILoggerFactory loggerFactory)
         {

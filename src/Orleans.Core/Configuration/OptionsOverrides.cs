@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Configuration.Overrides
 {
     /// <summary>
@@ -24,7 +23,7 @@ namespace Orleans.Configuration.Overrides
         private static IOptions<TOptions> GetOverridableOption<TOptions>(this IServiceProvider services, string key)
             where TOptions : class, new()
         {
-            TOptions option = services.GetKeyedService<TOptions>(key);
+            TOptions? option = services.GetKeyedService<TOptions>(key);
             return option != null
                 ? Options.Create(option)
                 : services.GetRequiredService<IOptions<TOptions>>();

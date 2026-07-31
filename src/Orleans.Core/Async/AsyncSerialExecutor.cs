@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -81,7 +80,7 @@ namespace Orleans
 
                     while (!actions.IsEmpty)
                     {
-                        Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>> actionTuple;
+                        Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>? actionTuple;
                         if (actions.TryDequeue(out actionTuple))
                         {
                             try

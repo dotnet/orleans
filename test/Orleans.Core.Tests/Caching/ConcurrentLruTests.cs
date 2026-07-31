@@ -485,8 +485,8 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     [Fact]
     public void WhenAddingNullValueCanBeAddedAndRemoved()
     {
-        _lru.GetOrAdd(1, _ => null).Should().BeNull();
-        _lru.AddOrUpdate(1, null);
+        _lru.GetOrAdd(1, _ => null!).Should().BeNull();
+        _lru.AddOrUpdate(1, null!);
         _lru.TryRemove(1).Should().BeTrue();
     }
 

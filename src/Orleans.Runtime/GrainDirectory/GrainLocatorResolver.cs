@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GrainLocatorResolver
@@ -14,7 +13,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly CachedGrainLocator cachedGrainLocator;
         private readonly DhtGrainLocator dhtGrainLocator;
-        private ClientGrainLocator _clientGrainLocator;
+        private ClientGrainLocator? _clientGrainLocator;
 
         public GrainLocatorResolver(
             IServiceProvider servicesProvider,

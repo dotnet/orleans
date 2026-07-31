@@ -81,13 +81,13 @@ namespace UnitTests.StreamingTests
 
         public async Task BecomeConsumer(Guid streamId)
         {
-            var consumer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
+            var consumer = this.cluster.GrainFactory!.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
             await consumer.BecomeConsumer(streamId, streamProvider);
         }
 
         public async Task ProduceMessage(Guid streamId)
         {
-            var producer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamProducerGrain>(0);
+            var producer = this.cluster.GrainFactory!.GetGrain<IStatelessWorkerStreamProducerGrain>(0);
             await producer.Produce(streamId, streamProvider, string.Empty);
         }
     }

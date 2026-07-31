@@ -5,8 +5,6 @@ using System.Data.Common;
 using System.Linq;
 using System.Reflection;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -47,14 +45,14 @@ namespace Orleans.Tests.SqlUtils
                 throw new ArgumentNullException(nameof(invariantName));
             }
 
-            List<Tuple<string, string>> providerFactoryDefinitions;
+            List<Tuple<string, string>>? providerFactoryDefinitions;
             if (!providerFactoryTypeMap.TryGetValue(invariantName, out providerFactoryDefinitions) || providerFactoryDefinitions.Count == 0)
                 throw new InvalidOperationException($"Database provider factory with '{invariantName}' invariant name not supported.");
 
-            List<Exception> exceptions = null;
+            List<Exception>? exceptions = null;
             foreach (var providerFactoryDefinition in providerFactoryDefinitions)
             {
-                Assembly asm = null;
+                Assembly? asm = null;
                 try
                 {
                     var asmName = new AssemblyName(providerFactoryDefinition.Item1);
@@ -86,11 +84,11 @@ namespace Orleans.Tests.SqlUtils
                     continue;
                 }
 
-                var factory = (DbProviderFactory)prop.GetValue(null);
-                return new CachedFactory(factory, providerFactoryType.Name, "", providerFactoryType.AssemblyQualifiedName);
+                var factory = (DbProviderFactory?)prop.GetValue(null);
+                return new CachedFactory(factory!, providerFactoryType.Name, "", providerFactoryType.AssemblyQualifiedName!);
             }
 
-            throw new AggregateException(exceptions);
+            throw new AggregateException(exceptions!);
 
             void AddException(Exception ex)
             {

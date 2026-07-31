@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -6,8 +7,8 @@ namespace UnitTests.Grains
     internal class ExtensionTestGrain : Grain, IExtensionTestGrain
     {
         private readonly IGrainContext _grainContext;
-        public string ExtensionProperty { get; private set; }
-        private TestExtension extender;
+        public string ExtensionProperty { get; private set; } = null!;
+        private TestExtension? extender;
 
         public ExtensionTestGrain(IGrainContext grainContext)
         {
@@ -37,8 +38,9 @@ namespace UnitTests.Grains
     public class GenericExtensionTestGrain<T> : Grain, IGenericExtensionTestGrain<T>
     {
         private readonly IGrainContext _grainContext;
+        [MaybeNull]
         public T ExtensionProperty { get; private set; }
-        private GenericTestExtension<T> extender;
+        private GenericTestExtension<T>? extender;
 
         public GenericExtensionTestGrain(IGrainContext grainContext)
         {
@@ -47,7 +49,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            ExtensionProperty = default;
+            ExtensionProperty = default!;
             extender = null;
             return base.OnActivateAsync(cancellationToken);
         }
@@ -68,7 +70,7 @@ namespace UnitTests.Grains
     internal class GenericGrainWithNonGenericExtension<T> : Grain, IGenericGrainWithNonGenericExtension<T>
     {
         private readonly IGrainContext _grainContext;
-        private SimpleExtension extender;
+        private SimpleExtension? extender;
 
         public GenericGrainWithNonGenericExtension(IGrainContext grainContext)
         {

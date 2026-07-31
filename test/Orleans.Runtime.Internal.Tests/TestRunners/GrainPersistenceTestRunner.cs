@@ -445,7 +445,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
         foreach (var silo in silos)
         {
-            var isPresent = await this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName);
+            var isPresent = await this.HostedCluster.Client!.GetTestHooks(silo).HasStorageProvider(providerName);
             Assert.True(isPresent, $"No storage provider found: {providerName}");
         }
     }

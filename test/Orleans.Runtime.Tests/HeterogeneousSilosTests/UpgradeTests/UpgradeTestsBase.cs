@@ -16,8 +16,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     {
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(200);
 
-        protected IClusterClient Client => this.cluster.Client;
-        protected IManagementGrain ManagementGrain => this.cluster.Client.GetGrain<IManagementGrain>(0);
+        protected IClusterClient Client => this.cluster.Client!; // Upgrade test clusters deploy the client.
+        protected IManagementGrain ManagementGrain => this.cluster.Client!.GetGrain<IManagementGrain>(0); // Upgrade test clusters deploy the client.
 #if DEBUG
         private const string BuildConfiguration = "Debug";
 #else
@@ -34,8 +34,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         private readonly List<SiloHandle> deployedSilos = new List<SiloHandle>();
         private int siloIdx = 0;
-        private TestClusterBuilder builder;
-        private TestCluster cluster;
+        private TestClusterBuilder builder = null!;
+        private TestCluster cluster = null!;
 
         protected abstract Type VersionSelectorStrategy { get; }
 
@@ -49,7 +49,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             while (string.Compare(testDirectory.Name, CommonParentDirectory, StringComparison.OrdinalIgnoreCase) != 0 || testDirectory.Parent == null)
             {
-                testDirectory = testDirectory.Parent;
+                testDirectory = testDirectory.Parent!;
             }
 
             if (testDirectory.Parent == null)
@@ -204,7 +204,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
                 this.cluster = builder.Build();
                 await this.cluster.DeployAsync();
-                silo = this.cluster.Primary;
+                silo = this.cluster.Primary!;
             }
             else
             {
@@ -218,7 +218,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 {
                     new MemoryConfigurationSource
                     {
-                        InitialData = new Dictionary<string, string>
+                        InitialData = new Dictionary<string, string?>
                         {
                             [StandaloneSiloHandle.ExecutablePathConfigKey] = grainAssembly.FullName
                         }
@@ -236,7 +236,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         protected async Task StopSilo(SiloHandle handle)
         {
-            await handle?.StopSiloAsync(true);
+            await handle?.StopSiloAsync(true)!;
             this.deployedSilos.Remove(handle);
             await WaitForActiveSilosAsync();
         }

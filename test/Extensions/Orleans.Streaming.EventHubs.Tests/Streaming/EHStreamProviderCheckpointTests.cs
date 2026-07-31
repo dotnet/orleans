@@ -23,7 +23,7 @@ namespace ServiceBus.Tests.StreamingTests
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
-        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName!;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private const string EHPath = "ehorleanstest6";
         private const string EHConsumerGroup = "orleansnightly";

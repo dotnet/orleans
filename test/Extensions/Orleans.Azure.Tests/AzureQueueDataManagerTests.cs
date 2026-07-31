@@ -17,7 +17,7 @@ namespace Tester.AzureUtils
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
-        private string queueName;
+        private string queueName = null!;
 
         public AzureQueueDataManagerTests()
         {
@@ -56,19 +56,22 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             var outMessage1 = await manager.PeekQueueMessage();
+            Assert.NotNull(outMessage1);
             logger.LogInformation("PeekQueueMessage 1: {Message}", PrintQueueMessage(outMessage1));
             Assert.Equal(inMessage, outMessage1.MessageText);
 
             var outMessage2 = await manager.PeekQueueMessage();
+            Assert.NotNull(outMessage2);
             logger.LogInformation("PeekQueueMessage 2: {Message}", PrintQueueMessage(outMessage2));
             Assert.Equal(inMessage, outMessage2.MessageText);
 
-            QueueMessage outMessage3 = await manager.GetQueueMessage();
+            var outMessage3 = await manager.GetQueueMessage();
+            Assert.NotNull(outMessage3);
             logger.LogInformation("GetQueueMessage 3: {Message}", PrintQueueMessage(outMessage3));
             Assert.Equal(inMessage, outMessage3.MessageText);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            QueueMessage outMessage4 = await manager.GetQueueMessage();
+            var outMessage4 = await manager.GetQueueMessage();
             Assert.Null(outMessage4);
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
@@ -84,7 +87,7 @@ namespace Tester.AzureUtils
             AzureQueueDataManager manager = await GetTableManager(queueName);
 
             IEnumerable<QueueMessage> msgs = await manager.GetQueueMessages();
-            Assert.True(msgs == null || !msgs.Any());
+            Assert.Empty(msgs);
 
             int numMsgs = 10;
             List<Task> promises = new List<Task>();
@@ -95,7 +98,9 @@ namespace Tester.AzureUtils
             Task.WaitAll(promises.ToArray());
             Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
-            msgs = new List<QueueMessage>(await manager.GetQueueMessages(numMsgs));
+            var receivedMessages = await manager.GetQueueMessages(numMsgs);
+            Assert.NotNull(receivedMessages);
+            msgs = new List<QueueMessage>(receivedMessages);
             Assert.Equal(numMsgs, msgs.Count());
             Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
@@ -140,7 +145,8 @@ namespace Tester.AzureUtils
             await manager.AddQueueMessage(inMessage);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            QueueMessage outMessage = await manager.GetQueueMessage();
+            var outMessage = await manager.GetQueueMessage();
+            Assert.NotNull(outMessage);
             logger.LogInformation("GetQueueMessage: {Message}", PrintQueueMessage(outMessage));
             Assert.Equal(inMessage, outMessage.MessageText);
 
@@ -148,7 +154,8 @@ namespace Tester.AzureUtils
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            QueueMessage outMessage2 = await manager.GetQueueMessage();
+            var outMessage2 = await manager.GetQueueMessage();
+            Assert.NotNull(outMessage2);
             Assert.Equal(inMessage, outMessage2.MessageText);
 
             await manager.DeleteQueueMessage(outMessage2);

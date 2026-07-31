@@ -27,7 +27,7 @@ namespace Tester.Redis.GrainDirectory
             var configuration = TestDefaultConfiguration.RedisConnectionString;
             var directoryOptions = new RedisGrainDirectoryOptions
             {
-                ConfigurationOptions = ConfigurationOptions.Parse(configuration),
+                ConfigurationOptions = ConfigurationOptions.Parse(configuration!),
                 EntryExpiry = TimeSpan.FromMinutes(1),
             };
 

@@ -469,7 +469,8 @@ public class ArcBufferWriterTests
                 else
                 {
                     // Consume the buffer partially.
-                    buffers[0] = new(buffers[0].Array, buffers[0].Offset + readSize, buffers[0].Count - readSize);
+                    // Entries are created from array-backed pages, so Array is always populated.
+                    buffers[0] = new(buffers[0].Array!, buffers[0].Offset + readSize, buffers[0].Count - readSize);
                     break;
                 }
             }

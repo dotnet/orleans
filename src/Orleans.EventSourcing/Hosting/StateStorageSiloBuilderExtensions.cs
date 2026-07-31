@@ -6,7 +6,6 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.EventSourcing.StateStorage;
 
-#nullable disable
 namespace Orleans.Hosting
 {
     public static class StateStorageSiloBuilderExtensions
@@ -30,7 +29,7 @@ namespace Orleans.Hosting
         internal static IServiceCollection AddStateStorageBasedLogConsistencyProvider(this IServiceCollection services, string name)
         {
             services.AddLogConsistencyProtocolServicesFactory();
-            services.TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetKeyedService<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            services.TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetKeyedService<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)!);
             return services.AddKeyedSingleton<ILogViewAdaptorFactory, LogConsistencyProvider>(name);
         }
     }

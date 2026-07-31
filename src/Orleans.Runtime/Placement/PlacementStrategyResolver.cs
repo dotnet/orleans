@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
 using Orleans.Metadata;
@@ -9,7 +10,6 @@ using Orleans.Runtime.Hosting;
 using System.Collections.Frozen;
 using Orleans.GrainDirectory;
 
-#nullable disable
 namespace Orleans.Runtime.Placement
 {
     /// <summary>
@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Placement
             _getStrategyInternal = GetPlacementStrategyInternal;
             _resolvers = resolvers.ToArray();
             _grainPropertiesResolver = grainPropertiesResolver;
-            _defaultPlacementStrategy = services.GetService<PlacementStrategy>();
+            _defaultPlacementStrategy = services.GetService<PlacementStrategy>()!;
         }
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace Orleans.Runtime.Placement
         /// </summary>
         public PlacementStrategy GetPlacementStrategy(GrainType grainType) => _resolvedStrategies.GetOrAdd(grainType, _getStrategyInternal);
 
-        private bool TryGetNonDefaultPlacementStrategy(GrainType grainType, out PlacementStrategy strategy)
+        private bool TryGetNonDefaultPlacementStrategy(GrainType grainType, [MaybeNullWhen(false)] out PlacementStrategy strategy)
         {
             _grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
 

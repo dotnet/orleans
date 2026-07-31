@@ -14,7 +14,6 @@ using Orleans.Runtime;
 using StackExchange.Redis;
 using static System.FormattableString;
 
-#nullable disable
 namespace Orleans.Reminders.Redis
 {
     internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncDisposable
@@ -23,8 +22,8 @@ namespace Orleans.Reminders.Redis
         private readonly RedisReminderTableOptions _redisOptions;
         private readonly ClusterOptions _clusterOptions;
         private readonly ILogger _logger;
-        private IConnectionMultiplexer _muxer;
-        private IDatabase _db;
+        private IConnectionMultiplexer _muxer = null!;
+        private IDatabase _db = null!;
         private bool _muxerIsShared;
 
         public RedisReminderTable(
@@ -57,7 +56,7 @@ namespace Orleans.Reminders.Redis
             }
         }
 
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             try
             {
@@ -69,7 +68,7 @@ namespace Orleans.Reminders.Redis
                 }
                 else
                 {
-                    return ConvertToEntry(values.SingleOrDefault());
+                    return ConvertToEntry(((string?)values.SingleOrDefault())!);
                 }
             }
             catch (Exception exception)
@@ -84,7 +83,7 @@ namespace Orleans.Reminders.Redis
             {
                 var (from, to) = GetFilter(grainId);
                 RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(((string?)v)!));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -113,7 +112,7 @@ namespace Orleans.Reminders.Redis
                     values = values1.Concat(values2);
                 }
 
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(((string?)v)!));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -148,7 +147,7 @@ namespace Orleans.Reminders.Redis
             }
         }
 
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string?> UpsertRow(ReminderEntry entry)
         {
             const string UpsertScript =
                 """
@@ -189,8 +188,8 @@ namespace Orleans.Reminders.Redis
             }
 
             var muxerIsShared = _muxerIsShared;
-            _muxer = null;
-            _db = null;
+            _muxer = null!;
+            _db = null!;
             _muxerIsShared = false;
 
             if (!muxerIsShared)
@@ -208,8 +207,8 @@ namespace Orleans.Reminders.Redis
             }
 
             var muxerIsShared = _muxerIsShared;
-            _muxer = null;
-            _db = null;
+            _muxer = null!;
+            _db = null!;
             _muxerIsShared = false;
 
             if (!muxerIsShared)
@@ -258,7 +257,7 @@ namespace Orleans.Reminders.Redis
             return (filter.From, filter.To);
         }
 
-        private (RedisValue eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
+        private (string eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
         {
             string grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
             string eTag = Guid.NewGuid().ToString();
@@ -284,6 +283,6 @@ namespace Orleans.Reminders.Redis
             Level = LogLevel.Debug,
             Message = "UpsertRow entry = {Entry}, ETag = {ETag}"
         )]
-        private partial void LogDebugUpsertRow(ReminderEntryLogValue entry, string eTag);
+        private partial void LogDebugUpsertRow(ReminderEntryLogValue entry, string? eTag);
     }
 }

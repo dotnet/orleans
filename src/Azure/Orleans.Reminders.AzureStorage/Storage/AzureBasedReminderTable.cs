@@ -9,7 +9,6 @@ using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
 using Orleans.Reminders.AzureStorage;
 
-#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     public sealed partial class AzureBasedReminderTable : IReminderTable
@@ -102,10 +101,10 @@ namespace Orleans.Runtime.ReminderService
             {
                 return new ReminderEntry
                 {
-                    GrainId = GrainId.Parse(tableEntry.GrainReference),
-                    ReminderName = tableEntry.ReminderName,
-                    StartAt = LogFormatter.ParseDate(tableEntry.StartAt),
-                    Period = TimeSpan.Parse(tableEntry.Period),
+                    GrainId = GrainId.Parse(tableEntry.GrainReference!),
+                    ReminderName = tableEntry.ReminderName!,
+                    StartAt = LogFormatter.ParseDate(tableEntry.StartAt!),
+                    Period = TimeSpan.Parse(tableEntry.Period!),
                     ETag = eTag,
                 };
             }
@@ -117,7 +116,7 @@ namespace Orleans.Runtime.ReminderService
             finally
             {
                 string serviceIdStr = this.clusterOptions.ServiceId;
-                if (!tableEntry.ServiceId.Equals(serviceIdStr))
+                if (!tableEntry.ServiceId!.Equals(serviceIdStr))
                 {
                     LogWarningAzureTable_ReadWrongReminder(tableEntry, serviceIdStr);
                     throw new OrleansException($"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.");
@@ -146,7 +145,8 @@ namespace Orleans.Runtime.ReminderService
                 Period = remEntry.Period.ToString(),
 
                 GrainRefConsistentHash = consistentHash.ToString("X8"),
-                ETag = new ETag(remEntry.ETag),
+                // The Azure SDK accepts the default reminder ETag even though its string constructor is non-nullable.
+                ETag = new ETag(remEntry.ETag!),
             };
         }
 
@@ -193,7 +193,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             try
             {
@@ -201,7 +201,7 @@ namespace Orleans.Runtime.ReminderService
 
                 LogDebugReadRow(grainId, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainId, reminderName);
-                return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag);
+                return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag!);
             }
             catch (Exception exc)
             {
@@ -210,7 +210,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string?> UpsertRow(ReminderEntry entry)
         {
             try
             {
@@ -219,7 +219,7 @@ namespace Orleans.Runtime.ReminderService
                 LogDebugUpsertRow(entry);
                 ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
 
-                string result = await this.remTableManager.UpsertRow(remTableEntry);
+                string? result = await this.remTableManager.UpsertRow(remTableEntry);
                 if (result == null)
                 {
                     LogWarningReminderUpsertFailed(entry);
@@ -264,7 +264,7 @@ namespace Orleans.Runtime.ReminderService
 
         private readonly struct RingRangeLogValue(uint Begin, uint End)
         {
-            public override string ToString() => RangeFactory.CreateRange(Begin, End).ToString();
+            public override string? ToString() => RangeFactory.CreateRange(Begin, End).ToString();
         }
 
         [LoggerMessage(

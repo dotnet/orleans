@@ -108,14 +108,14 @@ public class ClassDeserializeBenchmark
     {
         Session.Reset();
         var instance = Serializer.Deserialize(Input, Session);
-        return SumResult(instance);
+        return SumResult(instance!); // The benchmark input is a serialized IntClass.
     }
 
     [Benchmark]
     public int Utf8Json() => SumResult(Utf8JsonNS.JsonSerializer.Deserialize<IntClass>(Utf8JsonInput, Utf8JsonResolver));
 
     [Benchmark]
-    public int SystemTextJson() => SumResult(System.Text.Json.JsonSerializer.Deserialize<IntClass>(SystemTextJsonInput));
+    public int SystemTextJson() => SumResult(System.Text.Json.JsonSerializer.Deserialize<IntClass>(SystemTextJsonInput)!);
 
     [Benchmark]
     public int MessagePackCSharp() => SumResult(MessagePack.MessagePackSerializer.Deserialize<IntClass>(MsgPackInput));
@@ -142,7 +142,7 @@ public class ClassDeserializeBenchmark
     }
 
     [Benchmark]
-    public int NewtonsoftJson() => SumResult(JsonConvert.DeserializeObject<IntClass>(NewtonsoftJsonInput));
+    public int NewtonsoftJson() => SumResult(JsonConvert.DeserializeObject<IntClass>(NewtonsoftJsonInput)!);
 
     [Benchmark(Description = "SpanJson")]
     public int SpanJsonUtf8() => SumResult(SpanJson.JsonSerializer.Generic.Utf8.Deserialize<IntClass>(SpanJsonInput));

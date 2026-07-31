@@ -1,7 +1,7 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.TypeSystem;
 
-#nullable disable
 namespace Orleans.BroadcastChannel
 {
     /// <summary>
@@ -10,7 +10,7 @@ namespace Orleans.BroadcastChannel
     public class DefaultChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
     {  
         /// <inheritdoc/>
-        public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate)
+        public bool TryGetPredicate(string predicatePattern, [NotNullWhen(true)] out IChannelNamespacePredicate? predicate)
         {
             switch (predicatePattern)
             {
@@ -43,7 +43,7 @@ namespace Orleans.BroadcastChannel
         /// <summary>
         /// Formats a stream namespace predicate which indicates a concrete <see cref="IChannelNamespacePredicate"/> type to be constructed, along with an optional argument.
         /// </summary>
-        public static string FormatPattern(Type predicateType, string constructorArgument)
+        public static string FormatPattern(Type predicateType, string? constructorArgument)
         {
             if (constructorArgument is null)
             {
@@ -54,7 +54,7 @@ namespace Orleans.BroadcastChannel
         }
 
         /// <inheritdoc/>
-        public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate)
+        public bool TryGetPredicate(string predicatePattern, [NotNullWhen(true)] out IChannelNamespacePredicate? predicate)
         {
             if (!predicatePattern.StartsWith(Prefix, StringComparison.Ordinal))
             {
@@ -64,7 +64,7 @@ namespace Orleans.BroadcastChannel
 
             var start = Prefix.Length + 1;
             string typeName;
-            string arg;
+            string? arg;
             var index = predicatePattern.IndexOf(':', start);
             if (index < 0)
             {
@@ -86,11 +86,11 @@ namespace Orleans.BroadcastChannel
 
             if (string.IsNullOrEmpty(arg))
             {
-                predicate = (IChannelNamespacePredicate)Activator.CreateInstance(type);
+                predicate = (IChannelNamespacePredicate)Activator.CreateInstance(type)!;
             }
             else
             {
-                predicate = (IChannelNamespacePredicate)Activator.CreateInstance(type, arg);
+                predicate = (IChannelNamespacePredicate)Activator.CreateInstance(type, arg)!;
             }
 
             return true;

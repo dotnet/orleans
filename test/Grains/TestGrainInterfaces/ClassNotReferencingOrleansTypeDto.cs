@@ -3,6 +3,6 @@
     [Serializable]
     public class ClassNotReferencingOrleansTypeDto
     {
-        public string MyProperty { get; set; }
+        public string? MyProperty { get; set; }
     }
 }

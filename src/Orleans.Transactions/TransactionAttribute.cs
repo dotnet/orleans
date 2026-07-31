@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,6 @@ using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Transactions;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -82,7 +82,7 @@ namespace Orleans
         private Serializer<OrleansTransactionAbortedException> _serializer;
 
         [NonSerialized]
-        private ITransactionAgent _transactionAgent;
+        private ITransactionAgent? _transactionAgent;
 
         private ITransactionAgent TransactionAgent => _transactionAgent ?? throw new OrleansTransactionsDisabledException();
 
@@ -90,7 +90,7 @@ namespace Orleans
         public TransactionOption TransactionOption { get; set; }
 
         [Id(1)]
-        public TransactionInfo TransactionInfo { get; set; }
+        public TransactionInfo? TransactionInfo { get; set; }
 
         [Id(2)]
         public bool UseExclusiveLock { get; set; }
@@ -157,7 +157,7 @@ namespace Orleans
             }
         }
 
-        private TransactionInfo SetTransactionInfo()
+        private TransactionInfo? SetTransactionInfo()
         {
             // Clear transaction info if transaction operation requires new transaction.
             var transactionInfo = TransactionContext.GetTransactionInfo();
@@ -239,7 +239,7 @@ namespace Orleans
                     transactionInfo.RecordException(invokeException, _serializer);
                 }
 
-                OrleansTransactionException transactionException = transactionInfo.MustAbort(_serializer);
+                OrleansTransactionException? transactionException = transactionInfo.MustAbort(_serializer);
 
                 // This request started the transaction, so we try to commit before returning,
                 // or if it must abort, tell participants that it aborted
@@ -288,10 +288,10 @@ namespace Orleans
     public sealed class TransactionResponse : Response
     {
         [Id(0)]
-        private Response _response;
+        private Response _response = null!;
 
         [Id(1)]
-        public TransactionInfo TransactionInfo { get; set; }
+        public TransactionInfo? TransactionInfo { get; set; }
 
         public static TransactionResponse Create(Response response, TransactionInfo transactionInfo)
         {
@@ -304,7 +304,7 @@ namespace Orleans
 
         public Response InnerResponse => _response;
 
-        public override object Result
+        public override object? Result
         {
             get
             {
@@ -319,7 +319,7 @@ namespace Orleans
             set => _response.Result = value;
         }
 
-        public override Exception Exception
+        public override Exception? Exception
         {
             get
             {
@@ -332,7 +332,7 @@ namespace Orleans
             set => _response.Exception = value;
         }
 
-        public Exception GetException() => _response.Exception;
+        public Exception? GetException() => _response.Exception;
 
         public override string ToString() => _response?.ToString() ?? "[null]";
 
@@ -342,6 +342,7 @@ namespace Orleans
             _response.Dispose();
         }
 
+        [return: MaybeNull]
         public override T GetResult<T>() => _response.GetResult<T>();
     }
 

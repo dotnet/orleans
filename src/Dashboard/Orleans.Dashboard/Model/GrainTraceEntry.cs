@@ -1,6 +1,5 @@
 using System;
 
-#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
@@ -8,19 +7,19 @@ namespace Orleans.Dashboard.Model;
 internal class GrainTraceEntry
 {
     [Id(0)]
-    public string PeriodKey { get; set; }
+    public string PeriodKey { get; set; } = null!;
 
     [Id(1)]
     public DateTime Period { get; set; }
 
     [Id(2)]
-    public string SiloAddress { get; set; }
+    public string? SiloAddress { get; set; }
 
     [Id(3)]
-    public string Grain { get; set; }
+    public string? Grain { get; set; }
 
     [Id(4)]
-    public string Method { get; set; }
+    public string? Method { get; set; }
 
     [Id(5)]
     public long Count { get; set; }

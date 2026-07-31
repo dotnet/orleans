@@ -25,6 +25,6 @@ internal static class OrleansBinaryCommandCodecHelpers
     public static T ReadValue<T, TInput>(IFieldCodec<T> codec, ref Reader<TInput> reader)
     {
         var field = reader.ReadFieldHeader();
-        return codec.ReadValue(ref reader, field);
+        return codec.ReadValue(ref reader, field)!;
     }
 }

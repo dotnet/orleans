@@ -1,6 +1,5 @@
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
@@ -11,28 +10,28 @@ internal class SiloDetails
     public int FaultZone { get; set; }
 
     [Id(1)]
-    public string HostName { get; set; }
+    public string? HostName { get; set; }
 
     [Id(2)]
-    public string IAmAliveTime { get; set; }
+    public string? IAmAliveTime { get; set; }
 
     [Id(3)]
     public int ProxyPort { get; set; }
 
     [Id(4)]
-    public string RoleName { get; set; }
+    public string? RoleName { get; set; }
 
     [Id(5)]
-    public string SiloAddress { get; set; }
+    public string SiloAddress { get; set; } = null!;
 
     [Id(6)]
-    public string SiloName { get; set; }
+    public string SiloName { get; set; } = null!;
 
     [Id(7)]
-    public string StartTime { get; set; }
+    public string? StartTime { get; set; }
 
     [Id(8)]
-    public string Status { get; set; }
+    public string Status { get; set; } = null!;
 
     [Id(9)]
     public int UpdateZone { get; set; }

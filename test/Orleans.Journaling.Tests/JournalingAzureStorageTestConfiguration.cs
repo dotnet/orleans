@@ -25,7 +25,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
         else
         {
-            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString!); // The Azure Storage test setup supplies the connection string.
         }
 
         return options;
@@ -39,7 +39,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
         else
         {
-            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString!);
         }
 
         return options;

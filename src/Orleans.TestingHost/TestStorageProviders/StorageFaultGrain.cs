@@ -7,7 +7,6 @@ using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
 
-#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
@@ -15,16 +14,16 @@ namespace Orleans.TestingHost
     /// </summary>
     public partial class StorageFaultGrain : Grain, IStorageFaultGrain
     {
-        private ILogger logger;
-        private Dictionary<GrainId, Exception> readFaults;
-        private Dictionary<GrainId, Exception> writeFaults;
-        private Dictionary<GrainId, Exception> clearfaults;
+        private ILogger logger = null!;
+        private Dictionary<GrainId, Exception> readFaults = null!;
+        private Dictionary<GrainId, Exception> writeFaults = null!;
+        private Dictionary<GrainId, Exception> clearfaults = null!;
 
         /// <inheritdoc />
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
-            logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
+            logger = this.ServiceProvider.GetService<ILoggerFactory>()!.CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
             readFaults = new();
             writeFaults = new();
             clearfaults = new();

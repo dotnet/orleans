@@ -3,14 +3,13 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-#nullable disable
 [assembly: RegisterProvider("DynamoDB", "Reminders", "Silo", typeof(DynamoDBRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
 internal sealed class DynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseDynamoDBReminderService(options =>
             {

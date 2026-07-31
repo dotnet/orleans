@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -53,14 +52,14 @@ namespace Orleans
         /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">Name of the reminder.</param>
         /// <returns>The reminder table entry.</returns>
-        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
+        Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
         /// <summary>
         /// Upserts the specified entry.
         /// </summary>
         /// <param name="entry">The entry.</param>
         /// <returns>The row's new ETag.</returns>
-        Task<string> UpsertRow(ReminderEntry entry);
+        Task<string?> UpsertRow(ReminderEntry entry);
 
         /// <summary>
         /// Removes a row from the table.
@@ -94,9 +93,9 @@ namespace Orleans
 
         Task<ReminderTableData> ReadRows(uint begin, uint end);
 
-        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
+        Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
-        Task<string> UpsertRow(ReminderEntry entry);
+        Task<string?> UpsertRow(ReminderEntry entry);
 
         Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
 
@@ -169,7 +168,7 @@ namespace Orleans
         /// <see cref="GrainId"/>.
         /// </summary>
         [Id(1)]
-        public string ReminderName { get; set; }
+        public string ReminderName { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the time when the reminder was supposed to tick in the first time
@@ -188,7 +187,7 @@ namespace Orleans
         /// </summary>
         /// <value>The ETag.</value>
         [Id(4)]
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         /// <inheritdoc/>
         public override string ToString() => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period}>";
@@ -197,7 +196,7 @@ namespace Orleans
         /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.
         /// </summary>
         /// <returns>The <see cref="IGrainReminder"/>.</returns>
-        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag);
+        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag!);
     }
 
     [Serializable, GenerateSerializer, Immutable]

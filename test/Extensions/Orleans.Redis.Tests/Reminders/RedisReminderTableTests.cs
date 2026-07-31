@@ -53,7 +53,7 @@ namespace Tester.Redis.Reminders
             return reminderTable;
         }
 
-        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
+        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 
         [SkippableFact]
         public void RemindersTable_Redis_Init()
@@ -127,14 +127,14 @@ namespace Tester.Redis.Reminders
 
         private sealed class HostileStringConverter : JsonConverter<string>
         {
-            public override void WriteJson(JsonWriter writer, string value, JsonSerializer serializer)
+            public override void WriteJson(JsonWriter writer, string? value, JsonSerializer serializer)
             {
                 writer.WriteValue($"converted:{value}");
             }
 
-            public override string ReadJson(JsonReader reader, Type objectType, string existingValue, bool hasExistingValue, JsonSerializer serializer)
+            public override string? ReadJson(JsonReader reader, Type objectType, string? existingValue, bool hasExistingValue, JsonSerializer serializer)
             {
-                return (string)reader.Value;
+                return (string?)reader.Value;
             }
         }
     }

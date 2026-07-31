@@ -2,30 +2,30 @@ namespace UnitTests.GrainInterfaces
 {
     public interface IRequestContextTestGrain : IGrainWithIntegerKey
     {
-        Task<string> TraceIdEcho();
+        Task<string?> TraceIdEcho();
 
-        Task<string> TraceIdDoubleEcho();
+        Task<string?> TraceIdDoubleEcho();
 
-        Task<string> TraceIdDelayedEcho1();
+        Task<string?> TraceIdDelayedEcho1();
 
-        Task<string> TraceIdDelayedEcho2();
+        Task<string?> TraceIdDelayedEcho2();
 
         Task<Guid> E2EActivityId();
     }
 
     public interface IRequestContextTaskGrain : IGrainWithIntegerKey
     {
-        Task<string> TraceIdEcho();
+        Task<string?> TraceIdEcho();
 
-        Task<string> TraceIdDoubleEcho();
+        Task<string?> TraceIdDoubleEcho();
 
-        Task<string> TraceIdDelayedEcho1();
+        Task<string?> TraceIdDelayedEcho1();
 
-        Task<string> TraceIdDelayedEcho2();
+        Task<string?> TraceIdDelayedEcho2();
 
-        Task<string> TraceIdDelayedEchoAwait();
+        Task<string?> TraceIdDelayedEchoAwait();
 
-        Task<string> TraceIdDelayedEchoTaskRun();
+        Task<string?> TraceIdDelayedEchoTaskRun();
 
         Task<Guid> E2EActivityId();
 

@@ -2,8 +2,8 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -14,12 +14,13 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// Writes a field using the provided untyped value. The type must still match the codec instance!
         /// </summary>
-        void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>;
+        void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>;
 
         /// <summary>
         /// Reads a value and returns it untyped. The type must still match the codec instance!
         /// </summary>
-        object ReadValue<TInput>(ref Reader<TInput> reader, Field field);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        object? ReadValue<TInput>(ref Reader<TInput> reader, Field field);
     }
 
     /// <summary>
@@ -38,7 +39,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T value) where TBufferWriter : IBufferWriter<byte>;
+        void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] T value) where TBufferWriter : IBufferWriter<byte>;
 
         /// <summary>
         /// Reads a value.
@@ -47,12 +48,14 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: MaybeNull]
         new T ReadValue<TInput>(ref Reader<TInput> reader, Field field);
 
-        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
-            => WriteField(ref writer, fieldIdDelta, expectedType, (T)value);
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value)
+            => WriteField(ref writer, fieldIdDelta, expectedType, (T)value!);
 
-        object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
     }
 
     /// <summary>
@@ -113,15 +116,17 @@ namespace Orleans.Serialization.Codecs
 
         public UntypedCodecWrapper(IFieldCodec codec) => _codec = codec;
 
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
             => _codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
 
-        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value)
             => _codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
 
-        public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)_codec.ReadValue(ref reader, field);
+        [return: MaybeNull]
+        public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)_codec.ReadValue(ref reader, field)!;
 
-        object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => _codec.ReadValue(ref reader, field);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => _codec.ReadValue(ref reader, field);
     }
 
 }

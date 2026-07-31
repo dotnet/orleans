@@ -8,7 +8,6 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -33,7 +32,7 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, List<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -48,6 +47,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public List<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -58,7 +58,7 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            List<T> result = null;
+            List<T>? result = null;
             uint fieldId = 0;
             while (true)
             {
@@ -87,7 +87,7 @@ namespace Orleans.Serialization.Codecs
                             ListCodec<T>.ThrowLengthFieldMissing();
                         }
 
-                        result.Add(_fieldCodec.ReadValue(ref reader, header));
+                        result!.Add(_fieldCodec.ReadValue(ref reader, header)!);
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -101,7 +101,7 @@ namespace Orleans.Serialization.Codecs
                 ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 
-            return result;
+            return result!;
         }
 
         private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
@@ -153,7 +153,7 @@ namespace Orleans.Serialization.Codecs
 #endif
                         break;
                     case 1:
-                        value.Add(_fieldCodec.ReadValue(ref reader, header));
+                        value.Add(_fieldCodec.ReadValue(ref reader, header)!);
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -186,12 +186,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<List<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() != typeof(List<T>))
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new List<T>(input.Count);

@@ -1,11 +1,10 @@
 using Microsoft.Extensions.Options;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     internal class SiloMessagingOptionsValidator : IValidateOptions<SiloMessagingOptions>
     {
-        public ValidateOptionsResult Validate(string name, SiloMessagingOptions options)
+        public ValidateOptionsResult Validate(string? name, SiloMessagingOptions options)
         {
             if (options.MaxForwardCount > 255)
             {

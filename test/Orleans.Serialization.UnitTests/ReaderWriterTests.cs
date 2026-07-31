@@ -355,7 +355,8 @@ namespace Orleans.Serialization.UnitTests
             // implementation details.
             var buf = buffer.GetMemory(1);
             Assert.True(MemoryMarshal.TryGetArray<byte>(buf, out var seg));
-            var offset = seg.Array.Length - b.Length;
+            // A successful TryGetArray call guarantees that the returned segment is array-backed.
+            var offset = seg.Array!.Length - b.Length;
             buffer.Write(new byte[offset]);
             buffer.Write(b);
             buffer.Write(b2);
@@ -402,7 +403,8 @@ namespace Orleans.Serialization.UnitTests
             var services = new ServiceCollection();
             _ = services.AddSerializer();
             _serviceProvider = services.BuildServiceProvider();
-            _sessionPool = _serviceProvider.GetService<SerializerSessionPool>();
+            // AddSerializer guarantees that the session pool is registered.
+            _sessionPool = _serviceProvider.GetService<SerializerSessionPool>()!;
             _testOutputHelper = testOutputHelper;
         }
 

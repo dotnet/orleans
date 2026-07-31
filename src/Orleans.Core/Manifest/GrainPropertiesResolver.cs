@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Metadata
 {
     /// <summary>
@@ -56,7 +55,7 @@ namespace Orleans.Metadata
         /// <returns>
         /// A value indicating whether grain properties could be found for the provided grain type.
         /// </returns>
-        public bool TryGetGrainProperties(GrainType grainType, [NotNullWhen(true)] out GrainProperties properties)
+        public bool TryGetGrainProperties(GrainType grainType, [NotNullWhen(true)] out GrainProperties? properties)
         {
             var clusterManifest = _clusterManifestProvider.Current;
             if (clusterManifest is null)

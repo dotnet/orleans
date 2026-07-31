@@ -3,7 +3,6 @@ using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -12,13 +11,14 @@ namespace Orleans.Serialization.Codecs
     public class SkipFieldCodec : IFieldCodec
     {
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             throw new NotImplementedException();
         }
 
         /// <inheritdoc />
-        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             reader.SkipField(field);
             return null;

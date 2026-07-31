@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -6,7 +7,6 @@ using Azure.Core;
 using Azure.Data.Tables;
 using Orleans.Runtime;
 
-#nullable disable
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
@@ -29,12 +29,12 @@ namespace Orleans.GrainDirectory.AzureStorage
 {
     public class AzureStorageOperationOptions
     {
-        private TableServiceClient _tableServiceClient;
+        private TableServiceClient? _tableServiceClient;
 
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>
-        public virtual string TableName { get; set; }
+        public virtual string TableName { get; set; } = null!;
 
         /// <summary>
         /// Azure Storage Policy Options
@@ -44,21 +44,23 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary>
         /// Options to be used when configuring the table storage client, or <see langword="null"/> to use the default options.
         /// </summary>
-        public TableClientOptions ClientOptions { get; set; }
+        public TableClientOptions? ClientOptions { get; set; }
 
         /// <summary>
         /// The delegate used to create a <see cref="TableServiceClient"/> instance.
         /// </summary>
-        internal Func<Task<TableServiceClient>> CreateClient { get; private set; }
+        internal Func<Task<TableServiceClient>> CreateClient { get; private set; } = null!;
 
         /// <summary>
         /// Gets or sets the client used to access the Azure Table Service.
         /// </summary>
-        public TableServiceClient TableServiceClient
+        [DisallowNull]
+        public TableServiceClient? TableServiceClient
         {
             get => _tableServiceClient;
             set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _tableServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }
@@ -180,7 +182,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             retryOptions.MaxRetries = Math.Max(0, storagePolicyOptions.MaxOperationRetries);
         }
 
-        internal void Validate(string name)
+        internal void Validate(string? name)
         {
             if (CreateClient is null)
             {
@@ -196,21 +198,21 @@ namespace Orleans.GrainDirectory.AzureStorage
                 throw GetException($"{nameof(TableName)} is not valid.", ex);
             }
 
-            Exception GetException(string message, Exception inner = null) =>
-                new OrleansConfigurationException($"Configuration for {GetType().Name} {name} is invalid. {message}", inner);
+            Exception GetException(string message, Exception? inner = null) =>
+                new OrleansConfigurationException($"Configuration for {GetType().Name} {name} is invalid. {message}", inner!);
         }
     }
 
     public class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null)
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null)
         {
             Options = options;
             Name = name;
         }
 
         public TOptions Options { get; }
-        public string Name { get; }
+        public string? Name { get; }
 
         public virtual void ValidateConfiguration()
         {

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 
-#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
@@ -19,7 +18,7 @@ internal class DashboardCounters
     public int TotalActiveHostCount { get; set; }
 
     [Id(3)]
-    public ImmutableQueue<int> TotalActiveHostCountHistory { get; set; }
+    public ImmutableQueue<int> TotalActiveHostCountHistory { get; set; } = null!;
 
     [Id(4)]
     public int TotalActivationCount { get; set; }

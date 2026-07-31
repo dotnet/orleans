@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -10,6 +9,6 @@ namespace Orleans.Configuration
         /// Gets or sets the connection string.
         /// </summary>
         [RedactConnectionString]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
     }
 }

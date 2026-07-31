@@ -16,7 +16,7 @@ namespace UnitTests.Grains
         public int X { get; set; }
 
         [Id(2)]
-        public IChainedGrain Next { get; set; }
+        public IChainedGrain? Next { get; set; }
     }
 
     /// <summary>
@@ -32,7 +32,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 
+        Task<IChainedGrain?> IChainedGrain.GetNext() { return Task.FromResult(State.Next); }
 
         Task<int> IChainedGrain.GetId() { return Task.FromResult(State.Id); }
 
@@ -54,7 +54,7 @@ namespace UnitTests.Grains
             return State.X + nextValue;
         }
 
-        public Task SetNext(IChainedGrain next)
+        public Task SetNext(IChainedGrain? next)
         {
             State.Next = next;
             return Task.CompletedTask;
@@ -90,12 +90,12 @@ namespace UnitTests.Grains
 
         public Task PassThisNested(ChainGrainHolder next)
         {
-            return next.Next.SetNextNested(new ChainGrainHolder { Next = this });
+            return next.Next!.SetNextNested(new ChainGrainHolder { Next = this });
         }
 
         public Task PassNullNested(ChainGrainHolder next)
         {
-            return next.Next.SetNextNested(new ChainGrainHolder { Next = null });
+            return next.Next!.SetNextNested(new ChainGrainHolder { Next = null });
         }
     }
 }

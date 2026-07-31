@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using Xunit.Abstractions;
 
-#nullable disable
 namespace Orleans.Serialization.TestKit
 {
     /// <summary>
@@ -93,7 +92,7 @@ namespace Orleans.Serialization.TestKit
     public class SerializationTesterFixture : IDisposable
     {
         private readonly object _lock = new();
-        private IServiceProvider _serviceProvider;
+        private IServiceProvider? _serviceProvider;
 
         /// <summary>
         /// Initializes a new <see cref="SerializationTesterFixture"/> instance.

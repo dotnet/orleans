@@ -4,7 +4,6 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -13,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class ImmutableDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ImmutableDictionary<TKey, TValue>, ImmutableDictionarySurrogate<TKey, TValue>>
+    public sealed class ImmutableDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ImmutableDictionary<TKey, TValue>, ImmutableDictionarySurrogate<TKey, TValue>> where TKey : notnull
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableDictionaryCodec{TKey, TValue}"/> class.
@@ -44,7 +43,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct ImmutableDictionarySurrogate<TKey, TValue>
+    public struct ImmutableDictionarySurrogate<TKey, TValue> where TKey : notnull
     {
         /// <summary>
         /// Gets or sets the values.
@@ -57,7 +56,7 @@ namespace Orleans.Serialization.Codecs
         /// Gets or sets the value comparer.
         /// </summary>
         [Id(1)]
-        public IEqualityComparer<TValue> ValueComparer;
+        public IEqualityComparer<TValue>? ValueComparer;
     }
 
     /// <summary>
@@ -66,10 +65,10 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableDictionary<TKey, TValue>>, IOptionalDeepCopier
+    public sealed class ImmutableDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableDictionary<TKey, TValue>>, IOptionalDeepCopier where TKey : notnull
     {
-        private readonly IDeepCopier<TKey> _keyCopier;
-        private readonly IDeepCopier<TValue> _valueCopier;
+        private readonly IDeepCopier<TKey>? _keyCopier;
+        private readonly IDeepCopier<TValue>? _valueCopier;
 
         public ImmutableDictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
         {
@@ -83,7 +82,7 @@ namespace Orleans.Serialization.Codecs
         public ImmutableDictionary<TKey, TValue> DeepCopy(ImmutableDictionary<TKey, TValue> input, CopyContext context)
         {
             if (context.TryGetCopy<ImmutableDictionary<TKey, TValue>>(input, out var result))
-                return result;
+                return result!;
 
             if (input.IsEmpty || _keyCopier is null && _valueCopier is null)
                 return input;

@@ -111,7 +111,7 @@ namespace DefaultCluster.Tests.General
             {
                 var baseKey = Guid.NewGuid();
 
-                this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, null, null);
+                this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, null!, null);
             });
         }
 

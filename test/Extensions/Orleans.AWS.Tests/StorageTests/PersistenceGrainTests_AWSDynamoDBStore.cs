@@ -55,7 +55,7 @@ namespace AWSUtils.Tests.StorageTests
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid id = Guid.NewGuid();
-            IUser grain = this.HostedCluster.GrainFactory.GetGrain<IUser>(id);
+            IUser grain = this.HostedCluster.GrainFactory!.GetGrain<IUser>(id); // This test requires an initialized client.
 
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new GrainStateRecord();
@@ -73,9 +73,9 @@ namespace AWSUtils.Tests.StorageTests
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
             IUser[] grains = new IUser[3];
-            grains[0] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[0]);
-            grains[1] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[1]);
-            grains[2] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[2]);
+            grains[0] = this.HostedCluster.GrainFactory!.GetGrain<IUser>(ids[0]); // This test requires an initialized client.
+            grains[1] = this.HostedCluster.GrainFactory!.GetGrain<IUser>(ids[1]); // This test requires an initialized client.
+            grains[2] = this.HostedCluster.GrainFactory!.GetGrain<IUser>(ids[2]); // This test requires an initialized client.
 
             var initialState = new GrainStateContainingGrainReferences();
             foreach (var g in grains)

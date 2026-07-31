@@ -11,7 +11,7 @@ namespace UnitTests.GrainInterfaces
     public class TypeWithOnDeserializedHook : IOnDeserialized
     {
         [NonSerialized]
-        public DeserializationContext Context;
+        public DeserializationContext? Context;
 
         [Orleans.Id(0)]
         public int Int { get; set; }

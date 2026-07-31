@@ -75,7 +75,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
                     .ConfigureServices(svc =>
                     {
                         svc.AddScoped<ITransactionFaultInjector, SimpleAzureStorageExceptionInjector>()
-                        .AddScoped<IControlledTransactionFaultInjector>(sp => sp.GetService<ITransactionFaultInjector>() as IControlledTransactionFaultInjector);
+                        .AddScoped<IControlledTransactionFaultInjector>(sp => (sp.GetService<ITransactionFaultInjector>() as IControlledTransactionFaultInjector)!);
                     });
             }
         }

@@ -1652,7 +1652,7 @@ namespace Orleans.Metadata
 
     public partial interface IGrainBindingsProviderAttribute
     {
-        System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string>> GetBindings(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType);
+        System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string?>> GetBindings(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType);
     }
 
     public partial interface IGrainInterfacePropertiesProvider
@@ -2261,7 +2261,7 @@ namespace Orleans.Runtime
 
         protected System.Threading.Tasks.ValueTask InvokeAsync(IRequest methodDescription) { throw null; }
 
-        protected System.Threading.Tasks.ValueTask<T> InvokeAsync<T>(IRequest methodDescription) { throw null; }
+        protected System.Threading.Tasks.ValueTask<T?> InvokeAsync<T>(IRequest methodDescription) { throw null; }
 
         public static bool operator ==(GrainReference? reference1, GrainReference? reference2) { throw null; }
 
@@ -2358,7 +2358,7 @@ namespace Orleans.Runtime
 
         readonly bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
-        public override readonly string? ToString() { throw null; }
+        public override readonly string ToString() { throw null; }
 
         public static byte[]? UnsafeGetArray(GrainType id) { throw null; }
     }
@@ -2434,13 +2434,13 @@ namespace Orleans.Runtime
         [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask DisposeAsync(System.Guid requestId);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> MoveNext<T>(System.Guid requestId, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> MoveNext<T>(System.Guid requestId, System.Threading.CancellationToken cancellationToken);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> MoveNext<T>(System.Guid requestId);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> MoveNext<T>(System.Guid requestId);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request, System.Threading.CancellationToken cancellationToken);
         [Concurrency.AlwaysInterleave]
-        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request);
+        System.Threading.Tasks.ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(System.Guid requestId, IAsyncEnumerableRequest<T> request);
     }
 
     public partial interface IAsyncEnumerableRequest<T> : IRequest, Orleans.Serialization.Invocation.IInvokable, System.IDisposable
@@ -2592,7 +2592,7 @@ namespace Orleans.Runtime
         object Cast(IAddressable grain, System.Type interfaceType);
         void InvokeMethod(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
         System.Threading.Tasks.ValueTask InvokeMethodAsync(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
-        System.Threading.Tasks.ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
+        System.Threading.Tasks.ValueTask<T?> InvokeMethodAsync<T>(GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, CodeGeneration.InvokeMethodOptions options);
     }
 
     public partial interface IGrainRuntime
@@ -2727,7 +2727,7 @@ namespace Orleans.Runtime
 
         public static string PrintDate(System.DateTime date) { throw null; }
 
-        public static string PrintException(System.Exception exception) { throw null; }
+        public static string PrintException(System.Exception? exception) { throw null; }
 
         public static string PrintTime(System.DateTime date) { throw null; }
 
@@ -3335,9 +3335,9 @@ namespace Orleans.Versions
         bool IsEnabled { get; }
 
         System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<Runtime.GrainInterfaceType, Compatibility.CompatibilityStrategy>> GetCompatibilityStrategies();
-        System.Threading.Tasks.Task<Compatibility.CompatibilityStrategy> GetCompatibilityStrategy();
+        System.Threading.Tasks.Task<Compatibility.CompatibilityStrategy?> GetCompatibilityStrategy();
         System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<Runtime.GrainInterfaceType, Selector.VersionSelectorStrategy>> GetSelectorStrategies();
-        System.Threading.Tasks.Task<Selector.VersionSelectorStrategy> GetSelectorStrategy();
+        System.Threading.Tasks.Task<Selector.VersionSelectorStrategy?> GetSelectorStrategy();
     }
 }
 

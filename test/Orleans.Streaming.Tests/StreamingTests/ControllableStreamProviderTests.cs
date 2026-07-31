@@ -17,7 +17,7 @@ namespace UnitTests.StreamingTests
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = "ControllableTestStreamProvider";
-            public readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+            public readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName!;
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -69,7 +69,7 @@ namespace UnitTests.StreamingTests
             _fixture.Logger.LogInformation("************************ ControllableAdapterEchoTest *********************************");
             var mgmt = _fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)command, echoArg);
+            object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)command, echoArg);
             Assert.Equal(2, results.Length);
             Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)

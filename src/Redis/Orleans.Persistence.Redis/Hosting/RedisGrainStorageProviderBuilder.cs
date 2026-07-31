@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
 
-#nullable disable
 [assembly: RegisterProvider("Redis", "GrainStorage", "Silo", typeof(RedisGrainStorageProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "GrainStorage", "Silo", typeof(RedisGrainStorageProviderBuilder))]
 
@@ -18,9 +17,9 @@ namespace Orleans.Hosting;
 
 internal sealed class RedisGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddRedisGrainStorage(name, (OptionsBuilder<RedisStorageOptions> optionsBuilder) =>
+        builder.AddRedisGrainStorage(name!, (OptionsBuilder<RedisStorageOptions> optionsBuilder) =>
         {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {

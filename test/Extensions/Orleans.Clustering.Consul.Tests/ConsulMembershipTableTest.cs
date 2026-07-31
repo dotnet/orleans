@@ -74,7 +74,7 @@ namespace Consul.Tests
 
         protected override async Task<string> GetConnectionString()
         {
-            return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.ConsulConnectionString : null;
+            return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.ConsulConnectionString : null!;
         }
 
         /// <summary>

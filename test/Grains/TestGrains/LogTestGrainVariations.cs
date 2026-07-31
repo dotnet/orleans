@@ -38,7 +38,7 @@ namespace TestGrains
     {
 
         // we use another impl of this grain as the primary.
-        private ILogTestGrain storagegrain;
+        private ILogTestGrain? storagegrain;
 
         private ILogTestGrain GetStorageGrain()
         {
@@ -75,7 +75,7 @@ namespace TestGrains
         private readonly DeepCopier<MyGrainState> copier;
 
         // we use fake in-memory state as the storage
-        private MyGrainState state;
+        private MyGrainState? state;
         private int version;
 
         public LogTestGrainCustomStoragePrimaryCluster(DeepCopier<MyGrainState> copier)
@@ -121,7 +121,7 @@ namespace TestGrains
                 state = new MyGrainState();
                 version = 0;
             }
-            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, this.copier.Copy(state)));
+            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, this.copier.Copy(state!)!)); // State is initialized in the branch above.
         }
 
         public Task ClearStoredState()

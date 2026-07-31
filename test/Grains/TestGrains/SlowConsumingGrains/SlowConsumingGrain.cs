@@ -10,8 +10,8 @@ namespace UnitTests.Grains
     public class SlowConsumingGrain : Grain, ISlowConsumingGrain
     {
         private readonly ILogger logger;
-        public SlowObserver<int> ConsumerObserver { get; private set; }
-        public StreamSubscriptionHandle<int> ConsumerHandle { get; set; }
+        public SlowObserver<int>? ConsumerObserver { get; private set; }
+        public StreamSubscriptionHandle<int>? ConsumerHandle { get; set; }
 
         public SlowConsumingGrain(ILoggerFactory loggerFactory)
         {
@@ -27,7 +27,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberConsumed()
         {
-            return Task.FromResult(this.ConsumerObserver.NumConsumed);
+            return Task.FromResult(this.ConsumerObserver!.NumConsumed);
         }
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
@@ -59,7 +59,7 @@ namespace UnitTests.Grains
         public int NumConsumed { get; private set; }
         private readonly ILogger logger;
         private readonly SlowConsumingGrain slowConsumingGrain;
-        private StreamSequenceToken firstToken;
+        private StreamSequenceToken? firstToken;
 
         internal SlowObserver(SlowConsumingGrain grain, ILogger logger)
         {
@@ -68,7 +68,7 @@ namespace UnitTests.Grains
             this.logger = logger;
         }
 
-        public async Task OnNextAsync(T item, StreamSequenceToken token = null)
+        public async Task OnNextAsync(T item, StreamSequenceToken? token = null)
         {
             NumConsumed++;
 
@@ -79,7 +79,7 @@ namespace UnitTests.Grains
             else
             {
                 // slow consumer keep asking for the first item it received to mimic slow consuming behavior
-                this.slowConsumingGrain.ConsumerHandle = await this.slowConsumingGrain.ConsumerHandle.ResumeAsync(this.slowConsumingGrain.ConsumerObserver, firstToken);
+                this.slowConsumingGrain.ConsumerHandle = await this.slowConsumingGrain.ConsumerHandle!.ResumeAsync(this.slowConsumingGrain.ConsumerObserver!, firstToken);
             }
 
             this.logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", this.GetHashCode(), item, NumConsumed);

@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.Serialization;
 
-#nullable disable
 namespace Orleans.Storage
 {
     /// <summary>
@@ -22,7 +21,7 @@ namespace Orleans.Storage
             string grainId,
             string tableName,
             string storedEtag,
-            string currentEtag,
+            string? currentEtag,
             Exception storageException)
             : base(errorMsg, storedEtag, currentEtag, storageException)
         {
@@ -39,7 +38,7 @@ namespace Orleans.Storage
             string grainId,
             string tableName,
             string storedEtag,
-            string currentEtag,
+            string? currentEtag,
             Exception storageException)
             : this(CreateDefaultMessage(grainType, grainId, tableName, storedEtag, currentEtag), grainType, grainId, tableName, storedEtag, currentEtag, storageException)
         {
@@ -49,19 +48,19 @@ namespace Orleans.Storage
         /// Id of grain
         /// </summary>
         [Id(0)]
-        public string GrainId { get; }
+        public string? GrainId { get; }
 
         /// <summary>
         /// Type of grain that throw this exception
         /// </summary>
         [Id(1)]
-        public string GrainType { get; }
+        public string? GrainType { get; }
 
         /// <summary>
         /// Azure table name
         /// </summary>
         [Id(2)]
-        public string TableName { get; }
+        public string? TableName { get; }
 
         /// <summary>
         /// Exception thrown when an azure table storage exception is thrown due to update conditions not being satisfied.
@@ -91,7 +90,7 @@ namespace Orleans.Storage
             string grainId,
             string tableName,
             string storedEtag,
-            string currentEtag)
+            string? currentEtag)
         {
             return string.Format(DefaultMessageFormat, grainType, grainId, tableName, storedEtag, currentEtag);
         }

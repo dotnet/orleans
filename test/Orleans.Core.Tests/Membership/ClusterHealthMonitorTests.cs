@@ -221,12 +221,12 @@ namespace NonSilo.Tests.Membership
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions);
             using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
             var probeCalls = new ConcurrentQueue<(SiloAddress Target, int ProbeNumber, bool IsIndirect)>();
-            this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), false));
                 return Task.CompletedTask;
             });
-            this.prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(info =>
+            this.prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
                 return Task.FromResult(new IndirectProbeResponse
@@ -306,12 +306,12 @@ namespace NonSilo.Tests.Membership
             }
 
             // Make the probes fail.
-            this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), true));
                 return Task.FromException(new Exception("no"));
             });
-            this.prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(info =>
+            this.prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
                 return Task.FromResult(new IndirectProbeResponse
@@ -397,12 +397,12 @@ namespace NonSilo.Tests.Membership
             await testRig.Manager.Refresh();
 
             // Make the probes succeed again.
-            this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), false));
                 return Task.CompletedTask;
             });
-            this.prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(info =>
+            this.prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
                 return Task.FromResult(new IndirectProbeResponse
@@ -514,11 +514,13 @@ namespace NonSilo.Tests.Membership
             {
                 table = await this.membershipTable.ReadAll();
                 joiningEntry = GetEntryFromTable(table, joiningSilo);
+                Assert.NotNull(joiningEntry);
                 joiningEntry.Item1.AddSuspector(otherSilos[0].SiloAddress, DateTime.UtcNow);
                 Assert.True(await this.membershipTable.UpdateRow(joiningEntry.Item1, joiningEntry.Item2, table.Version.Next()));
 
                 table = await this.membershipTable.ReadAll();
                 createdEntry = GetEntryFromTable(table, createdSilo);
+                Assert.NotNull(createdEntry);
                 createdEntry.Item1.AddSuspector(otherSilos[0].SiloAddress, DateTime.UtcNow);
                 Assert.True(await this.membershipTable.UpdateRow(createdEntry.Item1, createdEntry.Item2, table.Version.Next()));
 
@@ -528,12 +530,18 @@ namespace NonSilo.Tests.Membership
             table = await this.membershipTable.ReadAll();
             joiningEntry = GetEntryFromTable(table, joiningSilo);
             createdEntry = GetEntryFromTable(table, createdSilo);
+            Assert.NotNull(joiningEntry);
+            Assert.NotNull(createdEntry);
 
             // Suspect time will be null if numVotesForDeathDeclaration == 1
             if (totalRequiredVotes > 1 && evictWhenMaxJoinAttemptTimeExceeded)
             {
-                Assert.Equal(totalRequiredVotes - 1, joiningEntry.Item1.SuspectTimes.Count);
-                Assert.Equal(totalRequiredVotes - 1, createdEntry.Item1.SuspectTimes.Count);
+                var initialJoiningSuspectTimes = joiningEntry.Item1.SuspectTimes;
+                var initialCreatedSuspectTimes = createdEntry.Item1.SuspectTimes;
+                Assert.NotNull(initialJoiningSuspectTimes);
+                Assert.NotNull(initialCreatedSuspectTimes);
+                Assert.Equal(totalRequiredVotes - 1, initialJoiningSuspectTimes.Count);
+                Assert.Equal(totalRequiredVotes - 1, initialCreatedSuspectTimes.Count);
             }
 
             // now we start the lifecycle and let the local silo add the final vote.
@@ -559,6 +567,8 @@ namespace NonSilo.Tests.Membership
             table = await this.membershipTable.ReadAll();
             joiningEntry = GetEntryFromTable(table, joiningSilo);
             createdEntry = GetEntryFromTable(table, createdSilo);
+            Assert.NotNull(joiningEntry);
+            Assert.NotNull(createdEntry);
 
             var expectedVotes = totalRequiredVotes == 1
                 ? 2
@@ -568,15 +578,19 @@ namespace NonSilo.Tests.Membership
                 ? totalRequiredVotes
                 : totalRequiredVotes - 1;
 
-            Assert.True(expectedVotes <= joiningEntry.Item1.SuspectTimes.Count);
-            Assert.True(expectedVotes <= createdEntry.Item1.SuspectTimes.Count);
+            var joiningSuspectTimes = joiningEntry.Item1.SuspectTimes;
+            var createdSuspectTimes = createdEntry.Item1.SuspectTimes;
+            Assert.NotNull(joiningSuspectTimes);
+            Assert.NotNull(createdSuspectTimes);
+            Assert.True(expectedVotes <= joiningSuspectTimes.Count);
+            Assert.True(expectedVotes <= createdSuspectTimes.Count);
 
             Assert.Equal(expected: evictWhenMaxJoinAttemptTimeExceeded ? SiloStatus.Dead : SiloStatus.Joining, actual: joiningEntry.Item1.Status);
             Assert.Equal(expected: evictWhenMaxJoinAttemptTimeExceeded ? SiloStatus.Dead : SiloStatus.Created, actual: createdEntry.Item1.Status);
 
             await StopLifecycle();
 
-            static Tuple<MembershipEntry, string> GetEntryFromTable(MembershipTableData table, string siloAddress)
+            static Tuple<MembershipEntry, string>? GetEntryFromTable(MembershipTableData table, string siloAddress)
             {
                 return table.Members.FirstOrDefault(entry => entry.Item1.SiloAddress.ToParsableString() == siloAddress);
             }
@@ -665,7 +679,7 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 optionsMonitor,
                 this.fatalErrorHandler,
-                null);
+                null!);
 
             ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(this.lifecycle);
 

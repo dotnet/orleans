@@ -2,7 +2,6 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -61,7 +60,7 @@ namespace Orleans.Configuration
         public static IServiceCollection ConfigureFormatter<TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
-            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
+            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>()!);
         }
 
         /// <summary>
@@ -146,7 +145,7 @@ namespace Orleans.Configuration
         public static IServiceCollection ConfigureNamedOptionForLogging<TOptions>(this IServiceCollection services, string name)
             where TOptions : class
         {
-            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
+            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>()!.Resolve(name));
         }
     }
 }

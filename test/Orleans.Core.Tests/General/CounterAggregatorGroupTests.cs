@@ -83,7 +83,7 @@ public class CounterAggregatorGroupTests
         var measurements = group.Collect().OrderBy(m => m.Tags[0].Value).ToList();
         foreach (var measurement in measurements)
         {
-            var i = (int)measurement.Tags[0].Value;
+            var i = (int)measurement.Tags[0].Value!;
             _output.WriteLine("{0} {1}", i, measurement.Value);
             Assert.Equal(i * Environment.ProcessorCount * numOfIterations, measurement.Value);
         }

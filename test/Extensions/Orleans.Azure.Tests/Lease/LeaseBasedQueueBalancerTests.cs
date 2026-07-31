@@ -93,8 +93,8 @@ namespace Tester.AzureUtils.Lease
 
         private static async Task WaitUntilAgentManagersOwnCorrectAmountOfAgents(int expectedAgentCountMin, int expectedAgentCountMax, IManagementGrain mgmtGrain)
         {
-            int[] lastObservedCounts = null;
-            Exception lastException = null;
+            int[]? lastObservedCounts = null;
+            Exception? lastException = null;
             using var queueChanges = new StreamProviderQueueChangeSignal(StreamProviderName);
             var stopwatch = Stopwatch.StartNew();
 
@@ -142,7 +142,7 @@ namespace Tester.AzureUtils.Lease
 
         private static async Task<int[]> GetRunningAgentCounts(IManagementGrain mgmtGrain)
         {
-            object[] agentStarted = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
+            object?[] agentStarted = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null!);
             return agentStarted.Select(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo)).ToArray();
         }
 
@@ -152,7 +152,7 @@ namespace Tester.AzureUtils.Lease
                 counts.All(startedAgentInEachSilo => startedAgentInEachSilo <= expectedAgentCountMax && startedAgentInEachSilo >= expectedAgentCountMin);
         }
 
-        private static string CreateUnexpectedAgentCountMessage(int expectedAgentCountMin, int expectedAgentCountMax, int[] counts, Exception exception = null)
+        private static string CreateUnexpectedAgentCountMessage(int expectedAgentCountMin, int expectedAgentCountMax, int[]? counts, Exception? exception = null)
         {
             var message =
                 $"Agent managers don't own the expected amount of agents. Expected total: {totalQueueCount}; " +
@@ -161,7 +161,7 @@ namespace Tester.AzureUtils.Lease
             return exception is null ? message : $"{message} Last query error: {exception.Message}";
         }
 
-        private static string FormatAgentCounts(int[] counts) => counts is null ? "<none>" : $"[{string.Join(", ", counts)}] (sum: {counts.Sum()})";
+        private static string FormatAgentCounts(int[]? counts) => counts is null ? "<none>" : $"[{string.Join(", ", counts)}] (sum: {counts.Sum()})";
 
         private sealed class StreamProviderQueueChangeSignal : IObserver<StreamingEvents.StreamingEvent>, IDisposable
         {

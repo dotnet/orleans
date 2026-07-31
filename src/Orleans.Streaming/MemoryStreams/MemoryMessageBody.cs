@@ -55,7 +55,8 @@ namespace Orleans.Providers
         /// <inheritdoc />
         public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes)
         {
-            return serializer.Deserialize(bodyBytes.ToArray());
+            // Serialize only accepts a non-null MemoryMessageBody.
+            return serializer.Deserialize(bodyBytes.ToArray())!;
         }
 
         /// <inheritdoc />
@@ -77,7 +78,7 @@ namespace Orleans.Providers
         /// </summary>
         /// <param name="events">Events that are part of this message.</param>
         /// <param name="requestContext">Context in which this message was sent.</param>        
-        public MemoryMessageBody(IEnumerable<object> events, Dictionary<string, object> requestContext)
+        public MemoryMessageBody(IEnumerable<object> events, Dictionary<string, object>? requestContext)
         {
             if (events == null) throw new ArgumentNullException(nameof(events));
             Events = events.ToList();
@@ -94,6 +95,6 @@ namespace Orleans.Providers
         /// Gets the message request context.
         /// </summary>
         [Id(1)]
-        public Dictionary<string, object> RequestContext { get; }
+        public Dictionary<string, object>? RequestContext { get; }
     }
 }

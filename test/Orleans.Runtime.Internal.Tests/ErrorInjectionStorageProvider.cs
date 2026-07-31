@@ -158,7 +158,7 @@ namespace UnitTests.StorageTests
                 }
                 else
                 {
-                    throw ((Exception)Activator.CreateInstance(ErrorInjection.ExceptionType));
+                    throw ((Exception)Activator.CreateInstance(ErrorInjection.ExceptionType)!);
                 }
             }
         }
@@ -168,13 +168,13 @@ namespace UnitTests.StorageTests
         /// </summary>
         /// <param name="command">A serial number of the command.</param>
         /// <param name="arg">An opaque command argument</param>
-        public override Task<object> ExecuteCommand(int command, object arg)
+        public override Task<object?> ExecuteCommand(int command, object? arg)
         { 
             switch ((Commands)command)
             {
                 case Commands.SetErrorInjection:
-                    SetErrorInjection((ErrorInjectionBehavior)arg);
-                    return Task.FromResult<object>(true);
+                    SetErrorInjection((ErrorInjectionBehavior)arg!);
+                    return Task.FromResult<object?>(true);
                 default:
                     return base.ExecuteCommand(command, arg);
             }

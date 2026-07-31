@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
 
-#nullable disable
 namespace Orleans.EventSourcing.LogStorage
 {
     /// <summary>
@@ -38,10 +37,10 @@ namespace Orleans.EventSourcing.LogStorage
         private readonly string grainTypeName;
 
         // the object containing the entire log, as retrieved from / sent to storage
-        private LogStateWithMetaDataAndETag<TLogEntry> GlobalLog;
+        private LogStateWithMetaDataAndETag<TLogEntry> GlobalLog = null!;
 
         // the confirmed view
-        private TLogView ConfirmedViewInternal;
+        private TLogView ConfirmedViewInternal = null!;
         private int ConfirmedVersionInternal;
 
         /// <inheritdoc/>
@@ -152,7 +151,7 @@ namespace Orleans.EventSourcing.LogStorage
 
             var writebit = GlobalLog.StateAndMetaData.FlipBit(Services.MyClusterId);
             foreach (var x in updates)
-                GlobalLog.StateAndMetaData.Log.Add(x.Entry);
+                GlobalLog.StateAndMetaData.Log.Add(x.Entry!);
 
             try
             {
@@ -265,15 +264,15 @@ namespace Orleans.EventSourcing.LogStorage
 
             /// <summary> The cluster that performed the update </summary>
             [Id(1)]
-            public string Origin { get; set; }
+            public string Origin { get; set; } = null!;
 
             /// <summary> The list of updates that were applied </summary>
             [Id(2)]
-            public List<TLogEntry> Updates { get; set; }
+            public List<TLogEntry> Updates { get; set; } = null!;
 
             /// <summary> The e-tag of the storage after applying the updates</summary>
             [Id(3)]
-            public string ETag { get; set; }
+            public string? ETag { get; set; }
 
             /// <inheritdoc/>
             public override string ToString()

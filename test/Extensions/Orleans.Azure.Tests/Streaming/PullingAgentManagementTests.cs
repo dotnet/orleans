@@ -45,7 +45,7 @@ namespace UnitTests.StreamingTests
 
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 #pragma warning disable 618
-        private readonly string adapterType = typeof(PersistentStreamProvider).FullName;
+        private readonly string adapterType = typeof(PersistentStreamProvider).FullName!;
 #pragma warning restore 618
 
         public PullingAgentManagementTests(Fixture fixture)
@@ -81,6 +81,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(2, states.Length);
             foreach (var state in states)
             {
+                Assert.NotNull(state);
                 StreamLifecycleOptions.RunState providerState;
                 Enum.TryParse(state.ToString(), out providerState);
                 Assert.Equal(expectedState, providerState);

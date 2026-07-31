@@ -4,7 +4,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -68,12 +67,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<ConcurrentQueue<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new ConcurrentQueue<T>();

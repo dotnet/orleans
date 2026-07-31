@@ -7,13 +7,13 @@ namespace UnitTests.Grains
 {
     public class FaultableConsumerGrain : Grain, IFaultableConsumerGrain
     {
-        private IAsyncObservable<int> consumer;
+        private IAsyncObservable<int>? consumer;
         private int eventsConsumedCount;
         private int errorsCount;
         private int eventsFailedCount;
         private readonly ILogger logger;
-        private StreamSubscriptionHandle<int> consumerHandle;
-        private Stopwatch failPeriodTimer;
+        private StreamSubscriptionHandle<int>? consumerHandle;
+        private Stopwatch? failPeriodTimer;
         private TimeSpan failPeriod;
 
         public FaultableConsumerGrain(ILoggerFactory loggerFactory)
@@ -90,7 +90,7 @@ namespace UnitTests.Grains
             return Task.FromResult(errorsCount);
         }
 
-        public Task OnNextAsync(int item, StreamSequenceToken token = null)
+        public Task OnNextAsync(int item, StreamSequenceToken? token = null)
         {
             logger.LogInformation("OnNextAsync(item={Item}, token={Token})", item, token != null ? token.ToString() : "null");
             if (failPeriodTimer == null)

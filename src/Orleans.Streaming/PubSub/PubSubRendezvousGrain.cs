@@ -85,7 +85,7 @@ namespace Orleans.Streams
         private readonly StateStorageBridge<PubSubGrainState> _storage;
         private readonly StreamInstruments _streamInstruments;
 
-        private PubSubGrainState State => _storage.State;
+        private PubSubGrainState State => _storage.State!; // OnActivateAsync reads state before grain calls are dispatched.
 
         public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory, ILogger<PubSubRendezvousGrain> logger, StreamInstruments streamInstruments)
         {
@@ -128,7 +128,8 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
-            return State.Consumers.Where(c => !c.IsFaulted).ToSet();
+            // The LINQ query is non-null, so ToSet cannot return null.
+            return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
         }
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
@@ -167,7 +168,7 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             QualifiedStreamId streamId,
             GrainId streamConsumer,
-            string filterData)
+            string? filterData)
         {
             _streamInstruments.PubSubConsumersAdded.Add(1);
             var pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -12,7 +13,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.GeneratedCodeHelpers
 {
     /// <summary>
@@ -55,7 +55,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <returns>The unwrapped service.</returns>
         public static TService GetService<TService>(object caller, ICodecProvider codecProvider)
         {
-            var state = ResolutionState.Value;
+            var state = ResolutionState.Value!;
 
             try
             {
@@ -93,7 +93,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <returns>The unwrapped service.</returns>
         public static TService UnwrapService<TService>(object caller, TService service)
         {
-            var state = ResolutionState.Value;
+            var state = ResolutionState.Value!;
 
             try
             {
@@ -125,9 +125,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             }
         }
 
-        internal static object TryGetService(Type serviceType)
+        internal static object? TryGetService(Type serviceType)
         {
-            var state = ResolutionState.Value;
+            var state = ResolutionState.Value!;
             foreach (var c in state.Callers)
             {
                 var type = c?.GetType();
@@ -143,7 +143,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <summary>
         /// Returns the provided copier if it's not shallow-copyable.
         /// </summary>
-        public static IDeepCopier<T> GetOptionalCopier<T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
+        public static IDeepCopier<T>? GetOptionalCopier<T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
 
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.
@@ -193,7 +193,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void SerializeUnexpectedType<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public static void SerializeUnexpectedType<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
             var specificSerializer = writer.Session.CodecProvider.GetCodec(value.GetType());
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
@@ -210,8 +210,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Reader<TInput> reader, scoped ref Field field) where TField : class
         {
-            var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType);
-            return (TField)specificSerializer.ReadValue(ref reader, field);
+            var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType!);
+            return (TField)specificSerializer.ReadValue(ref reader, field)!;
         }
 
         /// <summary>
@@ -223,7 +223,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="parameterTypes">The parameter types.</param>
         /// <returns>The corresponding <see cref="MethodInfo"/>.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static MethodInfo GetMethodInfoOrDefault(Type interfaceType, string methodName, Type[] methodTypeParameters, Type[] parameterTypes)
+        public static MethodInfo? GetMethodInfoOrDefault(Type? interfaceType, string methodName, Type[]? methodTypeParameters, Type[]? parameterTypes)
         {
             if (interfaceType is null)
             {
@@ -262,7 +262,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 var isMatch = true;
                 for (int i = 0; i < parameters.Length; i++)
                 {
-                    if (!parameters[i].ParameterType.Equals(parameterTypes[i]))
+                    if (!parameters[i].ParameterType.Equals(parameterTypes![i]))
                     {
                         isMatch = false;
                         break;
@@ -303,16 +303,17 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 _baseTypeCopier = GetService<IBaseCopier<B>>(this, codecProvider);
             }
 
-            public T DeepCopy(T original, CopyContext context)
+            [return: NotNullIfNotNull(nameof(original))]
+            public T? DeepCopy(T original, CopyContext context)
             {
                 if (original is null)
                 {
-                    return null;
+                    return default;
                 }
 
                 if (original.GetType() != _fieldType)
                 {
-                    return context.DeepCopy(original);
+                    return context.DeepCopy(original)!;
                 }
 
                 var result = _activator.Create();

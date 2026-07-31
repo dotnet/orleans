@@ -25,15 +25,15 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private readonly CachePressureInjectionMonitor cachePressureInjectionMonitor;
         private readonly PurgeDecisionInjectionPredicate purgePredicate;
         private readonly Serializer serializer;
-        private EventHubAdapterReceiver receiver1;
-        private EventHubAdapterReceiver receiver2;
+        private EventHubAdapterReceiver receiver1 = null!;
+        private EventHubAdapterReceiver receiver2 = null!;
         private readonly ObjectPool<FixedSizeBuffer> bufferPool;
         private readonly TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private readonly EventHubPartitionSettings ehSettings;
         private readonly OrleansInstruments instruments;
         private IEnvironmentStatisticsProvider environmentStatisticsProvider;
-        private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
-        private List<EHEvictionStrategyForTesting> evictionStrategyList;
+        private ConcurrentBag<EventHubQueueCacheForTesting> cacheList = null!;
+        private List<EHEvictionStrategyForTesting> evictionStrategyList = null!;
 
         public EHPurgeLogicTests()
         {
@@ -168,7 +168,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                     expectedPurgedBuffers.Add(purgedBufferList[i]);
             });
 
-            IList<IBatchContainer> ignore;
+            IList<IBatchContainer>? ignore;
             this.receiver1.TryPurgeFromCache(out ignore);
             this.receiver2.TryPurgeFromCache(out ignore);
 

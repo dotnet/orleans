@@ -6,12 +6,12 @@ namespace ServiceBus.Tests.MonitorTests
     {
         public EventHubReceiverMonitorCounters CallCounters { get; } = new EventHubReceiverMonitorCounters();
 
-        public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
+        public void TrackInitialization(bool success, TimeSpan callTime, Exception? exception)
         {
             if(success) Interlocked.Increment(ref this.CallCounters.TrackInitializationCallCounter);
         }
 
-        public void TrackRead(bool success, TimeSpan callTime, Exception exception)
+        public void TrackRead(bool success, TimeSpan callTime, Exception? exception)
         {
             if (success) Interlocked.Increment(ref this.CallCounters.TrackReadCallCounter);
         }
@@ -21,7 +21,7 @@ namespace ServiceBus.Tests.MonitorTests
             Interlocked.Increment(ref this.CallCounters.TrackMessagesReceivedCallCounter);
         }
 
-        public void TrackShutdown(bool success, TimeSpan callTime, Exception exception)
+        public void TrackShutdown(bool success, TimeSpan callTime, Exception? exception)
         {
             Interlocked.Increment(ref this.CallCounters.TrackShutdownCallCounter);
         }

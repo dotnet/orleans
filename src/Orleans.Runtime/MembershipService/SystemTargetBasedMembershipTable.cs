@@ -8,14 +8,13 @@ using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Serialization;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal partial class SystemTargetBasedMembershipTable : IMembershipTable
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
-        private IMembershipTableSystemTarget grain;
+        private IMembershipTableSystemTarget grain = null!;
 
         public SystemTargetBasedMembershipTable(IServiceProvider serviceProvider, ILogger<SystemTargetBasedMembershipTable> logger)
         {
@@ -36,7 +35,7 @@ namespace Orleans.Runtime.MembershipService
                     $"{nameof(DevelopmentClusterMembershipOptions)}.{nameof(options.PrimarySiloEndpoint)} must be set when using development clustering.");
             }
 
-            var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
+            var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>()!;
             bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
             var result = grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, SiloAddress.New(options.PrimarySiloEndpoint, 0));
@@ -155,7 +154,7 @@ namespace Orleans.Runtime.MembershipService
         public Task DeleteMembershipTableEntries(string clusterId)
         {
             LogInformationDeleteMembershipTableEntries(logger, clusterId);
-            table = null;
+            table = null!;
             return Task.CompletedTask;
         }
 

@@ -4,7 +4,7 @@ namespace UnitTests.Grains
 {
     public class GeneratorTestGrain : Grain, IGeneratorTestGrain
     {
-        protected byte[] myGrainBytes;
+        protected byte[] myGrainBytes = null!;
         protected string myGrainString = string.Empty;
         protected ReturnCode myCode;
 

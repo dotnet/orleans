@@ -343,13 +343,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
 
     public abstract class GrainBase : Grain
     {
-        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress);
+        public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress!);
     }
 
     public class A : GrainBase, IA
     {
-        private SiloAddress _silo1;
-        private SiloAddress _silo2;
+        private SiloAddress _silo1 = null!;
+        private SiloAddress _silo2 = null!;
 
         public async Task FirstPing(Scenario scenario, SiloAddress silo1, SiloAddress silo2)
         {
@@ -491,7 +491,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         // We are just 'Immovable' on this type, because we just want it to push messages to the stream,
         // as for some reason pushing to a stream via the cluster client isnt invoking the consumer grains.
 
-        private IAsyncStream<int> _stream;
+        private IAsyncStream<int> _stream = null!;
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {

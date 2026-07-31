@@ -1,7 +1,6 @@
 using System;
 using Orleans.Providers;
 
-#nullable disable
 namespace Orleans.Runtime.Providers
 {
     internal class SiloProviderRuntime : IProviderRuntime
@@ -26,7 +25,7 @@ namespace Orleans.Runtime.Providers
             where TExtension : class, TExtensionInterface
             where TExtensionInterface : class, IGrainExtension
         {
-            return _grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+            return _grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>()!.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
     }
 }

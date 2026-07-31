@@ -1,11 +1,11 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal partial class AsyncTimer : IAsyncTimer
@@ -102,7 +102,7 @@ namespace Orleans.Runtime
             return TimeSpan.Zero;
         }
 
-        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        public bool CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason)
         {
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             var due = this.expected;

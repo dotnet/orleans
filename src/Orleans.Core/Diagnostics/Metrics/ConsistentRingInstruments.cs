@@ -1,14 +1,13 @@
 using System;
 using System.Diagnostics.Metrics;
 
-#nullable disable
 namespace Orleans.Runtime;
 
 internal sealed class ConsistentRingInstruments(OrleansInstruments instruments)
 {
-    private ObservableGauge<int> _ringSize;
-    private ObservableGauge<float> _myRangeRingPercentage;
-    private ObservableGauge<float> _averageRingPercentage;
+    private ObservableGauge<int>? _ringSize;
+    private ObservableGauge<float>? _myRangeRingPercentage;
+    private ObservableGauge<float>? _averageRingPercentage;
 
     internal void RegisterRingSizeObserve(Func<int> observeValue)
     {

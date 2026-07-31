@@ -21,7 +21,7 @@ namespace Orleans.Serialization.UnitTests
     [DefaultInvokableBaseType(typeof(void), typeof(UnitTestVoidRequest))]
     public abstract class MyInvokableProxyBase
     {
-        public Action<IInvokable> OnInvoke { get; set; }
+        public Action<IInvokable>? OnInvoke { get; set; }
 
         protected MyInvokableProxyBase(CopyContextPool copyContextPool, CodecProvider codecProvider)
         {
@@ -62,9 +62,9 @@ namespace Orleans.Serialization.UnitTests
 
         protected ValueTask InvokeAsync(IInvokable body) => default;
 
-        protected CopyContextPool CopyContextPool { get; }
+        protected CopyContextPool? CopyContextPool { get; }
 
-        protected CodecProvider CodecProvider { get; }
+        protected CodecProvider? CodecProvider { get; }
     }
 
     [Alias("my_interface")]
@@ -145,7 +145,7 @@ namespace Orleans.Serialization.UnitTests
         Task<Type[]> GetTypesInferred<T, U>(T t, U u, int v);
         Task<T> RoundTrip<T>(T val);
         Task<int> RoundTrip(int val);
-        Task<T> Default<T>();
+        Task<T?> Default<T>();
         Task<string> Default();
         Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IMyInvokableBaseType;
         ValueTask<int> ValueTaskMethod(bool useCache);
@@ -153,7 +153,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class GrainWithGenericMethods : IGrainWithGenericMethods
     {
-        private object state;
+        private object? state;
 
         public Task<Type[]> GetTypesExplicit<T, U, V>()
         {
@@ -180,7 +180,7 @@ namespace Orleans.Serialization.UnitTests
             return Task.FromResult(-val);
         }
 
-        public Task<T> Default<T>()
+        public Task<T?> Default<T>()
         {
             return Task.FromResult(default(T));
         }
@@ -195,12 +195,12 @@ namespace Orleans.Serialization.UnitTests
             return Task.FromResult(grain);
         }
 
-        public void SetValue<T>(T value)
+        public void SetValue<T>(T? value)
         {
             this.state = value;
         }
 
-        public Task<T> GetValue<T>() => Task.FromResult((T) this.state);
+        public Task<T?> GetValue<T>() => Task.FromResult((T?)this.state);
 
         public ValueTask<int> ValueTaskMethod(bool useCache)
         {
@@ -242,14 +242,14 @@ namespace Orleans.Serialization.UnitTests
     public class GenericGrainState<T>
     {
         [Id(1)]
-        public T @event { get; set; }
+        public T? @event { get; set; }
     }
 
     /// <summary>
     /// A class designed to test that code generation correctly handles reserved keywords.
     /// </summary>
     [GenerateSerializer]
-    public class @event : IEquatable<@event>
+    public class @event : IEquatable<@event?>
     {
         private static readonly IEqualityComparer<@event> EventComparerInstance = new EventEqualityComparer();
 
@@ -275,7 +275,7 @@ namespace Orleans.Serialization.UnitTests
         /// A property with a reserved keyword type and identifier.
         /// </summary>
         [Id(2)]
-        public @event @public { get; set; }
+        public @event? @public { get; set; }
 
         /// <summary>
         /// Gets or sets the enum.
@@ -287,7 +287,7 @@ namespace Orleans.Serialization.UnitTests
         /// A property with a reserved keyword generic type and identifier.
         /// </summary>
         [Id(4)]
-        public List<@event> @if { get; set; }
+        public List<@event>? @if { get; set; }
 
         public static IEqualityComparer<@event> EventComparer
         {
@@ -314,7 +314,7 @@ namespace Orleans.Serialization.UnitTests
             }
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (ReferenceEquals(null, obj))
             {
@@ -344,7 +344,7 @@ namespace Orleans.Serialization.UnitTests
             }
         }
 
-        public bool Equals(@event other)
+        public bool Equals(@event? other)
         {
             if (ReferenceEquals(null, other))
             {
@@ -356,7 +356,8 @@ namespace Orleans.Serialization.UnitTests
             }
             if (this.@if != other.@if)
             {
-                if (this.@if != null && !this.@if.SequenceEqual(other.@if, EventComparer))
+                // Serialized equality inputs preserve whether the event list is present.
+                if (this.@if != null && !this.@if.SequenceEqual(other.@if!, EventComparer))
                 {
                     return false;
                 }
@@ -375,9 +376,10 @@ namespace Orleans.Serialization.UnitTests
 
         private sealed class EventEqualityComparer : IEqualityComparer<@event>
         {
-            public bool Equals(@event x, @event y)
+            public bool Equals(@event? x, @event? y)
             {
-                return x.Equals(y);
+                // Lists in this test declare non-null event elements.
+                return x!.Equals(y);
             }
 
             public int GetHashCode(@event obj)
@@ -391,13 +393,13 @@ namespace Orleans.Serialization.UnitTests
     public class NestedGeneric<T>
     {
         [Id(0)]
-        public Nested Payload { get; set; }
+        public Nested? Payload { get; set; }
 
         [GenerateSerializer]
         public class Nested
         {
             [Id(0)]
-            public T Value { get; set; }
+            public T? Value { get; set; }
         }
     }
 
@@ -405,13 +407,13 @@ namespace Orleans.Serialization.UnitTests
     public class NestedConstructedGeneric
     {
         [Id(0)]
-        public Nested<int> Payload { get; set; }
+        public Nested<int>? Payload { get; set; }
 
         [GenerateSerializer]
         public class Nested<T>
         {
             [Id(0)]
-            public T Value { get; set; }
+            public T? Value { get; set; }
         }
     }
 
@@ -428,12 +430,14 @@ namespace Orleans.Serialization.UnitTests
     {
         public Task<int> Do(NestedGeneric<int> value)
         {
-            return Task.FromResult(value.Payload.Value);
+            // Generated requests in this test always provide the initialized payload.
+            return Task.FromResult(value.Payload!.Value);
         }
 
         public Task<int> Do(NestedConstructedGeneric value)
         {
-            return Task.FromResult(value.Payload.Value);
+            // Generated requests in this test always provide the initialized payload.
+            return Task.FromResult(value.Payload!.Value);
         }
     }
 }

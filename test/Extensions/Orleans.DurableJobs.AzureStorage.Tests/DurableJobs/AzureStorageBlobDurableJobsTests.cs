@@ -12,7 +12,7 @@ namespace Tester.AzureUtils.DurableJobs;
 
 public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
 {
-    private DurableJobTestsRunner _runner;
+    private DurableJobTestsRunner _runner = null!;
 
     protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
 
@@ -139,7 +139,7 @@ internal static class AzureBlobDurableJobsTestConfiguration
         }
         else
         {
-            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString!);
         }
 
         return options;

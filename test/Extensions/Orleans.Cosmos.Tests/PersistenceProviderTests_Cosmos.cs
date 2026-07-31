@@ -151,7 +151,7 @@ public class PersistenceProviderTests_Cosmos
         await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
     }
 
-    private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store, GrainState<TestStoreGrainState> grainState, GrainId grainId)
+    private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store, GrainState<TestStoreGrainState>? grainState, GrainId grainId)
     {
         grainState ??= new GrainState<TestStoreGrainState>(new TestStoreGrainState());
 
@@ -166,13 +166,15 @@ public class PersistenceProviderTests_Cosmos
         output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
         var storedState = storedGrainState.State;
+        Assert.NotNull(grainState.State);
+        Assert.NotNull(storedState);
         Assert.Equal(grainState.State.A, storedState.A);
         Assert.Equal(grainState.State.B, storedState.B);
         Assert.Equal(grainState.State.C, storedState.C);
     }
 
     private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
-        IGrainStorage store, GrainState<TestStoreGrainState> grainState, GrainId grainId)
+        IGrainStorage store, GrainState<TestStoreGrainState>? grainState, GrainId grainId)
     {
         grainState ??= TestStoreGrainState.NewRandomState();
 
@@ -191,6 +193,8 @@ public class PersistenceProviderTests_Cosmos
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
         TimeSpan readTime = sw.Elapsed;
         output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        Assert.NotNull(grainState.State);
+        Assert.NotNull(storedGrainState.State);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
         Assert.Equal(grainState.State.B, storedGrainState.State.B);
         Assert.Equal(grainState.State.C, storedGrainState.State.C);
@@ -199,7 +203,7 @@ public class PersistenceProviderTests_Cosmos
     }
 
     private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
-        IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+        IGrainStorage store, GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
     {
         grainId = fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
 
@@ -236,7 +240,7 @@ public class PersistenceProviderTests_Cosmos
     public class TestStoreGrainStateWithCustomJsonProperties
     {
         [JsonPropertyName("s")]
-        public string String { get; set; }
+        public string? String { get; set; }
 
         internal static GrainState<TestStoreGrainStateWithCustomJsonProperties> NewRandomState(int? aPropertyLength = null)
         {

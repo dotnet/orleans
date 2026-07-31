@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.Serialization;
 
-#nullable disable
 namespace Orleans.Storage.Internal
 {
     /// <summary>Exception used to communicate with the storage provider, so that it throws this exception to its caller.</summary>
@@ -11,18 +10,18 @@ namespace Orleans.Storage.Internal
     {
         /// <summary>Gets the Etag value currently held in persistent storage.</summary>
         [Id(0)]
-        public string StoredEtag { get; private set; }
+        public string? StoredEtag { get; private set; }
 
         /// <summary>Gets the Etag value currently help in memory, and attempting to be updated.</summary>
         [Id(1)]
-        public string ReceivedEtag { get; private set; }
+        public string? ReceivedEtag { get; private set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryStorageEtagMismatchException"/> class.
         /// </summary>
         /// <param name="storedEtag">The stored etag.</param>
         /// <param name="receivedEtag">The received etag.</param>
-        public MemoryStorageEtagMismatchException(string storedEtag, string receivedEtag)
+        public MemoryStorageEtagMismatchException(string storedEtag, string? receivedEtag)
         {
             StoredEtag = storedEtag;
             ReceivedEtag = receivedEtag;

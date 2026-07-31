@@ -21,10 +21,10 @@ internal interface ISiloGrainService : IGrainService
     Task Enable(bool enabled);
 
     [Alias("GetExtendedProperties")]
-    Task<Immutable<Dictionary<string, string>>> GetExtendedProperties();
+    Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties();
 
     [Alias("GetRuntimeStatistics")]
-    Task<Immutable<SiloRuntimeStatistics[]>> GetRuntimeStatistics();
+    Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics();
 
     [Alias("GetCounters")]
     Task<Immutable<StatCounter[]>> GetCounters();

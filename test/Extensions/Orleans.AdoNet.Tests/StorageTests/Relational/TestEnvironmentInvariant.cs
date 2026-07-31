@@ -26,10 +26,10 @@ namespace UnitTests.StorageTests.Relational
     public class TestEnvironmentSettings
     {
         [Orleans.Id(0)]
-        public ICollection<StorageConnection> ConnectionStrings { get; set; }
+        public ICollection<StorageConnection> ConnectionStrings { get; set; } = null!;
 
         [Orleans.Id(1)]
-        public string EnvironmentId { get; set; }
+        public string EnvironmentId { get; set; } = null!;
     }
 
     /// <summary>
@@ -58,17 +58,17 @@ namespace UnitTests.StorageTests.Relational
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameSqlServer,
-                    ConnectionString = TestDefaultConfiguration.MsSqlConnectionString
+                    ConnectionString = TestDefaultConfiguration.MsSqlConnectionString!
                 },
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameMySql,
-                    ConnectionString = TestDefaultConfiguration.MySqlConnectionString
+                    ConnectionString = TestDefaultConfiguration.MySqlConnectionString!
                 },
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNamePostgreSql,
-                    ConnectionString = TestDefaultConfiguration.PostgresConnectionString
+                    ConnectionString = TestDefaultConfiguration.PostgresConnectionString!
                 }
             })),
             EnvironmentId = "Default"
@@ -93,7 +93,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="connection">The connection with which to ensure the storage is functional.</param>
         /// <param name="storageName">Storage name. This is optional.</param>
         /// <returns></returns>
-        public RelationalStorageForTesting EnsureStorageForTesting(StorageConnection connection, string storageName = null)
+        public RelationalStorageForTesting? EnsureStorageForTesting(StorageConnection connection, string? storageName = null)
         {
 
             if (AdoNetInvariants.Invariants.Contains(connection.StorageInvariant))
@@ -126,7 +126,7 @@ namespace UnitTests.StorageTests.Relational
             var codeBaseUrl = new Uri(Assembly.GetExecutingAssembly().Location);
             var codeBasePath = Uri.UnescapeDataString(codeBaseUrl.AbsolutePath);
             var dirPath = Path.GetDirectoryName(codeBasePath);
-            var customFileLoc = Path.Combine(dirPath, customTestSettingsFileLocation);
+            var customFileLoc = Path.Combine(dirPath!, customTestSettingsFileLocation);
 
             var finalSettings = JObject.FromObject(defaultSettings);
             if (File.Exists(customFileLoc))
@@ -138,7 +138,7 @@ namespace UnitTests.StorageTests.Relational
                 finalSettings = customSettingsJson;
             }
 
-            return finalSettings.ToObject<TestEnvironmentSettings>();
+            return finalSettings.ToObject<TestEnvironmentSettings>()!;
         }
 
         /// <summary>

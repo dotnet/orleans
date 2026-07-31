@@ -18,16 +18,16 @@ namespace UnitTests.General
         private static readonly Dictionary<string, string> ConnectionStringsByInvariant =
             new()
             {
-                {AdoNetInvariants.InvariantNameSqlServer, TestDefaultConfiguration.MsSqlConnectionString},
-                {AdoNetInvariants.InvariantNameMySql, TestDefaultConfiguration.MySqlConnectionString},
-                {AdoNetInvariants.InvariantNamePostgreSql, TestDefaultConfiguration.PostgresConnectionString}
+                {AdoNetInvariants.InvariantNameSqlServer, TestDefaultConfiguration.MsSqlConnectionString!},
+                {AdoNetInvariants.InvariantNameMySql, TestDefaultConfiguration.MySqlConnectionString!},
+                {AdoNetInvariants.InvariantNamePostgreSql, TestDefaultConfiguration.PostgresConnectionString!}
             };
 
         public IRelationalStorage Storage { get; private set; }
 
         public string CurrentConnectionString
         {
-            get { return Storage?.ConnectionString; }
+            get { return Storage.ConnectionString; }
         }
 
         /// <summary>
@@ -91,7 +91,7 @@ namespace UnitTests.General
         /// <param name="databaseName">the name of the database</param>
         protected abstract IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName);
 
-        public static void CheckPreconditionsOrThrow(string invariantName, string connectionString = null)
+        public static void CheckPreconditionsOrThrow(string invariantName, string? connectionString = null)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
             {
@@ -101,7 +101,7 @@ namespace UnitTests.General
             Skip.If(string.IsNullOrEmpty(connectionString), "Connection string not provided.");
         }
 
-        public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string connectionString = null)
+        public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string? connectionString = null)
         {
             CheckPreconditionsOrThrow(invariantName, connectionString);
             if (string.IsNullOrWhiteSpace(invariantName))
@@ -157,9 +157,9 @@ namespace UnitTests.General
             return testStorage;
         }
 
-        private static RelationalStorageForTesting CreateTestInstance(string invariantName, string connectionString)
+        private static RelationalStorageForTesting CreateTestInstance(string invariantName, string? connectionString)
         {
-            return instanceFactory[invariantName](connectionString);
+            return instanceFactory[invariantName](connectionString!);
         }
 
         /// <summary>
@@ -167,7 +167,7 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="invariantName"></param>
         /// <param name="connectionString"></param>
-        protected RelationalStorageForTesting(string invariantName, string connectionString)
+        protected RelationalStorageForTesting(string invariantName, string? connectionString)
         {
             if (!string.IsNullOrEmpty(connectionString))
             {

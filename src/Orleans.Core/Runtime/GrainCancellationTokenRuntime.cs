@@ -7,7 +7,6 @@ using Orleans.Internal;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal class GrainCancellationTokenRuntime : IGrainCancellationTokenRuntime
@@ -28,7 +27,7 @@ namespace Orleans.Runtime
 
             // propagate the exception from the _cancellationTokenSource.Cancel back to the caller
             // but also cancel _targetGrainReferences.
-            Task localTask = null;
+            Task? localTask = null;
             try
             {
                 // Cancel the token now, preventing recursion.
@@ -39,7 +38,7 @@ namespace Orleans.Runtime
                 localTask = Task.FromException(exception);
             }
 
-            List<Task> tasks = null;
+            List<Task>? tasks = null;
             foreach (var reference in grainReferences)
             {
                 if (tasks is null)

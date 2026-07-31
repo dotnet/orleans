@@ -16,12 +16,12 @@ namespace DistributedTests.Client.Commands
 
         private class Parameters
         {
-            public string ServiceId { get; set; }
-            public string ClusterId { get; set; }
-            public Uri AzureTableUri { get; set; }
-            public Uri AzureQueueUri { get; set; }
-            public string CounterKey { get; set; }
-            public List<string> Counters { get; set; }
+            public string ServiceId { get; set; } = null!;
+            public string ClusterId { get; set; } = null!;
+            public Uri AzureTableUri { get; set; } = null!;
+            public Uri AzureQueueUri { get; set; } = null!;
+            public string CounterKey { get; set; } = null!;
+            public List<string> Counters { get; set; } = null!;
         }
 
         public CounterCaptureCommand(ILogger logger)
@@ -50,7 +50,8 @@ namespace DistributedTests.Client.Commands
             using var host = hostBuilder.Build();
             await host.StartAsync();
 
-            var client = host.Services.GetService<IClusterClient>();
+            // The Orleans client is always registered by UseOrleansClient above.
+            var client = host.Services.GetService<IClusterClient>()!;
 
             var counterGrain = client.GetGrain<ICounterGrain>(parameters.CounterKey);
 

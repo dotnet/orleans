@@ -6,7 +6,6 @@ using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     [Serializable]
@@ -66,7 +65,7 @@ namespace Orleans.Transactions.TestKit
     {
         protected ITransactionalState<GrainData>[] dataArray;
         private readonly ILoggerFactory loggerFactory;
-        protected ILogger logger;
+        protected ILogger logger = null!;
 
         public MultiStateTransactionalGrainBaseClass(
             ITransactionalState<GrainData>[] dataArray,

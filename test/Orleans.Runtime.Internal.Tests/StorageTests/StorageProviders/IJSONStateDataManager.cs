@@ -40,7 +40,7 @@ namespace Samples.StorageProviders
         /// <param name="collectionName">The name of a collection, such as a type name.</param>
         /// <param name="key">The primary key of the object to read.</param>
         /// <returns>A string containing a JSON representation of the entity, if it exists; null otherwise.</returns>
-        System.Threading.Tasks.Task<string> Read(string collectionName, string key);
+        System.Threading.Tasks.Task<string?> Read(string collectionName, string key);
 
         /// <summary>
         /// Writes grain state to storage.

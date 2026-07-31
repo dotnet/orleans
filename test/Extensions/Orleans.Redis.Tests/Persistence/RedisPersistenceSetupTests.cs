@@ -18,7 +18,7 @@ namespace Tester.Redis.Persistence
         [SkippableTheory]
         [InlineData(null)]
         [InlineData("localhost:1234")]
-        public void StorageOptionsValidator(string connectionString)
+        public void StorageOptionsValidator(string? connectionString)
         {
             TestUtils.CheckForRedis();
 

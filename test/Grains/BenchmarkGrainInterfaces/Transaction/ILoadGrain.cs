@@ -19,6 +19,6 @@ namespace BenchmarkGrainInterfaces.Transaction
     public interface ILoadGrain : IGrainWithGuidKey
     {
         Task Generate(int run, int transactions, int conncurrent);
-        Task<Report> TryGetReport();
+        Task<Report?> TryGetReport();
     }
 }

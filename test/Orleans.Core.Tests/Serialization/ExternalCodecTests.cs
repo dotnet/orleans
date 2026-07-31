@@ -180,6 +180,7 @@ namespace UnitTests.Serialization
 
             var deserialized = serializer.Deserialize<JsonPoco>(serialized);
 
+            Assert.NotNull(deserialized);
             Assert.Equal(data.Prop, deserialized.Prop);
         }
 
@@ -207,7 +208,7 @@ namespace UnitTests.Serialization
         public class JsonPoco
         {
             [JsonProperty("crazy_name")]
-            public string Prop { get; set; }
+            public string? Prop { get; set; }
 
             [JsonProperty("some_flag")]
             public bool Flag { get; set; }

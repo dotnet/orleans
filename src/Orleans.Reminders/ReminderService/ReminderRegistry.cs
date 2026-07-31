@@ -53,7 +53,7 @@ namespace Orleans.Runtime.ReminderService
             return GetGrainService(callingGrainId).UnregisterReminder(reminder);
         }
 
-        public Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
+        public Task<IGrainReminder?> GetReminder(GrainId callingGrainId, string reminderName)
         {
             if (string.IsNullOrEmpty(reminderName))
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));

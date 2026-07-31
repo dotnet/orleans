@@ -64,7 +64,7 @@ namespace UnitTests.MessageCenterTests
             var gatewayUris = new List<Uri> { new("gwy.tcp://127.0.0.1:12345/42") };
             var listProvider = new TestListProvider(gatewayUris);
             using var observer = new Observer(GatewayEvents.AllEvents);
-            using var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null, TimeProvider.System);
+            using var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null!, TimeProvider.System);
 
             await gatewayManager.StartAsync(CancellationToken.None);
 
@@ -90,7 +90,7 @@ namespace UnitTests.MessageCenterTests
             }).ToList();
 
             // Create and start the gateway manager with our test gateway list
-            var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null, TimeProvider.System);
+            var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null!, TimeProvider.System);
             await gatewayManager.StartAsync(CancellationToken.None);
 
             var counts = new int[4];  // Track selections per gateway

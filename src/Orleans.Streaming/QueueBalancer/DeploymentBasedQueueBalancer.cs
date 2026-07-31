@@ -9,7 +9,6 @@ using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -26,7 +25,7 @@ namespace Orleans.Streams
         private readonly DeploymentBasedQueueBalancerOptions options;
         private readonly TimeProvider _timeProvider;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
-        private List<QueueId> allQueues;
+        private List<QueueId> allQueues = null!; // Initialized in Initialize.
         private bool isStarting;
         
         public DeploymentBasedQueueBalancer(
@@ -91,8 +90,7 @@ namespace Orleans.Streams
                 ? balancer.IdealDistribution
                 : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
 
-            List<QueueId> myQueues;
-            if (distribution.TryGetValue(siloStatusOracle.SiloName, out myQueues))
+            if (distribution.TryGetValue(siloStatusOracle.SiloName, out var myQueues))
             {
                 if (!useIdealDistribution)
                 {
@@ -113,7 +111,7 @@ namespace Orleans.Streams
                 bool immatureBit;
                 if (!(immatureSilos.TryGetValue(kvp.Key, out immatureBit) && immatureBit)) // if not immature now or any more
                 {
-                    string siloName;
+                    string? siloName;
                     if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
                     {
                         activeSiloNames.Add(siloName);
@@ -142,11 +140,10 @@ namespace Orleans.Streams
             HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();
             foreach (var silo in immatureSilos.Where(s => s.Value)) // take only those from immature set that have their immature status bit set
             {
-                string siloName;
+                string? siloName;
                 if (siloStatusOracle.TryGetSiloName(silo.Key, out siloName))
                 {
-                    List<QueueId> queues;
-                    if (idealDistribution.TryGetValue(siloName, out queues))
+                    if (idealDistribution.TryGetValue(siloName, out var queues))
                     {
                         queuesOfImmatureSilos.UnionWith(queues);
                     }

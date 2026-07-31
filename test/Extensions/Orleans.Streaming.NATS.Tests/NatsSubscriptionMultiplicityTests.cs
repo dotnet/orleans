@@ -15,7 +15,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     private const string NatsStreamProviderName = "NatsProvider-Subscription-Test";
     private const string StreamNamespace = "NatsSubscriptionMultiplicityTestsNamespace";
     private const string TestStreamName = "test-subscription-stream";
-    private SubscriptionMultiplicityTestRunner runner;
+    private SubscriptionMultiplicityTestRunner runner = null!;
     private readonly NatsConnection natsConnection;
     private readonly NatsJSContext natsContext;
 

@@ -16,7 +16,6 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using System.Net;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -255,7 +254,7 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            LogInfoGrainServiceRegistered(logger, service.GetType().FullName);
+            LogInfoGrainServiceRegistered(logger, service.GetType().FullName!);
         }
 
         private async Task StartGrainService(IGrainService service)
@@ -272,7 +271,7 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            LogInfoGrainServiceStarted(logger, service.GetType().FullName);
+            LogInfoGrainServiceStarted(logger, service.GetType().FullName!);
         }
 
         /// <summary>
@@ -456,7 +455,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                LogDebugGrainServiceStopped(logger, grainService.GetType().FullName, grainService.GetGrainId());
+                LogDebugGrainServiceStopped(logger, grainService.GetType().FullName!, grainService.GetGrainId());
             }
         }
 

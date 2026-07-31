@@ -15,6 +15,6 @@ namespace Orleans.Streams
         Task Stop();
         Task StartAgents();
         Task StopAgents();
-        Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg);
+        Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg);
     }
 }

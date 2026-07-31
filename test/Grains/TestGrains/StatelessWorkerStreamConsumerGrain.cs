@@ -22,7 +22,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync(Exception ex) => Task.CompletedTask;
 
-        public Task OnNextAsync(string item, StreamSequenceToken token = null) => Task.CompletedTask;
+        public Task OnNextAsync(string item, StreamSequenceToken? token = null) => Task.CompletedTask;
 
         public async Task BecomeConsumer(Guid streamId, string providerToUse)
         {

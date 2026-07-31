@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -7,7 +8,6 @@ using System.Threading.Tasks;
 using Orleans.Dashboard.Model;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Dashboard.Implementation;
 
 /// <summary>
@@ -30,7 +30,7 @@ internal static class LifecycleStageInspector
     private static readonly Func<CancellationToken, Task> NoOpStart = _ => Task.CompletedTask;
     private static readonly Func<CancellationToken, Task> NoOpStop = _ => Task.CompletedTask;
 
-    public static LifecycleStageInfo[] GetStages(ISiloLifecycleSubject lifecycle)
+    public static LifecycleStageInfo[] GetStages(ISiloLifecycleSubject? lifecycle)
     {
         if (lifecycle is null)
         {
@@ -56,7 +56,7 @@ internal static class LifecycleStageInspector
         return [];
     }
 
-    private static LifecycleStageInfo[] BuildStages(IEnumerable<(int Stage, string StageName, string Name, object InnerObserver)> entries)
+    private static LifecycleStageInfo[] BuildStages(IEnumerable<(int Stage, string? StageName, string? Name, object? InnerObserver)> entries)
     {
         return entries
             .GroupBy(e => e.Stage)
@@ -71,7 +71,7 @@ internal static class LifecycleStageInspector
             .ToArray();
     }
 
-    private static IEnumerable<(int Stage, string StageName, string Name, object InnerObserver)> EnumerateMonitored(System.Collections.IEnumerable monitored)
+    private static IEnumerable<(int Stage, string? StageName, string? Name, object? InnerObserver)> EnumerateMonitored(System.Collections.IEnumerable monitored)
     {
         foreach (var item in monitored)
         {
@@ -85,7 +85,7 @@ internal static class LifecycleStageInspector
         }
     }
 
-    private static IEnumerable<(int Stage, string StageName, string Name, object InnerObserver)> EnumerateOrdered(System.Collections.IEnumerable ordered)
+    private static IEnumerable<(int Stage, string? StageName, string? Name, object? InnerObserver)> EnumerateOrdered(System.Collections.IEnumerable ordered)
     {
         foreach (var item in ordered)
         {
@@ -97,7 +97,7 @@ internal static class LifecycleStageInspector
         }
     }
 
-    private static LifecycleObserverInfo BuildObserver(string name, object inner)
+    private static LifecycleObserverInfo BuildObserver(string? name, object? inner)
     {
         var info = new LifecycleObserverInfo
         {
@@ -123,8 +123,8 @@ internal static class LifecycleStageInspector
         // private `Observer` (with onStart/onStop fields) or `StartupObserver`
         // (with an `_onStart` field, OnStop is no-op).
         var innerType = inner.GetType();
-        Delegate onStart = TryReadDelegateField(inner, innerType, "onStart") ?? TryReadDelegateField(inner, innerType, "_onStart");
-        Delegate onStop = TryReadDelegateField(inner, innerType, "onStop") ?? TryReadDelegateField(inner, innerType, "_onStop");
+        Delegate? onStart = TryReadDelegateField(inner, innerType, "onStart") ?? TryReadDelegateField(inner, innerType, "_onStart");
+        Delegate? onStop = TryReadDelegateField(inner, innerType, "onStop") ?? TryReadDelegateField(inner, innerType, "_onStop");
 
         if (onStart is null && onStop is null && innerType.GetMethod("OnStart") is not null)
         {
@@ -154,13 +154,13 @@ internal static class LifecycleStageInspector
         return info;
     }
 
-    private static Delegate TryReadDelegateField(object owner, Type ownerType, string fieldName)
+    private static Delegate? TryReadDelegateField(object owner, Type ownerType, string fieldName)
     {
         var field = ownerType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
         return field?.GetValue(owner) as Delegate;
     }
 
-    private static bool IsNoOp(Delegate d)
+    private static bool IsNoOp(Delegate? d)
     {
         // We treat compiler-generated `_ => Task.CompletedTask` and the
         // shared no-op delegates as "no-op" purely so the UI can dim the
@@ -177,7 +177,7 @@ internal static class LifecycleStageInspector
         return false;
     }
 
-    private static string FormatDelegate(Delegate d)
+    private static string? FormatDelegate(Delegate? d)
     {
         if (d is null) return null;
         var method = d.Method;
@@ -282,7 +282,7 @@ internal static class LifecycleStageInspector
         return -1;
     }
 
-    private static string ResolveOwningType(Delegate onStart, Delegate onStop)
+    private static string? ResolveOwningType(Delegate? onStart, Delegate? onStop)
     {
         var d = onStart ?? onStop;
         if (d is null) return null;
@@ -300,7 +300,8 @@ internal static class LifecycleStageInspector
         return FormatType(declaring);
     }
 
-    private static string FormatType(Type type)
+    [return: NotNullIfNotNull(nameof(type))]
+    private static string? FormatType(Type? type)
     {
         if (type is null) return null;
         if (!type.IsGenericType) return type.FullName ?? type.Name;
@@ -311,7 +312,7 @@ internal static class LifecycleStageInspector
         return $"{name}<{genericArgs}>";
     }
 
-    private static T TryReadField<T>(object owner, string fieldName) where T : class
+    private static T? TryReadField<T>(object owner, string fieldName) where T : class
     {
         var type = owner.GetType();
         while (type is not null)
@@ -333,7 +334,7 @@ internal static class LifecycleStageInspector
         {
             if (field.FieldType == typeof(int))
             {
-                values.Add((int)field.GetRawConstantValue());
+                values.Add((int)field.GetRawConstantValue()!);
             }
         }
         return values;

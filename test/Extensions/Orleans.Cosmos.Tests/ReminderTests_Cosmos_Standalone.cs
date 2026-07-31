@@ -144,6 +144,7 @@ public class ReminderTests_Cosmos_Standalone
     private static async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
     {
         ReminderTableData data = await table.ReadRows(0, 0xffffffff);
+        Assert.NotNull(data);
         return data.Reminders;
     }
 }

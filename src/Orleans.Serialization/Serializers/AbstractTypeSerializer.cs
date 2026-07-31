@@ -5,7 +5,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Serializers
 {
     /// <summary>
@@ -15,10 +14,11 @@ namespace Orleans.Serialization.Serializers
     {
         protected AbstractTypeSerializer() : base(typeof(TField)) { }
 
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
             => base.WriteField(ref writer, fieldIdDelta, expectedType, value);
 
-        public new TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)base.ReadValue(ref reader, field);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public new TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)base.ReadValue(ref reader, field)!;
 
         public virtual void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, TField instance) where TBufferWriter : IBufferWriter<byte> { }
 
@@ -30,10 +30,11 @@ namespace Orleans.Serialization.Serializers
     {
         public AbstractTypeSerializerWrapper() : base(typeof(TField)) { }
 
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
             => base.WriteField(ref writer, fieldIdDelta, expectedType, value);
 
-        public new TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)base.ReadValue(ref reader, field);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public new TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)base.ReadValue(ref reader, field)!;
     }
 
     public class AbstractTypeSerializer : IFieldCodec
@@ -42,7 +43,7 @@ namespace Orleans.Serialization.Serializers
 
         protected internal AbstractTypeSerializer(Type fieldType) => _fieldType = fieldType;
 
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -54,7 +55,8 @@ namespace Orleans.Serialization.Serializers
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 
-        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
                 return ReferenceCodec.ReadReference(ref reader, field.FieldType ?? _fieldType);
@@ -63,7 +65,7 @@ namespace Orleans.Serialization.Serializers
             if (fieldType is null)
                 ThrowMissingFieldType();
 
-            var specificSerializer = reader.Session.CodecProvider.GetCodec(fieldType);
+            var specificSerializer = reader.Session.CodecProvider.GetCodec(fieldType!);
             return specificSerializer.ReadValue(ref reader, field);
         }
 

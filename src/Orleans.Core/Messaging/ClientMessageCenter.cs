@@ -10,7 +10,6 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 
-#nullable disable
 namespace Orleans.Messaging
 {
     // <summary>
@@ -54,14 +53,14 @@ namespace Orleans.Messaging
         internal bool Running { get; private set; }
 
         private readonly GatewayManager gatewayManager;
-        private Action<Message> messageHandler;
+        private Action<Message>? messageHandler;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
         // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
         // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
         // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-        private readonly WeakReference<ClientOutboundConnection>[] grainBuckets;
+        private readonly WeakReference<ClientOutboundConnection>?[] grainBuckets;
         private readonly ILogger logger;
         public SiloAddress MyAddress => _localClientDetails.ClientAddress;
         private int numberOfConnectedGateways = 0;
@@ -92,7 +91,7 @@ namespace Orleans.Messaging
             Running = false;
             this.gatewayManager = gatewayManager;
             numMessages = 0;
-            this.grainBuckets = new WeakReference<ClientOutboundConnection>[clientMessagingOptions.Value.ClientSenderBuckets];
+            this.grainBuckets = new WeakReference<ClientOutboundConnection>?[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
             clientInstruments.RegisterConnectedGatewayCountObserve(() => connectionManager.ConnectionCount);
         }
@@ -194,7 +193,7 @@ namespace Orleans.Messaging
             {
                 _ = SendAsync(connectionTask, msg);
 
-                async Task SendAsync(ValueTask<Connection> task, Message message)
+                async Task SendAsync(ValueTask<Connection?> task, Message message)
                 {
                     try
                     {
@@ -214,7 +213,7 @@ namespace Orleans.Messaging
                             ++message.RetryCount;
 
                             _ = Task.Factory.StartNew(
-                                state => this.SendMessage((Message)state),
+                                state => this.SendMessage((Message)state!),
                                 message,
                                 CancellationToken.None,
                                 TaskCreationOptions.DenyChildAttach,
@@ -229,14 +228,14 @@ namespace Orleans.Messaging
             }
         }
 
-        private ValueTask<Connection> GetGatewayConnection(Message msg)
+        private ValueTask<Connection?> GetGatewayConnection(Message msg)
         {
             // If there's a specific gateway specified, use it
             if (msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
                 var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
                 var connectionTask = this.connectionManager.GetConnection(siloAddress);
-                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask!;
 
                 return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);
             }
@@ -257,13 +256,13 @@ namespace Orleans.Messaging
                 {
                     RejectMessage(msg, "No gateways available");
                     LogSendFailed(msg, gatewayManager);
-                    return new ValueTask<Connection>(default(Connection));
+                    return new ValueTask<Connection?>(default(Connection));
                 }
 
                 var gatewayAddress = gatewayAddresses[msgNumber % numGateways];
 
                 var connectionTask = this.connectionManager.GetConnection(gatewayAddress);
-                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask!;
 
                 return ConnectAsync(gatewayAddress, connectionTask, msg, directGatewayMessage: false);
             }
@@ -276,14 +275,14 @@ namespace Orleans.Messaging
             // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
             // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
             // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-            WeakReference<ClientOutboundConnection> weakRef = grainBuckets[index];
+            WeakReference<ClientOutboundConnection>? weakRef = grainBuckets[index];
 
             if (weakRef != null
                 && weakRef.TryGetTarget(out var existingConnection)
                 && existingConnection.IsValid
                 && gatewayManager.IsGatewayAvailable(existingConnection.RemoteSiloAddress))
             {
-                return new ValueTask<Connection>(existingConnection);
+                return new ValueTask<Connection?>(existingConnection);
             }
 
             var addr = gatewayManager.GetLiveGateway();
@@ -291,19 +290,19 @@ namespace Orleans.Messaging
             {
                 RejectMessage(msg, "No gateways available");
                 LogNoGatewayAvailableForMessage(msg, gatewayManager);
-                return new ValueTask<Connection>(default(Connection));
+                return new ValueTask<Connection?>(default(Connection));
             }
 
             var gatewayConnection = this.connectionManager.GetConnection(addr);
             if (gatewayConnection.IsCompletedSuccessfully)
             {
                 this.UpdateBucket(index, (ClientOutboundConnection)gatewayConnection.Result);
-                return gatewayConnection;
+                return gatewayConnection!;
             }
 
             return AddToBucketAsync(index, gatewayConnection, addr);
 
-            async ValueTask<Connection> AddToBucketAsync(
+            async ValueTask<Connection?> AddToBucketAsync(
                 uint bucketIndex,
                 ValueTask<Connection> connectionTask,
                 SiloAddress gatewayAddress)
@@ -322,13 +321,13 @@ namespace Orleans.Messaging
                 }
             }
 
-            async ValueTask<Connection> ConnectAsync(
+            async ValueTask<Connection?> ConnectAsync(
                 SiloAddress gateway,
                 ValueTask<Connection> connectionTask,
                 Message message,
                 bool directGatewayMessage)
             {
-                Connection result = default;
+                Connection? result = default;
                 try
                 {
                     return result = await connectionTask;
@@ -352,12 +351,12 @@ namespace Orleans.Messaging
             }
         }
 
-        private void UpdateBucket(uint index, ClientOutboundConnection connection)
+        private void UpdateBucket(uint index, ClientOutboundConnection? connection)
         {
             lock (this.grainBucketUpdateLock)
             {
-                var value = this.grainBuckets[index] ?? new WeakReference<ClientOutboundConnection>(connection);
-                value.SetTarget(connection);
+                var value = this.grainBuckets[index] ?? new WeakReference<ClientOutboundConnection>(connection!);
+                value.SetTarget(connection!);
                 this.grainBuckets[index] = value;
             }
         }
@@ -367,7 +366,7 @@ namespace Orleans.Messaging
             this.messageHandler = handler;
         }
 
-        public void RejectMessage(Message msg, string reason, Exception exc = null)
+        public void RejectMessage(Message msg, string reason, Exception? exc = null)
         {
             if (!Running) return;
 

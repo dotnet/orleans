@@ -12,7 +12,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 {
     public class EHStreamProviderForMonitorTestsAdapterFactory : EventDataGeneratorAdapterFactory
     {
-        private CachePressureInjectionMonitor cachePressureInjectionMonitor;
+        private CachePressureInjectionMonitor cachePressureInjectionMonitor = null!;
         private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamCacheEvictionOptions evictionOptions;
         private readonly StreamStatisticOptions staticticOptions;
@@ -103,8 +103,8 @@ namespace ServiceBus.Tests.TestStreamProviders
                 EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
                 OrleansInstruments instruments,
-                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
-                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor>? cacheMonitorFactory = null,
+                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor>? blockPoolMonitorFactory = null)
                 : base(cacheOptions, streamCacheEviction, statisticOptions, dataAdater, sharedDimensions, instruments, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.cachePressureInjectionMonitor = cachePressureInjectionMonitor;
@@ -124,9 +124,9 @@ namespace ServiceBus.Tests.TestStreamProviders
             ChangeCachePressure = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 13
         }
 
-        public override Task<object> ExecuteCommand(int command, object arg)
+        public override Task<object?> ExecuteCommand(int command, object? arg)
         {
-            object re = null;
+            object? re = null;
             switch (command)
             {
                 case (int)QueryCommands.GetCacheMonitorCallCounters:
@@ -152,7 +152,7 @@ namespace ServiceBus.Tests.TestStreamProviders
     {
         public bool UnderPressure { get; set; }
         private bool wasUnderPressur;
-        public ICacheMonitor CacheMonitor { set; private get; }
+        public ICacheMonitor? CacheMonitor { set; private get; }
         public CachePressureInjectionMonitor()
         {
             this.UnderPressure = false;

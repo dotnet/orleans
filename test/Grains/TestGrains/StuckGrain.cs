@@ -65,7 +65,7 @@ namespace UnitTests.Grains
             else if (mre != null)
                 mre.Reset();
 
-            blockingMREMap[key] = mre;
+            blockingMREMap[key] = mre!;
         }
 
         public static bool IsActivated(Guid key)

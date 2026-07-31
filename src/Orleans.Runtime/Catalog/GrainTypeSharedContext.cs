@@ -72,7 +72,7 @@ public sealed class GrainTypeSharedContext
     /// <summary>
     /// Gets the grain instance type name, if available.
     /// </summary>
-    public string? GrainTypeName { get; }
+    public string GrainTypeName { get; }
 
     internal CatalogInstruments CatalogInstruments { get; }
     internal GrainInstruments GrainInstruments { get; }

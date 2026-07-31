@@ -310,7 +310,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         var replacement = _shared.Shared.InternalRuntime.Catalog.GetOrCreateActivation(
             GrainId,
             message.RequestContextData ?? [],
-            rehydrationContext: null);
+            rehydrationContext: null)!;
         Debug.Assert(!ReferenceEquals(replacement, this), "Catalog must not resolve to a terminated stateless worker context.");
         StatelessWorkerEvents.EmitMessageForwarded(this, replacement, message);
         replacement.ReceiveMessage(message);

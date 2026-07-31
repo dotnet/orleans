@@ -47,8 +47,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 {
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";
 
-    private IRelationalStorage _storage;
-    private RelationalOrleansQueries _queries;
+    private IRelationalStorage _storage = null!;
+    private RelationalOrleansQueries _queries = null!;
 
     public async Task InitializeAsync()
     {

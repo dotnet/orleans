@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
@@ -8,7 +9,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Streaming.AzureStorage;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -16,7 +16,7 @@ namespace Orleans.Configuration
     /// </summary>
     public class AzureBlobLeaseProviderOptions
     {
-        private BlobServiceClient _blobServiceClient;
+        private BlobServiceClient? _blobServiceClient;
 
         public string BlobContainerName { get; set; } = DefaultBlobContainerName;
         public const string DefaultBlobContainerName = "Leases";
@@ -25,21 +25,23 @@ namespace Orleans.Configuration
         /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
         /// </summary>
         [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
-        public BlobClientOptions ClientOptions { get; set; }
+        public BlobClientOptions? ClientOptions { get; set; }
 
         /// <summary>
         /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
         /// </summary>
-        internal Func<Task<BlobServiceClient>> CreateClient { get; private set; }
+        internal Func<Task<BlobServiceClient>>? CreateClient { get; private set; }
 
         /// <summary>
         /// Gets or sets the client used to access the Azure Blob Service.
         /// </summary>
-        public BlobServiceClient BlobServiceClient
+        [DisallowNull]
+        public BlobServiceClient? BlobServiceClient
         {
             get => _blobServiceClient;
             set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _blobServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }
@@ -106,7 +108,7 @@ namespace Orleans.Configuration
     public class AzureBlobLeaseProviderOptionsValidator : IConfigurationValidator
     {
         private readonly AzureBlobLeaseProviderOptions options;
-        private readonly string name;
+        private readonly string? name;
 
         /// <summary>
         /// Constructor
@@ -134,7 +136,7 @@ namespace Orleans.Configuration
         /// </summary>
         /// <param name="options">The option to be validated.</param>
         /// <param name="name">The option name to be validated.</param>
-        private AzureBlobLeaseProviderOptionsValidator(AzureBlobLeaseProviderOptions options, string name)
+        private AzureBlobLeaseProviderOptionsValidator(AzureBlobLeaseProviderOptions options, string? name)
         {
             this.options = options;
             this.name = name ?? string.Empty;

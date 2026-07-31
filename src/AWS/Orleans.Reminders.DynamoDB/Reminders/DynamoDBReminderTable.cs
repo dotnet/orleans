@@ -8,7 +8,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans.Reminders.DynamoDB
 {
     /// <summary>
@@ -32,7 +31,7 @@ namespace Orleans.Reminders.DynamoDB
         private readonly DynamoDBReminderStorageOptions options;
         private readonly string serviceId;
 
-        private DynamoDBStorage storage;
+        private DynamoDBStorage storage = null!;
 
         /// <summary>Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.</summary>
         /// <param name="loggerFactory">logger factory to use</param>
@@ -111,7 +110,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="grainId"> grain ref to locate the row </param>
         /// <param name="reminderName"> reminder name to locate the row </param>
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
@@ -167,7 +166,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
         public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            Dictionary<string, AttributeValue> expressionValues = null;
+            Dictionary<string, AttributeValue>? expressionValues = null;
 
             try
             {
@@ -209,7 +208,7 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                LogWarningReadReminderEntryRange(logger, exc, new(expressionValues), this.options.TableName);
+                LogWarningReadReminderEntryRange(logger, exc, new(expressionValues!), this.options.TableName);
                 throw;
             }
         }
@@ -304,7 +303,7 @@ namespace Orleans.Reminders.DynamoDB
         /// </summary>
         /// <param name="entry"> The entry to put </param>
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string?> UpsertRow(ReminderEntry entry)
         {
             var reminderId = ConstructReminderId(this.serviceId, entry.GrainId, entry.ReminderName);
 
@@ -382,7 +381,7 @@ namespace Orleans.Reminders.DynamoDB
             Level = LogLevel.Debug,
             Message = "UpsertRow entry = {Entry}, etag = {ETag}"
         )]
-        private static partial void LogDebugUpsertRow(ILogger logger, ReminderEntry entry, string eTag);
+        private static partial void LogDebugUpsertRow(ILogger logger, ReminderEntry entry, string? eTag);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.ReminderServiceBase,

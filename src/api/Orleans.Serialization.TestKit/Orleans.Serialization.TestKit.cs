@@ -22,7 +22,7 @@ namespace Orleans.Serialization.TestKit
 
         protected abstract TValue[] TestValues { get; }
 
-        protected virtual System.Action<System.Action<TValue>> ValueProvider { get { throw null; } }
+        protected virtual System.Action<System.Action<TValue>>? ValueProvider { get { throw null; } }
 
         [Xunit.Fact]
         public void CanCopyCollectionViaSerializer() { }
@@ -46,7 +46,7 @@ namespace Orleans.Serialization.TestKit
         protected override System.IServiceProvider CreateServiceProvider() { throw null; }
 
         protected abstract TValue CreateValue();
-        protected virtual bool Equals(TValue left, TValue right) { throw null; }
+        protected virtual bool Equals(TValue? left, TValue? right) { throw null; }
 
         [Xunit.Fact]
         public void ReferencesAreAddedToCopyContext() { }
@@ -66,7 +66,7 @@ namespace Orleans.Serialization.TestKit
 
         protected abstract TValue[] TestValues { get; }
 
-        protected virtual System.Action<System.Action<TValue>> ValueProvider { get { throw null; } }
+        protected virtual System.Action<System.Action<TValue>>? ValueProvider { get { throw null; } }
 
         [Xunit.Fact]
         public void CanRoundTripCollectionViaSerializer() { }
@@ -126,9 +126,9 @@ namespace Orleans.Serialization.TestKit
         protected override System.IServiceProvider CreateServiceProvider() { throw null; }
 
         protected abstract TValue CreateValue();
-        protected virtual bool Equals(TValue left, TValue right) { throw null; }
+        protected virtual bool Equals(TValue? left, TValue? right) { throw null; }
 
-        protected virtual TValue GetWriteCopy(TValue input) { throw null; }
+        protected virtual TValue? GetWriteCopy(TValue? input) { throw null; }
 
         [Xunit.Fact]
         public void ProducesValidBitStream() { }
@@ -138,7 +138,7 @@ namespace Orleans.Serialization.TestKit
 
         protected T RoundTripThroughCodec<T>(T original) { throw null; }
 
-        protected object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream) { throw null; }
+        protected object? RoundTripThroughUntypedSerializer(object? original, out string formattedBitStream) { throw null; }
 
         [Xunit.Fact]
         public void WritersProduceSameResults() { }

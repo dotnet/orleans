@@ -2,7 +2,6 @@ using System;
 using System.Runtime.Serialization;
 using MessagePack;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>
@@ -23,10 +22,10 @@ public class MessagePackCodecOptions
     /// <summary>
     /// Gets or sets a delegate used to determine if a type is supported by the MessagePack serializer for serialization and deserialization.
     /// </summary>
-    public Func<Type, bool?> IsSerializableType { get; set; }
+    public Func<Type, bool?>? IsSerializableType { get; set; }
 
     /// <summary>
     /// Gets or sets a delegate used to determine if a type is supported by the MessagePack serializer for copying.
     /// </summary>
-    public Func<Type, bool?> IsCopyableType { get; set; }
+    public Func<Type, bool?>? IsCopyableType { get; set; }
 }

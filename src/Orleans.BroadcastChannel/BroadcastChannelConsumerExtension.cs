@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Orleans.BroadcastChannel.Diagnostics;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.BroadcastChannel
 {
     internal interface IBroadcastChannelConsumerExtension : IGrainExtension
@@ -34,7 +33,7 @@ namespace Orleans.BroadcastChannel
 
             private static Task NoOp(Exception _) => Task.CompletedTask;
 
-            public Callback(Func<T, Task> onPublished, Func<Exception, Task> onError)
+            public Callback(Func<T, Task> onPublished, Func<Exception, Task>? onError)
             {
                 _onPublished = onPublished;
                 _onError = onError ?? NoOp;
@@ -53,7 +52,7 @@ namespace Orleans.BroadcastChannel
         public BroadcastChannelConsumerExtension(IGrainContextAccessor grainContextAccessor)
         {
             var grainContext = grainContextAccessor.GrainContext;
-            _subscriptionObserver = grainContext?.GrainInstance as IOnBroadcastChannelSubscribed;
+            _subscriptionObserver = (grainContext?.GrainInstance as IOnBroadcastChannelSubscribed)!;
             _grainId = grainContext?.GrainId ?? default;
             if (_subscriptionObserver == null)
             {
@@ -80,14 +79,14 @@ namespace Orleans.BroadcastChannel
             }
         }
 
-        public void Attach<T>(InternalChannelId streamId, Func<T, Task> onPublished, Func<Exception, Task> onError)
+        public void Attach<T>(InternalChannelId streamId, Func<T, Task> onPublished, Func<Exception, Task>? onError)
         {
             _handlers.TryAdd(streamId, new Callback<T>(onPublished, onError));
         }
 
-        private async ValueTask<ICallback> GetStreamCallback(InternalChannelId streamId)
+        private async ValueTask<ICallback?> GetStreamCallback(InternalChannelId streamId)
         {
-            ICallback callback;
+            ICallback? callback;
             if (_handlers.TryGetValue(streamId, out callback))
             {
                 return callback;
@@ -107,4 +106,3 @@ namespace Orleans.BroadcastChannel
         }
     }
 }
-

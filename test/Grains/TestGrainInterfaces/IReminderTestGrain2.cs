@@ -22,7 +22,7 @@ namespace UnitTests.GrainInterfaces
         Task<TimeSpan> GetReminderPeriod(string reminderName);
         Task<(TimeSpan DueTime, TimeSpan Period)> GetReminderDueTimeAndPeriod(string reminderName);
         Task<long> GetCounter(string name);
-        Task<IGrainReminder> GetReminderObject(string reminderName);
+        Task<IGrainReminder?> GetReminderObject(string reminderName);
         Task<List<IGrainReminder>> GetRemindersList();
 
         Task EraseReminderTable();

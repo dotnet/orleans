@@ -8,7 +8,7 @@ namespace UnitTests.Grains
     /// </summary>
     public class AsyncSimpleGrain : SimpleGrain, ISimpleGrainWithAsyncMethods
     {
-        private TaskCompletionSource<int> resolver;
+        private TaskCompletionSource<int> resolver = null!;
 
         public AsyncSimpleGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
         {

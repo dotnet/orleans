@@ -56,8 +56,8 @@ namespace ServiceBus.Tests.TestStreamProviders
                 IEventHubDataAdapter dataAdapter, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
                 OrleansInstruments instruments,
-                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = null,
-                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor>? cacheMonitorFactory = null,
+                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor>? blockPoolMonitorFactory = null)
                 : base(cacheOptions, evictionOptions, statisticOptions, dataAdapter, sharedDimensions, instruments, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.name = name;
@@ -115,12 +115,12 @@ namespace ServiceBus.Tests.TestStreamProviders
         /// <param name="command"></param>
         /// <param name="arg"></param>
         /// <returns></returns>
-        public override Task<object> ExecuteCommand(int command, object arg)
+        public override Task<object?> ExecuteCommand(int command, object? arg)
         {
             switch (command)
             {
                 case IsCacheBackPressureTriggeredCommand:
-                    return Task.FromResult<object>(this.createdCaches.Any(cache => cache.IsUnderPressure));
+                    return Task.FromResult<object?>(this.createdCaches.Any(cache => cache.IsUnderPressure));
                 default: return base.ExecuteCommand(command, arg);
             }
         }

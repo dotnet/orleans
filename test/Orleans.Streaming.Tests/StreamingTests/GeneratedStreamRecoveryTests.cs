@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests
     /// </summary>
     public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
-        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName!;
         private const int TotalQueueCount = 4;
         private readonly Fixture fixture;
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
@@ -96,7 +96,7 @@ namespace UnitTests.StreamingTests
             };
 
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+            object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
             Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();
             foreach (var result in bResults)

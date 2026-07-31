@@ -3,7 +3,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Persistence;
 using Orleans.Providers;
 
-#nullable disable
 namespace Orleans.Hosting
 {
     /// <summary>
@@ -36,7 +35,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures Redis as the default grain storage provider.
         /// </summary>
-        public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<RedisStorageOptions>> configureOptionsBuilder)
+        public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<RedisStorageOptions>>? configureOptionsBuilder)
         {
             return builder.AddRedisGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptionsBuilder);
         }
@@ -50,7 +49,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures Redis as a grain storage provider.
         /// </summary>
-        public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<RedisStorageOptions>> configureOptionsBuilder)
+        public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<RedisStorageOptions>>? configureOptionsBuilder)
         {
             return builder.ConfigureServices(services => services.AddRedisGrainStorage(name, configureOptionsBuilder));
         }

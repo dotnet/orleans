@@ -9,7 +9,7 @@ namespace UnitTests.StorageTests.Relational
     /// <typeparam name="T">The type of the range.</typeparam>
     /// <remarks>A rudimentary implementation.</remarks>
     [DebuggerDisplay("Start = {Start}, End = {End}")]
-    public sealed class Range<T>: IEquatable<Range<T>>
+    public sealed class Range<T>: IEquatable<Range<T>> where T : notnull
     {
         /// <summary>
         /// The start of a contiguous range.
@@ -28,7 +28,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="end">The end of the range.</param>
         /// <param name="comparer">The range comparer.</param>
         /// <exception cref="ArgumentOutOfRangeException"/>.
-        public Range(T start, T end, IComparer<T> comparer = null)
+        public Range(T start, T end, IComparer<T>? comparer = null)
         {
             var comp = comparer == null ? Comparer<T>.Default : comparer;
             if(comp.Compare(end, start) < 0)
@@ -41,7 +41,7 @@ namespace UnitTests.StorageTests.Relational
         }
 
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if(!(obj is Range<T>)) return false;
             Range<T> other = (Range<T>)obj;
@@ -50,9 +50,9 @@ namespace UnitTests.StorageTests.Relational
         }
 
 
-        public bool Equals(Range<T> other)
+        public bool Equals(Range<T>? other)
         {
-            return Start.Equals(other.Start) && End.Equals(other.End);
+            return Start.Equals(other!.Start) && End.Equals(other!.End);
         }
 
 

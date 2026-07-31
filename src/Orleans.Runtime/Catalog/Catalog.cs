@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Diagnostics;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>
@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         private readonly GrainContextActivator grainActivator;
         private readonly CatalogInstruments _catalogInstruments;
         private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
-        private ISiloStatusOracle _siloStatusOracle;
+        private ISiloStatusOracle _siloStatusOracle = null!;
 
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
@@ -130,10 +130,10 @@ namespace Orleans.Runtime
         /// <param name="requestContextData">Optional request context data.</param>
         /// <param name="rehydrationContext">Optional rehydration context.</param>
         /// <returns></returns>
-        public IGrainContext GetOrCreateActivation(
+        public IGrainContext? GetOrCreateActivation(
             in GrainId grainId,
-            Dictionary<string, object> requestContextData,
-            MigrationContext rehydrationContext)
+            Dictionary<string, object>? requestContextData,
+            MigrationContext? rehydrationContext)
         {
             if (TryGetGrainContext(grainId, out var result))
             {
@@ -207,7 +207,7 @@ namespace Orleans.Runtime
             return result;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
+            static IGrainContext? UnableToCreateActivation(Catalog self, GrainId grainId)
             {
                 // Did not find and did not start placing new
                 var status = self._siloStatusOracle.CurrentStatus;
@@ -256,7 +256,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Try to get runtime data for an activation
         /// </summary>
-        private bool TryGetGrainContext(GrainId grainId, out IGrainContext data)
+        private bool TryGetGrainContext(GrainId grainId, [NotNullWhen(true)] out IGrainContext? data)
         {
             data = activations.FindTarget(grainId);
             return data != null;

@@ -57,7 +57,7 @@ namespace UnitTests.RemindersTest
         protected abstract Task<string> GetConnectionString();
         protected IReminderTable RemindersTable => remindersTable;
 
-        protected virtual string GetAdoInvariant()
+        protected virtual string? GetAdoInvariant()
         {
             return null;
         }
@@ -84,8 +84,9 @@ namespace UnitTests.RemindersTest
             await remindersTable.UpsertRow(reminder);
 
             var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+            Assert.NotNull(readReminder);
 
-            string etagTemp = reminder.ETag = readReminder.ETag;
+            string? etagTemp = reminder.ETag = readReminder.ETag;
 
             Assert.Equal(readReminder.ETag, reminder.ETag);
             Assert.Equal(readReminder.GrainId, reminder.GrainId);
@@ -96,6 +97,7 @@ namespace UnitTests.RemindersTest
 
             reminder.StartAt = reminder.StartAt.AddSeconds(1);
             reminder.ETag = await remindersTable.UpsertRow(reminder);
+            Assert.NotNull(reminder.ETag);
 
             var removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, etagTemp);
             Assert.False(removeRowRes, "should have failed. Etag is wrong");
@@ -121,10 +123,12 @@ namespace UnitTests.RemindersTest
             }));
 
             var rows = await remindersTable.ReadRows(0, uint.MaxValue);
+            Assert.NotNull(rows);
 
             Assert.Equal(rows.Reminders.Count, iterations);
 
             rows = await remindersTable.ReadRows(0, 0);
+            Assert.NotNull(rows);
 
             Assert.Equal(rows.Reminders.Count, iterations);
 
@@ -148,7 +152,9 @@ namespace UnitTests.RemindersTest
                 : remindersHashes.Where(r => r > beginHash || r <= endHash);
 
             HashSet<uint> expectedSet = new HashSet<uint>(expectedHashes);
-            var returnedHashes = (await rowsTask).Reminders.Select(r => r.GrainId.GetUniformHashCode());
+            var rows = await rowsTask;
+            Assert.NotNull(rows);
+            var returnedHashes = rows.Reminders.Select(r => r.GrainId.GetUniformHashCode());
             var returnedSet = new HashSet<uint>(returnedHashes);
 
             Assert.True(returnedSet.SetEquals(expectedSet));

@@ -43,7 +43,7 @@ internal partial class InMemoryTransportConnection : TransportConnection
         // Swap the application & tranport pipes since we're going in the other direction.
         var pair = new DuplexPipe.DuplexPipePair(transport: other.Application, application: other.Transport);
         var remoteEndPoint = other.LocalEndPoint;
-        return new InMemoryTransportConnection(memoryPool, logger, pair, localEndPoint, remoteEndPoint);
+        return new InMemoryTransportConnection(memoryPool, logger, pair, localEndPoint, remoteEndPoint!); // In-memory connections are always created with a local endpoint.
     }
 
     public override MemoryPool<byte> MemoryPool { get; }

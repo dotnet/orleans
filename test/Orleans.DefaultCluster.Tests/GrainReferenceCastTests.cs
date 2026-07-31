@@ -20,7 +20,7 @@ namespace DefaultCluster.Tests
 
         public GrainReferenceCastTests(DefaultClusterFixture fixture) : base(fixture)
         {
-            var client = this.HostedCluster.Client;
+            var client = this.HostedCluster.Client!;
             this.internalGrainFactory = client.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
         }
 
@@ -211,7 +211,7 @@ namespace DefaultCluster.Tests
         public async Task FailSideCastAfterContinueWith()
         {
             var grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-            IGeneratorTestDerivedGrain2 cast = null;
+            IGeneratorTestDerivedGrain2? cast = null;
             var av = grain.StringIsNullOrEmpty();
             var av2 = av.ContinueWith(t => Assert.True(t.Result))
                 .ContinueWith(
@@ -227,7 +227,7 @@ namespace DefaultCluster.Tests
                     {
                         // Call a method which the grain does not implement, resulting in a cast failure.
                         Assert.True(t.IsCompletedSuccessfully);
-                        return cast.StringConcat("a", "b", "c");
+                        return cast!.StringConcat("a", "b", "c");
                     })
                 .Unwrap()
                 .ContinueWith(
@@ -236,7 +236,7 @@ namespace DefaultCluster.Tests
                         // Call a method on the common interface, which the grain implements.
                         // This should not throw.
                         Assert.True(t.IsFaulted);
-                        return cast.StringIsNullOrEmpty();
+                        return cast!.StringIsNullOrEmpty();
                     })
                 .Unwrap();
 
@@ -449,7 +449,7 @@ namespace DefaultCluster.Tests
             isNullStr = grain.StringSet("a").ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
             Assert.False(await isNullStr, "Value should not be null after SetString(a)");
 
-            isNullStr = grain.StringSet(null).ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
+            isNullStr = grain.StringSet(null!).ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
             Assert.True(await isNullStr, "Value should be null after SetString(null)");
 
             IGeneratorTestGrain cast = grain.AsReference<IGeneratorTestGrain>();

@@ -48,10 +48,10 @@ namespace AWSUtils.Tests.StorageTests
             }
         });
 
-        public static string DynamoDbAccessKey { get; set; } = TestDefaultConfiguration.DynamoDbAccessKey;
-        public static string DynamoDbSecretKey { get; set; } = TestDefaultConfiguration.DynamoDbSecretKey;
-        public static string DynamoDbService { get; set; } = TestDefaultConfiguration.DynamoDbService;
-        public static string SqsConnectionString { get; set; } = TestDefaultConfiguration.SqsConnectionString;
+        public static string DynamoDbAccessKey { get; set; } = TestDefaultConfiguration.DynamoDbAccessKey!;
+        public static string DynamoDbSecretKey { get; set; } = TestDefaultConfiguration.DynamoDbSecretKey!;
+        public static string DynamoDbService { get; set; } = TestDefaultConfiguration.DynamoDbService!;
+        public static string SqsConnectionString { get; set; } = TestDefaultConfiguration.SqsConnectionString!;
 
         public static bool IsDynamoDbAvailable => _isDynamoDbAvailable.Value;
         public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(SqsConnectionString);

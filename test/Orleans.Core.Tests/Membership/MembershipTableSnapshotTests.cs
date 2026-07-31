@@ -141,7 +141,7 @@ namespace NonSilo.Tests.Membership
             return new MembershipTableSnapshot(table.Version, entries.ToImmutable());
         }
 
-        private static void AssertSpanFormattable(ISpanFormattable value, string format = null)
+        private static void AssertSpanFormattable(ISpanFormattable value, string? format = null)
         {
             var expected = value.ToString(format, null);
             var formatSpan = format is null ? default : format.AsSpan();

@@ -16,7 +16,6 @@ using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Versions;
 
-#nullable disable
 namespace Orleans.Runtime.Placement
 {
     /// <summary>
@@ -156,7 +155,7 @@ namespace Orleans.Runtime.Placement
             static void ThrowMissingAddress() => throw new InvalidOperationException("Cannot address a message without a target");
         }
 
-        private void SetMessageTargetPlacement(Message message, SiloAddress targetSilo)
+        private void SetMessageTargetPlacement(Message message, SiloAddress? targetSilo)
         {
             message.TargetSilo = targetSilo;
             LogTraceAddressMessageSelectTarget(message);
@@ -287,10 +286,10 @@ namespace Orleans.Runtime.Placement
         /// <param name="requestContextData">The request context, which will be available to the placement strategy.</param>
         /// <param name="placementStrategy">The placement strategy to use.</param>
         /// <returns>A location for the new activation.</returns>
-        public async Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object> requestContextData, PlacementStrategy placementStrategy)
+        public async Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object>? requestContextData, PlacementStrategy placementStrategy)
         {
             using var _ = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
-            var target = new PlacementTarget(grainId, requestContextData, default, 0);
+            var target = new PlacementTarget(grainId, requestContextData!, default, 0);
             ThrowIfStopping();
             var director = _directorResolver.GetPlacementDirector(placementStrategy);
             return await director.OnAddActivation(placementStrategy, target, this);
@@ -321,7 +320,7 @@ namespace Orleans.Runtime.Placement
 #endif
             private readonly PlacementService _placementService;
             private readonly int _workerIndex;
-            private List<(Message Message, TaskCompletionSource Completion)> _messages = new();
+            private List<(Message Message, TaskCompletionSource Completion)>? _messages = new();
 
             public PlacementWorker(PlacementService placementService, int workerIndex)
             {
@@ -359,7 +358,7 @@ namespace Orleans.Runtime.Placement
                 return completion.Task;
             }
 
-            private List<(Message Message, TaskCompletionSource Completion)> GetMessages()
+            private List<(Message Message, TaskCompletionSource Completion)>? GetMessages()
             {
                 lock (_lockObj)
                 {
@@ -485,7 +484,7 @@ namespace Orleans.Runtime.Placement
                 {
                     var originalException = exception switch
                     {
-                        AggregateException ae when ae.InnerExceptions.Count == 1 => ae.InnerException,
+                        AggregateException ae when ae.InnerExceptions.Count == 1 => ae.InnerException!,
                         _ => exception,
                     };
 
@@ -519,7 +518,7 @@ namespace Orleans.Runtime.Placement
 
                     var target = new PlacementTarget(
                         firstMessage.TargetGrain,
-                        firstMessage.RequestContextData,
+                        firstMessage.RequestContextData!,
                         firstMessage.InterfaceType,
                         firstMessage.InterfaceVersion);
 
@@ -527,7 +526,7 @@ namespace Orleans.Runtime.Placement
                     var result = await _placementService._grainLocator.Lookup(targetGrain);
                     if (result is not null)
                     {
-                        return result.SiloAddress;
+                        return result.SiloAddress!;
                     }
 
                     _placementService.ThrowIfStopping();
@@ -538,7 +537,7 @@ namespace Orleans.Runtime.Placement
                     // Give the grain locator one last chance to tell us that the grain has already been placed
                     if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
                     {
-                        return result.SiloAddress;
+                        return result.SiloAddress!;
                     }
 
                     _placementService._grainLocator.InvalidateCache(targetGrain);
@@ -551,7 +550,7 @@ namespace Orleans.Runtime.Placement
             {
                 public List<(Message Message, TaskCompletionSource Completion)> Messages { get; } = new();
 
-                public Task<SiloAddress> Result { get; set; }
+                public Task<SiloAddress> Result { get; set; } = null!;
             }
         }
 
@@ -583,7 +582,7 @@ namespace Orleans.Runtime.Placement
         /// <summary>
         /// Attempts to restore the parent activity context from request context data.
         /// </summary>
-        private static Activity TryRestoreActivityContext(Dictionary<string, object> requestContextData, string operationName)
+        private static Activity? TryRestoreActivityContext(Dictionary<string, object>? requestContextData, string operationName)
         {
             if (requestContextData is null)
             {

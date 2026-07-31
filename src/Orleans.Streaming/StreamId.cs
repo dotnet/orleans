@@ -89,7 +89,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ns">The namespace.</param>
         /// <param name="key">The key.</param>
-        public static StreamId Create(string ns, Guid key)
+        public static StreamId Create(string? ns, Guid key)
         {
             if (ns is null)
             {
@@ -114,14 +114,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ns">The namespace.</param>
         /// <param name="key">The key.</param>
-        public static StreamId Create(string ns, long key) => Create(ns, key.ToString());
+        public static StreamId Create(string? ns, long key) => Create(ns, key.ToString());
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StreamId"/> struct.
         /// </summary>
         /// <param name="ns">The namespace.</param>
         /// <param name="key">The key.</param>
-        public static StreamId Create(string ns, string key)
+        public static StreamId Create(string? ns, string key)
         {
             if (ns is null)
                 return new StreamId(Encoding.UTF8.GetBytes(key), 0);

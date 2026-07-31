@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Threading.Tasks;
 #if NET8_0_OR_GREATER
@@ -28,96 +29,96 @@ public class EnumerableInterfaceCodecTests(ITestOutputHelper output, Serializati
 {
     protected override IFieldCodec<IEnumerable<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IEnumerable<int>>();
     protected override IEnumerable<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IEnumerable<int>[] TestValues => [null, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IEnumerable<int> left, IEnumerable<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IEnumerable<int>[] TestValues => [null!, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IEnumerable<int>? left, IEnumerable<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class EnumerableInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IEnumerable<int>, IDeepCopier<IEnumerable<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IEnumerable<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IEnumerable<int>>();
     protected override IEnumerable<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IEnumerable<int>[] TestValues => [null, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IEnumerable<int> left, IEnumerable<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IEnumerable<int>[] TestValues => [null!, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IEnumerable<int>? left, IEnumerable<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class ReadOnlyCollectionInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IReadOnlyCollection<int>, IFieldCodec<IReadOnlyCollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IReadOnlyCollection<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlyCollection<int>>();
     protected override IReadOnlyCollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IReadOnlyCollection<int>[] TestValues => [null, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IReadOnlyCollection<int> left, IReadOnlyCollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IReadOnlyCollection<int>[] TestValues => [null!, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IReadOnlyCollection<int>? left, IReadOnlyCollection<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class ReadOnlyCollectionInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlyCollection<int>, IDeepCopier<IReadOnlyCollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlyCollection<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlyCollection<int>>();
     protected override IReadOnlyCollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IReadOnlyCollection<int>[] TestValues => [null, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IReadOnlyCollection<int> left, IReadOnlyCollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IReadOnlyCollection<int>[] TestValues => [null!, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IReadOnlyCollection<int>? left, IReadOnlyCollection<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class ReadOnlyListInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IReadOnlyList<int>, IFieldCodec<IReadOnlyList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IReadOnlyList<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlyList<int>>();
     protected override IReadOnlyList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IReadOnlyList<int>[] TestValues => [null, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IReadOnlyList<int> left, IReadOnlyList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IReadOnlyList<int>[] TestValues => [null!, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IReadOnlyList<int>? left, IReadOnlyList<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class ReadOnlyListInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlyList<int>, IDeepCopier<IReadOnlyList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlyList<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlyList<int>>();
     protected override IReadOnlyList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IReadOnlyList<int>[] TestValues => [null, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IReadOnlyList<int> left, IReadOnlyList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IReadOnlyList<int>[] TestValues => [null!, Array.Empty<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IReadOnlyList<int>? left, IReadOnlyList<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class CollectionInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ICollection<int>, IFieldCodec<ICollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<ICollection<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<ICollection<int>>();
     protected override ICollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override ICollection<int>[] TestValues => [null, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(ICollection<int> left, ICollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override ICollection<int>[] TestValues => [null!, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(ICollection<int>? left, ICollection<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class CollectionInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ICollection<int>, IDeepCopier<ICollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<ICollection<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<ICollection<int>>();
     protected override ICollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override ICollection<int>[] TestValues => [null, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(ICollection<int> left, ICollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override ICollection<int>[] TestValues => [null!, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(ICollection<int>? left, ICollection<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class ListInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IList<int>, IFieldCodec<IList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IList<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IList<int>>();
     protected override IList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IList<int>[] TestValues => [null, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IList<int> left, IList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IList<int>[] TestValues => [null!, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IList<int>? left, IList<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class ListInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IList<int>, IDeepCopier<IList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IList<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IList<int>>();
     protected override IList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
-    protected override IList<int>[] TestValues => [null, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
-    protected override bool Equals(IList<int> left, IList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
+    protected override IList<int>[] TestValues => [null!, new List<int>(), new List<int> { 1, 2, 3 }, CreateValue()];
+    protected override bool Equals(IList<int>? left, IList<int>? right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
 public class SetInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ISet<string>, IFieldCodec<ISet<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<ISet<string>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<ISet<string>>();
     protected override ISet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
-    protected override ISet<string>[] TestValues => [null, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
-    protected override bool Equals(ISet<string> left, ISet<string> right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
+    protected override ISet<string>[] TestValues => [null!, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
+    protected override bool Equals(ISet<string>? left, ISet<string>? right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
 }
 
 public class SetInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ISet<string>, IDeepCopier<ISet<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<ISet<string>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<ISet<string>>();
     protected override ISet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
-    protected override ISet<string>[] TestValues => [null, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
-    protected override bool Equals(ISet<string> left, ISet<string> right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
+    protected override ISet<string>[] TestValues => [null!, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
+    protected override bool Equals(ISet<string>? left, ISet<string>? right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
 }
 
 #if NET5_0_OR_GREATER
@@ -125,16 +126,16 @@ public class ReadOnlySetInterfaceCodecTests(ITestOutputHelper output, Serializat
 {
     protected override IFieldCodec<IReadOnlySet<string>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlySet<string>>();
     protected override IReadOnlySet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
-    protected override IReadOnlySet<string>[] TestValues => [null, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
-    protected override bool Equals(IReadOnlySet<string> left, IReadOnlySet<string> right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
+    protected override IReadOnlySet<string>[] TestValues => [null!, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
+    protected override bool Equals(IReadOnlySet<string>? left, IReadOnlySet<string>? right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
 }
 
 public class ReadOnlySetInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlySet<string>, IDeepCopier<IReadOnlySet<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlySet<string>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlySet<string>>();
     protected override IReadOnlySet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
-    protected override IReadOnlySet<string>[] TestValues => [null, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
-    protected override bool Equals(IReadOnlySet<string> left, IReadOnlySet<string> right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
+    protected override IReadOnlySet<string>[] TestValues => [null!, new HashSet<string>(), new HashSet<string> { "a", "b" }, CreateValue()];
+    protected override bool Equals(IReadOnlySet<string>? left, IReadOnlySet<string>? right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
 }
 #endif
 
@@ -142,32 +143,32 @@ public class DictionaryInterfaceCodecTests(ITestOutputHelper output, Serializati
 {
     protected override IFieldCodec<IDictionary<string, int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IDictionary<string, int>>();
     protected override IDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
-    protected override IDictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
-    protected override bool Equals(IDictionary<string, int> left, IDictionary<string, int> right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
+    protected override IDictionary<string, int>[] TestValues => [null!, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
+    protected override bool Equals(IDictionary<string, int>? left, IDictionary<string, int>? right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
 }
 
 public class DictionaryInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IDictionary<string, int>, IDeepCopier<IDictionary<string, int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IDictionary<string, int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IDictionary<string, int>>();
     protected override IDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
-    protected override IDictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
-    protected override bool Equals(IDictionary<string, int> left, IDictionary<string, int> right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
+    protected override IDictionary<string, int>[] TestValues => [null!, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
+    protected override bool Equals(IDictionary<string, int>? left, IDictionary<string, int>? right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
 }
 
 public class ReadOnlyDictionaryInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IReadOnlyDictionary<string, int>, IFieldCodec<IReadOnlyDictionary<string, int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IReadOnlyDictionary<string, int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlyDictionary<string, int>>();
     protected override IReadOnlyDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
-    protected override IReadOnlyDictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
-    protected override bool Equals(IReadOnlyDictionary<string, int> left, IReadOnlyDictionary<string, int> right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
+    protected override IReadOnlyDictionary<string, int>[] TestValues => [null!, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
+    protected override bool Equals(IReadOnlyDictionary<string, int>? left, IReadOnlyDictionary<string, int>? right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
 }
 
 public class ReadOnlyDictionaryInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlyDictionary<string, int>, IDeepCopier<IReadOnlyDictionary<string, int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlyDictionary<string, int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlyDictionary<string, int>>();
     protected override IReadOnlyDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
-    protected override IReadOnlyDictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
-    protected override bool Equals(IReadOnlyDictionary<string, int> left, IReadOnlyDictionary<string, int> right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
+    protected override IReadOnlyDictionary<string, int>[] TestValues => [null!, new Dictionary<string, int>(), new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, CreateValue()];
+    protected override bool Equals(IReadOnlyDictionary<string, int>? left, IReadOnlyDictionary<string, int>? right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
 }
 
 [Trait("Category", "BVT")]
@@ -192,7 +193,8 @@ public class InterfaceCollectionRegressionTests
 
         var result = RoundTrip(original);
 
-        Assert.Collection(result.Values, value => Assert.Equal("a", value), value => Assert.Equal("b", value));
+        // The initialized collection is preserved by this round trip.
+        Assert.Collection(result.Values!, value => Assert.Equal("a", value), value => Assert.Equal("b", value));
     }
 
     [Fact]
@@ -203,7 +205,8 @@ public class InterfaceCollectionRegressionTests
         var result = Copy(original);
 
         Assert.NotSame(original, result);
-        Assert.Collection(result.Values, value => Assert.Equal("a", value), value => Assert.Equal("b", value));
+        // The initialized collection is preserved by this copy.
+        Assert.Collection(result.Values!, value => Assert.Equal("a", value), value => Assert.Equal("b", value));
     }
 
     [Fact]
@@ -320,8 +323,9 @@ public class InterfaceCollectionRegressionTests
 
         var result = RoundTrip(original);
 
-        Assert.True(result.Set.SetEquals(["a", "b"]));
-        Assert.Equal(1, result.Dictionary["a"]);
+        // The initialized collections are preserved by this round trip.
+        Assert.True(result.Set!.SetEquals(["a", "b"]));
+        Assert.Equal(1, result.Dictionary!["a"]);
         Assert.Equal(2, result.Dictionary["b"]);
     }
 #endif
@@ -465,13 +469,13 @@ public class InterfaceCollectionRegressionTests
     {
         using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = serviceProvider.GetRequiredService<Serializer>();
-        return serializer.Deserialize<T>(serializer.SerializeToArray(value));
+        return serializer.Deserialize<T>(serializer.SerializeToArray(value))!;
     }
 
     private static T Copy<T>(T value)
     {
         using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        return serviceProvider.GetRequiredService<DeepCopier<T>>().Copy(value);
+        return serviceProvider.GetRequiredService<DeepCopier<T>>().Copy(value)!;
     }
 
 #if !NETCOREAPP3_1
@@ -508,7 +512,7 @@ public class InterfaceCollectionRegressionTests
     public sealed class ReadOnlyListContainer
     {
         [Id(0)]
-        public IReadOnlyList<string> Values { get; set; }
+        public IReadOnlyList<string>? Values { get; set; }
     }
 
     [GenerateSerializer]
@@ -516,7 +520,7 @@ public class InterfaceCollectionRegressionTests
     public sealed class IntReadOnlyListContainer
     {
         [Id(0)]
-        public IReadOnlyList<int> Values { get; set; }
+        public IReadOnlyList<int>? Values { get; set; }
     }
 
     [GenerateSerializer]
@@ -524,7 +528,7 @@ public class InterfaceCollectionRegressionTests
     public sealed class SetContainer
     {
         [Id(0)]
-        public ISet<string> Values { get; set; }
+        public ISet<string>? Values { get; set; }
     }
 
     [GenerateSerializer]
@@ -535,7 +539,7 @@ public class InterfaceCollectionRegressionTests
         public List<int> Values { get; set; } = [];
 
         [Id(1)]
-        public string Marker { get; set; }
+        public string? Marker { get; set; }
 
         public int Count => Values.Count;
 
@@ -553,7 +557,7 @@ public class InterfaceCollectionRegressionTests
     public sealed class UnsupportedElementListContainer
     {
         [Id(0)]
-        public IList<UnsupportedElement> Values { get; set; }
+        public IList<UnsupportedElement> Values { get; set; } = null!;
     }
 
     [GenerateSerializer]
@@ -561,7 +565,7 @@ public class InterfaceCollectionRegressionTests
     public sealed class GeneratedUnsupportedElementReadOnlyList : IReadOnlyList<UnsupportedElement>
     {
         [Id(0)]
-        public string Marker { get; set; }
+        public string Marker { get; set; } = null!;
 
         public int Count => 0;
 
@@ -578,10 +582,10 @@ public class InterfaceCollectionRegressionTests
     public sealed class FrozenCollectionContainer
     {
         [Id(0)]
-        public IReadOnlySet<string> Set { get; set; }
+        public IReadOnlySet<string>? Set { get; set; }
 
         [Id(1)]
-        public IReadOnlyDictionary<string, int> Dictionary { get; set; }
+        public IReadOnlyDictionary<string, int>? Dictionary { get; set; }
     }
 #endif
 
@@ -590,33 +594,33 @@ public class InterfaceCollectionRegressionTests
     public sealed class GenericInterfaceCollectionContainer
     {
         [Id(0)]
-        public IEnumerable<int> Enumerable { get; set; }
+        public IEnumerable<int>? Enumerable { get; set; }
 
         [Id(1)]
-        public IReadOnlyCollection<int> ReadOnlyCollection { get; set; }
+        public IReadOnlyCollection<int>? ReadOnlyCollection { get; set; }
 
         [Id(2)]
-        public IReadOnlyList<int> ReadOnlyList { get; set; }
+        public IReadOnlyList<int>? ReadOnlyList { get; set; }
 
         [Id(3)]
-        public ICollection<int> Collection { get; set; }
+        public ICollection<int>? Collection { get; set; }
 
         [Id(4)]
-        public IList<int> List { get; set; }
+        public IList<int>? List { get; set; }
 
         [Id(5)]
-        public ISet<string> Set { get; set; }
+        public ISet<string>? Set { get; set; }
 
 #if NET5_0_OR_GREATER
         [Id(6)]
-        public IReadOnlySet<string> ReadOnlySet { get; set; }
+        public IReadOnlySet<string>? ReadOnlySet { get; set; }
 #endif
 
         [Id(7)]
-        public IDictionary<string, int> Dictionary { get; set; }
+        public IDictionary<string, int>? Dictionary { get; set; }
 
         [Id(8)]
-        public IReadOnlyDictionary<string, int> ReadOnlyDictionary { get; set; }
+        public IReadOnlyDictionary<string, int>? ReadOnlyDictionary { get; set; }
     }
 }
 
@@ -658,13 +662,13 @@ internal static class InterfaceCollectionTestHelpers
         return result;
     }
 
-    public static bool SequenceEqual<T>(IEnumerable<T> left, IEnumerable<T> right) =>
+    public static bool SequenceEqual<T>(IEnumerable<T>? left, IEnumerable<T>? right) =>
         ReferenceEquals(left, right) || left is not null && right is not null && left.SequenceEqual(right);
 
-    public static bool SetEqual<T>(IEnumerable<T> left, IEnumerable<T> right) =>
+    public static bool SetEqual<T>(IEnumerable<T>? left, IEnumerable<T>? right) =>
         ReferenceEquals(left, right) || left is not null && right is not null && left.ToHashSet().SetEquals(right);
 
-    public static bool DictionaryEqual<TKey, TValue>(IEnumerable<KeyValuePair<TKey, TValue>> left, IEnumerable<KeyValuePair<TKey, TValue>> right) where TKey : notnull
+    public static bool DictionaryEqual<TKey, TValue>(IEnumerable<KeyValuePair<TKey, TValue>>? left, IEnumerable<KeyValuePair<TKey, TValue>>? right) where TKey : notnull
     {
         if (ReferenceEquals(left, right))
         {
@@ -780,6 +784,7 @@ internal sealed class UnknownSet<T>(IEnumerable<T> values) : ISet<T>
 }
 
 internal sealed class UnknownDictionary<TKey, TValue>(IDictionary<TKey, TValue> values) : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
+    where TKey : notnull
 {
     private readonly Dictionary<TKey, TValue> _values = new(values);
 
@@ -819,7 +824,7 @@ internal sealed class UnknownDictionary<TKey, TValue>(IDictionary<TKey, TValue> 
 
     public bool Remove(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)_values).Remove(item);
 
-    public bool TryGetValue(TKey key, out TValue value) => _values.TryGetValue(key, out value);
+    public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value) => _values.TryGetValue(key, out value);
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

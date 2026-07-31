@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -10,7 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Streams
 {
     internal class ImplicitStreamSubscriberTable
@@ -78,7 +78,7 @@ namespace Orleans.Streams
                            $"Stream binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.StreamBindingPatternKey}\" value");
                     }
 
-                    IStreamNamespacePredicate predicate = null;
+                    IStreamNamespacePredicate? predicate = null;
                     foreach (var provider in _providers)
                     {
                         if (provider.TryGetPredicate(pattern, out predicate)) break;
@@ -97,7 +97,7 @@ namespace Orleans.Streams
                            $"Stream binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.StreamIdMapperKey}\" value");
                     }
 
-                    var streamIdMapper = _serviceProvider.GetKeyedService<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName);
+                    var streamIdMapper = _serviceProvider.GetKeyedService<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName)!; // A mapper is always registered under the resolved key.
                     var subscriber = new StreamSubscriber(binding, streamIdMapper);
                     newPredicates.Add(new StreamSubscriberPredicate(subscriber, predicate));
                 }
@@ -205,7 +205,7 @@ namespace Orleans.Streams
             return SubscriptionMarker.MarkAsImplictSubscriptionId(new(bytes));
         }
 
-        internal static bool IsImplicitSubscribeEligibleNameSpace(string streamNameSpace)
+        internal static bool IsImplicitSubscribeEligibleNameSpace([NotNullWhen(true)] string? streamNameSpace)
         {
             return !string.IsNullOrWhiteSpace(streamNameSpace);
         }
@@ -239,7 +239,7 @@ namespace Orleans.Streams
             public IStreamNamespacePredicate Predicate { get; }
         }
 
-        private sealed class StreamSubscriber : IEquatable<StreamSubscriber>
+        private sealed class StreamSubscriber : IEquatable<StreamSubscriber?>
         {
             public StreamSubscriber(GrainBindings grainBindings, IStreamIdMapper streamIdMapper)
             {
@@ -253,9 +253,9 @@ namespace Orleans.Streams
 
             private IStreamIdMapper streamIdMapper { get; }
 
-            public override bool Equals(object obj) => Equals(obj as StreamSubscriber);
+            public override bool Equals(object? obj) => Equals(obj as StreamSubscriber);
 
-            public bool Equals(StreamSubscriber other) => other != null && GrainType.Equals(other.GrainType);
+            public bool Equals(StreamSubscriber? other) => other is not null && GrainType.Equals(other.GrainType);
 
             public override int GetHashCode() => GrainType.GetHashCode();
 

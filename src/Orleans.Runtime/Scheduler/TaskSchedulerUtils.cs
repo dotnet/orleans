@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans.Runtime.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.Scheduler
 {
     internal static class TaskSchedulerUtils
@@ -22,7 +21,7 @@ namespace Orleans.Runtime.Scheduler
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor();
 
-            var task = new Task(action, state);
+            var task = new Task((Action<object?>)action, state);
             task.Start(taskScheduler);
         }
 

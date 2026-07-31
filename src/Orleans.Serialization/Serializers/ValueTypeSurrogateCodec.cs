@@ -60,6 +60,7 @@ public sealed class ValueTypeSurrogateCodec<TField, TSurrogate, TConverter>
     }
 
     /// <inheritdoc/>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         field.EnsureWireTypeTagDelimited();
@@ -78,7 +79,7 @@ public sealed class ValueTypeSurrogateCodec<TField, TSurrogate, TConverter>
     }
 
     /// <inheritdoc/>
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
     {
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteStartObject(fieldIdDelta, expectedType, typeof(TField));

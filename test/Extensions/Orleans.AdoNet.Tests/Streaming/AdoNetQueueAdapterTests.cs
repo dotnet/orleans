@@ -44,9 +44,9 @@ public class PostgreSqlAdoNetQueueAdapterTests(TestEnvironmentFixture fixture) :
 public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentFixture fixture) : IAsyncLifetime
 {
     private readonly TestEnvironmentFixture _fixture = fixture;
-    private RelationalStorageForTesting _testing;
-    private IRelationalStorage _storage;
-    private RelationalOrleansQueries _queries;
+    private RelationalStorageForTesting _testing = null!;
+    private IRelationalStorage _storage = null!;
+    private RelationalOrleansQueries _queries = null!;
 
     private const string TestDatabaseName = "OrleansStreamTest";
 
@@ -124,9 +124,9 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
 
         // act - enqueue (via adapter) some messages
         var beforeEnqueued = DateTime.UtcNow;
-        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null, context);
-        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null, context);
-        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null, context);
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null!, context);
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null!, context);
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null!, context);
         var afterEnqueued = DateTime.UtcNow;
 
         // assert - stored messages are as expected
@@ -148,6 +148,8 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             Assert.Equal(item.VisibleOn, item.ModifiedOn);
 
             var serializedContainer = serializer.Deserialize(item.Payload);
+            Assert.NotNull(serializedContainer);
+            Assert.NotNull(serializedContainer.RequestContext);
             Assert.Equal(streamId, serializedContainer.StreamId);
             Assert.Null(serializedContainer.SequenceToken);
             Assert.Equal(new[] { new TestModel(i + 1) }, serializedContainer.Events);
@@ -188,9 +190,9 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
 
         // act - enqueue (via adapter) some messages
         var beforeEnqueued = DateTime.UtcNow;
-        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null, new Dictionary<string, object> { { "MyKey", 1 } });
-        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null, new Dictionary<string, object> { { "MyKey", 2 } });
-        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null, new Dictionary<string, object> { { "MyKey", 3 } });
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null!, new Dictionary<string, object> { { "MyKey", 1 } });
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null!, new Dictionary<string, object> { { "MyKey", 2 } });
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null!, new Dictionary<string, object> { { "MyKey", 3 } });
         var afterEnqueued = DateTime.UtcNow;
 
         // act - grab receiver and dequeue messages
@@ -201,6 +203,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var afterDequeued = DateTime.UtcNow;
 
         // assert - dequeued messages are as expected
+        Assert.NotNull(messages);
         Assert.Equal(3, messages.Count);
         for (var i = 0; i < messages.Count; i++)
         {
@@ -233,6 +236,8 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             Assert.True(item.ModifiedOn <= afterDequeued);
 
             var serializedContainer = serializer.Deserialize(item.Payload);
+            Assert.NotNull(serializedContainer);
+            Assert.NotNull(serializedContainer.RequestContext);
             Assert.Equal(streamId, serializedContainer.StreamId);
             Assert.Null(serializedContainer.SequenceToken);
             Assert.Equal(new[] { new TestModel(i + 1) }, serializedContainer.Events);

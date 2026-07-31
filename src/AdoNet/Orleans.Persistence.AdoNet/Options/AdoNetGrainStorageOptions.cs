@@ -3,7 +3,6 @@ using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Storage;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -15,7 +14,7 @@ namespace Orleans.Configuration
         /// Connection string for AdoNet storage.
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
@@ -38,12 +37,12 @@ namespace Orleans.Configuration
         public string Invariant { get; set; } = DEFAULT_ADONET_INVARIANT;
 
         /// <inheritdoc/>
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the hasher picker to use for this storage provider. 
         /// </summary>
-        public IStorageHasherPicker HashPicker { get; set; }
+        public IStorageHasherPicker HashPicker { get; set; } = null!;
 
         /// <summary>
         /// Sets legacy Orleans v3-compatible hash picker to use for this storage provider. Invoke this method if you need to run
@@ -105,7 +104,7 @@ namespace Orleans.Configuration
     /// </summary>
     public class DefaultAdoNetGrainStorageOptionsHashPickerConfigurator : IPostConfigureOptions<AdoNetGrainStorageOptions>
     {
-        public void PostConfigure(string name, AdoNetGrainStorageOptions options)
+        public void PostConfigure(string? name, AdoNetGrainStorageOptions options)
         {
             // preserving explicitly configured HashPicker
             if (options.HashPicker != null)

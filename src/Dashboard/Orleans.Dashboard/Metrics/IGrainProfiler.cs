@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
 
-#nullable disable
 namespace Orleans.Dashboard.Metrics;
 
 /// <summary>
@@ -16,7 +15,7 @@ internal interface IGrainProfiler
     /// <param name="grainType">The type of the grain.</param>
     /// <param name="methodName">The name of the method that was invoked. Automatically captured from the caller if not specified.</param>
     /// <param name="failed">True if the method invocation resulted in an exception; otherwise, false.</param>
-    void Track(double elapsedMs, Type grainType, [CallerMemberName] string methodName = null, bool failed = false);
+    void Track(double elapsedMs, Type grainType, [CallerMemberName] string? methodName = null, bool failed = false);
 
     /// <summary>
     /// Enables or disables the grain profiler.

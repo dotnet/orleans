@@ -25,10 +25,10 @@ namespace DefaultCluster.Tests
             data.SetBit(13);
             data.SetEnemy(17, CampaignEnemyTestType.Enemy1);
 
-            object obj = HostedCluster.DeepCopy(data);
+            object? obj = HostedCluster.DeepCopy(data);
             Assert.IsAssignableFrom<LargeTestData>(obj);
 
-            object copy = HostedCluster.RoundTripSerializationForTesting(obj);
+            object? copy = HostedCluster.RoundTripSerializationForTesting(obj);
             Assert.IsAssignableFrom<LargeTestData>(copy);
         }
 

@@ -21,7 +21,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
         GrainId grainId,
         string collection,
         string storedEtag,
-        string currentEtag)
+        string? currentEtag)
         : base(errorMsg, storedEtag, currentEtag)
     {
         GrainType = grainType;
@@ -37,7 +37,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
         GrainId grainId,
         string collection,
         string storedEtag,
-        string currentEtag)
+        string? currentEtag)
         : this(CreateDefaultMessage(grainType, grainId, collection, storedEtag, currentEtag), grainType, grainId, collection, storedEtag, currentEtag)
     {
     }
@@ -88,7 +88,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
         GrainId grainId,
         string collection,
         string storedEtag,
-        string currentEtag) => string.Format(DefaultMessageFormat, grainType, grainId, collection, storedEtag, currentEtag);
+        string? currentEtag) => string.Format(DefaultMessageFormat, grainType, grainId, collection, storedEtag, currentEtag);
 
     /// <summary>
     /// Exception thrown when a Cosmos DB exception is thrown due to update conditions not being satisfied.

@@ -226,7 +226,7 @@ namespace Orleans.Runtime
             return Task.FromResult(this.activationDirectory.Count);
         }
 
-        public Task<object> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable
+        public Task<object?> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable
         {
             var t = services
                     .GetKeyedServices<IControllable>(providerName);

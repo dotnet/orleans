@@ -6,7 +6,6 @@ using System.Threading;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions
 {
     [GenerateSerializer]
@@ -55,7 +54,7 @@ namespace Orleans.Transactions
         public bool IsReadOnly { get; }
 
         [Id(4)]
-        public byte[] OriginalException { get; set; }
+        public byte[]? OriginalException { get; set; }
 
         // counts how many writes were done per each accessed resource
         // zero means the resource was only read
@@ -85,7 +84,7 @@ namespace Orleans.Transactions
             joined.Enqueue(x);
         }
 
-        public OrleansTransactionAbortedException MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
+        public OrleansTransactionAbortedException? MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
         {
             if (OriginalException != null)
             {
@@ -118,7 +117,7 @@ namespace Orleans.Transactions
         /// <returns>true if there are no orphans, false otherwise</returns>
         public void ReconcilePending()
         {
-            TransactionInfo transactionInfo;
+            TransactionInfo? transactionInfo;
             while (this.joined.TryDequeue(out transactionInfo))
             {
                 Union(transactionInfo);

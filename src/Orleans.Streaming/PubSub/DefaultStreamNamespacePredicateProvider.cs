@@ -1,7 +1,7 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.TypeSystem;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -10,7 +10,7 @@ namespace Orleans.Streams
     public class DefaultStreamNamespacePredicateProvider : IStreamNamespacePredicateProvider
     {  
         /// <inheritdoc/>
-        public bool TryGetPredicate(string predicatePattern, out IStreamNamespacePredicate predicate)
+        public bool TryGetPredicate(string predicatePattern, [MaybeNullWhen(false)] out IStreamNamespacePredicate predicate)
         {
             switch (predicatePattern)
             {
@@ -43,7 +43,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Formats a stream namespace predicate which indicates a concrete <see cref="IStreamNamespacePredicate"/> type to be constructed, along with an optional argument.
         /// </summary>
-        public static string FormatPattern(Type predicateType, string constructorArgument)
+        public static string FormatPattern(Type predicateType, string? constructorArgument)
         {
             if (constructorArgument is null)
             {
@@ -54,7 +54,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public bool TryGetPredicate(string predicatePattern, out IStreamNamespacePredicate predicate)
+        public bool TryGetPredicate(string predicatePattern, [MaybeNullWhen(false)] out IStreamNamespacePredicate predicate)
         {
             if (!predicatePattern.StartsWith(Prefix, StringComparison.Ordinal))
             {
@@ -64,7 +64,7 @@ namespace Orleans.Streams
 
             var start = Prefix.Length + 1;
             string typeName;
-            string arg;
+            string? arg;
             var index = predicatePattern.IndexOf(':', start);
             if (index < 0)
             {
@@ -77,7 +77,7 @@ namespace Orleans.Streams
                 arg = predicatePattern[(index + 1)..];
             }
 
-            var type = Type.GetType(typeName, throwOnError: true);
+            var type = Type.GetType(typeName, throwOnError: true)!; // throwOnError ensures that a Type is returned or an exception is thrown.
 
             if (!typeof(IStreamNamespacePredicate).IsAssignableFrom(type))
             {
@@ -86,11 +86,11 @@ namespace Orleans.Streams
 
             if (string.IsNullOrEmpty(arg))
             {
-                predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type);
+                predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type)!; // CreateInstance returns a predicate instance or throws.
             }
             else
             {
-                predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type, arg);
+                predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type, arg)!; // CreateInstance returns a predicate instance or throws.
             }
 
             return true;

@@ -20,6 +20,7 @@ internal interface IMyDirectoryTestGrain : IGrainWithIntegerKey
     ValueTask Ping();
 }
 
+
 [CollectionAgeLimit(Minutes = 1.01)]
 internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 {
@@ -52,7 +53,7 @@ public sealed class GrainDirectoryResilienceTests
         var lowerLimit = 1; // Membership is kept on the primary, so we can't go below 1
         var target = upperLimit;
         var idBase = 0L;
-        var client = ((InProcessSiloHandle)testCluster.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>();
+        var client = ((InProcessSiloHandle)testCluster.Primary!).SiloHost.Services.GetRequiredService<IGrainFactory>();
         const int CallsPerIteration = 100;
         var loadTask = Task.Run(async () =>
         {
@@ -165,7 +166,7 @@ public sealed class GrainDirectoryResilienceTests
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
         var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
-        var client = ((InProcessSiloHandle)testCluster.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>();
+        var client = ((InProcessSiloHandle)testCluster.Primary!).SiloHost.Services.GetRequiredService<IGrainFactory>();
         var previousDirectoryView = await WaitForDirectoryViewAsync(
             ((InProcessSiloHandle)testCluster.Primary).ServiceProvider.GetRequiredService<DirectoryMembershipService>(),
             view => view.Members.Contains(testCluster.Primary.SiloAddress),
@@ -364,4 +365,3 @@ public sealed class GrainDirectoryResilienceTests
         RingRange Range,
         string OperationName);
 }
-

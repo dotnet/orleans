@@ -2,7 +2,6 @@ using Orleans.Providers.Streams.Common;
 using System;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -17,7 +16,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Cache monitor which is used to report cache related metrics
         /// </summary>
-        public ICacheMonitor CacheMonitor { set; private get; }
+        public ICacheMonitor? CacheMonitor { set; private get; }
         /// <summary>
         /// Default flow control threshold
         /// </summary>
@@ -42,7 +41,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(ILogger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(ILogger logger, ICacheMonitor? monitor = null)
             : this(DefaultFlowControlThreshold, DefaultPressureWindowSize, logger, monitor)
         { }
 
@@ -52,7 +51,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="pressureWindowSize"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(TimeSpan pressureWindowSize, ILogger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(TimeSpan pressureWindowSize, ILogger logger, ICacheMonitor? monitor = null)
             : this(DefaultFlowControlThreshold, pressureWindowSize, logger, monitor)
         {
         }
@@ -63,7 +62,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor? monitor = null)
             : this(flowControlThreshold, DefaultPressureWindowSize, logger, monitor)
         {
         }
@@ -75,7 +74,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="pressureWindowSzie"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(double flowControlThreshold, TimeSpan pressureWindowSzie, ILogger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(double flowControlThreshold, TimeSpan pressureWindowSzie, ILogger logger, ICacheMonitor? monitor = null)
         {
             this.FlowControlThreshold = flowControlThreshold;
             this.logger = logger;

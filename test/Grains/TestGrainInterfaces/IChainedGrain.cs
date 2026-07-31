@@ -4,10 +4,10 @@ namespace UnitTests.GrainInterfaces
     {
         Task<int> GetId();
         Task<int> GetX();
-        Task<IChainedGrain> GetNext();
+        Task<IChainedGrain?> GetNext();
         //[ReadOnly]
         Task<int> GetCalculatedValue();
-        Task SetNext(IChainedGrain next);
+        Task SetNext(IChainedGrain? next);
         Task SetNextNested(ChainGrainHolder next);
         //[ReadOnly]
         Task Validate(bool nextIsSet);
@@ -21,6 +21,6 @@ namespace UnitTests.GrainInterfaces
     public class ChainGrainHolder
     {
         [Id(0)]
-        public IChainedGrain Next { get; set; }
+        public IChainedGrain? Next { get; set; }
     }
 }

@@ -295,12 +295,13 @@ namespace Orleans
                         {
                             var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
                             await invoker.Invoke();
-                            response = invoker.Response;
+                            response = invoker.Response!;
                         }
                         else
                         {
                             response = await request.Invoke();
-                            response = _manager._responseCopier.Copy(response);
+                            // The copier preserves the null state of its input.
+                            response = _manager._responseCopier.Copy(response)!;
                         }
 
                         if (message.Direction != Message.Directions.OneWay)
@@ -340,7 +341,8 @@ namespace Orleans
                 try
                 {
                     // we're expected to notify the caller if the deep copy failed.
-                    deepCopy = _manager.deepCopier.Copy(resultObject);
+                    // The copier preserves the null state of its input.
+                    deepCopy = _manager.deepCopier.Copy(resultObject)!;
                 }
                 catch (Exception exc2)
                 {
@@ -367,7 +369,8 @@ namespace Orleans
                         try
                         {
                             // we're expected to notify the caller if the deep copy failed.
-                            deepCopy = _manager.deepCopier.Copy(exception);
+                            // The copier preserves the null state of its input.
+                            deepCopy = _manager.deepCopier.Copy(exception)!;
                         }
                         catch (Exception ex2)
                         {

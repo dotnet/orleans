@@ -4,7 +4,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -13,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The type of the t key.</typeparam>
     /// <typeparam name="TValue">The type of the t value.</typeparam>
     [RegisterSerializer]
-    public sealed class ConcurrentDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ConcurrentDictionary<TKey, TValue>, ConcurrentDictionarySurrogate<TKey, TValue>>
+    public sealed class ConcurrentDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ConcurrentDictionary<TKey, TValue>, ConcurrentDictionarySurrogate<TKey, TValue>> where TKey : notnull
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ConcurrentDictionaryCodec{TKey, TValue}"/> class.
@@ -42,7 +41,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct ConcurrentDictionarySurrogate<TKey, TValue>
+    public struct ConcurrentDictionarySurrogate<TKey, TValue> where TKey : notnull
     {
         /// <summary>
         /// Gets or sets the values.
@@ -58,7 +57,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The type of the t key.</typeparam>
     /// <typeparam name="TValue">The type of the t value.</typeparam>
     [RegisterCopier]
-    public sealed class ConcurrentDictionaryCopier<TKey, TValue> : IDeepCopier<ConcurrentDictionary<TKey, TValue>>, IBaseCopier<ConcurrentDictionary<TKey, TValue>>
+    public sealed class ConcurrentDictionaryCopier<TKey, TValue> : IDeepCopier<ConcurrentDictionary<TKey, TValue>>, IBaseCopier<ConcurrentDictionary<TKey, TValue>> where TKey : notnull
     {
         private readonly Type _fieldType = typeof(ConcurrentDictionary<TKey, TValue>);
         private readonly IDeepCopier<TKey> _keyCopier;
@@ -80,12 +79,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<ConcurrentDictionary<TKey, TValue>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
 #if NET6_0_OR_GREATER

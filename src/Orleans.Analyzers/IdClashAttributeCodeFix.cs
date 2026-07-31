@@ -9,7 +9,6 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers;
 
-#nullable disable
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(IdClashAttributeCodeFix)), Shared]
 public class IdClashAttributeCodeFix : CodeFixProvider
 {
@@ -18,8 +17,8 @@ public class IdClashAttributeCodeFix : CodeFixProvider
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-        var semanticModel = await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
+        var root = (await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
+        var semanticModel = (await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false))!;
         var idAttributeSymbol = semanticModel.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
         var diagnostic = context.Diagnostics.First();
         if (root.FindNode(diagnostic.Location.SourceSpan) is not AttributeSyntax attribute)
@@ -38,11 +37,11 @@ public class IdClashAttributeCodeFix : CodeFixProvider
                         .DescendantNodes()
                         .OfType<AttributeSyntax>()
                         .Where(a => a.IsAttribute(semanticModel, idAttributeSymbol))
-                        .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString()))
+                        .Select(a => int.Parse(a.ArgumentList!.Arguments.Single().ToString()))
                         .Max() + 1;
 
                     var newAttribute = attribute.ReplaceNode(
-                        attribute.ArgumentList.Arguments[0].Expression,
+                        attribute.ArgumentList!.Arguments[0].Expression,
                         LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(newIdValue)));
 
                     var newRoot = root.ReplaceNode(attribute, newAttribute);

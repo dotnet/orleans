@@ -30,7 +30,7 @@ namespace Tester.AzureUtils.Streaming
         {
             this.output = output;
             this.fixture = fixture;
-            this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
+            this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>()!;
         }
 
         public Task InitializeAsync() => Task.CompletedTask;
@@ -54,7 +54,7 @@ namespace Tester.AzureUtils.Streaming
                 QueueNames = azureQueueNames
             };
             options.ConfigureTestDefaults();
-            var serializer = this.fixture.Services.GetService<Serializer>();
+            var serializer = this.fixture.Services.GetService<Serializer>()!;
             var queueCacheOptions = new SimpleQueueCacheOptions();
             var queueDataAdapter = new AzureQueueDataAdapterV2(serializer);
             var adapterFactory = new AzureQueueAdapterFactory(
@@ -97,7 +97,9 @@ namespace Tester.AzureUtils.Streaming
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = receiver.GetQueueMessagesAsync(QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG).Result.ToArray();
+                        var receivedMessages = receiver.GetQueueMessagesAsync(QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG).Result;
+                        Assert.NotNull(receivedMessages);
+                        var messages = receivedMessages.ToArray();
                         if (!messages.Any())
                         {
                             continue;
@@ -130,7 +132,7 @@ namespace Tester.AzureUtils.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null!, RequestContextExtensions.Export(this.fixture.DeepCopier)!).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent
@@ -148,13 +150,14 @@ namespace Tester.AzureUtils.Streaming
                     // read all messages in cache for stream
                     IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
                     int messageCount = 0;
-                    StreamSequenceToken tenthInCache = null;
+                    StreamSequenceToken? tenthInCache = null;
                     StreamSequenceToken lastToken = firstInCache;
                     while (cursor.MoveNext())
                     {
-                        Exception ex;
+                        Exception? ex;
                         messageCount++;
-                        IBatchContainer batch = cursor.GetCurrent(out ex);
+                        var batch = cursor.GetCurrent(out ex);
+                        Assert.NotNull(batch);
                         this.output.WriteLine("Token: {0}", batch.SequenceToken);
                         Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;

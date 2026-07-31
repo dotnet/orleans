@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal partial class SocketsTrace : ISocketsTrace
@@ -74,11 +73,11 @@ namespace Orleans.Networking.Shared
         )]
         public partial void ConnectionResume(string connectionId);
 
-        public IDisposable BeginScope<TState>(TState state) => _logger.BeginScope(state);
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => _logger.BeginScope(state);
 
         public bool IsEnabled(LogLevel logLevel) => _logger.IsEnabled(logLevel);
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             => _logger.Log(logLevel, eventId, state, exception, formatter);
     }
 }

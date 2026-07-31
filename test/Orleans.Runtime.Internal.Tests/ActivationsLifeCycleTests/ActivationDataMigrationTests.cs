@@ -13,7 +13,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
 {
     private readonly Fixture _fixture = fixture;
 
-    private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary;
+    private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
 
     [Fact]
     public async Task TryStartMigration_ReturnsTrue_WhenActivationCanStartMigration()

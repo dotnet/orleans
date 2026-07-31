@@ -43,9 +43,9 @@ public class PostgreSqlAdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fi
 public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvironmentFixture fixture) : IAsyncLifetime
 {
     private readonly TestEnvironmentFixture _fixture = fixture;
-    private RelationalStorageForTesting _testing;
-    private IRelationalStorage _storage;
-    private RelationalOrleansQueries _queries;
+    private RelationalStorageForTesting _testing = null!;
+    private IRelationalStorage _storage = null!;
+    private RelationalOrleansQueries _queries = null!;
 
     private const string TestDatabaseName = "OrleansStreamTest";
 
@@ -103,6 +103,7 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
 
         // act - dequeue messages via receiver
         var dequeued = await receiver.GetQueueMessagesAsync(maxCount);
+        Assert.NotNull(dequeued);
         var storedDequeued = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToDictionary(x => x.MessageId);
 
         // act - confirm messages via receiver
@@ -110,8 +111,8 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
         var storedConfirmed = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToDictionary(x => x.MessageId);
 
         // assert - dequeued messages are as expected
-        Assert.NotNull(dequeued);
         var single = Assert.IsType<AdoNetBatchContainer>(Assert.Single(dequeued));
+        Assert.NotNull(single.RequestContext);
         Assert.Equal(streamId, single.StreamId);
         Assert.Equal(events, single.Events);
         Assert.Equal(context.Select(x => (x.Key, x.Value)), single.RequestContext.Select(x => (x.Key, x.Value)));
@@ -162,7 +163,7 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - enqueue a message
-        var payload = serializer.SerializeToArray(new AdoNetBatchContainer(StreamId.Create("MyNamespace", "MyKey"), [new TestModel(1)], null));
+        var payload = serializer.SerializeToArray(new AdoNetBatchContainer(StreamId.Create("MyNamespace", "MyKey"), [new TestModel(1)], null!));
         await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100);
 
         // act - start getting messages from the receiver

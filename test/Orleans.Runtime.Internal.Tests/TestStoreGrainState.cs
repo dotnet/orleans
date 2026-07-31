@@ -7,7 +7,7 @@ namespace UnitTests.Persistence
     public class TestStoreGrainState
     {
         [Id(0)]
-        public string A { get; set; }
+        public string? A { get; set; }
         [Id(1)]
         public int B { get; set; }
         [Id(2)]
@@ -39,5 +39,4 @@ namespace UnitTests.Persistence
         }
     }
 }
-
 

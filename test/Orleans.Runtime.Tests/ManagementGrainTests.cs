@@ -160,7 +160,7 @@ namespace UnitTests.Management
 
         private SimpleGrainStatistic[] GetSimpleGrainStatisticsRunner(string when)
         {
-            SimpleGrainStatistic[] stats = mgmtGrain.GetSimpleGrainStatistics(null).Result;
+            SimpleGrainStatistic[] stats = mgmtGrain.GetSimpleGrainStatistics(null!).Result;
             StringBuilder sb = new StringBuilder();
             foreach (var s in stats) sb.AppendLine().Append(s);
             sb.AppendLine();

@@ -51,7 +51,7 @@ namespace UnitTests
         [Fact, TestCategory("BVT")]
         public async Task ReactivateGrainWithPoisonGrainDirectoryEntry_LocalSilo()
         {
-            var primarySilo = (InProcessSiloHandle)Fixture.HostedCluster.Primary;
+            var primarySilo = (InProcessSiloHandle)Fixture.HostedCluster.Primary!;
             var primarySiloAddress = primarySilo.SiloAddress;
             var grain = GrainFactory.GetGrain<IGuidTestGrain>(Guid.NewGuid());
 
@@ -87,7 +87,7 @@ namespace UnitTests
         [Fact, TestCategory("BVT")]
         public async Task ReactivateGrainWithPoisonGrainDirectoryEntry_RemoteSilo()
         {
-            var primarySilo = (InProcessSiloHandle)Fixture.HostedCluster.Primary;
+            var primarySilo = (InProcessSiloHandle)Fixture.HostedCluster.Primary!;
             var secondarySiloAddress = Fixture.HostedCluster.SecondarySilos.First().SiloAddress;
             var primarySiloAddress = primarySilo.SiloAddress;
             var grain = GrainFactory.GetGrain<IGuidTestGrain>(Guid.NewGuid());

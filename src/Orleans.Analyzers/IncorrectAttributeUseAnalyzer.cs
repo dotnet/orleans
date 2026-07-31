@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers;
 
-#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
 {
@@ -33,7 +32,7 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
             var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
             if (aliasAttributeSymbol is not null && grainSymbol is not null)
             {
-                context.RegisterSymbolAction(context => AnalyzeNamedType(context, aliasAttributeSymbol, grainSymbol, generateSerializerAttributeSymbol), SymbolKind.NamedType);
+                context.RegisterSymbolAction(context => AnalyzeNamedType(context, aliasAttributeSymbol, grainSymbol, generateSerializerAttributeSymbol!), SymbolKind.NamedType);
             }
         });
     }

@@ -13,7 +13,7 @@ public sealed class SystemTextJsonGrainStorageSerializer : IGrainStorageStreamin
         _options = options ?? new JsonSerializerOptions();
     }
 
-    public BinaryData Serialize<T>(T input)
+    public BinaryData Serialize<T>(T? input)
     {
         var payload = JsonSerializer.SerializeToUtf8Bytes(input, _options);
         return new BinaryData(payload);
@@ -25,7 +25,7 @@ public sealed class SystemTextJsonGrainStorageSerializer : IGrainStorageStreamin
         return result!;
     }
 
-    public ValueTask SerializeAsync<T>(T input, Stream destination, CancellationToken cancellationToken = default)
+    public ValueTask SerializeAsync<T>(T? input, Stream destination, CancellationToken cancellationToken = default)
     {
         return new(JsonSerializer.SerializeAsync(destination, input, _options, cancellationToken));
     }

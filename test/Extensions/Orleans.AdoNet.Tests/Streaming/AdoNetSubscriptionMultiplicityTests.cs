@@ -44,10 +44,10 @@ public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
     private const string AdoNetStreamProviderName = "AdoNet";
     private const string StreamNamespace = "AdoNetSubscriptionMultiplicityTestsNamespace";
 
-    private static string _invariant;
+    private static string _invariant = null!;
 
-    private static RelationalStorageForTesting _testing;
-    private SubscriptionMultiplicityTestRunner _runner;
+    private static RelationalStorageForTesting _testing = null!;
+    private SubscriptionMultiplicityTestRunner _runner = null!;
 
     protected AdoNetSubscriptionMultiplicityTests(string invariant)
     {

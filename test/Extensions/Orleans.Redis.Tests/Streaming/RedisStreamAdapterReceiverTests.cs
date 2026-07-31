@@ -53,8 +53,12 @@ public sealed class RedisStreamAdapterReceiverTests
                 new RedisStreamStorage(providerName, clusterOptions, redisOptions, receiverOptions, queueId));
             await firstReceiver.Initialize(TimeSpan.FromSeconds(10));
 
-            var firstBatch = Assert.IsType<RedisStreamBatchContainer>(Assert.Single(await firstReceiver.GetQueueMessagesAsync(1)));
-            var secondBatch = Assert.IsType<RedisStreamBatchContainer>(Assert.Single(await firstReceiver.GetQueueMessagesAsync(1)));
+            var firstMessages = await firstReceiver.GetQueueMessagesAsync(1);
+            Assert.NotNull(firstMessages);
+            var firstBatch = Assert.IsType<RedisStreamBatchContainer>(Assert.Single(firstMessages));
+            var secondMessages = await firstReceiver.GetQueueMessagesAsync(1);
+            Assert.NotNull(secondMessages);
+            var secondBatch = Assert.IsType<RedisStreamBatchContainer>(Assert.Single(secondMessages));
 
             Assert.Equal(0, Assert.Single(firstBatch.GetEvents<int>()).Item1);
             Assert.Equal(1, Assert.Single(secondBatch.GetEvents<int>()).Item1);
@@ -74,7 +78,9 @@ public sealed class RedisStreamAdapterReceiverTests
                 new RedisStreamStorage(providerName, clusterOptions, redisOptions, receiverOptions, queueId));
             await resumedReceiver.Initialize(TimeSpan.FromSeconds(10));
 
-            var resumedBatch = Assert.IsType<RedisStreamBatchContainer>(Assert.Single(await resumedReceiver.GetQueueMessagesAsync(10)));
+            var resumedMessages = await resumedReceiver.GetQueueMessagesAsync(10);
+            Assert.NotNull(resumedMessages);
+            var resumedBatch = Assert.IsType<RedisStreamBatchContainer>(Assert.Single(resumedMessages));
             Assert.Equal(2, Assert.Single(resumedBatch.GetEvents<int>()).Item1);
 
             var resumedToken = Assert.IsType<RedisStreamSequenceToken>(resumedBatch.SequenceToken);

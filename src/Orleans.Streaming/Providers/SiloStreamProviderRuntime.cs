@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Streams.Filtering;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.Providers
 {
     internal partial class SiloStreamProviderRuntime : ISiloSideStreamProviderRuntime
@@ -47,7 +46,7 @@ namespace Orleans.Runtime.Providers
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
 
-        public IStreamPubSub PubSub(StreamPubSubType pubSubType)
+        public IStreamPubSub? PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
             {
@@ -77,7 +76,7 @@ namespace Orleans.Runtime.Providers
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,
-                this.PubSub(pubsubOptions.PubSubType),
+                this.PubSub(pubsubOptions.PubSubType)!, // Configured StreamPubSubType values always select a runtime.
                 adapterFactory,
                 queueBalancer,
                 filter,
@@ -99,10 +98,10 @@ namespace Orleans.Runtime.Providers
 
         private (IBackoffProvider, IBackoffProvider) CreateBackoffProviders(string streamProviderName)
         {
-            var deliveryProvider = (IBackoffProvider)ServiceProvider.GetKeyedService<IMessageDeliveryBackoffProvider>(streamProviderName) ??
+            var deliveryProvider = ServiceProvider.GetKeyedService<IMessageDeliveryBackoffProvider>(streamProviderName) as IBackoffProvider ??
                 new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
 
-            var queueReaderProvider = (IBackoffProvider)ServiceProvider.GetKeyedService<IQueueReaderBackoffProvider>(streamProviderName) ??
+            var queueReaderProvider = ServiceProvider.GetKeyedService<IQueueReaderBackoffProvider>(streamProviderName) as IBackoffProvider ??
                 new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
 
             return new(deliveryProvider, queueReaderProvider);
@@ -155,7 +154,8 @@ namespace Orleans.Runtime.Providers
                 throw new InvalidOperationException($"The extension { typeof(TExtension) } cannot be bound to a Stateless Worker.");
             }
 
-            return this.grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+            return this.grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>()! // Grain contexts expose an extension binder.
+                .GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 
         [LoggerMessage(

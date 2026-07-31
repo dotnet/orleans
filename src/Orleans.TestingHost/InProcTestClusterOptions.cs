@@ -4,7 +4,6 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
-#nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>
@@ -17,14 +16,14 @@ public sealed class InProcessTestClusterOptions
     /// </summary>
     /// <seealso cref="ClusterOptions.ClusterId"/>
     /// <value>The cluster identifier.</value>
-    public string ClusterId { get; set; }
+    public string ClusterId { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the service identifier.
     /// </summary>
     /// <seealso cref="ClusterOptions.ServiceId"/>
     /// <value>The service identifier.</value>
-    public string ServiceId { get; set; }
+    public string ServiceId { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the base silo port, which is the port for the first silo. Other silos will use subsequent ports.

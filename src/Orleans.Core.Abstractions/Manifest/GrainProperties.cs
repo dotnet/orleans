@@ -341,7 +341,7 @@ namespace Orleans.Metadata
         /// <returns>
         /// The bindings for the specified grain.
         /// </returns>
-        IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType);
+        IEnumerable<Dictionary<string, string?>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType);
     }
 
     /// <summary>
@@ -382,7 +382,7 @@ namespace Orleans.Metadata
                 {
                     foreach (var pair in binding)
                     {
-                        properties[BindingPrefix + bindingIndex.ToString(CultureInfo.InvariantCulture) + '.' + pair.Key] = pair.Value;
+                        properties[BindingPrefix + bindingIndex.ToString(CultureInfo.InvariantCulture) + '.' + pair.Key] = pair.Value!; // Null is the legacy sentinel for the default mapper.
                     }
 
                     ++bindingIndex;

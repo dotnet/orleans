@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,14 +35,15 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
-    public class PersistenceGenericGrainState<T>
+    public class PersistenceGenericGrainState<T> where T : notnull
     {
         [Id(0)]
+        [MaybeNull]
         public T Field1 { get; set; }
         [Id(1)]
-        public string Field2 { get; set; }
+        public string? Field2 { get; set; }
         [Id(2)]
-        public SortedDictionary<T, T> SortedDict { get; set; }
+        public SortedDictionary<T, T>? SortedDict { get; set; }
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
@@ -67,7 +69,7 @@ namespace UnitTests.Grains
         {
             IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(GetType(), this.ServiceProvider);
             Assert.NotNull(grainStorage);
-            return Task.FromResult(grainStorage.GetType().FullName);
+            return Task.FromResult(grainStorage.GetType().FullName!);
         }
 
         public Task DoSomething()
@@ -154,7 +156,7 @@ namespace UnitTests.Grains
 
         public async Task DoWrite(int val, bool recover)
         {
-            var original = this.copier.Copy(State);
+            var original = this.copier.Copy(State)!; // Grain state is non-null after activation.
             try
             {
                 State.Field1 = val;
@@ -165,13 +167,13 @@ namespace UnitTests.Grains
                 if (!recover) throw;
 
                 this.logger.LogWarning(exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
-                State = (PersistenceTestGrainState)original;
+                State = original;
             }
         }
 
         public async Task<int> DoRead(bool recover)
         {
-            var original = this.copier.Copy(State);
+            var original = this.copier.Copy(State)!; // Grain state is non-null after activation.
             try
             {
                 await ReadStateAsync();
@@ -181,7 +183,7 @@ namespace UnitTests.Grains
                 if (!recover) throw;
 
                 this.logger.LogWarning(exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
-                State = (PersistenceTestGrainState)original;
+                State = original;
             }
             return State.Field1;
         }
@@ -336,8 +338,8 @@ namespace UnitTests.Grains
 
         public ValueTask<GrainState<PersistenceTestGrainState>> GetStateAsync()
         {
-            var field = GetType().BaseType.GetField("_storage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            var storage = (IStorage<PersistenceTestGrainState>)field.GetValue(this);
+            var field = GetType().BaseType!.GetField("_storage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var storage = (IStorage<PersistenceTestGrainState>)field.GetValue(this)!;
             return new(new GrainState<PersistenceTestGrainState>
             {
                 RecordExists = storage.RecordExists,
@@ -350,6 +352,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
     public class GrainStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
         IGrainStorageGenericGrain<T>
+        where T : notnull
     {
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -358,7 +361,7 @@ namespace UnitTests.Grains
 
         public Task<T> GetValue()
         {
-            return Task.FromResult(State.Field1);
+            return Task.FromResult(State.Field1!);
         }
 
         public Task DoWrite(T val)
@@ -370,7 +373,7 @@ namespace UnitTests.Grains
         public async Task<T> DoRead()
         {
             await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
+            return State.Field1!;
         }
 
         public Task DoDelete()
@@ -395,9 +398,9 @@ namespace UnitTests.Grains
 
         public Task<string> GetExtendedKeyValue()
         {
-            string extKey;
+            string? extKey;
             _ = this.GetPrimaryKey(out extKey);
-            return Task.FromResult(extKey);
+            return Task.FromResult(extKey!);
         }
 
         public Task DoWrite(int val)
@@ -457,9 +460,9 @@ namespace UnitTests.Grains
             [Id(0)]
             public int Field1 { get; set; }
             [Id(1)]
-            public string Field2 { get; set; }
+            public string? Field2 { get; set; }
             [Id(2)]
-            public SortedDictionary<int, int> SortedDict { get; set; }
+            public SortedDictionary<int, int>? SortedDict { get; set; }
         }
     }
 
@@ -473,9 +476,9 @@ namespace UnitTests.Grains
         }
 
         [Id(0)]
-        public string Name { get; set; }
+        public string? Name { get; set; }
         [Id(1)]
-        public string Status { get; set; }
+        public string? Status { get; set; }
         [Id(2)]
         public List<IUser> Friends { get; set; }
     }
@@ -511,7 +514,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetName()
         {
-            return Task.FromResult(State.Name);
+            return Task.FromResult(State.Name!);
         }
 
         public Task UpdateStatus(string status)
@@ -580,12 +583,12 @@ namespace UnitTests.Grains
     {
         private const int Multiple = 100;
 
-        private IReentrentGrainWithState _other;
-        private IGrainContext _context;
-        private TaskScheduler _scheduler;
+        private IReentrentGrainWithState _other = null!;
+        private IGrainContext _context = null!;
+        private TaskScheduler _scheduler = null!;
         private readonly ILogger logger;
         private bool executing;
-        private Task outstandingWriteStateOperation;
+        private Task? outstandingWriteStateOperation;
 
         public ReentrentGrainWithState(ILoggerFactory loggerFactory)
         {
@@ -594,7 +597,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            _context = RuntimeContext.Current;
+            _context = RuntimeContext.Current!;
             _scheduler = TaskScheduler.Current;
             executing = false;
             return base.OnActivateAsync(cancellationToken);
@@ -768,7 +771,7 @@ namespace UnitTests.Grains
     internal class NonReentrantStressGrainWithoutState : Grain, INonReentrantStressGrainWithoutState
     {
         private const int Multiple = 100;
-        private ILogger logger;
+        private ILogger logger = null!;
         private bool executing;
         private const int LEVEL = 2; // level 2 is enough to repro the problem.
 

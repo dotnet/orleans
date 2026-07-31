@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-#nullable disable
 namespace Orleans.Transactions.Abstractions
 {
     /// <summary>
@@ -14,13 +13,17 @@ namespace Orleans.Transactions.Abstractions
     {
         Task<TransactionalStorageLoadResponse<TState>> Load();
 
+        /// <summary>
+        /// Stores transactional state changes.
+        /// </summary>
+        /// <returns>A task whose result is the ETag assigned to the stored state.</returns>
         Task<string> Store(
 
-            string expectedETag,
+            string? expectedETag,
             TransactionalStateMetaData metadata,
 
             // a list of transactions to prepare.
-            List<PendingTransactionState<TState>> statesToPrepare,
+            List<PendingTransactionState<TState>>? statesToPrepare,
 
             // if non-null, commit all pending transaction up to and including this sequence number.
             long? commitUpTo,
@@ -46,7 +49,7 @@ namespace Orleans.Transactions.Abstractions
         /// A globally unique identifier of the transaction. 
         /// </summary>
         [Id(1)]
-        public string TransactionId { get; set; }
+        public string TransactionId { get; set; } = null!;
 
         /// <summary>
         /// The logical timestamp of the transaction.
@@ -67,7 +70,7 @@ namespace Orleans.Transactions.Abstractions
         /// A snapshot of the state after this transaction executed
         /// </summary>
         [Id(4)]
-        public TState State { get; set; }
+        public TState State { get; set; } = null!;
     }
 
     [Serializable, GenerateSerializer, Immutable]
@@ -76,7 +79,7 @@ namespace Orleans.Transactions.Abstractions
     {
         public TransactionalStorageLoadResponse() : this(null, new TState(), 0, new TransactionalStateMetaData(), Array.Empty<PendingTransactionState<TState>>()) { }
 
-        public TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, TransactionalStateMetaData metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
+        public TransactionalStorageLoadResponse(string? etag, TState committedState, long committedSequenceId, TransactionalStateMetaData metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {
             this.ETag = etag;
             this.CommittedState = committedState;
@@ -86,7 +89,7 @@ namespace Orleans.Transactions.Abstractions
         }
 
         [Id(0)]
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         [Id(1)]
         public TState CommittedState { get; set; }
@@ -131,6 +134,6 @@ namespace Orleans.Transactions.Abstractions
         public DateTime Timestamp { get; set; }
 
         [Id(1)]
-        public List<ParticipantId> WriteParticipants { get; set; }
+        public List<ParticipantId> WriteParticipants { get; set; } = null!;
     }
 }

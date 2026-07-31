@@ -3,7 +3,6 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -11,7 +10,7 @@ namespace Orleans
     /// </summary>
     public class PersistentStateAttributeMapper : IAttributeToFactoryMapper<PersistentStateAttribute>
     {
-        private static readonly MethodInfo CreateMethodInfo = typeof(IPersistentStateFactory).GetMethod("Create");
+        private static readonly MethodInfo CreateMethodInfo = typeof(IPersistentStateFactory).GetMethod("Create")!;
 
         /// <inheritdoc/>
         public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, PersistentStateAttribute attribute)
@@ -20,7 +19,7 @@ namespace Orleans
             // set state name to parameter name, if not already specified
             if (string.IsNullOrEmpty(config.StateName))
             {
-                config = new PersistentStateConfiguration() { StateName = parameter.Name, StorageName = attribute.StorageName };
+                config = new PersistentStateConfiguration() { StateName = parameter.Name!, StorageName = attribute.StorageName };
             }
 
             if (!parameter.ParameterType.IsGenericType || !typeof(IPersistentState<>).Equals(parameter.ParameterType.GetGenericTypeDefinition()))
@@ -40,14 +39,14 @@ namespace Orleans
         {
             IPersistentStateFactory factory = context.ActivationServices.GetRequiredService<IPersistentStateFactory>();
             object[] args = [context, config];
-            return genericCreate.Invoke(factory, args);
+            return genericCreate.Invoke(factory, args)!;
         }
 
         private class PersistentStateConfiguration : IPersistentStateConfiguration
         {
-            public string StateName { get; set; }
+            public string StateName { get; set; } = null!;
 
-            public string StorageName { get; set; }
+            public string? StorageName { get; set; }
         }
     }
 }

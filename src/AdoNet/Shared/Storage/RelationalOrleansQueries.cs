@@ -6,8 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -101,7 +99,8 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainId grainId)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, GetReminderEntry, command =>
+            // Collection queries only yield rows containing reminder data; the selector is nullable for single-row outer joins.
+            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, record => GetReminderEntry(record)!, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -117,7 +116,8 @@ namespace Orleans.Tests.SqlUtils
         {
             var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
-            return ReadAsync(query, GetReminderEntry, command =>
+            // Collection queries only yield rows containing reminder data; the selector is nullable for single-row outer joins.
+            return ReadAsync<ReminderEntry, ReminderTableData>(query, record => GetReminderEntry(record)!, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -128,10 +128,10 @@ namespace Orleans.Tests.SqlUtils
                 record.GetValue<string>("QueryText"));
         }
 
-        internal static ReminderEntry GetReminderEntry(IDataRecord record)
+        internal static ReminderEntry? GetReminderEntry(IDataRecord record)
         {
             //Having non-null field, GrainId, means with the query filter options, an entry was found.
-            string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
+            string? grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
             if (grainId != null)
             {
                 return new ReminderEntry
@@ -155,7 +155,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="grainId">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
-        internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainId grainId,
+        internal Task<ReminderEntry?> ReadReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName)
         {
             return ReadAsync(dbStoredQueries.ReadReminderRowKey, GetReminderEntry, command =>
@@ -176,10 +176,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-        internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,
+        internal Task<string?> UpsertReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName, DateTime startTime, TimeSpan period)
         {
-            return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
+            return ReadAsync<int, string?>(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -363,14 +363,14 @@ namespace Orleans.Tests.SqlUtils
                 }, ret => ret.First());
         }
 
-        private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry, int>> ret)
+        private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry?, int>> ret)
         {
             var retList = ret.ToList();
             var tableVersionEtag = retList[0].Item2;
             var membershipEntries = new List<Tuple<MembershipEntry, string>>();
             if (retList[0].Item1 != null)
             {
-                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1, string.Empty)));
+                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1!, string.Empty)));
             }
             return new MembershipTableData(membershipEntries, new TableVersion(tableVersionEtag, tableVersionEtag.ToString()));
         }
@@ -654,7 +654,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="clusterId">The cluster identifier.</param>
         /// <param name="grainId">The grain identifier.</param>
         /// <returns>The grain activation if found or null if not.</returns>
-        internal Task<AdoNetGrainDirectoryEntry> LookupGrainActivationAsync(string clusterId, string providerId, string grainId)
+        internal Task<AdoNetGrainDirectoryEntry?> LookupGrainActivationAsync(string clusterId, string providerId, string grainId)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
             ArgumentNullException.ThrowIfNull(providerId);

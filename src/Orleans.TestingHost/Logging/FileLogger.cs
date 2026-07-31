@@ -7,7 +7,6 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.TestingHost.Logging
 {
     /// <summary>
@@ -15,7 +14,7 @@ namespace Orleans.TestingHost.Logging
     /// </summary>
     public class FileLoggingOutput : IDisposable
     {
-        private static readonly ConcurrentDictionary<FileLoggingOutput, object> Instances = new();
+        private static readonly ConcurrentDictionary<FileLoggingOutput, object?> Instances = new();
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
 #if NET9_0_OR_GREATER
         private readonly Lock lockObj = new();
@@ -24,7 +23,7 @@ namespace Orleans.TestingHost.Logging
 #endif
         private readonly string logFileName;
         private DateTime lastFlush = DateTime.UtcNow;
-        private StreamWriter logOutput;
+        private StreamWriter? logOutput;
 
         /// <summary>
         /// Initializes static members of the <see cref="FileLoggingOutput"/> class.
@@ -33,7 +32,7 @@ namespace Orleans.TestingHost.Logging
         {
             AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
 
-            static void CurrentDomain_ProcessExit(object sender, EventArgs args)
+            static void CurrentDomain_ProcessExit(object? sender, EventArgs args)
             {
                 foreach (var instance in Instances)
                 {
@@ -63,8 +62,8 @@ namespace Orleans.TestingHost.Logging
         /// <param name="exception">The exception.</param>
         /// <param name="formatter">The formatter.</param>
         /// <param name="category">The category.</param>
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception,
-            Func<TState, Exception, string> formatter, string category)
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter, string category)
         {
             var logMessage = FormatMessage(DateTime.UtcNow, logLevel, category, formatter(state, exception), exception, eventId);
             lock (this.lockObj)
@@ -86,7 +85,7 @@ namespace Orleans.TestingHost.Logging
             LogLevel logLevel,
             string caller,
             string message,
-            Exception exception,
+            Exception? exception,
             EventId errorCode)
         {
             if (logLevel == LogLevel.Error)
@@ -156,7 +155,7 @@ namespace Orleans.TestingHost.Logging
         }
 
         /// <inheritdoc />
-        public IDisposable BeginScope<TState>(TState state)
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
         {
             return NullScope.Instance;
         }
@@ -168,7 +167,7 @@ namespace Orleans.TestingHost.Logging
         }
 
         /// <inheritdoc />
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             this.output.Log(logLevel, eventId, state, exception, formatter, this.category);
 

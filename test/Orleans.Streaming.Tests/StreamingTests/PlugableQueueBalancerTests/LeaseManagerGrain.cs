@@ -22,8 +22,8 @@ namespace Tester.StreamingTests
     {
         //queueId is the lease id here
         private static readonly DateTime UnAssignedLeaseTime = DateTime.MinValue;
-        private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap;
-        private ISiloStatusOracle siloStatusOracle;
+        private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap = null!;
+        private ISiloStatusOracle siloStatusOracle = null!;
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
@@ -83,7 +83,7 @@ namespace Tester.StreamingTests
         }
 
         //methods used in test asserts
-        private Dictionary<string, int> responsibilityMap;
+        private Dictionary<string, int> responsibilityMap = null!;
         public Task RecordBalancerResponsibility(string balancerId, int ownedQueues)
         {
             responsibilityMap[balancerId] = ownedQueues;

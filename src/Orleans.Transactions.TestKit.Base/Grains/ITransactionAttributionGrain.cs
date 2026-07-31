@@ -6,49 +6,49 @@ namespace Orleans.Transactions.TestKit
 {
     public interface INoAttributionGrain : IGrainWithGuidKey
     {
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public interface ISuppressAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.Suppress)]
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public interface ICreateOrJoinAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.CreateOrJoin)]
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public interface ICreateAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.Create)]
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public interface IJoinAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOptionAlias.Mandatory)]
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public interface ISupportedAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.Supported)]
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public interface INotAllowedAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.NotAllowed)]
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     #region wrappers
     public interface ITransactionAttributionGrain
     {
-        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+        Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public static class TransactionAttributionGrainExtensions
@@ -89,7 +89,7 @@ namespace Orleans.Transactions.TestKit
                 this.grain = grain;
             }
 
-            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
@@ -106,7 +106,7 @@ namespace Orleans.Transactions.TestKit
                 this.grain = grain;
             }
 
-            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
@@ -123,7 +123,7 @@ namespace Orleans.Transactions.TestKit
                 this.grain = grain;
             }
 
-            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
@@ -140,7 +140,7 @@ namespace Orleans.Transactions.TestKit
                 this.grain = grain;
             }
 
-            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
@@ -157,7 +157,7 @@ namespace Orleans.Transactions.TestKit
                 this.grain = grain;
             }
 
-            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
@@ -174,7 +174,7 @@ namespace Orleans.Transactions.TestKit
                 this.grain = grain;
             }
 
-            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
@@ -191,7 +191,7 @@ namespace Orleans.Transactions.TestKit
                 this.grain = grain;
             }
 
-            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            public Task<List<string?>?[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }

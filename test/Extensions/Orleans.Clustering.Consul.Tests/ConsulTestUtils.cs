@@ -14,9 +14,9 @@ namespace Consul.Tests
 
         private const string WindowsDockerModeSkipReason = "Docker is running in Windows container mode (OSType=windows), so Consul tests are skipped.";
 
-        private static readonly Lazy<string> DockerDaemonOsTypeLazy = new(GetDockerDaemonOsType);
+        private static readonly Lazy<string?> DockerDaemonOsTypeLazy = new(GetDockerDaemonOsType);
 
-        private static readonly Lazy<string> EnsureConsulSkipReasonLazy = new(() => EnsureConsulAndGetSkipReasonAsync().GetAwaiter().GetResult());
+        private static readonly Lazy<string?> EnsureConsulSkipReasonLazy = new(() => EnsureConsulAndGetSkipReasonAsync().GetAwaiter().GetResult());
 
         private static readonly ConsulContainer _container = new ConsulBuilder("public.ecr.aws/hashicorp/consul:1.19")
             .WithCreateParameterModifier(parameters =>
@@ -49,7 +49,7 @@ namespace Consul.Tests
             return Task.FromResult(EnsureConsulSkipReasonLazy.Value is null);
         }
 
-        private static async Task<string> EnsureConsulAndGetSkipReasonAsync()
+        private static async Task<string?> EnsureConsulAndGetSkipReasonAsync()
         {
             var skipReason = GetDockerSkipReason();
             if (skipReason is not null)
@@ -76,7 +76,7 @@ namespace Consul.Tests
             }
         }
 
-        private static string GetDockerSkipReason()
+        private static string? GetDockerSkipReason()
         {
             var dockerDaemonOsType = DockerDaemonOsTypeLazy.Value;
             if (string.IsNullOrWhiteSpace(dockerDaemonOsType))
@@ -97,7 +97,7 @@ namespace Consul.Tests
             return string.Equals(DockerDaemonOsTypeLazy.Value, "windows", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string GetDockerDaemonOsType()
+        private static string? GetDockerDaemonOsType()
         {
             try
             {

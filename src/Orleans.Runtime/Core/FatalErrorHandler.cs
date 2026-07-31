@@ -25,7 +25,7 @@ namespace Orleans.Runtime
             return !(exception is ThreadAbortException);
         }
 
-        public void OnFatalException(object sender, string context, Exception exception)
+        public void OnFatalException(object? sender, string? context, Exception? exception)
         {
             LogFatalError(this.log, exception, sender, context);
 
@@ -46,6 +46,6 @@ namespace Orleans.Runtime
             EventId = (int)ErrorCode.Logger_ProcessCrashing,
             Message = "Fatal error from {Sender}. Context: {Context}"
         )]
-        private static partial void LogFatalError(ILogger logger, Exception exception, object sender, string context);
+        private static partial void LogFatalError(ILogger logger, Exception? exception, object? sender, string? context);
     }
 }

@@ -38,7 +38,7 @@ public class CosmosRemindersTableTests : ReminderTableTestsBase
 
     protected override Task<string> GetConnectionString()
     {
-        return Task.FromResult(TestDefaultConfiguration.CosmosDBAccountKey);
+        return Task.FromResult(TestDefaultConfiguration.CosmosDBAccountKey!);
     }
 
     [SkippableFact, TestCategory("Functional")]

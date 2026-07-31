@@ -6,7 +6,6 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-#nullable disable
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary>
@@ -18,7 +17,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     {
         [JsonProperty]
         [Id(0)]
-        private EventSequenceTokenV2 sequenceToken;
+        private EventSequenceTokenV2 sequenceToken = null!;
 
         [JsonProperty]
         [Id(1)]
@@ -26,7 +25,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         [JsonProperty]
         [Id(2)]
-        private readonly Dictionary<string, object> requestContext;
+        private readonly Dictionary<string, object>? requestContext;
 
         [Id(3)]
         public StreamId StreamId { get; }
@@ -42,14 +41,14 @@ namespace Orleans.Providers.Streams.AzureQueue
         public AzureQueueBatchContainerV2(
             StreamId streamId,
             List<object> events,
-            Dictionary<string, object> requestContext,
+            Dictionary<string, object>? requestContext,
             EventSequenceTokenV2 sequenceToken)
             : this(streamId, events, requestContext)
         {
             this.sequenceToken = sequenceToken;
         }
 
-        public AzureQueueBatchContainerV2(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+        public AzureQueueBatchContainerV2(StreamId streamId, List<object> events, Dictionary<string, object>? requestContext)
         {
             if (events == null) throw new ArgumentNullException(nameof(events), "Message contains no events");
 

@@ -16,7 +16,7 @@ namespace UnitTests.Grains
         [Id(0)]
         public int MyId { get; set; }
         [Id(1)]
-        public string LastEcho { get; set; }
+        public string? LastEcho { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
@@ -36,7 +36,7 @@ namespace UnitTests.Grains
             return base.OnActivateAsync(cancellationToken);
         }
 
-        public Task<string> GetLastEcho()
+        public Task<string?> GetLastEcho()
         {
             return Task.FromResult(State.LastEcho);
         }
@@ -74,7 +74,7 @@ namespace UnitTests.Grains
         }
 
         public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); }
-        public Task<string> GetLastEchoAsync() { return Task.FromResult(State.LastEcho); }
+        public Task<string?> GetLastEchoAsync() { return Task.FromResult(State.LastEcho); }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -151,7 +151,7 @@ namespace UnitTests.Grains
         public Task PingLocalSiloAsync()
         {
             logger.LogInformation("IEchoGrainAsync.PingLocal");
-            SiloAddress mySilo = _grainContext.Address.SiloAddress;
+            SiloAddress mySilo = _grainContext.Address.SiloAddress!;
             return GetSiloControlReference(mySilo).Ping("PingLocal");
         }
 
@@ -164,7 +164,7 @@ namespace UnitTests.Grains
         public async Task PingOtherSiloAsync()
         {
             logger.LogInformation("IEchoGrainAsync.PingOtherSilo");
-            SiloAddress mySilo = _grainContext.Address.SiloAddress;
+            SiloAddress mySilo = _grainContext.Address.SiloAddress!;
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
@@ -179,7 +179,7 @@ namespace UnitTests.Grains
         public async Task PingClusterMemberAsync()
         {
             logger.LogInformation("IEchoGrainAsync.PingClusterMemberAsync");
-            SiloAddress mySilo = _grainContext.Address.SiloAddress;
+            SiloAddress mySilo = _grainContext.Address.SiloAddress!;
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
@@ -237,7 +237,7 @@ namespace UnitTests.Grains
             return Task.FromResult(State.MyId);
         }
 
-        public Task<string> GetLastEcho()
+        public Task<string?> GetLastEcho()
         {
             return Task.FromResult(State.LastEcho);
         }
@@ -330,7 +330,7 @@ namespace UnitTests.Grains
             return Task.FromResult(State.MyId);
         }
 
-        public Task<string> GetLastEcho()
+        public Task<string?> GetLastEcho()
         {
             return Task.FromResult(State.LastEcho);
         }

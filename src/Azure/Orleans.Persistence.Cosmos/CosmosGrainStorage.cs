@@ -219,7 +219,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                     ETag = grainState.ETag,
                     Id = id,
                     GrainType = grainType,
-                    State = default!,
+                    State = default,
                     PartitionKey = partitionKey
                 };
 
@@ -405,7 +405,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         Level = LogLevel.Trace,
         Message = "Writing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} from Container={Container} with PartitionKey={PartitionKey}"
     )]
-    private partial void LogTraceWritingState(string grainType, string id, GrainId grainId, string eTag, string container, string partitionKey);
+    private partial void LogTraceWritingState(string grainType, string id, GrainId grainId, string? eTag, string container, string partitionKey);
 
     [LoggerMessage(
         Level = LogLevel.Error,
@@ -417,7 +417,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         Level = LogLevel.Trace,
         Message = "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Container={Container} with PartitionKey {PartitionKey}"
     )]
-    private partial void LogTraceClearingState(string grainType, string id, GrainId grainId, string eTag, bool deleteStateOnClear, string container, string partitionKey);
+    private partial void LogTraceClearingState(string grainType, string id, GrainId grainId, string? eTag, bool deleteStateOnClear, string container, string partitionKey);
 
     [LoggerMessage(
         Level = LogLevel.Error,

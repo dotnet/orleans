@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.State
 {
     internal partial class ReadWriteLock<TState>
@@ -22,7 +22,7 @@ namespace Orleans.Transactions.State
 
         // the linked list of lock groups
         // the head is the group that is currently holding the lock
-        private LockGroup currentGroup = null;
+        private LockGroup? currentGroup;
 
         // cache the last known minimum so we don't have to recompute it as much
         private DateTime cachedMin = DateTime.MaxValue;
@@ -32,8 +32,8 @@ namespace Orleans.Transactions.State
         private class LockGroup : Dictionary<Guid, TransactionRecord<TState>>
         {
             public int FillCount;
-            public List<Action> Tasks; // the tasks for executing the waiting operations
-            public LockGroup Next; // queued-up transactions waiting to acquire lock
+            public List<Action>? Tasks; // the tasks for executing the waiting operations
+            public LockGroup? Next; // queued-up transactions waiting to acquire lock
             public DateTime? Deadline;
             public void Reset()
             {
@@ -189,7 +189,7 @@ namespace Orleans.Transactions.State
 
         public async Task<(TransactionalStatus Status, TransactionRecord<TState> State)> ValidateLock(Guid transactionId, AccessCounter accessCount)
         {
-            if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out TransactionRecord<TState> record))
+            if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out TransactionRecord<TState>? record))
             {
                 return (TransactionalStatus.BrokenLock, new TransactionRecord<TState>());
             }
@@ -210,12 +210,12 @@ namespace Orleans.Transactions.State
             this.lockWorker.Notify();
         }
 
-        public bool TryGetRecord(Guid transactionId, out TransactionRecord<TState> record)
+        public bool TryGetRecord(Guid transactionId, [NotNullWhen(true)] out TransactionRecord<TState>? record)
         {
-            return this.currentGroup.TryGetValue(transactionId, out record);
+            return this.currentGroup!.TryGetValue(transactionId, out record);
         }
 
-        public Task AbortExecutingTransactions(Exception exception)
+        public Task AbortExecutingTransactions(Exception? exception)
         {
             if (currentGroup != null)
             {
@@ -226,7 +226,7 @@ namespace Orleans.Transactions.State
             return Task.CompletedTask;
         }
 
-        private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception exception)
+        private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception? exception)
         {
             LogTraceBreakLock(transactionId);
             return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
@@ -365,7 +365,7 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private bool Find(Guid guid, bool isRead, out LockGroup group, out TransactionRecord<TState> record)
+        private bool Find(Guid guid, bool isRead, out LockGroup group, [NotNullWhen(true)] out TransactionRecord<TState>? record)
         {
             if (currentGroup == null)
             {
@@ -375,7 +375,7 @@ namespace Orleans.Transactions.State
             }
             else
             {
-                group = null;
+                group = null!;
                 var pos = currentGroup;
 
                 while (true)
@@ -452,13 +452,13 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private bool LockExits(out TransactionRecord<TState> single, out List<TransactionRecord<TState>> multiple)
+        private bool LockExits(out TransactionRecord<TState>? single, out List<TransactionRecord<TState>>? multiple)
         {
             single = null;
             multiple = null;
 
             // fast-path the one-element case
-            if (currentGroup.Count == 1)
+            if (currentGroup!.Count == 1)
             {
                 var kvp = currentGroup.First();
                 if (kvp.Value.Role == CommitRole.NotYetDetermined) // has not received commit from TA

@@ -5,12 +5,12 @@ using System.Buffers;
 using System.Runtime.Serialization;
 using System.Security;
 
-#nullable disable
 namespace Orleans.Serialization
 {
     internal abstract class ValueTypeSerializer
     {
         public abstract void WriteValue<TBufferWriter>(ref Writer<TBufferWriter> writer, object value) where TBufferWriter : IBufferWriter<byte>;
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract object ReadValue<TInput>(ref Reader<TInput> reader, Type type);
     }
 
@@ -88,6 +88,7 @@ namespace Orleans.Serialization
         }
 
         [SecurityCritical]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public override object ReadValue<TInput>(ref Reader<TInput> reader, Type type)
         {
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
@@ -112,11 +113,11 @@ namespace Orleans.Serialization
                     var entry = _entrySerializer.ReadValue(ref reader, header);
                     if (entry.ObjectType is { } entryType)
                     {
-                        info.AddValue(entry.Name, entry.Value, entryType);
+                        info.AddValue(entry.Name!, entry.Value, entryType);
                     }
                     else
                     {
-                        info.AddValue(entry.Name, entry.Value);
+                        info.AddValue(entry.Name!, entry.Value);
                     }
                 }
                 else

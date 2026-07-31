@@ -85,7 +85,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
-            (bool isSuccess, string eTag) result;
+            (bool isSuccess, string? eTag) result;
             if (previousAddress is not null)
             {
                 var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
@@ -101,7 +101,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 else
                 {
-                    _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag);
+                    _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag!);
                     return address;
                 }
             }

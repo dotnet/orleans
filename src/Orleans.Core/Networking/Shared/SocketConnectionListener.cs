@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 
-#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal sealed class SocketConnectionListener : IConnectionListener
@@ -15,7 +14,7 @@ namespace Orleans.Networking.Shared
         private readonly MemoryPool<byte> _memoryPool;
         private readonly SocketSchedulers _schedulers;
         private readonly ISocketsTrace _trace;
-        private Socket _listenSocket;
+        private Socket? _listenSocket;
         private readonly SocketConnectionOptions _options;
 
         public EndPoint EndPoint { get; private set; }
@@ -76,20 +75,20 @@ namespace Orleans.Networking.Shared
                 throw new AddressInUseException(e.Message, e);
             }
 
-            EndPoint = listenSocket.LocalEndPoint;
+            EndPoint = listenSocket.LocalEndPoint!;
 
             listenSocket.Listen(512);
 
             _listenSocket = listenSocket;
         }
 
-        public async ValueTask<ConnectionContext> AcceptAsync(CancellationToken cancellationToken = default)
+        public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
         {
             while (true)
             {
                 try
                 {
-                    var acceptSocket = await _listenSocket.AcceptAsync();
+                    var acceptSocket = await _listenSocket!.AcceptAsync();
                     acceptSocket.NoDelay = _options.NoDelay;
                     if (_options.KeepAlive)
                     {

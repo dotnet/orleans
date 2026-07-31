@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using Orleans.Serialization;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal class InMemoryMembershipTable
@@ -27,14 +26,16 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableData Read(SiloAddress key)
         {
             return siloTable.TryGetValue(key, out var data) ?
-                new MembershipTableData(this.deepCopier.Copy(data), tableVersion)
+                // The copier preserves the null state of its input.
+                new MembershipTableData(this.deepCopier.Copy(data)!, tableVersion)
                 : new MembershipTableData(tableVersion);
         }
 
         public MembershipTableData ReadAll()
         {
             return new MembershipTableData(siloTable.Values.Select(tuple =>
-                new Tuple<MembershipEntry, string>(this.deepCopier.Copy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
+                // The copier preserves the null state of its input.
+                new Tuple<MembershipEntry, string>(this.deepCopier.Copy(tuple.Item1)!, tuple.Item2)).ToList(), tableVersion);
         }
 
         public TableVersion ReadTableVersion()
@@ -44,8 +45,7 @@ namespace Orleans.Runtime.MembershipService
 
         public bool Insert(MembershipEntry entry, TableVersion version)
         {
-            Tuple<MembershipEntry, string> data;
-            siloTable.TryGetValue(entry.SiloAddress, out data);
+            siloTable.TryGetValue(entry.SiloAddress, out var data);
             if (data != null) return false;
             if (!tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
 
@@ -57,8 +57,7 @@ namespace Orleans.Runtime.MembershipService
 
         public bool Update(MembershipEntry entry, string etag, TableVersion version)
         {
-            Tuple<MembershipEntry, string> data;
-            siloTable.TryGetValue(entry.SiloAddress, out data);
+            siloTable.TryGetValue(entry.SiloAddress, out var data);
             if (data == null) return false;
             if (!data.Item2.Equals(etag) || !tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
 
@@ -70,8 +69,7 @@ namespace Orleans.Runtime.MembershipService
 
         public void UpdateIAmAlive(MembershipEntry entry)
         {
-            Tuple<MembershipEntry, string> data;
-            siloTable.TryGetValue(entry.SiloAddress, out data);
+            siloTable.TryGetValue(entry.SiloAddress, out var data);
             if (data == null) return;
 
             data.Item1.IAmAliveTime = entry.IAmAliveTime;

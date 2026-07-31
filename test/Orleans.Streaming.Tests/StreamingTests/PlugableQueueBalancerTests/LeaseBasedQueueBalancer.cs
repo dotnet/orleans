@@ -7,7 +7,7 @@ namespace Tester.StreamingTests
     {
         private readonly string id;
         private readonly ILeaseManagerGrain leaseManagerGrain;
-        private List<QueueId> ownedQueues;
+        private List<QueueId> ownedQueues = null!;
 
         public LeaseBasedQueueBalancerForTest(string name, IGrainFactory grainFactory)
         {

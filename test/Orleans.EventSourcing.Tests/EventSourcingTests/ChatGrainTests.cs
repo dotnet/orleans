@@ -82,7 +82,7 @@ namespace Tester.EventSourcingTests
                 var container = doc.GetPostsContainer();
                 Assert.Equal(3, container.Elements("post").Count());
                 var post = doc.FindPost(guid.ToString());
-                Assert.Equal("I am not retiring", post.Element("text").Value);
+                Assert.Equal("I am not retiring", post!.Element("text")!.Value);
             }
         }
 

@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -13,7 +12,7 @@ namespace Orleans.Streams
         /// <returns>The stream identity (key + namespace).</returns>
         public static StreamIdentity GetImplicitStreamIdentity(this IGrainWithGuidCompoundKey grain)
         {
-            string keyExtension;
+            string? keyExtension;
             var key = grain.GetPrimaryKey(out keyExtension);
             return new StreamIdentity(key, keyExtension);
         }

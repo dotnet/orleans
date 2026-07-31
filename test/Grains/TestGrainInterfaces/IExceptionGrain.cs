@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -86,7 +87,7 @@ namespace UnitTests.GrainInterfaces
         public UndeserializableType DeepCopy(UndeserializableType input, CopyContext context) => input;
 
         public UndeserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException(UndeserializableType.FailureMessage);
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UndeserializableType value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, UndeserializableType value) where TBufferWriter : IBufferWriter<byte>
         {
             Int32Codec.WriteField(ref writer, fieldIdDelta, value.Number);
         }
@@ -94,12 +95,12 @@ namespace UnitTests.GrainInterfaces
 
     [RegisterSerializer]
     [RegisterCopier]
-    public sealed class UnserializableTypeCodec : IFieldCodec<UnserializableType>, IDeepCopier<UnserializableType>
+    public sealed class UnserializableTypeCodec : IFieldCodec<UnserializableType?>, IDeepCopier<UnserializableType?>
     {
-        public UnserializableType DeepCopy(UnserializableType input, CopyContext context) => input;
+        public UnserializableType? DeepCopy(UnserializableType? input, CopyContext context) => input;
 
-        public UnserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UnserializableType value) where TBufferWriter : IBufferWriter<byte>
+        public UnserializableType? ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, UnserializableType? value) where TBufferWriter : IBufferWriter<byte>
         {
             throw new NotSupportedException(UndeserializableType.FailureMessage);
         }

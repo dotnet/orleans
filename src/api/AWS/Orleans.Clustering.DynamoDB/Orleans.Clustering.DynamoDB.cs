@@ -11,16 +11,16 @@ namespace Orleans.Clustering.DynamoDB
     public partial class DynamoDBClientOptions
     {
         [Redact]
-        public string AccessKey { get { throw null; } set { } }
+        public string? AccessKey { get { throw null; } set { } }
 
-        public string ProfileName { get { throw null; } set { } }
+        public string? ProfileName { get { throw null; } set { } }
 
         [Redact]
-        public string SecretKey { get { throw null; } set { } }
+        public string? SecretKey { get { throw null; } set { } }
 
         public string Service { get { throw null; } set { } }
 
-        public string Token { get { throw null; } set { } }
+        public string? Token { get { throw null; } set { } }
     }
 
     public partial class DynamoDBGatewayListProviderHelper

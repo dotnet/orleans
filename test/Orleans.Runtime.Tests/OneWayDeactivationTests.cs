@@ -51,7 +51,7 @@ namespace UnitTests.General
         [Fact]
         public async Task OneWay_Deactivation_CacheInvalidated()
         {
-            var directoryCache = ((InProcessSiloHandle)_fixture.HostedCluster.Primary).SiloHost.Services.GetRequiredService<TestDirectoryCache>();
+            var directoryCache = ((InProcessSiloHandle)_fixture.HostedCluster.Primary!).SiloHost.Services.GetRequiredService<TestDirectoryCache>();
             IOneWayGrain grainToCallFrom;
             while (true)
             {

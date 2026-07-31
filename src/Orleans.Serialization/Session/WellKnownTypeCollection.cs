@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
-#nullable disable
 namespace Orleans.Serialization.Session
 {
     /// <summary>
@@ -34,7 +33,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         /// <returns>A type.</returns>
-        public Type GetWellKnownType(uint typeId)
+        public Type? GetWellKnownType(uint typeId)
         {
             if (typeId == 0)
             {
@@ -50,7 +49,7 @@ namespace Orleans.Serialization.Session
         /// <param name="typeId">The type identifier.</param>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the corresponding type was found, <see langword="false" /> otherwise.</returns>
-        public bool TryGetWellKnownType(uint typeId, [NotNullWhen(true)] out Type type)
+        public bool TryGetWellKnownType(uint typeId, out Type? type)
         {
             if (typeId == 0)
             {

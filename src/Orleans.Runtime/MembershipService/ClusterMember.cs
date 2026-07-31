@@ -1,6 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -50,10 +50,10 @@ namespace Orleans.Runtime
         public string Name { get; }
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => this.Equals(obj as ClusterMember);
+        public override bool Equals([NotNullWhen(true)] object? obj) => this.Equals(obj as ClusterMember);
 
         /// <inheritdoc/>
-        public bool Equals(ClusterMember other) => other != null
+        public bool Equals(ClusterMember? other) => other != null
             && this.SiloAddress.Equals(other.SiloAddress)
             && this.Status == other.Status
             && string.Equals(this.Name, other.Name, StringComparison.Ordinal);
@@ -64,9 +64,9 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString() => $"{this.SiloAddress}/{this.Name}/{this.Status}";
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"{this.SiloAddress}/{this.Name}/{this.Status}", out charsWritten);
     }
 }

@@ -3,7 +3,6 @@ using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Storage;
 
-#nullable disable
 namespace Orleans.Configuration
 {
     public class DynamoDBStorageOptions : DynamoDBClientOptions, IStorageProviderSerializerOptions
@@ -60,7 +59,7 @@ namespace Orleans.Configuration
         /// every StateWrite will increase the TTL of the grain
         /// </summary>
         public TimeSpan? TimeToLive { get; set; }
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
     }
 
     /// <summary>

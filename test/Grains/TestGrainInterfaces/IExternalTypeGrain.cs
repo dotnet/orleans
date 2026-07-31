@@ -7,7 +7,7 @@ namespace UnitTests.GrainInterfaces
     public class EnumClass
     {
         [Id(0)]
-        public IEnumerable<DateTimeKind> EnumsList { get; set; }
+        public IEnumerable<DateTimeKind>? EnumsList { get; set; }
     }
 
     public interface IExternalTypeGrain : IGrainWithIntegerKey

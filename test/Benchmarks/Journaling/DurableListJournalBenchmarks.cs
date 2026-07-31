@@ -16,17 +16,17 @@ public class DurableListJournalBenchmarks
     private const int OperationsPerInvocation = 4_096;
     private static readonly JournalStreamId ListJournalStreamId = new(8);
 
-    private IDurableListCommandCodec<int> _codec;
-    private IJournalFormat _journalFormat;
-    private DurableList<int> _list;
-    private IJournaledState _state;
-    private OrleansBinaryJournalBufferWriter _writeBuffer;
-    private OrleansBinaryJournalBufferWriter _encodedJournalStreamWriter;
+    private IDurableListCommandCodec<int> _codec = null!;
+    private IJournalFormat _journalFormat = null!;
+    private DurableList<int> _list = null!;
+    private IJournaledState _state = null!;
+    private OrleansBinaryJournalBufferWriter _writeBuffer = null!;
+    private OrleansBinaryJournalBufferWriter _encodedJournalStreamWriter = null!;
     private ArcBuffer _encodedJournalData;
-    private ArcBufferWriter _recoveryBuffer;
-    private RecoveryConsumer _recoveryConsumer;
+    private ArcBufferWriter _recoveryBuffer = null!;
+    private RecoveryConsumer _recoveryConsumer = null!;
     private JournalReplayContext _replayContext;
-    private SerializerSessionPool _sessionPool;
+    private SerializerSessionPool _sessionPool = null!;
 
     [GlobalSetup]
     public void GlobalSetup()

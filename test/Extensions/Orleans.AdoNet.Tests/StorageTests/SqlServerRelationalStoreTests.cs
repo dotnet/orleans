@@ -28,12 +28,12 @@ namespace UnitTests.StorageTests.AdoNet
                 }
             }
 
-            public RelationalStorageForTesting Storage { get; private set; }
+            public RelationalStorageForTesting? Storage { get; private set; }
         }
 
         public SqlServerRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
         {
-            _storage = fixture.Storage;
+            _storage = fixture.Storage!;
         }
 
         [SkippableFact, TestCategory("Functional")]

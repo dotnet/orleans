@@ -6,14 +6,14 @@ namespace Orleans.Storage
 {
     internal class HierarchicalKeyStore : ILocalDataStore
     {
-        public string Etag { get; private set; }
+        public string? Etag { get; private set; }
 
         private const char KEY_VALUE_PAIR_SEPERATOR = '+';
         private const char KEY_VALUE_SEPERATOR = '=';
 
         private long lastETagCounter = 1;
         [NonSerialized]
-        private readonly Dictionary<string, Dictionary<string, object>> dataTable = new();
+        private readonly Dictionary<string, Dictionary<string, object?>> dataTable = new();
         private readonly int numKeyLayers;
         private readonly object lockable = new object();
 
@@ -22,7 +22,7 @@ namespace Orleans.Storage
             numKeyLayers = keyLayers;
         }
 
-        public string WriteRow(IList<Tuple<string, string>> keys, IDictionary<string, object> data, string eTag)
+        public string WriteRow(IList<Tuple<string, string>> keys, IDictionary<string, object?> data, string? eTag)
         {
             if (keys.Count > numKeyLayers)
             {
@@ -39,11 +39,11 @@ namespace Orleans.Storage
                     storedData[kv.Key] = kv.Value;
 
                 Etag = NewEtag();
-                return Etag;
+                return Etag!;
             }
         }
 
-        public IDictionary<string, object> ReadRow(IList<Tuple<string, string>> keys)
+        public IDictionary<string, object?> ReadRow(IList<Tuple<string, string>> keys)
         {
             if (keys.Count > numKeyLayers)
             {
@@ -58,7 +58,7 @@ namespace Orleans.Storage
             }
         }
 
-        public IList<IDictionary<string, object>> ReadMultiRow(IList<Tuple<string, string>> keys)
+        public IList<IDictionary<string, object?>> ReadMultiRow(IList<Tuple<string, string>> keys)
         {
             if (keys.Count > numKeyLayers)
             {
@@ -72,7 +72,7 @@ namespace Orleans.Storage
             }
         }
 
-        public bool DeleteRow(IList<Tuple<string, string>> keys, string eTag)
+        public bool DeleteRow(IList<Tuple<string, string>> keys, string? eTag)
         {
             if (keys.Count > numKeyLayers)
             {
@@ -114,7 +114,7 @@ namespace Orleans.Storage
             return sb.ToString();
         }
 
-        private Dictionary<string, object> GetDataStore(IList<Tuple<string, string>> keys)
+        private Dictionary<string, object?> GetDataStore(IList<Tuple<string, string>> keys)
         {
             string keyStr = MakeStoreKey(keys);
 
@@ -122,21 +122,21 @@ namespace Orleans.Storage
             {
                 if (!dataTable.TryGetValue(keyStr, out var data))
                 {
-                    data = new Dictionary<string, object>(); // Empty data set
+                    data = new Dictionary<string, object?>(); // Empty data set
                     dataTable[keyStr] = data;
                 }
                 return data;
             }
         }
 
-        private IList<IDictionary<string, object>> FindDataStores(IList<Tuple<string, string>> keys)
+        private IList<IDictionary<string, object?>> FindDataStores(IList<Tuple<string, string>> keys)
         {
             if (numKeyLayers == keys.Count)
             {
                 return new[] { GetDataStore(keys) };
             }
 
-            var results = new List<IDictionary<string, object>>();
+            var results = new List<IDictionary<string, object?>>();
             string keyStr = MakeStoreKey(keys);
 
             lock (lockable)

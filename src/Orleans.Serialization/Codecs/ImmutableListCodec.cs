@@ -4,7 +4,6 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -51,7 +50,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableListCopier<T> : IDeepCopier<ImmutableList<T>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T> _copier;
+        private readonly IDeepCopier<T>? _copier;
 
         public ImmutableListCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
@@ -61,7 +60,7 @@ namespace Orleans.Serialization.Codecs
         public ImmutableList<T> DeepCopy(ImmutableList<T> input, CopyContext context)
         {
             if (context.TryGetCopy<ImmutableList<T>>(input, out var result))
-                return result;
+                return result!;
 
             if (input.IsEmpty || _copier is null)
                 return input;
@@ -72,7 +71,7 @@ namespace Orleans.Serialization.Codecs
 
             var items = new List<T>(input.Count);
             foreach (var item in input)
-                items.Add(_copier.DeepCopy(item, context));
+                items.Add(_copier!.DeepCopy(item, context));
 
             var res = ImmutableList.CreateRange(items);
             context.RecordCopy(input, res);

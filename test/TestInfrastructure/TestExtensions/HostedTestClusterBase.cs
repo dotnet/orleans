@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,19 +30,22 @@ namespace TestExtensions
 
     public static class TestClusterExtensions
     {
-        public static T RoundTripSystemTextJsonSerialization<T>(this TestCluster cluster, T value)
+        [return: MaybeNull]
+        public static T RoundTripSystemTextJsonSerialization<T>(this TestCluster cluster, [AllowNull] T value)
         {
-            var serialized = JsonSerializer.Serialize<T>(value);
+            var serialized = JsonSerializer.Serialize<T>(value!);
             return JsonSerializer.Deserialize<T>(serialized);
         }
 
-        public static T RoundTripSerializationForTesting<T>(this TestCluster cluster, T value)
+        [return: MaybeNull]
+        public static T RoundTripSerializationForTesting<T>(this TestCluster cluster, [AllowNull] T value)
         {
             var serializer = cluster.ServiceProvider.GetRequiredService<Serializer>();
             return serializer.Deserialize<T>(serializer.SerializeToArray(value));
         }
 
-        public static T DeepCopy<T>(this TestCluster cluster, T value)
+        [return: MaybeNull]
+        public static T DeepCopy<T>(this TestCluster cluster, [AllowNull] T value)
         {
             var copier = cluster.ServiceProvider.GetRequiredService<DeepCopier>();
             return copier.Copy(value);

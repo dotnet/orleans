@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -17,7 +18,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="purgedItems">The purged items.</param>
         /// <returns><see langword="true" /> if items were successfully purged from the cache., <see langword="false" /> otherwise.</returns>
-        bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems);
+        bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems);
 
         /// <summary>
         /// Acquire a stream message cursor.  This can be used to retrieve messages from the
@@ -26,7 +27,7 @@ namespace Orleans.Streams
         /// <param name="streamId">The stream identifier.</param>
         /// <param name="token">The token.</param>
         /// <returns>The queue cache cursor.</returns>
-        IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token);
+        IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token);
 
         /// <summary>
         /// Returns <see langword="true" /> if this cache is under pressure, <see langword="false" /> otherwise.

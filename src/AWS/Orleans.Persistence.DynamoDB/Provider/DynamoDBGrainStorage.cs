@@ -15,7 +15,6 @@ using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 
-#nullable disable
 namespace Orleans.Storage
 {
     /// <summary>
@@ -37,7 +36,7 @@ namespace Orleans.Storage
         private readonly ILogger logger;
         private readonly string name;
 
-        private DynamoDBStorage storage;
+        private DynamoDBStorage storage = null!;
 
         /// <summary>
         /// Default Constructor
@@ -288,7 +287,7 @@ namespace Orleans.Storage
         {
             public string GrainReference { get; set; } = "";
             public string GrainType { get; set; } = "";
-            public byte[] State { get; set; }
+            public byte[]? State { get; set; }
             public int ETag { get; set; }
         }
 
@@ -298,9 +297,9 @@ namespace Orleans.Storage
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
 
-        internal T ConvertFromStorageFormat<T>(GrainStateRecord entity)
+        internal T? ConvertFromStorageFormat<T>(GrainStateRecord entity)
         {
-            T dataValue = default;
+            T? dataValue = default;
             try
             {
                 if (entity.State is { Length: > 0 })
@@ -324,7 +323,7 @@ namespace Orleans.Storage
             return dataValue;
         }
 
-        internal void ConvertToStorageFormat(object grainState, GrainStateRecord entity)
+        internal void ConvertToStorageFormat(object? grainState, GrainStateRecord entity)
         {
             int dataSize;
             // Convert to binary format
@@ -382,19 +381,19 @@ namespace Orleans.Storage
             Level = LogLevel.Error,
             Message = "Error Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to Table={TableName}"
         )]
-        private static partial void LogErrorWritingGrainState(ILogger logger, Exception exception, string grainType, GrainId grainId, string eTag, string tableName);
+        private static partial void LogErrorWritingGrainState(ILogger logger, Exception exception, string grainType, GrainId grainId, string? eTag, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}"
         )]
-        private static partial void LogTraceClearingGrainState(ILogger logger, string grainType, string partitionKey, GrainId grainId, string eTag, bool deleteStateOnClear, string tableName);
+        private static partial void LogTraceClearingGrainState(ILogger logger, string grainType, string partitionKey, GrainId grainId, string? eTag, bool deleteStateOnClear, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}"
         )]
-        private static partial void LogErrorClearingGrainState(ILogger logger, Exception exception, string operation, string grainType, GrainId grainId, string eTag, string tableName);
+        private static partial void LogErrorClearingGrainState(ILogger logger, Exception exception, string operation, string grainType, GrainId grainId, string? eTag, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Error,

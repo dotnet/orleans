@@ -6,7 +6,7 @@ namespace UnitTests.Grains
 {
     public class MessageSerializationGrain : Grain, IMessageSerializationGrain
     {
-        private IMessageSerializationGrain grainOnOtherSilo;
+        private IMessageSerializationGrain? grainOnOtherSilo;
 
         public Task SendUnserializable(UnserializableType input) => Task.CompletedTask;
         public Task SendUndeserializable(UndeserializableType input) => Task.CompletedTask;

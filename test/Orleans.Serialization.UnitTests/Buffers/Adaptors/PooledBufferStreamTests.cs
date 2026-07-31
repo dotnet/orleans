@@ -160,7 +160,7 @@ public class PooledBufferStreamTests
     public void Return_NullStream_ThrowsException()
     {
         // Arrange & Act & Assert
-        Assert.Throws<ArgumentNullException>(() => PooledBufferStream.Return(null));
+        Assert.Throws<ArgumentNullException>(() => PooledBufferStream.Return(null!));
     }
 
     /// <summary>
@@ -213,7 +213,8 @@ public class PooledBufferStreamTests
         stream.Write(expectedData);
 
         var output = new byte[expectedData.Length];
-        var writer = Writer.Create(output, session: null);
+        // This test only exercises raw buffer copying, which does not access a serializer session.
+        var writer = Writer.Create(output, session: null!);
 
         stream.CopyTo(ref writer);
 
@@ -240,7 +241,8 @@ public class PooledBufferStreamTests
         stream.Write(expectedData, 0, expectedData.Length);
 
         var output = new byte[expectedData.Length];
-        var writer = Writer.Create(output, session: null);
+        // This test only exercises raw buffer copying, which does not access a serializer session.
+        var writer = Writer.Create(output, session: null!);
 
         stream.CopyTo(ref writer);
 
@@ -676,7 +678,7 @@ public class PooledBufferStreamTests
         using var stream = new PooledBufferStream();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => stream.Read(null, 0, 5));
+        Assert.Throws<ArgumentNullException>(() => stream.Read(null!, 0, 5));
     }
 
     /// <summary>
@@ -769,14 +771,14 @@ public class PooledBufferStreamTests
     /// Provides invalid parameter combinations for testing Write method exceptions.
     /// Each object array contains: buffer, offset, count, and expected exception type.
     /// </summary>
-    public static IEnumerable<object[]> InvalidWriteParameters
+    public static IEnumerable<object?[]> InvalidWriteParameters
     {
         get
         {
-            yield return new object[] { null, 0, 1, typeof(ArgumentNullException) };
-            yield return new object[] { new byte[5], -1, 3, typeof(ArgumentOutOfRangeException) };
-            yield return new object[] { new byte[5], 2, -1, typeof(ArgumentOutOfRangeException) };
-            yield return new object[] { new byte[5], 3, 3, typeof(ArgumentOutOfRangeException) };
+            yield return new object?[] { null, 0, 1, typeof(ArgumentNullException) };
+            yield return new object?[] { new byte[5], -1, 3, typeof(ArgumentOutOfRangeException) };
+            yield return new object?[] { new byte[5], 2, -1, typeof(ArgumentOutOfRangeException) };
+            yield return new object?[] { new byte[5], 3, 3, typeof(ArgumentOutOfRangeException) };
         }
     }
 
@@ -789,10 +791,11 @@ public class PooledBufferStreamTests
     /// <param name="expectedException">The expected type of exception.</param>
     [Theory]
     [MemberData(nameof(InvalidWriteParameters))]
-    public void Write_InvalidParameters_ThrowsException(byte[] buffer, int offset, int count, Type expectedException)
+    public void Write_InvalidParameters_ThrowsException(byte[]? buffer, int offset, int count, Type expectedException)
     {
         using var stream = new PooledBufferStream();
-        Assert.Throws(expectedException, () => stream.Write(buffer, offset, count));
+        // Null is an intentional theory input used to verify Stream.Write's argument validation.
+        Assert.Throws(expectedException, () => stream.Write(buffer!, offset, count));
     }
 
     /// <summary>

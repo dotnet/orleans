@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
-#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -20,7 +20,7 @@ namespace Orleans.Runtime.GrainDirectory
             _clientDirectory = clientDirectory;
         }
 
-        public async ValueTask<GrainAddress> Lookup(GrainId grainId)
+        public async ValueTask<GrainAddress?> Lookup(GrainId grainId)
         {
             if (!ClientGrainId.TryParse(grainId, out var clientGrainId))
             {
@@ -31,14 +31,14 @@ namespace Orleans.Runtime.GrainDirectory
             return SelectAddress(results, grainId);
         }
 
-        private GrainAddress SelectAddress(List<GrainAddress> results, GrainId grainId)
+        private GrainAddress? SelectAddress(List<GrainAddress> results, GrainId grainId)
         {
-            GrainAddress unadjustedResult = null;
+            GrainAddress? unadjustedResult = null;
             if (results is { Count: > 0 })
             {
                 foreach (var location in results)
                 {
-                    if (location.SiloAddress.Equals(_localSiloAddress))
+                    if (location.SiloAddress!.Equals(_localSiloAddress))
                     {
                         unadjustedResult = location;
                         break;
@@ -53,13 +53,13 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (unadjustedResult is not null)
             {
-                return GrainAddress.GetAddress(unadjustedResult.SiloAddress, grainId, unadjustedResult.ActivationId);
+                return GrainAddress.GetAddress(unadjustedResult.SiloAddress!, grainId, unadjustedResult.ActivationId);
             }
 
             return null;
         }
 
-        public Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress) => throw new InvalidOperationException($"Cannot register client grain explicitly");
+        public Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => throw new InvalidOperationException($"Cannot register client grain explicitly");
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause) => throw new InvalidOperationException($"Cannot unregister client grain explicitly");
 
@@ -71,7 +71,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCache(GrainAddress address) { }
 
-        public bool TryLookupInCache(GrainId grainId, out GrainAddress address)
+        public bool TryLookupInCache(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
         {
             if (!ClientGrainId.TryParse(grainId, out var clientGrainId))
             {

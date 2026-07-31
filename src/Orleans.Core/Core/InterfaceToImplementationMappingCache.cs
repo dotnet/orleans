@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection;
 using Orleans.CodeGeneration;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -59,7 +58,7 @@ namespace Orleans
             {
                 internal static readonly TypeArrayComparer Instance = new();
 
-                public bool Equals(Type[] x, Type[] y) => ReferenceEquals(x, y) || x is null && y is null || x.Length != y.Length || x.AsSpan().SequenceEqual(y.AsSpan());
+                public bool Equals(Type[]? x, Type[]? y) => ReferenceEquals(x, y) || x is null && y is null || x!.Length != y!.Length || x.AsSpan().SequenceEqual(y.AsSpan());
 
                 public int GetHashCode([DisallowNull] Type[] obj)
                 {
@@ -133,15 +132,15 @@ namespace Orleans
                     // get the mapping for the interface which it does belong to.
                     if (mapping.InterfaceType != method.DeclaringType)
                     {
-                        mapping = implementationType.GetInterfaceMap(method.DeclaringType);
+                        mapping = implementationType.GetInterfaceMap(method.DeclaringType!);
                     }
 
                     // Find the index of the interface method and then get the implementation method at that position.
-                    for (var k = 0; k < mapping.InterfaceMethods.Length; k++)
+                    for (var k = 0; k < mapping.InterfaceMethods!.Length; k++)
                     {
                         if (mapping.InterfaceMethods[k] != method) continue;
                         Debug.Assert(method is not null);
-                        methodMap[method] = new Entry(mapping.TargetMethods[k], method);
+                        methodMap[method] = new Entry(mapping.TargetMethods![k], method);
 
                         break;
                     }

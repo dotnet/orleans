@@ -8,17 +8,16 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Storage;
 
-#nullable disable
 [assembly: RegisterProvider("DynamoDB", "GrainStorage", "Silo", typeof(DynamoDBGrainStorageProviderBuilder))]
 
 namespace Orleans.Hosting;
 
 internal sealed class DynamoDBGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.AddDynamoDBGrainStorage(
-            name,
+            name!,
             (OptionsBuilder<DynamoDBStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
                 var accessKey = configurationSection[nameof(options.AccessKey)];

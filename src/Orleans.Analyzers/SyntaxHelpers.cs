@@ -1,15 +1,15 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Analyzers
 {
-#nullable disable
     internal readonly record struct AttributeArgumentBag<T>(T Value, Location Location);
 
     internal static class SyntaxHelpers
     {
-        private static INamedTypeSymbol GetAttributeSymbol(this SemanticModel semanticModel, AttributeSyntax attributeSyntax)
+        private static INamedTypeSymbol? GetAttributeSymbol(this SemanticModel semanticModel, AttributeSyntax attributeSyntax)
         {
             var symbolInfo = semanticModel.GetSymbolInfo(attributeSyntax);
             var symbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
@@ -22,7 +22,7 @@ namespace Orleans.Analyzers
             };
         }
 
-        public static bool IsAttribute(this AttributeSyntax attributeSyntax, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute)
+        public static bool IsAttribute(this AttributeSyntax? attributeSyntax, SemanticModel? semanticModel, INamedTypeSymbol? expectedAttribute)
         {
             if (attributeSyntax is null || semanticModel is null || expectedAttribute is null)
             {
@@ -32,7 +32,7 @@ namespace Orleans.Analyzers
             return SymbolEqualityComparer.Default.Equals(semanticModel.GetAttributeSymbol(attributeSyntax), expectedAttribute);
         }
 
-        public static bool HasAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute)
+        public static bool HasAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol? expectedAttribute)
         {
             foreach (var list in member.AttributeLists)
             {
@@ -48,7 +48,7 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static bool TryGetAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute, out AttributeSyntax attribute)
+        public static bool TryGetAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol? expectedAttribute, [NotNullWhen(true)] out AttributeSyntax? attribute)
         {
             foreach (var list in member.AttributeLists)
             {
@@ -132,7 +132,7 @@ namespace Orleans.Analyzers
             return isFieldOrAutoProperty;
         }
 
-        public static bool ExtendsGrainInterface(this INamedTypeSymbol symbol)
+        public static bool ExtendsGrainInterface(this INamedTypeSymbol? symbol)
         {
             if (symbol is null || symbol.TypeKind != TypeKind.Interface)
             {
@@ -179,7 +179,7 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static bool IsGrainClass(this INamedTypeSymbol typeSymbol)
+        public static bool IsGrainClass(this INamedTypeSymbol? typeSymbol)
         {
             if (typeSymbol is null || typeSymbol.TypeKind != TypeKind.Class)
             {
@@ -218,12 +218,12 @@ namespace Orleans.Analyzers
                 new(value, attribute.GetLocation()) : default;
         }
 
-        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute) =>
+        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, SemanticModel semanticModel, INamedTypeSymbol? expectedAttribute) =>
             attributeLists
                 .SelectMany(attributeList => attributeList.Attributes)
                 .Where(attribute => attribute.IsAttribute(semanticModel, expectedAttribute));
 
-        public static string GetArgumentValue(this AttributeSyntax attribute, SemanticModel semanticModel)
+        public static string? GetArgumentValue(this AttributeSyntax attribute, SemanticModel semanticModel)
         {
             if (attribute?.ArgumentList == null || attribute.ArgumentList.Arguments.Count == 0)
             {

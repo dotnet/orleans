@@ -25,7 +25,7 @@ namespace UnitTests.StreamingTests
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-            public static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+            public static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName!;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -83,7 +83,7 @@ namespace UnitTests.StreamingTests
             try
             {
                 var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-                object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+                object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
                 Assert.Equal(2, results.Length);
                 bool[] bResults = results.Cast<bool>().ToArray();
 

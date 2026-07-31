@@ -53,7 +53,7 @@ namespace DefaultCluster.Tests.General
                 Assert.True(grainCalled, "Grain should have been called during lifecycle participation");
                 
                 // Also verify the cluster is operational by calling a grain after startup
-                var grain = cluster.Client.GetGrain<ISimpleGrain>(42);
+                var grain = cluster.Client!.GetGrain<ISimpleGrain>(42);
                 await grain.SetA(100);
                 var value = await grain.GetA();
                 Assert.Equal(100, value);

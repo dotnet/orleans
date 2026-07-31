@@ -34,16 +34,16 @@ namespace TestGrains
             );
         }
 
-        public static XElement FindPost(this XDocument document, string guid)
+        public static XElement? FindPost(this XDocument document, string guid)
         {
             return document.GetPostsContainer()
                        .Elements("post")
-                       .FirstOrDefault(x => x.Attribute("id").Value == guid);
+                       .FirstOrDefault(x => x.Attribute("id")!.Value == guid);
         }
 
         public static void ReplaceText(this XElement post, string text)
         {
-            post.Element("text").ReplaceAll(text);
+            post.Element("text")!.ReplaceAll(text);
         }
 
         public static void EnforceLimit(this XDocument document)

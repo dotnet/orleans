@@ -28,12 +28,12 @@ namespace UnitTests.StorageTests.Relational
         /// <remarks>The state, basically the <see cref="Range{T}"/> object isn't used currently.</remarks>
         private static Dictionary<Type, object> RandomGenerators { get; } = new Dictionary<Type, object>
         {
-            [typeof(Guid)] = new Func<object, Guid>(_ => Guid.NewGuid()),
-            [typeof(int)] = new Func<object, int>(_ => Random.Shared.Next()),
-            [typeof(long)] = new Func<object, long>(_=> Random.Shared.NextInt64()),
-            [typeof(string)] = new Func<object, string>(symbolSet =>
+            [typeof(Guid)] = new Func<object?, Guid>(_ => Guid.NewGuid()),
+            [typeof(int)] = new Func<object?, int>(_ => Random.Shared.Next()),
+            [typeof(long)] = new Func<object?, long>(_=> Random.Shared.NextInt64()),
+            [typeof(string)] = new Func<object?, string>(symbolSet =>
             {
-                var count = ((Tuple<Range<long>, SymbolSet>)symbolSet).Item1.Start;
+                var count = ((Tuple<Range<long>, SymbolSet>)symbolSet!).Item1.Start;
                 var symbols = ((Tuple<Range<long>, SymbolSet>)symbolSet).Item2;
                 var builder = new StringBuilder();
                 for(long i = 0; i < count; ++i)
@@ -52,9 +52,9 @@ namespace UnitTests.StorageTests.Relational
         /// <typeparam name="T"></typeparam>
         /// <returns>Random value of the given type.</returns>
         /// <exception cref="ArgumentException"/>.
-        public static T GetRandom<T>(Range<long> range = null)
+        public static T GetRandom<T>(Range<long>? range = null)
         {
-            object randomGenerator;
+            object? randomGenerator;
             if(RandomGenerators.TryGetValue(typeof(T), out randomGenerator))
             {
                 //If this a string type, some symbol set from which to draw the symbols needs to given
@@ -63,10 +63,10 @@ namespace UnitTests.StorageTests.Relational
                 {
                     const long SymbolsDefaultCount = 15;
                     var symbols = new SymbolSet(SymbolSet.Latin1);
-                    return ((Func<object, T>)randomGenerator)(Tuple.Create(range ?? new Range<long>(SymbolsDefaultCount, SymbolsDefaultCount), symbols));
+                    return ((Func<object?, T>)randomGenerator)(Tuple.Create(range ?? new Range<long>(SymbolsDefaultCount, SymbolsDefaultCount), symbols));
                 }
 
-                return ((Func<object, T>)randomGenerator)(null);
+                return ((Func<object?, T>)randomGenerator)(null);
             }
 
             throw new ArgumentException(typeof(T).Name);

@@ -1,4 +1,3 @@
-#nullable enable
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;

@@ -10,7 +10,6 @@ using Newtonsoft.Json;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions.AzureStorage
 {
     public partial class AzureTableTransactionalStateStorage<TState> : ITransactionalStateStorage<TState>
@@ -21,8 +20,8 @@ namespace Orleans.Transactions.AzureStorage
         private readonly JsonSerializerSettings jsonSettings;
         private readonly ILogger logger;
 
-        private KeyEntity key;
-        private List<KeyValuePair<long, StateEntity>> states;
+        private KeyEntity key = null!;
+        private List<KeyValuePair<long, StateEntity>> states = null!;
 
         public AzureTableTransactionalStateStorage(TableClient table, string partition, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
         {
@@ -91,7 +90,7 @@ namespace Orleans.Transactions.AzureStorage
                             SequenceId = kvp.Key,
                             State = kvp.Value.GetState<TState>(this.jsonSettings),
                             TimeStamp = kvp.Value.TransactionTimestamp,
-                            TransactionId = kvp.Value.TransactionId,
+                            TransactionId = kvp.Value.TransactionId!, // Persisted transaction rows always include an identifier.
                             TransactionManager = tm
                         });
                     }
@@ -105,7 +104,7 @@ namespace Orleans.Transactions.AzureStorage
 
                     LogDebugLoadedPartitionKeyRows(partition, this.key.CommittedSequenceId, new(states));
 
-                    TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata, this.jsonSettings);
+                    TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata!, this.jsonSettings)!;
                     return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
                 }
             }
@@ -116,7 +115,7 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
-        public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+        public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             var keyETag = key.ETag.ToString();
             if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) && keyETag != expectedETag)
@@ -374,7 +373,7 @@ namespace Orleans.Transactions.AzureStorage
                 }
             }
 
-            private static bool IsStorageConflict(Exception exception)
+            private static bool IsStorageConflict(Exception? exception)
             {
                 while (exception is not null)
                 {
@@ -424,19 +423,19 @@ namespace Orleans.Transactions.AzureStorage
             Level = LogLevel.Trace,
             Message = "{PartitionKey}.{RowKey} Delete {TransactionId}"
         )]
-        private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey, string transactionId);
+        private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey, string? transactionId);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "{PartitionKey}.{RowKey} Update {TransactionId}"
         )]
-        private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey, string transactionId);
+        private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey, string? transactionId);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "{PartitionKey}.{RowKey} Insert {TransactionId}"
         )]
-        private partial void LogTraceInsertTransaction(string partitionKey, string rowKey, string transactionId);
+        private partial void LogTraceInsertTransaction(string partitionKey, string rowKey, string? transactionId);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

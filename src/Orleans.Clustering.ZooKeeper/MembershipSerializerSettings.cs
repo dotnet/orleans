@@ -4,7 +4,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 
-#nullable disable
 namespace Orleans.Runtime.Host
 {
     internal class MembershipSerializerSettings : JsonSerializerSettings
@@ -25,9 +24,9 @@ namespace Orleans.Runtime.Host
                 return (objectType == typeof(MembershipEntry));
             }
 
-            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+            public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
             {
-                MembershipEntry me = (MembershipEntry)value;
+                MembershipEntry me = (MembershipEntry)value!;
                 writer.WriteStartObject();
                 writer.WritePropertyName("SiloAddress"); serializer.Serialize(writer, me.SiloAddress);
                 writer.WritePropertyName("HostName"); writer.WriteValue(me.HostName);
@@ -40,19 +39,19 @@ namespace Orleans.Runtime.Host
                 writer.WriteEndObject();
             }
 
-            public override object ReadJson(JsonReader reader, Type objectType, object existingValue,
+            public override object ReadJson(JsonReader reader, Type objectType, object? existingValue,
                 JsonSerializer serializer)
             {
                 JObject jo = JObject.Load(reader);
                 return new MembershipEntry
                 {
-                    SiloAddress = jo["SiloAddress"].ToObject<SiloAddress>(serializer),
-                    HostName = jo["HostName"].ToObject<string>(),
-                    SiloName = (jo["SiloName"] ?? jo["InstanceName"]).ToObject<string>(),
-                    Status = jo["Status"].ToObject<SiloStatus>(serializer),
-                    ProxyPort = jo["ProxyPort"].Value<int>(),
-                    StartTime = jo["StartTime"].Value<DateTime>(),
-                    SuspectTimes = jo["SuspectTimes"].ToObject<List<Tuple<SiloAddress, DateTime>>>(serializer)
+                    SiloAddress = jo["SiloAddress"]!.ToObject<SiloAddress>(serializer)!,
+                    HostName = jo["HostName"]!.ToObject<string>()!,
+                    SiloName = (jo["SiloName"] ?? jo["InstanceName"])!.ToObject<string>()!,
+                    Status = jo["Status"]!.ToObject<SiloStatus>(serializer),
+                    ProxyPort = jo["ProxyPort"]!.Value<int>(),
+                    StartTime = jo["StartTime"]!.Value<DateTime>(),
+                    SuspectTimes = jo["SuspectTimes"]!.ToObject<List<Tuple<SiloAddress, DateTime>>>(serializer)
                 };
             }
         }
@@ -64,20 +63,20 @@ namespace Orleans.Runtime.Host
                 return (objectType == typeof(SiloAddress));
             }
 
-            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+            public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
             {
-                SiloAddress se = (SiloAddress)value;
+                SiloAddress se = (SiloAddress)value!;
                 writer.WriteStartObject();
                 writer.WritePropertyName("SiloAddress");
                 writer.WriteValue(se.ToParsableString());
                 writer.WriteEndObject();
             }
 
-            public override object ReadJson(JsonReader reader, Type objectType, object existingValue,
+            public override object ReadJson(JsonReader reader, Type objectType, object? existingValue,
                 JsonSerializer serializer)
             {
                 JObject jo = JObject.Load(reader);
-                string seStr = jo["SiloAddress"].ToObject<string>(serializer);
+                string seStr = jo["SiloAddress"]!.ToObject<string>(serializer)!;
                 return SiloAddress.FromParsableString(seStr);
             }
         }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.ExceptionServices;
@@ -15,7 +16,6 @@ using Orleans.Streaming.EventHubs.Testing;
 using Azure.Messaging.EventHubs;
 using Orleans.Statistics;
 
-#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
@@ -26,14 +26,14 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Eventhub settings
         /// </summary>
-        public EventHubOptions Hub { get; set; }
+        public EventHubOptions Hub { get; set; } = null!;
 
-        public EventHubReceiverOptions ReceiverOptions { get; set; }
+        public EventHubReceiverOptions ReceiverOptions { get; set; } = null!;
 
         /// <summary>
         /// Partition name
         /// </summary>
-        public string Partition { get; set; }
+        public string Partition { get; set; } = null!;
     }
 
     internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCache
@@ -49,14 +49,14 @@ namespace Orleans.Streaming.EventHubs
         private readonly IQueueAdapterReceiverMonitor monitor;
         private readonly LoadSheddingOptions loadSheddingOptions;
         private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
-        private IEventHubQueueCache cache;
+        private IEventHubQueueCache? cache;
 
-        private IEventHubReceiver receiver;
+        private IEventHubReceiver? receiver;
 
         private readonly Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
 
-        private IStreamQueueCheckpointer<string> checkpointer;
-        private AggregatedQueueFlowController flowController;
+        private IStreamQueueCheckpointer<string>? checkpointer;
+        private AggregatedQueueFlowController flowController = null!;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -76,7 +76,7 @@ namespace Orleans.Streaming.EventHubs
             IQueueAdapterReceiverMonitor monitor,
             LoadSheddingOptions loadSheddingOptions,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
-            Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory = null)
+            Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver>? eventHubReceiverFactory = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.cacheFactory = cacheFactory ?? throw new ArgumentNullException(nameof(cacheFactory));
@@ -149,10 +149,11 @@ namespace Orleans.Streaming.EventHubs
                 }
             }
             var watch = Stopwatch.StartNew();
-            List<EventData> messages;
+            List<EventData>? messages;
             try
             {
 
+                // Receivers built against older Orleans versions can still return null.
                 messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
                 watch.Stop();
 
@@ -167,7 +168,7 @@ namespace Orleans.Streaming.EventHubs
             }
 
             var batches = new List<IBatchContainer>();
-            if (messages == null || messages.Count == 0)
+            if (messages is null || messages.Count == 0)
             {
                 this.monitor?.TrackMessagesReceived(0, null, null);
                 return batches;
@@ -181,7 +182,7 @@ namespace Orleans.Streaming.EventHubs
 
             this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-            List<StreamPosition> messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
+            List<StreamPosition> messageStreamPositions = this.cache!.Add(messages, dequeueTimeUtc);
             foreach (var streamPosition in messageStreamPositions)
             {
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
@@ -194,21 +195,21 @@ namespace Orleans.Streaming.EventHubs
             // do nothing, we add data directly into cache.  No need for agent involvement
         }
 
-        public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
+        public bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
 
             //if not under pressure, signal the cache to do a time based purge
             //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
             if (!this.IsUnderPressure())
-                this.cache.SignalPurge();
+                this.cache!.SignalPurge();
 
             return false;
         }
 
-        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
-            return new Cursor(this.cache, streamId, token);
+            return new Cursor(this.cache!, streamId, token);
         }
 
         public bool IsUnderPressure()
@@ -221,7 +222,7 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public void UpdateDeliveryProgress(StreamSequenceToken earliestSubscriptionToken, DateTime utcNow)
+        public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         {
             if (earliestSubscriptionToken is IEventHubPartitionLocation location
                 && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
@@ -261,7 +262,7 @@ namespace Orleans.Streaming.EventHubs
                 }
 
                 // clear cache and receiver
-                IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);
+                IEventHubQueueCache? localCache = Interlocked.Exchange(ref this.cache, null);
 
                 var localReceiver = Interlocked.Exchange(ref this.receiver, null);
 
@@ -368,9 +369,9 @@ namespace Orleans.Streaming.EventHubs
         {
             private readonly IEventHubQueueCache cache;
             private readonly object cursor;
-            private IBatchContainer current;
+            private IBatchContainer? current;
 
-            public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken token)
+            public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken? token)
             {
                 this.cache = cache;
                 this.cursor = cache.GetCursor(streamId, token);
@@ -380,7 +381,7 @@ namespace Orleans.Streaming.EventHubs
             {
             }
 
-            public IBatchContainer GetCurrent(out Exception exception)
+            public IBatchContainer? GetCurrent(out Exception? exception)
             {
                 exception = null;
                 return this.current;
@@ -388,7 +389,7 @@ namespace Orleans.Streaming.EventHubs
 
             public bool MoveNext()
             {
-                IBatchContainer next;
+                IBatchContainer? next;
                 if (!this.cache.TryGetNextMessage(this.cursor, out next))
                 {
                     return false;
@@ -398,7 +399,7 @@ namespace Orleans.Streaming.EventHubs
                 return true;
             }
 
-            public void Refresh(StreamSequenceToken token)
+            public void Refresh(StreamSequenceToken? token)
             {
                 this.cache.Refresh(this.cursor, token);
             }

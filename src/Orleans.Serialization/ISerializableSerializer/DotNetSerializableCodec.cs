@@ -10,7 +10,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
 
-#nullable disable
 namespace Orleans.Serialization
 {
     /// <summary>
@@ -60,14 +59,14 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
         [SecurityCritical]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
             {
                 return;
             }
 
-            var type = value.GetType();
+            var type = value!.GetType();
             writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
             if (type.IsValueType)
             {
@@ -84,7 +83,8 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
         [SecurityCritical]
-        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
             {
@@ -100,14 +100,14 @@ namespace Orleans.Serialization
             {
                 // This is an exception type, so deserialize it as an exception.
                 var typeName = StringCodec.ReadValue(ref reader, header);
-                if (!_typeConverter.TryParse(typeName, out type))
+                if (!_typeConverter.TryParse(typeName!, out type))
                 {
-                    return ReadFallbackException(ref reader, typeName, placeholderReferenceId);
+                    return ReadFallbackException(ref reader, typeName!, placeholderReferenceId);
                 }
             }
             else
             {
-                type = TypeSerializerCodec.ReadValue(ref reader, header);
+                type = TypeSerializerCodec.ReadValue(ref reader, header)!;
 
                 if (type.IsValueType)
                 {
@@ -153,11 +153,11 @@ namespace Orleans.Serialization
                     var entry = _entrySerializer.ReadValue(ref reader, header);
                     if (entry.ObjectType is { } entryType)
                     {
-                        info.AddValue(entry.Name, entry.Value, entryType);
+                        info.AddValue(entry.Name!, entry.Value, entryType);
                     }
                     else
                     {
-                        info.AddValue(entry.Name, entry.Value);
+                        info.AddValue(entry.Name!, entry.Value);
                     }
                 }
                 else

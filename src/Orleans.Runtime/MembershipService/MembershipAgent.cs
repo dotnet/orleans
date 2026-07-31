@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
@@ -54,11 +54,11 @@ namespace Orleans.Runtime.MembershipService
 
         internal interface ITestAccessor
         {
-            Action OnUpdateIAmAlive { get; set; }
+            Action? OnUpdateIAmAlive { get; set; }
             Func<DateTime> GetDateTime { get; set; }
         }
 
-        Action ITestAccessor.OnUpdateIAmAlive { get; set; }
+        Action? ITestAccessor.OnUpdateIAmAlive { get; set; }
         Func<DateTime> ITestAccessor.GetDateTime { get => this.getUtcDateTime; set => this.getUtcDateTime = value ?? throw new ArgumentNullException(nameof(value)); }
 
         private async Task UpdateIAmAlive()
@@ -408,7 +408,7 @@ namespace Orleans.Runtime.MembershipService
             this.iAmAliveTimer.Dispose();
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this.iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason) => this.iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
 
         private readonly struct EnumerableToStringLogValue<T>(IEnumerable<T> enumerable)
         {

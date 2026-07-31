@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -10,6 +9,6 @@ namespace Orleans.Configuration
         /// Connection string for ZooKeeper Storage
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
     }
 }

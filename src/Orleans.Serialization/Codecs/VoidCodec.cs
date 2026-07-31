@@ -1,10 +1,10 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -13,22 +13,23 @@ namespace Orleans.Serialization.Codecs
     internal sealed class VoidCodec : IFieldCodec
     {
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (!ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (!ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
             {
                 ThrowNotNullException(value);
             }
         }
 
         /// <inheritdoc />
-        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireType(WireType.Reference);
             return ReferenceCodec.ReadReference(ref reader, field.FieldType);
         }
 
-        private static void ThrowNotNullException(object value) => throw new InvalidOperationException(
+        private static void ThrowNotNullException(object? value) => throw new InvalidOperationException(
             $"Expected a value of null, but encountered a value of '{value}'.");
     }
 
@@ -37,9 +38,10 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     internal sealed class VoidCopier : IDeepCopier
     {
-        public object DeepCopy(object input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public object? DeepCopy(object? input, CopyContext context)
         {
-            if (context.TryGetCopy<object>(input, out var result))
+            if (context.TryGetCopy<object>(input!, out var result))
             {
                 return result;
             }
@@ -48,6 +50,6 @@ namespace Orleans.Serialization.Codecs
             return null;
         }
 
-        private static void ThrowNotNullException(object value) => throw new InvalidOperationException($"Expected a value of null, but encountered a value of type '{value.GetType()}'.");
+        private static void ThrowNotNullException(object? value) => throw new InvalidOperationException($"Expected a value of null, but encountered a value of type '{value!.GetType()}'.");
     }
 }

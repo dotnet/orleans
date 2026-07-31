@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -6,7 +7,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers;
 
-#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 {
@@ -40,7 +40,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         SymbolAnalysisContext context,
         INamedTypeSymbol aliasAttributeSymbol,
         INamedTypeSymbol generateSerializerAttributeSymbol,
-        INamedTypeSymbol grainSymbol)
+        INamedTypeSymbol? grainSymbol)
     {
         var symbol = (INamedTypeSymbol)context.Symbol;
 
@@ -54,7 +54,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
             if (!symbol.HasAttribute(aliasAttributeSymbol))
             {
-                if (!TryGetDeclarationSyntax(symbol, out InterfaceDeclarationSyntax interfaceDeclaration))
+                if (!TryGetDeclarationSyntax(symbol, out InterfaceDeclarationSyntax? interfaceDeclaration))
                 {
                     return;
                 }
@@ -76,7 +76,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
                 if (!methodSymbol.HasAttribute(aliasAttributeSymbol))
                 {
-                    if (!TryGetDeclarationSyntax(methodSymbol, out MethodDeclarationSyntax methodDeclaration))
+                    if (!TryGetDeclarationSyntax(methodSymbol, out MethodDeclarationSyntax? methodDeclaration))
                     {
                         continue;
                     }
@@ -106,7 +106,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            if (!TryGetDeclarationSyntax(symbol, out TypeDeclarationSyntax typeDeclaration))
+            if (!TryGetDeclarationSyntax(symbol, out TypeDeclarationSyntax? typeDeclaration))
             {
                 return;
             }
@@ -135,7 +135,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
     private static string GetNamespaceAndNesting(TypeDeclarationSyntax typeDeclarationSyntax)
     {
-        SyntaxNode node = typeDeclarationSyntax.Parent;
+        SyntaxNode? node = typeDeclarationSyntax.Parent;
         StringBuilder sb = new();
         Stack<string> segments = new();
 
@@ -166,16 +166,16 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         return sb.ToString();
     }
 
-    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, out TSyntax syntax)
+    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, [NotNullWhen(true)] out TSyntax? syntax)
         where TSyntax : SyntaxNode
     {
         syntax = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TSyntax;
         return syntax is not null;
     }
 
-    private static void ReportFor(SymbolAnalysisContext context, Location location, string typeName, int arity, string namespaceAndNesting)
+    private static void ReportFor(SymbolAnalysisContext context, Location location, string typeName, int arity, string? namespaceAndNesting)
     {
-        var builder = ImmutableDictionary.CreateBuilder<string, string>();
+        var builder = ImmutableDictionary.CreateBuilder<string, string?>();
 
         builder.Add("TypeName", typeName);
         builder.Add("NamespaceAndNesting", namespaceAndNesting);

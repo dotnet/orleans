@@ -16,7 +16,7 @@ namespace Orleans.Transactions.Azure.Tests
     {
         public int State { get; set; }
 
-        public bool Equals(TestState other)
+        public bool Equals(TestState? other)
         {
             return other == null?false:this.State.Equals(other.State);
         }

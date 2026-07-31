@@ -119,11 +119,11 @@ namespace Orleans.Serialization
     [GenerateSerializer]
     public partial struct FSharpListSurrogate<T>
     {
-        private System.Collections.Generic.List<T> _Value_k__BackingField;
+        private System.Collections.Generic.List<T>? _Value_k__BackingField;
         private object _dummy;
         private int _dummyPrimitive;
         [Id(0)]
-        public System.Collections.Generic.List<T> Value { get { throw null; } set { } }
+        public System.Collections.Generic.List<T>? Value { get { throw null; } set { } }
     }
 
     [RegisterSerializer]
@@ -147,11 +147,11 @@ namespace Orleans.Serialization
     [GenerateSerializer]
     public partial struct FSharpMapSurrogate<TKey, TValue>
     {
-        private System.Collections.Generic.List<System.Tuple<TKey, TValue>> _Value_k__BackingField;
+        private System.Collections.Generic.List<System.Tuple<TKey, TValue>>? _Value_k__BackingField;
         private object _dummy;
         private int _dummyPrimitive;
         [Id(0)]
-        public System.Collections.Generic.List<System.Tuple<TKey, TValue>> Value { get { throw null; } set { } }
+        public System.Collections.Generic.List<System.Tuple<TKey, TValue>>? Value { get { throw null; } set { } }
     }
 
     [RegisterSerializer]
@@ -170,7 +170,7 @@ namespace Orleans.Serialization
     {
         public FSharpOptionCopier(Cloning.IDeepCopier<T> valueCopier) { }
 
-        public Microsoft.FSharp.Core.FSharpOption<T> DeepCopy(Microsoft.FSharp.Core.FSharpOption<T> input, Cloning.CopyContext context) { throw null; }
+        public Microsoft.FSharp.Core.FSharpOption<T>? DeepCopy(Microsoft.FSharp.Core.FSharpOption<T> input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -238,11 +238,11 @@ namespace Orleans.Serialization
     [GenerateSerializer]
     public partial struct FSharpSetSurrogate<T>
     {
-        private System.Collections.Generic.List<T> _Value_k__BackingField;
+        private System.Collections.Generic.List<T>? _Value_k__BackingField;
         private object _dummy;
         private int _dummyPrimitive;
         [Id(0)]
-        public System.Collections.Generic.List<T> Value { get { throw null; } set { } }
+        public System.Collections.Generic.List<T>? Value { get { throw null; } set { } }
     }
 
     [RegisterSerializer]

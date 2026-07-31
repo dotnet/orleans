@@ -17,7 +17,7 @@ namespace Tester.AzureUtils.Streaming
     {
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
-        private SubscriptionMultiplicityTestRunner runner;
+        private SubscriptionMultiplicityTestRunner runner = null!;
         private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {

@@ -51,7 +51,7 @@ namespace NonSilo.Tests.Membership
             this.localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
 
             this.fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
-            this.fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
+            this.fatalErrorHandler.IsUnexpected(default!).ReturnsForAnyArgs(true);
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             this.timers = new List<DelegateAsyncTimer>();
@@ -93,11 +93,11 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 optionsMonitor,
                 this.fatalErrorHandler,
-                null);
+                null!);
             ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
 
             this.remoteSiloProber = Substitute.For<IRemoteSiloProber>();
-            remoteSiloProber.Probe(default, default).ReturnsForAnyArgs(Task.CompletedTask);
+            remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.CompletedTask);
 
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
             this.localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
@@ -218,7 +218,7 @@ namespace NonSilo.Tests.Membership
             var testAccessor = (MembershipAgent.ITestAccessor)this.agent;
             testAccessor.OnUpdateIAmAlive = () => ++updateCounter;
 
-            (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
+            (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default!);
             while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1);
             timer.Completion.TrySetResult(true);
             await Until(() => updateCounter == 1);
@@ -304,7 +304,7 @@ namespace NonSilo.Tests.Membership
             this.clusterMembershipOptions.Value.NumMissedProbesLimit = 1;
             this.clusterMembershipOptions.Value.NumVotesForDeathDeclaration = 1;
             this.clusterMembershipOptions.Value.ProbeTimeout = TimeSpan.FromMilliseconds(20);
-            this.remoteSiloProber.Probe(default, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
+            this.remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
 
             var staleSilo = Silo("127.0.0.200:100@100");
             var staleEntry = Entry(staleSilo, SiloStatus.Active, DateTime.UtcNow.Subtract(TimeSpan.FromHours(1)));
@@ -371,7 +371,7 @@ namespace NonSilo.Tests.Membership
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            this.remoteSiloProber.Probe(default, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
+            this.remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
 
             var dateTimeIndex = 0;
             var dateTimes = new DateTime[] { DateTime.UtcNow, DateTime.UtcNow.AddMinutes(1) };

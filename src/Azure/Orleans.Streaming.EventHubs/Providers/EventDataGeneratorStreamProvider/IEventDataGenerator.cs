@@ -1,5 +1,6 @@
 using Orleans.Runtime;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Streaming.EventHubs.Testing
 {
@@ -15,7 +16,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <param name="maxCount"></param>
         /// <param name="events"></param>
         /// <returns></returns>
-        bool TryReadEvents(int maxCount, out IEnumerable<T> events);
+        bool TryReadEvents(int maxCount, [NotNullWhen(true)] out IEnumerable<T>? events);
     }
 
     /// <summary>

@@ -125,7 +125,7 @@ namespace DefaultCluster.Tests.General
                 var expectedState = Random.Shared.Next();
                 await a.SetState(expectedState);
                 var originalAddressA = await a.GetGrainAddress();
-                var originalHostA = originalAddressA.SiloAddress;
+                var originalHostA = originalAddressA.SiloAddress!;
 
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, originalHostA);
                 var b = GrainFactory.GetGrain<IMigrationTestGrain>(baseId + 1 + 2 * i);
@@ -252,8 +252,8 @@ namespace DefaultCluster.Tests.General
 
             // Wait for membership to stabilize and for cluster manifests to be propagated.
             // We do this by repeatedly trying to activate a grain on the target silo.
-            var primaryGrainFactory = ((InProcessSiloHandle)Fixture.HostedCluster.Primary).ServiceProvider.GetRequiredService<IGrainFactory>();
-            SiloAddress grainOnOtherSiloAddr;
+            var primaryGrainFactory = ((InProcessSiloHandle)Fixture.HostedCluster.Primary!).ServiceProvider.GetRequiredService<IGrainFactory>();
+            SiloAddress? grainOnOtherSiloAddr;
             do
             {
                 cts.Token.ThrowIfCancellationRequested();
@@ -422,7 +422,7 @@ namespace DefaultCluster.Tests.General
     public class MigrationTestGrain : Grain, IMigrationTestGrain, IGrainMigrationParticipant
     {
         private int _state;
-        private SiloAddress _migrateDuringDeactivationTargetHost;
+        private SiloAddress? _migrateDuringDeactivationTargetHost;
         public ValueTask<int> GetState() => new(_state);
 
         public ValueTask SetState(int state)

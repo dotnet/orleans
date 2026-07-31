@@ -1,9 +1,9 @@
 using Orleans.Streams.Core;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Streams.PubSub
 {
     /// <summary>
@@ -30,7 +30,7 @@ namespace Orleans.Streams.PubSub
             where TGrainInterface : IGrainWithGuidKey
         {
             var grainRef = grainFactory.GetGrain(grainId) as GrainReference;
-            return manager.AddSubscription(streamProviderName, streamId, grainRef);
+            return manager.AddSubscription(streamProviderName, streamId, grainRef!); // GetGrain always returns a GrainReference-derived reference.
         }
 
         /// <summary>
@@ -50,11 +50,11 @@ namespace Orleans.Streams.PubSub
             StreamId streamId,
             string streamProviderName,
             Guid primaryKey,
-            string grainClassNamePrefix = null)
+            string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidKey
         {
             var grainRef = grainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix) as GrainReference;
-            return manager.AddSubscription(streamProviderName, streamId, grainRef);
+            return manager.AddSubscription(streamProviderName, streamId, grainRef!); // GetGrain always returns a GrainReference-derived reference.
         }
 
         /// <summary>
@@ -74,11 +74,11 @@ namespace Orleans.Streams.PubSub
             StreamId streamId,
             string streamProviderName,
             long primaryKey,
-            string grainClassNamePrefix = null)
+            string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerKey
         {
             var grainRef = grainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix) as GrainReference;
-            return manager.AddSubscription(streamProviderName, streamId, grainRef);
+            return manager.AddSubscription(streamProviderName, streamId, grainRef!); // GetGrain always returns a GrainReference-derived reference.
         }
 
         /// <summary>
@@ -98,11 +98,11 @@ namespace Orleans.Streams.PubSub
             StreamId streamId,
             string streamProviderName,
             string primaryKey,
-            string grainClassNamePrefix = null)
+            string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey
         {
             var grainRef = grainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix) as GrainReference;
-            return manager.AddSubscription(streamProviderName, streamId, grainRef);
+            return manager.AddSubscription(streamProviderName, streamId, grainRef!); // GetGrain always returns a GrainReference-derived reference.
         }
 
         /// <summary>
@@ -124,11 +124,11 @@ namespace Orleans.Streams.PubSub
             string streamProviderName,
             Guid primaryKey,
             string keyExtension,
-            string grainClassNamePrefix = null)
+            string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
             var grainRef = grainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix) as GrainReference;
-            return manager.AddSubscription(streamProviderName, streamId, grainRef);
+            return manager.AddSubscription(streamProviderName, streamId, grainRef!); // GetGrain always returns a GrainReference-derived reference.
         }
 
         /// <summary>
@@ -150,11 +150,11 @@ namespace Orleans.Streams.PubSub
             string streamProviderName,
             long primaryKey,
             string keyExtension,
-            string grainClassNamePrefix = null)
+            string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey
         {
             var grainRef = grainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix) as GrainReference;
-            return manager.AddSubscription(streamProviderName, streamId, grainRef);
+            return manager.AddSubscription(streamProviderName, streamId, grainRef!); // GetGrain always returns a GrainReference-derived reference.
         }
 
         /// <summary>
@@ -163,13 +163,13 @@ namespace Orleans.Streams.PubSub
         /// <param name="streamProvider">The stream provider.</param>
         /// <param name="manager">The manager.</param>
         /// <returns><see langword="true" /> if the stream subscription manager could be retrieved, <see langword="false" /> otherwise.</returns>
-        public static bool TryGetStreamSubscriptionManager(this IStreamProvider streamProvider, out IStreamSubscriptionManager manager)
+        public static bool TryGetStreamSubscriptionManager(this IStreamProvider streamProvider, [NotNullWhen(true)] out IStreamSubscriptionManager? manager)
         {
             manager = null;
             if (streamProvider is IStreamSubscriptionManagerRetriever)
             {
                 var streamSubManagerRetriever = streamProvider as IStreamSubscriptionManagerRetriever;
-                manager = streamSubManagerRetriever.GetStreamSubscriptionManager();
+                manager = streamSubManagerRetriever!.GetStreamSubscriptionManager(); // Guaranteed non-null by the preceding `is` check; return value itself may be null (implicit-only providers).
                 //implicit only stream provider don't have a subscription manager configured 
                 //so manager can be null;
                 return manager != null;

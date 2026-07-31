@@ -1,4 +1,3 @@
-#nullable disable
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
 #elif PERSISTENCE_DYNAMODB
@@ -15,27 +14,27 @@ namespace Orleans.Reminders.DynamoDB
         /// AccessKey string for DynamoDB Storage
         /// </summary>
         [Redact]
-        public string AccessKey { get; set; }
+        public string? AccessKey { get; set; }
 
         /// <summary>
         /// Secret key for DynamoDB storage
         /// </summary>
         [Redact]
-        public string SecretKey { get; set; }
+        public string? SecretKey { get; set; }
 
         /// <summary>
         /// DynamoDB region name, such as "us-west-2"
         /// </summary>
-        public string Service { get; set; }
+        public string Service { get; set; } = null!;
 
         /// <summary>
         /// Token for DynamoDB storage
         /// </summary>
-        public string Token { get; set; }
+        public string? Token { get; set; }
 
         /// <summary>
         /// AWS profile name.
         /// </summary>
-        public string ProfileName { get; set; }
+        public string? ProfileName { get; set; }
     }
 }

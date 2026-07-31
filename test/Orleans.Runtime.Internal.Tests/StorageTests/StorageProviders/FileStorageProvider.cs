@@ -87,7 +87,7 @@ namespace Samples.StorageProviders
         /// <param name="collectionName">The type of the grain state object.</param>
         /// <param name="key">The grain id string.</param>
         /// <returns>Completion promise for this operation.</returns>
-        public async Task<string> Read(string collectionName, string key)
+        public async Task<string?> Read(string collectionName, string key)
         {
             FileInfo fileInfo = GetStorageFilePath(collectionName, key);
 

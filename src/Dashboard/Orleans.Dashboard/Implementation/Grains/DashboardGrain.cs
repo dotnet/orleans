@@ -17,7 +17,6 @@ using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
 using Orleans.Dashboard.Core;
 
-#nullable disable
 namespace Orleans.Dashboard.Implementation.Grains;
 
 [Reentrant]
@@ -185,7 +184,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         .ToArray();
     }
 
-    public async Task<Immutable<DashboardCounters>> GetCounters(string[] exclusions)
+    public async Task<Immutable<DashboardCounters>> GetCounters(string[]? exclusions)
     {
         await EnsureIsActive();
         await EnsureCountersAreUpToDate();
@@ -231,7 +230,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         return _history.QuerySilo(address).AsImmutable();
     }
 
-    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[] exclusions)
+    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[]? exclusions)
     {
         await EnsureIsActive();
         await EnsureCountersAreUpToDate();
@@ -275,22 +274,22 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         return Task.CompletedTask;
     }
 
-    public async Task<Immutable<string>> GetGrainState(string id, string grainType)
+    public async Task<Immutable<string>> GetGrainState(string? id, string? grainType)
     {
         var result = new ExpandoObject();
 
         try
         {
             var implementationType = _typeManifestOptions.InterfaceImplementations
-                .FirstOrDefault(w => w.FullName.Equals(grainType));
+                .FirstOrDefault(w => w.FullName!.Equals(grainType))!;
 
-            var mappedGrainId = GrainStateHelper.GetGrainId(id, implementationType);
-            object grainId = mappedGrainId.Item1;
+            var mappedGrainId = GrainStateHelper.GetGrainId(id!, implementationType);
+            object? grainId = mappedGrainId.Item1;
             string keyExtension = mappedGrainId.Item2;
 
             var propertiesAndFields = GrainStateHelper.GetPropertiesAndFieldsForGrainState(implementationType);
 
-            var getGrainMethod = GrainStateHelper.GenerateGetGrainMethod(GrainFactory, grainId, keyExtension);
+            var getGrainMethod = GrainStateHelper.GenerateGetGrainMethod(GrainFactory, grainId!, keyExtension);
 
             var interfaceTypes = implementationType.GetInterfaces();
 
@@ -298,11 +297,11 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
             {
                 try
                 {
-                    object[] grainMethodParameters;
+                    object?[] grainMethodParameters;
                     if (string.IsNullOrWhiteSpace(keyExtension))
-                        grainMethodParameters = new object[] { interfaceType, grainId };
+                        grainMethodParameters = new object?[] { interfaceType, grainId };
                     else
-                        grainMethodParameters = new object[] { interfaceType, grainId, keyExtension };
+                        grainMethodParameters = new object?[] { interfaceType, grainId, keyExtension };
 
                     var grain = getGrainMethod.Invoke(GrainFactory, grainMethodParameters);
 
@@ -321,7 +320,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
                                 )
                                )
                             {
-                                var task = (method.Invoke(grain, null) as Task);
+                                var task = (method.Invoke(grain, null) as Task)!;
                                 var resultProperty = task.GetType().GetProperty("Result");
 
                                 if (resultProperty == null)
@@ -346,7 +345,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }
         catch (Exception ex)
         {
-            result.TryAdd("error", string.Concat(ex.Message, " - ", ex?.InnerException.Message));
+            result.TryAdd("error", string.Concat(ex.Message, " - ", ex?.InnerException!.Message));
         }
 
         return JsonSerializer.Serialize(result, options: new JsonSerializerOptions()
@@ -355,12 +354,12 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }).AsImmutable();
     }
 
-    public Task<Immutable<string[]>> GetGrainTypes(string[] exclusions)
+    public Task<Immutable<string[]>> GetGrainTypes(string[]? exclusions)
     {
         return Task.FromResult(_typeManifestOptions.InterfaceImplementations
             .Where(s => s.GetInterfaces().Any(i => i == typeof(IGrain) || i == typeof(ISystemTarget)))
-            .Where(s => exclusions == null || !exclusions.Any(e => s.FullName.StartsWith(e, StringComparison.OrdinalIgnoreCase)))
-            .Select(s => s.FullName)
+            .Where(s => exclusions == null || !exclusions.Any(e => s.FullName!.StartsWith(e, StringComparison.OrdinalIgnoreCase)))
+            .Select(s => s.FullName!)
             .ToArray()
             .AsImmutable());
     }

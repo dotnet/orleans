@@ -2,7 +2,6 @@ using System;
 using System.Collections.Immutable;
 using System.Text;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -142,9 +141,9 @@ namespace Orleans.Runtime
             return sb.ToString();
         }
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
             var written = 0;
 

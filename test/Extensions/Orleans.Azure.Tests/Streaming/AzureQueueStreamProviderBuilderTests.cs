@@ -32,7 +32,7 @@ public class AzureQueueStreamProviderBuilderTests
 		}
 		""";
 
-		var queueOptions = ConfigureSilo(json).Services.BuildServiceProvider().GetOptionsByName<AzureQueueOptions>(null);
+		var queueOptions = ConfigureSilo(json).Services.BuildServiceProvider().GetOptionsByName<AzureQueueOptions>(null!);
 
 		Assert.Null(queueOptions.QueueServiceClient);
 	}
@@ -59,7 +59,7 @@ public class AzureQueueStreamProviderBuilderTests
 		}
 		""";
 
-		var queueOptions = ConfigureSilo(json).Services.BuildServiceProvider().GetOptionsByName<AzureQueueOptions>(null);
+		var queueOptions = ConfigureSilo(json).Services.BuildServiceProvider().GetOptionsByName<AzureQueueOptions>(null!);
 
 		Assert.NotNull(queueOptions.QueueServiceClient);
 		Assert.Equal("devstoreaccount1", queueOptions.QueueServiceClient.AccountName);
@@ -91,7 +91,7 @@ public class AzureQueueStreamProviderBuilderTests
 		}
 		""";
 
-		var queueOptions = ConfigureSilo(json).Services.BuildServiceProvider().GetOptionsByName<AzureQueueOptions>(null);
+		var queueOptions = ConfigureSilo(json).Services.BuildServiceProvider().GetOptionsByName<AzureQueueOptions>(null!);
 
 		Assert.NotNull(queueOptions.QueueServiceClient);
 		Assert.Equal("devstoreaccount1", queueOptions.QueueServiceClient.AccountName);

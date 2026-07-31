@@ -1,4 +1,3 @@
-#nullable enable
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Orleans.Runtime.Diagnostics;
@@ -401,7 +400,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
         _subscription?.Dispose();
     }
 
-    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString()!;
+    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString();
 }
 
 /// <summary>

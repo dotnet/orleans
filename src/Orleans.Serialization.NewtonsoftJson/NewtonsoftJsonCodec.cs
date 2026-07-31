@@ -1,6 +1,7 @@
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -15,7 +16,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 [Alias(WellKnownAlias)]
@@ -49,7 +49,7 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
         _serializer = JsonSerializer.Create(_options.SerializerSettings);
     }
 
-    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] object? value)
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -74,7 +74,7 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
         writer.WriteEndObject();
     }
 
-    object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.IsReference)
         {
@@ -84,8 +84,8 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        object result = null;
-        Type type = null;
+        object? result = null;
+        Type? type = null;
         uint fieldId = 0;
         while (true)
         {
@@ -110,8 +110,8 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
 
                     // To possibly improve efficiency, this could be converted to read a ReadOnlySequence<byte> instead of a byte array.
                     var serializedValue = StringCodec.ReadValue(ref reader, header);
-                    result = JsonConvert.DeserializeObject(serializedValue, type, _options.SerializerSettings);
-                    ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+                    result = JsonConvert.DeserializeObject(serializedValue!, type, _options.SerializerSettings);
+                    ReferenceCodec.RecordObject(reader.Session, result!, placeholderReferenceId);
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -156,15 +156,16 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
     }
 
     /// <inheritdoc/>
-    object IDeepCopier.DeepCopy(object input, CopyContext context)
+    [return: NotNullIfNotNull(nameof(input))]
+    object? IDeepCopier.DeepCopy(object? input, CopyContext context)
     {
-        if (context.TryGetCopy(input, out object result))
+        if (context.TryGetCopy(input!, out object? result))
             return result;
 
         var stream = PooledBufferStream.Rent();
         try
         {
-            var type = input.GetType();
+            var type = input!.GetType();
             var streamWriter = new StreamWriter(stream);
             using (var textWriter = new JsonTextWriter(streamWriter) { CloseOutput = false })
                 _serializer.Serialize(textWriter, input, type);
@@ -174,14 +175,15 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
 
             var streamReader = new StreamReader(stream);
             using var jsonReader = new JsonTextReader(streamReader);
-            result = _serializer.Deserialize(jsonReader, type);
+            result = _serializer.Deserialize(jsonReader, type)
+                ?? throw new JsonSerializationException($"Newtonsoft.Json returned null while deep copying an instance of type '{type}'.");
         }
         finally
         {
             PooledBufferStream.Return(stream);
         }
 
-        context.RecordCopy(input, result);
+        context.RecordCopy(input!, result);
         return result;
     }
 

@@ -114,6 +114,6 @@ namespace Tester
 
     public class TestGrainServiceOptions
     {
-        public string ConfigProperty { get; set; }
+        public string ConfigProperty { get; set; } = null!;
     }
 }

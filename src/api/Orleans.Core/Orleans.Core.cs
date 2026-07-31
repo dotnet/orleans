@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.Hosting
 {
     public static partial class OrleansClientGenericHostExtensions
     {
-        public static DependencyInjection.IServiceCollection AddOrleansClient(this DependencyInjection.IServiceCollection services, Configuration.IConfiguration configuration, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) { throw null; }
+        public static DependencyInjection.IServiceCollection AddOrleansClient(this DependencyInjection.IServiceCollection services, Configuration.IConfiguration? configuration, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) { throw null; }
 
         public static DependencyInjection.IServiceCollection AddOrleansClient(this DependencyInjection.IServiceCollection services, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) { throw null; }
 
@@ -87,7 +87,7 @@ namespace Orleans
         public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
     }
 
-    public delegate void ConnectionToClusterLostHandler(object sender, System.EventArgs e);
+    public delegate void ConnectionToClusterLostHandler(object? sender, System.EventArgs e);
     public delegate TInstance Factory<out TInstance>();
     public delegate TInstance Factory<in TParam1, out TInstance>(TParam1 param1);
     public delegate TInstance Factory<in TParam1, in TParam2, out TInstance>(TParam1 param1, TParam2 param2);
@@ -103,7 +103,7 @@ namespace Orleans
         public int PreviousNumberOfConnectedGateways { get { throw null; } }
     }
 
-    public delegate void GatewayCountChangedHandler(object sender, GatewayCountChangedEventArgs e);
+    public delegate void GatewayCountChangedHandler(object? sender, GatewayCountChangedEventArgs e);
     public partial class GrainInterfaceTypeToGrainTypeResolver
     {
         public GrainInterfaceTypeToGrainTypeResolver(Runtime.IClusterManifestProvider clusterManifestProvider) { }
@@ -120,18 +120,18 @@ namespace Orleans
     {
         public GrainState() { }
 
-        public GrainState(T state, string eTag) { }
+        public GrainState(T? state, string? eTag) { }
 
-        public GrainState(T state) { }
+        public GrainState(T? state) { }
 
         [Id(1)]
-        public string ETag { get { throw null; } set { } }
+        public string? ETag { get { throw null; } set { } }
 
         [Id(2)]
         public bool RecordExists { get { throw null; } set { } }
 
         [Id(0)]
-        public T State { get { throw null; } set { } }
+        public T? State { get { throw null; } set { } }
     }
 
     public partial interface IClientConnectionRetryFilter
@@ -156,11 +156,11 @@ namespace Orleans
 
     public partial interface IGrainState<T>
     {
-        string ETag { get; set; }
+        string? ETag { get; set; }
 
         bool RecordExists { get; set; }
 
-        T State { get; set; }
+        T? State { get; set; }
     }
 
     public partial interface IMembershipTable
@@ -260,7 +260,7 @@ namespace Orleans
         public int ProxyPort { get { throw null; } set { } }
 
         [Id(6)]
-        public string RoleName { get { throw null; } set { } }
+        public string? RoleName { get { throw null; } set { } }
 
         [Id(0)]
         public Runtime.SiloAddress SiloAddress { get { throw null; } set { } }
@@ -275,7 +275,7 @@ namespace Orleans
         public Runtime.SiloStatus Status { get { throw null; } set { } }
 
         [Id(2)]
-        public System.Collections.Generic.List<System.Tuple<Runtime.SiloAddress, System.DateTime>> SuspectTimes { get { throw null; } set { } }
+        public System.Collections.Generic.List<System.Tuple<Runtime.SiloAddress, System.DateTime>>? SuspectTimes { get { throw null; } set { } }
 
         [Id(7)]
         public int UpdateZone { get { throw null; } set { } }
@@ -284,9 +284,9 @@ namespace Orleans
 
         public void AddSuspector(Runtime.SiloAddress suspectingSilo, System.DateTime suspectingTime) { }
 
-        string System.IFormattable.ToString(string format, System.IFormatProvider formatProvider) { throw null; }
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
-        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider provider) { throw null; }
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public string ToFullString() { throw null; }
 
@@ -310,7 +310,7 @@ namespace Orleans
 
         public override string ToString() { throw null; }
 
-        public System.Tuple<MembershipEntry, string> TryGet(Runtime.SiloAddress silo) { throw null; }
+        public System.Tuple<MembershipEntry, string>? TryGet(Runtime.SiloAddress silo) { throw null; }
 
         public MembershipTableData WithoutDuplicateDeads() { throw null; }
     }
@@ -323,9 +323,9 @@ namespace Orleans
 
     public static partial class OptionFormattingUtilities
     {
-        public static string Format(object key, object value, string formatting = null) { throw null; }
+        public static string Format(object? key, object? value, string? formatting = null) { throw null; }
 
-        public static string Name<TOptions>(string name = null, string formatting = null) { throw null; }
+        public static string Name<TOptions>(string? name = null, string? formatting = null) { throw null; }
     }
 
     public abstract partial class OptionsLogger
@@ -342,13 +342,13 @@ namespace Orleans
     [System.AttributeUsage(System.AttributeTargets.Property, AllowMultiple = false)]
     public partial class RedactAttribute : System.Attribute
     {
-        public virtual string Redact(object value) { throw null; }
+        public virtual string Redact(object? value) { throw null; }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Property, AllowMultiple = false)]
     public partial class RedactConnectionStringAttribute : RedactAttribute
     {
-        public override string Redact(object value) { throw null; }
+        public override string Redact(object? value) { throw null; }
     }
 
     public partial class SerializerConfigurationValidator : IConfigurationValidator
@@ -387,21 +387,21 @@ namespace Orleans
         [Id(1)]
         public string VersionEtag { get { throw null; } }
 
-        public bool Equals(TableVersion other) { throw null; }
+        public bool Equals(TableVersion? other) { throw null; }
 
-        public override bool Equals(object obj) { throw null; }
+        public override bool Equals(object? obj) { throw null; }
 
         public override int GetHashCode() { throw null; }
 
         public TableVersion Next() { throw null; }
 
-        public static bool operator ==(TableVersion left, TableVersion right) { throw null; }
+        public static bool operator ==(TableVersion? left, TableVersion? right) { throw null; }
 
-        public static bool operator !=(TableVersion left, TableVersion right) { throw null; }
+        public static bool operator !=(TableVersion? left, TableVersion? right) { throw null; }
 
-        string System.IFormattable.ToString(string format, System.IFormatProvider formatProvider) { throw null; }
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
-        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider provider) { throw null; }
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public override string ToString() { throw null; }
     }
@@ -420,9 +420,9 @@ namespace Orleans.Configuration
         public const System.Net.Sockets.AddressFamily DEFAULT_PREFERRED_FAMILY = 2;
         public int ClientSenderBuckets { get { throw null; } set { } }
 
-        public System.Net.IPAddress LocalAddress { get { throw null; } set { } }
+        public System.Net.IPAddress? LocalAddress { get { throw null; } set { } }
 
-        public string NetworkInterfaceName { get { throw null; } set { } }
+        public string? NetworkInterfaceName { get { throw null; } set { } }
 
         public System.Net.Sockets.AddressFamily PreferredFamily { get { throw null; } set { } }
     }
@@ -735,7 +735,7 @@ namespace Orleans.GrainReferences
 
     public partial interface IGrainReferenceActivatorProvider
     {
-        bool TryGet(Runtime.GrainType grainType, Runtime.GrainInterfaceType interfaceType, out IGrainReferenceActivator activator);
+        bool TryGet(Runtime.GrainType grainType, Runtime.GrainInterfaceType interfaceType, out IGrainReferenceActivator? activator);
     }
 }
 
@@ -849,13 +849,13 @@ namespace Orleans.Hosting
 
     public static partial class NamedServiceConfiguratorExtensions
     {
-        public static void Configure<TOptions>(this INamedServiceConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>> configureOptions)
+        public static void Configure<TOptions>(this INamedServiceConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>>? configureOptions)
             where TOptions : class, new() { }
 
         public static void ConfigureComponent<TComponent>(this INamedServiceConfigurator configurator, System.Func<System.IServiceProvider, string, TComponent> factory)
             where TComponent : class { }
 
-        public static void ConfigureComponent<TOptions, TComponent>(this INamedServiceConfigurator configurator, System.Func<System.IServiceProvider, string, TComponent> factory, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>> configureOptions = null)
+        public static void ConfigureComponent<TOptions, TComponent>(this INamedServiceConfigurator configurator, System.Func<System.IServiceProvider, string, TComponent> factory, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>>? configureOptions = null)
             where TOptions : class, new()
             where TComponent : class { }
 
@@ -869,11 +869,11 @@ namespace Orleans.Internal
     public static partial class AsyncExecutorWithRetries
     {
         public static readonly int INFINITE_RETRIES;
-        public static System.Threading.Tasks.Task ExecuteWithRetries(System.Func<int, System.Threading.Tasks.Task> action, int maxNumErrorTries, System.Func<System.Exception, int, bool> retryExceptionFilter, System.TimeSpan maxExecutionTime, IBackoffProvider onErrorBackOff) { throw null; }
+        public static System.Threading.Tasks.Task ExecuteWithRetries(System.Func<int, System.Threading.Tasks.Task> action, int maxNumErrorTries, System.Func<System.Exception, int, bool>? retryExceptionFilter, System.TimeSpan maxExecutionTime, IBackoffProvider? onErrorBackOff) { throw null; }
 
-        public static System.Threading.Tasks.Task<T> ExecuteWithRetries<T>(System.Func<int, System.Threading.Tasks.Task<T>> function, int maxNumErrorTries, System.Func<System.Exception, int, bool> retryExceptionFilter, System.TimeSpan maxExecutionTime, IBackoffProvider onErrorBackOff, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<T> ExecuteWithRetries<T>(System.Func<int, System.Threading.Tasks.Task<T>> function, int maxNumErrorTries, System.Func<System.Exception, int, bool>? retryExceptionFilter, System.TimeSpan maxExecutionTime, IBackoffProvider? onErrorBackOff, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task<T> ExecuteWithRetries<T>(System.Func<int, System.Threading.Tasks.Task<T>> function, int maxNumSuccessTries, int maxNumErrorTries, System.Func<T, int, bool> retryValueFilter, System.Func<System.Exception, int, bool> retryExceptionFilter, System.TimeSpan maxExecutionTime = default, IBackoffProvider onSuccessBackOff = null, IBackoffProvider onErrorBackOff = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<T> ExecuteWithRetries<T>(System.Func<int, System.Threading.Tasks.Task<T>> function, int maxNumSuccessTries, int maxNumErrorTries, System.Func<T, int, bool>? retryValueFilter, System.Func<System.Exception, int, bool>? retryExceptionFilter, System.TimeSpan maxExecutionTime = default, IBackoffProvider? onSuccessBackOff = null, IBackoffProvider? onErrorBackOff = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public partial class FixedBackoff : IBackoffProvider
@@ -895,7 +895,7 @@ namespace Orleans.LeaseProviders
     [Immutable]
     public sealed partial class AcquiredLease
     {
-        public AcquiredLease(string resourceKey, System.TimeSpan duration, string token, System.DateTime startTimeUtc) { }
+        public AcquiredLease(string resourceKey, System.TimeSpan duration, string? token, System.DateTime startTimeUtc) { }
 
         public AcquiredLease(string resourceKey) { }
 
@@ -909,20 +909,20 @@ namespace Orleans.LeaseProviders
         public System.DateTime StartTimeUtc { get { throw null; } }
 
         [Id(2)]
-        public string Token { get { throw null; } }
+        public string? Token { get { throw null; } }
     }
 
     [GenerateSerializer]
     [Immutable]
     public sealed partial class AcquireLeaseResult
     {
-        public AcquireLeaseResult(AcquiredLease acquiredLease, ResponseCode statusCode, System.Exception failureException) { }
+        public AcquireLeaseResult(AcquiredLease? acquiredLease, ResponseCode statusCode, System.Exception? failureException) { }
 
         [Id(0)]
-        public AcquiredLease AcquiredLease { get { throw null; } }
+        public AcquiredLease? AcquiredLease { get { throw null; } }
 
         [Id(2)]
-        public System.Exception FailureException { get { throw null; } }
+        public System.Exception? FailureException { get { throw null; } }
 
         [Id(1)]
         public ResponseCode StatusCode { get { throw null; } }
@@ -1020,7 +1020,7 @@ namespace Orleans.Metadata
 
         public GrainProperties GetGrainProperties(Runtime.GrainType grainType) { throw null; }
 
-        public bool TryGetGrainProperties(Runtime.GrainType grainType, out GrainProperties properties) { throw null; }
+        public bool TryGetGrainProperties(Runtime.GrainType grainType, out GrainProperties? properties) { throw null; }
     }
 
     public partial class GrainTypeResolver
@@ -1163,7 +1163,7 @@ namespace Orleans.Placement.Repartitioning
 
         public readonly bool Equals(CandidateConnectedVertex other) { throw null; }
 
-        public override readonly bool Equals(object obj) { throw null; }
+        public override readonly bool Equals(object? obj) { throw null; }
 
         public override readonly int GetHashCode() { throw null; }
 
@@ -1188,7 +1188,7 @@ namespace Orleans.Placement.Repartitioning
 
         public readonly bool Equals(EdgeVertex other) { throw null; }
 
-        public override readonly bool Equals(object obj) { throw null; }
+        public override readonly bool Equals(object? obj) { throw null; }
 
         public override readonly int GetHashCode() { throw null; }
 
@@ -1209,7 +1209,7 @@ namespace Orleans.Providers
 {
     public partial interface IControllable
     {
-        System.Threading.Tasks.Task<object> ExecuteCommand(int command, object arg);
+        System.Threading.Tasks.Task<object?> ExecuteCommand(int command, object? arg);
     }
 
     public partial interface IProviderRuntime
@@ -1327,7 +1327,7 @@ namespace Orleans.Runtime
 
         public readonly bool Equals(GenericGrainType other) { throw null; }
 
-        public override readonly bool Equals(object obj) { throw null; }
+        public override readonly bool Equals(object? obj) { throw null; }
 
         public readonly System.Type[] GetArguments(Orleans.Serialization.TypeSystem.TypeConverter converter) { throw null; }
 
@@ -1354,13 +1354,13 @@ namespace Orleans.Runtime
         public GrainId SourceGrain { get { throw null; } set { } }
 
         [Id(2)]
-        public SiloAddress SourceHost { get { throw null; } set { } }
+        public SiloAddress? SourceHost { get { throw null; } set { } }
 
         [Id(1)]
         public GrainId TargetGrain { get { throw null; } set { } }
 
         [Id(3)]
-        public SiloAddress TargetHost { get { throw null; } set { } }
+        public SiloAddress? TargetHost { get { throw null; } set { } }
     }
 
     public partial interface IClusterManifestProvider
@@ -1374,7 +1374,7 @@ namespace Orleans.Runtime
 
     public partial interface IHealthCheckable
     {
-        bool CheckHealth(System.DateTime lastCheckTime, out string reason);
+        bool CheckHealth(System.DateTime lastCheckTime, out string? reason);
     }
 
     public partial interface ILocalSiloDetails
@@ -1396,19 +1396,19 @@ namespace Orleans.Runtime
         System.Threading.Tasks.Task ForceActivationCollection(System.TimeSpan ageLimit);
         System.Threading.Tasks.Task ForceGarbageCollection(SiloAddress[] hostsIds);
         System.Threading.Tasks.Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses);
-        System.Threading.Tasks.ValueTask<SiloAddress> GetActivationAddress(IAddressable reference);
+        System.Threading.Tasks.ValueTask<SiloAddress?> GetActivationAddress(IAddressable reference);
         System.Threading.Tasks.ValueTask<System.Collections.Generic.List<GrainId>> GetActiveGrains(GrainType type);
-        System.Threading.Tasks.Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null);
+        System.Threading.Tasks.Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[]? types = null, SiloAddress[]? hostsIds = null);
         System.Threading.Tasks.Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false);
         System.Threading.Tasks.Task<int> GetGrainActivationCount(GrainReference grainReference);
-        System.Threading.Tasks.Task<System.Collections.Generic.List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+        System.Threading.Tasks.Task<System.Collections.Generic.List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[]? hostsIds = null);
         System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false);
         System.Threading.Tasks.Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds);
         System.Threading.Tasks.Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
         System.Threading.Tasks.Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds);
         System.Threading.Tasks.Task<int> GetTotalActivationCount();
-        System.Threading.Tasks.ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null);
-        System.Threading.Tasks.Task<object[]> SendControlCommandToProvider<T>(string providerName, int command, object arg = null)
+        System.Threading.Tasks.ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds = null);
+        System.Threading.Tasks.Task<object?[]> SendControlCommandToProvider<T>(string providerName, int command, object? arg = null)
             where T : Providers.IControllable;
     }
 
@@ -1419,7 +1419,7 @@ namespace Orleans.Runtime
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
         [Id(3)]
-        public string FailureMessage { get { throw null; } init { } }
+        public string? FailureMessage { get { throw null; } init { } }
 
         [Id(0)]
         public int IntermediaryHealthScore { get { throw null; } init { } }
@@ -1595,7 +1595,7 @@ namespace Orleans.Runtime.Configuration
 {
     public static partial class ConfigUtilities
     {
-        public static string RedactConnectionStringInfo(string connectionString) { throw null; }
+        public static string RedactConnectionStringInfo(string? connectionString) { throw null; }
     }
 }
 
@@ -1657,7 +1657,7 @@ namespace Orleans.Runtime.Placement
     {
         string PlacementHintKey { get; set; }
 
-        SiloAddress GetPlacementHint(System.Collections.Generic.Dictionary<string, object> requestContextData, SiloAddress[] compatibleSilos);
+        SiloAddress? GetPlacementHint(System.Collections.Generic.Dictionary<string, object> requestContextData, SiloAddress[] compatibleSilos);
         System.Threading.Tasks.Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context);
     }
 
@@ -1683,25 +1683,25 @@ namespace Orleans.Serialization
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
     public partial class ConfigureOrleansJsonSerializerOptions : Microsoft.Extensions.Options.IPostConfigureOptions<OrleansJsonSerializerOptions>
     {
         public ConfigureOrleansJsonSerializerOptions(System.IServiceProvider serviceProvider) { }
 
-        public void PostConfigure(string name, OrleansJsonSerializerOptions options) { }
+        public void PostConfigure(string? name, OrleansJsonSerializerOptions options) { }
     }
 
     public partial class GrainIdConverter : Newtonsoft.Json.JsonConverter
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
     public partial class GrainReferenceJsonConverter : Newtonsoft.Json.JsonConverter
@@ -1710,36 +1710,36 @@ namespace Orleans.Serialization
 
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
     public partial class IPAddressConverter : Newtonsoft.Json.JsonConverter
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
     public partial class IPEndPointConverter : Newtonsoft.Json.JsonConverter
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
     public partial class MembershipVersionJsonConverter : Newtonsoft.Json.JsonConverter
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
     public partial class OrleansJsonSerializationBinder : Newtonsoft.Json.Serialization.DefaultSerializationBinder
@@ -1748,7 +1748,7 @@ namespace Orleans.Serialization
 
         public OrleansJsonSerializationBinder(TypeSystem.TypeResolver typeResolver) { }
 
-        public override System.Type BindToType(string assemblyName, string typeName) { throw null; }
+        public override System.Type BindToType(string? assemblyName, string typeName) { throw null; }
     }
 
     public partial class OrleansJsonSerializer
@@ -1758,13 +1758,13 @@ namespace Orleans.Serialization
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public OrleansJsonSerializer(Microsoft.Extensions.Options.IOptions<OrleansJsonSerializerOptions> options) { }
 
-        public object Deserialize(System.Type expectedType, System.IO.Stream input) { throw null; }
+        public object? Deserialize(System.Type expectedType, System.IO.Stream input) { throw null; }
 
-        public object Deserialize(System.Type expectedType, string input) { throw null; }
+        public object? Deserialize(System.Type expectedType, string? input) { throw null; }
 
-        public void Serialize(object item, System.Type expectedType, System.IO.Stream destination) { }
+        public void Serialize(object? item, System.Type expectedType, System.IO.Stream destination) { }
 
-        public string Serialize(object item, System.Type expectedType) { throw null; }
+        public string Serialize(object? item, System.Type expectedType) { throw null; }
     }
 
     public partial class OrleansJsonSerializerOptions
@@ -1785,18 +1785,18 @@ namespace Orleans.Serialization
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object? ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
     public partial class UniqueKeyConverter : Newtonsoft.Json.JsonConverter
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
 
-        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
+        public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
-        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) { }
+        public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 }
 
@@ -1828,14 +1828,14 @@ namespace Orleans.Storage
     {
         public GrainStorageSerializer(IGrainStorageSerializer serializer, IGrainStorageSerializer fallbackDeserializer) { }
 
-        public T Deserialize<T>(System.BinaryData input) { throw null; }
+        public T? Deserialize<T>(System.BinaryData input) { throw null; }
 
-        public System.BinaryData Serialize<T>(T input) { throw null; }
+        public System.BinaryData Serialize<T>(T? input) { throw null; }
     }
 
     public static partial class GrainStorageSerializerExtensions
     {
-        public static T Deserialize<T>(this IGrainStorageSerializer serializer, System.ReadOnlyMemory<byte> input) { throw null; }
+        public static T? Deserialize<T>(this IGrainStorageSerializer serializer, System.ReadOnlyMemory<byte> input) { throw null; }
     }
 
     public partial interface IGrainStorage
@@ -1847,20 +1847,20 @@ namespace Orleans.Storage
 
     public partial interface IGrainStorageSerializer
     {
-        T Deserialize<T>(System.BinaryData input);
-        System.BinaryData Serialize<T>(T input);
+        T? Deserialize<T>(System.BinaryData input);
+        System.BinaryData Serialize<T>(T? input);
     }
 
     public partial interface IGrainStorageStreamingSerializer : IGrainStorageSerializer
     {
         System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream input, System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.ValueTask SerializeAsync<T>(T input, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask SerializeAsync<T>(T? input, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IMemoryStorageGrain : IGrainWithIntegerKey, IGrain, Runtime.IAddressable
     {
-        System.Threading.Tasks.Task DeleteStateAsync<T>(string grainStoreKey, string eTag);
-        System.Threading.Tasks.Task<IGrainState<T>> ReadStateAsync<T>(string grainStoreKey);
+        System.Threading.Tasks.Task DeleteStateAsync<T>(string grainStoreKey, string? eTag);
+        System.Threading.Tasks.Task<IGrainState<T>?> ReadStateAsync<T>(string grainStoreKey);
         System.Threading.Tasks.Task<string> WriteStateAsync<T>(string grainStoreKey, IGrainState<T> grainState);
     }
 
@@ -1872,21 +1872,21 @@ namespace Orleans.Storage
         [System.Obsolete]
         protected InconsistentStateException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
 
-        public InconsistentStateException(string message, System.Exception innerException) { }
+        public InconsistentStateException(string message, System.Exception? innerException) { }
 
-        public InconsistentStateException(string storedEtag, string currentEtag, System.Exception storageException) { }
+        public InconsistentStateException(string? storedEtag, string? currentEtag, System.Exception storageException) { }
 
-        public InconsistentStateException(string errorMsg, string storedEtag, string currentEtag, System.Exception storageException) { }
+        public InconsistentStateException(string errorMsg, string? storedEtag, string? currentEtag, System.Exception? storageException) { }
 
-        public InconsistentStateException(string errorMsg, string storedEtag, string currentEtag) { }
+        public InconsistentStateException(string errorMsg, string? storedEtag, string? currentEtag) { }
 
         public InconsistentStateException(string message) { }
 
         [Id(2)]
-        public string CurrentEtag { get { throw null; } }
+        public string? CurrentEtag { get { throw null; } }
 
         [Id(1)]
-        public string StoredEtag { get { throw null; } }
+        public string? StoredEtag { get { throw null; } }
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
@@ -1908,26 +1908,26 @@ namespace Orleans.Storage
     {
         public JsonGrainStorageSerializer(Serialization.OrleansJsonSerializer orleansJsonSerializer) { }
 
-        public T Deserialize<T>(System.BinaryData input) { throw null; }
+        public T? Deserialize<T>(System.BinaryData input) { throw null; }
 
         public System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream input, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.BinaryData Serialize<T>(T value) { throw null; }
+        public System.BinaryData Serialize<T>(T? value) { throw null; }
 
-        public System.Threading.Tasks.ValueTask SerializeAsync<T>(T value, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.ValueTask SerializeAsync<T>(T? value, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public partial class OrleansGrainStorageSerializer : IGrainStorageStreamingSerializer, IGrainStorageSerializer
     {
         public OrleansGrainStorageSerializer(Serialization.Serializer serializer) { }
 
-        public T Deserialize<T>(System.BinaryData input) { throw null; }
+        public T? Deserialize<T>(System.BinaryData input) { throw null; }
 
         public System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream input, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.BinaryData Serialize<T>(T value) { throw null; }
+        public System.BinaryData Serialize<T>(T? value) { throw null; }
 
-        public System.Threading.Tasks.ValueTask SerializeAsync<T>(T value, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.ValueTask SerializeAsync<T>(T? value, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 

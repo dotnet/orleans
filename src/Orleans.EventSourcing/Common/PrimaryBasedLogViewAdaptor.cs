@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 
-#nullable disable
 namespace Orleans.EventSourcing.Common
 {
     /// <summary>
@@ -260,7 +260,7 @@ namespace Orleans.EventSourcing.Common
         ///  Tentative State. Represents Stable State + effects of pending updates.
         ///  Computed lazily (null if not in use)
         /// </summary>
-        private TLogView tentativeStateInternal;
+        private TLogView? tentativeStateInternal;
 
         /// <summary>
         /// A flag that indicates to the worker that the client wants to refresh the state
@@ -275,7 +275,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// A pending clear-log request to be processed by the worker.
         /// </summary>
-        private TaskCompletionSource<bool> clearLogRequest;
+        private TaskCompletionSource<bool>? clearLogRequest;
         private CancellationToken clearLogCancellationToken;
 
         /// <summary>
@@ -289,7 +289,7 @@ namespace Orleans.EventSourcing.Common
         protected TLogView InitialState { init; get => Services.DeepCopy(field); }
 
         /// statistics gathering. Is null unless stats collection is turned on.
-        protected LogConsistencyStatistics stats = null;
+        protected LogConsistencyStatistics? stats = null;
 
 
         /// For use by protocols. Determines if this cluster is part of the configured multicluster.
@@ -391,7 +391,7 @@ namespace Orleans.EventSourcing.Common
 
         private const int unconditional = -1;
 
-        private void SubmitInternal(DateTime time, TLogEntry logentry, int conditionalPosition = unconditional, TaskCompletionSource<bool> resultPromise = null)
+        private void SubmitInternal(DateTime time, TLogEntry logentry, int conditionalPosition = unconditional, TaskCompletionSource<bool>? resultPromise = null)
         {
             // create a submission entry
             var submissionentry = this.MakeSubmissionEntry(logentry);
@@ -469,7 +469,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         /// <param name="payLoad"></param>
         /// <returns></returns>
-        public async Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad)
+        public async Task<ILogConsistencyProtocolMessage?> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad)
         {
             var notificationMessage = payLoad as INotificationMessage;
 
@@ -530,11 +530,12 @@ namespace Orleans.EventSourcing.Common
         /// Get states
         /// </summary>
         /// <returns></returns>
-        public LogConsistencyStatistics GetStats()
+        public LogConsistencyStatistics? GetStats()
         {
             return stats;
         }
 
+        [MemberNotNull(nameof(tentativeStateInternal))]
         private void CalculateTentativeState()
         {
             // copy the confirmed view
@@ -544,7 +545,7 @@ namespace Orleans.EventSourcing.Common
             foreach (var u in this.pending)
                 try
                 {
-                    Host.UpdateView(this.tentativeStateInternal, u.Entry);
+                    Host.UpdateView(this.tentativeStateInternal, u.Entry!);
                 }
                 catch (Exception e)
                 {
@@ -775,7 +776,7 @@ namespace Orleans.EventSourcing.Common
         {
             get
             {
-                return pending.Select(te => te.Entry);
+                return pending.Select(te => te.Entry!);
             }
         }
 
@@ -850,13 +851,14 @@ namespace Orleans.EventSourcing.Common
     public class SubmissionEntry<TLogEntry>
     {
         /// <summary> The log entry that is submitted. </summary>
+        [MaybeNull]
         public TLogEntry Entry;
 
         /// <summary> A timestamp for this submission. </summary>
         public DateTime SubmissionTime;
 
         /// <summary> For conditional updates, a promise that resolves once it is known whether the update was successful or not.</summary>
-        public TaskCompletionSource<bool> ResultPromise;
+        public TaskCompletionSource<bool>? ResultPromise;
 
         /// <summary> For conditional updates, the log position at which this update is supposed to be applied. </summary>
         public int ConditionalPosition;

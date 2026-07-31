@@ -5,7 +5,6 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -14,7 +13,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class FrozenDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<FrozenDictionary<TKey, TValue>, FrozenDictionarySurrogate<TKey, TValue>>
+    public sealed class FrozenDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<FrozenDictionary<TKey, TValue>, FrozenDictionarySurrogate<TKey, TValue>> where TKey : notnull
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="FrozenDictionaryCodec{TKey, TValue}"/> class.
@@ -42,7 +41,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct FrozenDictionarySurrogate<TKey, TValue>
+    public struct FrozenDictionarySurrogate<TKey, TValue> where TKey : notnull
     {
         /// <summary>
         /// Gets or sets the values.
@@ -56,7 +55,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(1)]
-        public IEqualityComparer<TKey> KeyComparer;
+        public IEqualityComparer<TKey>? KeyComparer;
     }
 
     /// <summary>
@@ -65,10 +64,10 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class FrozenDictionaryCopier<TKey, TValue> : IDeepCopier<FrozenDictionary<TKey, TValue>>, IOptionalDeepCopier, IDerivedTypeCopier
+    public sealed class FrozenDictionaryCopier<TKey, TValue> : IDeepCopier<FrozenDictionary<TKey, TValue>>, IOptionalDeepCopier, IDerivedTypeCopier where TKey : notnull
     {
-        private readonly IDeepCopier<TKey> _keyCopier;
-        private readonly IDeepCopier<TValue> _valueCopier;
+        private readonly IDeepCopier<TKey>? _keyCopier;
+        private readonly IDeepCopier<TValue>? _valueCopier;
 
         public FrozenDictionaryCopier(IDeepCopier<TKey> keyCopier, IDeepCopier<TValue> valueCopier)
         {
@@ -82,7 +81,7 @@ namespace Orleans.Serialization.Codecs
         public FrozenDictionary<TKey, TValue> DeepCopy(FrozenDictionary<TKey, TValue> input, CopyContext context)
         {
             if (context.TryGetCopy<FrozenDictionary<TKey, TValue>>(input, out var result))
-                return result;
+                return result!;
 
             if (input.Count == 0 || _keyCopier is null && _valueCopier is null)
                 return input;

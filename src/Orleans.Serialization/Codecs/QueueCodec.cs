@@ -6,7 +6,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -29,7 +28,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Queue<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Queue<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -53,6 +52,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Queue<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -63,7 +63,7 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            Queue<T> result = null;
+            Queue<T>? result = null;
             uint fieldId = 0;
             while (true)
             {
@@ -87,7 +87,7 @@ namespace Orleans.Serialization.Codecs
                             ThrowLengthFieldMissing();
                         }
 
-                        result.Enqueue(_fieldCodec.ReadValue(ref reader, header));
+                        result!.Enqueue(_fieldCodec.ReadValue(ref reader, header)!);
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -101,7 +101,7 @@ namespace Orleans.Serialization.Codecs
                 ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 
-            return result;
+            return result!;
         }
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized queue is missing its length field.");
@@ -131,12 +131,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<Queue<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new Queue<T>(input.Count);

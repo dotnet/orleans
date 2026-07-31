@@ -98,7 +98,8 @@ namespace Orleans.Storage
             var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = new TableEntity(pk, rowKey)
             {
-                ETag = new ETag(grainState.ETag)
+                // The Azure SDK accepts the default grain-state ETag even though its string constructor is non-nullable.
+                ETag = new ETag(grainState.ETag!)
             };
             ConvertToStorageFormat(grainState.State, entity);
             try
@@ -130,7 +131,8 @@ namespace Orleans.Storage
             var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = new TableEntity(pk, rowKey)
             {
-                ETag = new ETag(grainState.ETag)
+                // The Azure SDK accepts the default grain-state ETag even though its string constructor is non-nullable.
+                ETag = new ETag(grainState.ETag!)
             };
             string operation = "Clearing";
             try
@@ -157,7 +159,7 @@ namespace Orleans.Storage
             }
         }
 
-        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, string grainType, GrainId grainId, string tableName, string currentETag)
+        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, string grainType, GrainId grainId, string tableName, string? currentETag)
         {
             try
             {
@@ -393,7 +395,7 @@ namespace Orleans.Storage
                     }
 
                     var record = data.Entity;
-                    record.ETag = new ETag(data.ETag);
+                    record.ETag = new ETag(data.ETag!);
                     LogTraceDataRead(record.PartitionKey, record.RowKey, TableName, record.ETag.ToString());
 
                     return record;
@@ -481,7 +483,10 @@ namespace Orleans.Storage
         /// <summary> Decodes Storage exceptions.</summary>
         public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false)
         {
-            return AzureTableUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
+            var result = AzureTableUtils.EvaluateException(e, out httpStatusCode, out var decodedRestStatus, getRESTErrors);
+            // IRestExceptionDecoder predates nullable annotations, while the decoder can return no REST status.
+            restStatus = decodedRestStatus!;
+            return result;
         }
 
         private async Task Init(CancellationToken ct)
@@ -528,21 +533,21 @@ namespace Orleans.Storage
             Level = LogLevel.Trace,
             Message = "Writing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} to Table={TableName}"
         )]
-        private partial void LogTraceWritingGrainState(string grainType, string partitionKey, GrainId grainId, string eTag, string tableName);
+        private partial void LogTraceWritingGrainState(string grainType, string partitionKey, GrainId grainId, string? eTag, string tableName);
 
         [LoggerMessage(
             EventId = (int)AzureProviderErrorCode.AzureTableProvider_WriteError,
             Level = LogLevel.Error,
             Message = "Error Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to Table={TableName}"
         )]
-        private partial void LogErrorWriteGrainState(string grainType, GrainId grainId, string eTag, string tableName, Exception exception);
+        private partial void LogErrorWriteGrainState(string grainType, GrainId grainId, string? eTag, string tableName, Exception exception);
 
         [LoggerMessage(
             EventId = (int)AzureProviderErrorCode.AzureTableProvider_WritingData,
             Level = LogLevel.Trace,
             Message = "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}"
         )]
-        private partial void LogTraceClearingGrainState(string grainType, string partitionKey, GrainId grainId, string eTag, bool deleteStateOnClear, string tableName);
+        private partial void LogTraceClearingGrainState(string grainType, string partitionKey, GrainId grainId, string? eTag, bool deleteStateOnClear, string tableName);
 
         [LoggerMessage(
             EventId = (int)AzureProviderErrorCode.AzureTableProvider_DeleteError,

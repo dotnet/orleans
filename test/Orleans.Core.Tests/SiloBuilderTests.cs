@@ -110,7 +110,7 @@ namespace NonSilo.Tests
                         .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
                         .Configure<GrainCollectionOptions>(options => options
                                     .ClassSpecificCollectionAge
-                                    .Add(typeof(CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain).FullName, TimeSpan.Zero));
+                                    .Add(typeof(CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain).FullName!, TimeSpan.Zero));
                 }).RunConsoleAsync();
             });
         }

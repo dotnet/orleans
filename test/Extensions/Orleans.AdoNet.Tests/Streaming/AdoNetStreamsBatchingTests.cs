@@ -46,7 +46,7 @@ public class PostgreSqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : Ad
 public abstract class AdoNetStreamsBatchingTests : StreamBatchingTestRunner, IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
-    private static RelationalStorageForTesting _testing;
+    private static RelationalStorageForTesting _testing = null!;
 
     protected AdoNetStreamsBatchingTests(Fixture fixture, ITestOutputHelper output) : base(fixture, output)
     {
@@ -59,7 +59,7 @@ public abstract class AdoNetStreamsBatchingTests : StreamBatchingTestRunner, IAs
 
     public class Fixture : BaseTestClusterFixture
     {
-        private static string _invariant;
+        private static string _invariant = null!;
 
         public Fixture(string invariant)
         {

@@ -16,7 +16,7 @@ namespace Orleans.Streams
         /// If null then the stream has completed or there was a stream error.  
         /// If there was a stream error, an error exception will be provided in the output.
         /// </returns>
-        IBatchContainer GetCurrent(out Exception exception);
+        IBatchContainer? GetCurrent(out Exception? exception);
 
         /// <summary>
         /// Move to next message in the stream.

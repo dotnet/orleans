@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.Dashboard.Model;
 
 /// <summary>
@@ -13,7 +12,7 @@ internal sealed class LifecycleObserverInfo
     /// The observer name supplied when the observer subscribed to the lifecycle.
     /// </summary>
     [Id(0)]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     /// <summary>
     /// The type of the underlying observer (typically the concrete
@@ -21,7 +20,7 @@ internal sealed class LifecycleObserverInfo
     /// the registered delegate when subscribing via delegate-based extensions).
     /// </summary>
     [Id(1)]
-    public string ObserverType { get; set; }
+    public string ObserverType { get; set; } = null!;
 
     /// <summary>
     /// True when the observer has a non-default <c>OnStart</c> action.
@@ -39,11 +38,11 @@ internal sealed class LifecycleObserverInfo
     /// The fully-qualified method invoked on start (when known).
     /// </summary>
     [Id(4)]
-    public string OnStartMethod { get; set; }
+    public string? OnStartMethod { get; set; }
 
     /// <summary>
     /// The fully-qualified method invoked on stop (when known).
     /// </summary>
     [Id(5)]
-    public string OnStopMethod { get; set; }
+    public string? OnStopMethod { get; set; }
 }

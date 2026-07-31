@@ -113,7 +113,8 @@ namespace Orleans.Serialization.UnitTests
 
             var result = RoundTripToExpectedType<Exception, InvalidOperationException>(ioEx);
             Assert.Equal(ioEx.Message, result.Message);
-            Assert.Contains(ioEx.StackTrace, result.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(ioEx.StackTrace!, result.StackTrace);
             Assert.Equal(ioEx.InnerException, result.InnerException);
             Assert.NotNull(result.Data);
             var data = result.Data;
@@ -122,7 +123,8 @@ namespace Orleans.Serialization.UnitTests
 
             var exCopy = DeepCopy(ioEx);
             Assert.Equal(ioEx.Message, exCopy.Message);
-            Assert.Contains(ioEx.StackTrace, exCopy.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(ioEx.StackTrace!, exCopy.StackTrace);
             Assert.Equal(ioEx.InnerException, exCopy.InnerException);
             Assert.NotNull(exCopy.Data);
             var copyData = exCopy.Data;
@@ -131,7 +133,8 @@ namespace Orleans.Serialization.UnitTests
 
             var baseExResult = RoundTripToExpectedType<Exception, Exception>(baseEx);
             Assert.Equal(baseEx.Message, baseExResult.Message);
-            Assert.Contains(baseEx.StackTrace, baseExResult.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(baseEx.StackTrace!, baseExResult.StackTrace);
             Assert.Equal(baseEx.InnerException, baseExResult.InnerException);
             Assert.NotNull(baseExResult.Data);
             var baseExData = baseExResult.Data;
@@ -140,7 +143,8 @@ namespace Orleans.Serialization.UnitTests
 
             var baseExCopy = DeepCopy(baseEx);
             Assert.Equal(baseEx.Message, baseExCopy.Message);
-            Assert.Contains(baseEx.StackTrace, baseExCopy.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(baseEx.StackTrace!, baseExCopy.StackTrace);
             Assert.Equal(baseEx.InnerException, baseExCopy.InnerException);
             Assert.NotNull(baseExCopy.Data);
             var baseExCopyData = baseExCopy.Data;
@@ -149,24 +153,28 @@ namespace Orleans.Serialization.UnitTests
 
             var agResult = RoundTripToExpectedType<Exception, AggregateException>(aggregateException);
             Assert.Equal(aggregateException.Message, agResult.Message);
-            Assert.Contains(aggregateException.StackTrace, agResult.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(aggregateException.StackTrace!, agResult.StackTrace);
             var inner = Assert.IsType<InvalidOperationException>(agResult.InnerException);
             Assert.Equal(ioEx.Message, inner.Message);
 
             var agCopy = DeepCopy(aggregateException);
             Assert.Equal(aggregateException.Message, agCopy.Message);
-            Assert.Contains(aggregateException.StackTrace, agCopy.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(aggregateException.StackTrace!, agCopy.StackTrace);
             var agInner = Assert.IsType<InvalidOperationException>(agCopy.InnerException);
             Assert.Equal(ioEx.Message, agInner.Message);
 
             var ceResult = RoundTripToExpectedType<Exception, CustomException>(customException);
             Assert.Equal(customException.Message, ceResult.Message);
-            Assert.Contains(customException.StackTrace, ceResult.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(customException.StackTrace!, ceResult.StackTrace);
             Assert.Equal(customException.CustomInt, ceResult.CustomInt);
 
             var ceCopy = DeepCopy(customException);
             Assert.Equal(customException.Message, ceCopy.Message);
-            Assert.Contains(customException.StackTrace, ceCopy.StackTrace);
+            // Exceptions caught above have populated stack traces.
+            Assert.Contains(customException.StackTrace!, ceCopy.StackTrace);
             Assert.Equal(customException.CustomInt, ceCopy.CustomInt);
         }
 
@@ -262,7 +270,8 @@ namespace Orleans.Serialization.UnitTests
         private TActual RoundTripToExpectedType<TBase, TActual>(TActual original)
             where TActual : TBase
         {
-            var serializer = _serviceProvider.GetService<Serializer<TBase>>();
+            // AddSerializer guarantees that the closed serializer is registered.
+            var serializer = _serviceProvider.GetService<Serializer<TBase>>()!;
             var array = serializer.SerializeToArray(original);
 
             string formatted;
@@ -271,13 +280,15 @@ namespace Orleans.Serialization.UnitTests
                 formatted = BitStreamFormatter.Format(array, session);
             }
 
-            return (TActual)serializer.Deserialize(array);
+            // The non-null original is round-tripped through the matching closed serializer.
+            return (TActual)serializer.Deserialize(array)!;
         }
 
         private T DeepCopy<T>(T original)
         {
-            var deepCopier = _serviceProvider.GetService<DeepCopier<T>>();
-            return deepCopier.Copy(original);
+            // AddSerializer guarantees that the closed copier is registered.
+            var deepCopier = _serviceProvider.GetService<DeepCopier<T>>()!;
+            return deepCopier.Copy(original)!;
         }
 
         [Id(1000)]
@@ -285,7 +296,7 @@ namespace Orleans.Serialization.UnitTests
         public class SomeBaseClass
         {
             [Id(0)]
-            public string SbcString { get; set; }
+            public string? SbcString { get; set; }
 
             [Id(1)]
             public int SbcInteger { get; set; }
@@ -299,7 +310,7 @@ namespace Orleans.Serialization.UnitTests
             public int SscInteger { get; set; }
 
             [Id(1)]
-            public string SscString { get; set; }
+            public string? SscString { get; set; }
         }
 
         [Id(1002)]
@@ -310,7 +321,7 @@ namespace Orleans.Serialization.UnitTests
             public int OtherSubClassInt { get; set; }
 
             [Id(1)]
-            public string OtherSubClassString { get; set; }
+            public string? OtherSubClassString { get; set; }
         }
 
         [Id(1003)]
@@ -321,7 +332,7 @@ namespace Orleans.Serialization.UnitTests
             public int SomeSubClassChildInt { get; set; }
 
             [Id(1)]
-            public string SomeSubClassChildString { get; set; }
+            public string? SomeSubClassChildString { get; set; }
         }
     }
 }

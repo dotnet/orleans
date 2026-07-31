@@ -16,7 +16,6 @@ using Orleans.Serialization.Serializers;
 using Xunit.Abstractions;
 using Orleans.Serialization.GeneratedCodeHelpers;
 
-#nullable disable
 namespace Orleans.Serialization.TestKit
 {
     /// <summary>
@@ -100,14 +99,15 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Compares two values for equality.
         /// </summary>
-        protected virtual bool Equals(TValue left, TValue right) => EqualityComparer<TValue>.Default.Equals(left, right);
+        protected virtual bool Equals(TValue? left, TValue? right) => EqualityComparer<TValue>.Default.Equals(left!, right!);
 
         /// <summary>
         /// Gets a value provider delegate.
         /// </summary>
-        protected virtual Action<Action<TValue>> ValueProvider { get; }
+        protected virtual Action<Action<TValue>>? ValueProvider { get; }
 
-        protected virtual TValue GetWriteCopy(TValue input) => input;
+        [return: NotNullIfNotNull(nameof(input))]
+        protected virtual TValue? GetWriteCopy(TValue? input) => input;
 
         /// <summary>
         /// Checks whether the codec correctly advances the reference counter when writing to a stream and reading from a stream.
@@ -242,7 +242,7 @@ namespace Orleans.Serialization.TestKit
 
                 buffer.Position = 0;
                 var reader = Reader.Create(buffer, _sessionPool.GetSession());
-                var deserialized = serializer.Deserialize(ref reader);
+                var deserialized = serializer.Deserialize(ref reader)!;
                 var isEqual = Equals(original, deserialized);
                 Assert.True(
                     isEqual,
@@ -594,7 +594,7 @@ namespace Orleans.Serialization.TestKit
             original.AddRange(TestValues);
             foreach (var value in original)
             {
-                originalCopy.Add(GetWriteCopy(value));
+                originalCopy.Add(GetWriteCopy(value)!);
             }
 
             for (var i = 0; i < 5; i++)
@@ -602,7 +602,7 @@ namespace Orleans.Serialization.TestKit
                 var o = CreateValue();
                 var c = GetWriteCopy(o);
                 original.Add(o);
-                originalCopy.Add(c);
+                originalCopy.Add(c!);
             }
 
             using var writerSession = _sessionPool.GetSession();
@@ -610,7 +610,7 @@ namespace Orleans.Serialization.TestKit
             serializer.Serialize(originalCopy, ref writer);
             using var readerSession = _sessionPool.GetSession();
             var reader = Reader.Create(writer.Output, readerSession);
-            var deserialized = serializer.Deserialize(ref reader);
+            var deserialized = serializer.Deserialize(ref reader)!;
 
             Assert.Equal(original.Count, deserialized.Count);
             for (var i = 0; i < original.Count; ++i)
@@ -631,10 +631,10 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripWeaklyTypedCollectionViaSerializer()
         {
-            var serializer = ServiceProvider.GetRequiredService<Serializer<List<object>>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<List<object?>>>();
 
-            var original = new List<object>();
-            var originalCopy = new List<object>();
+            var original = new List<object?>();
+            var originalCopy = new List<object?>();
             foreach (var value in TestValues)
             {
                 var o = value;
@@ -656,13 +656,13 @@ namespace Orleans.Serialization.TestKit
             serializer.Serialize(originalCopy, ref writer);
             using var readerSession = _sessionPool.GetSession();
             var reader = Reader.Create(writer.Output, readerSession);
-            var deserialized = serializer.Deserialize(ref reader);
+            var deserialized = serializer.Deserialize(ref reader)!;
 
             Assert.Equal(original.Count, deserialized.Count);
             for (var i = 0; i < original.Count; ++i)
             {
-                var left = (TValue)original[i];
-                var right = (TValue)deserialized[i];
+                var left = (TValue?)original[i];
+                var right = (TValue?)deserialized[i];
                 var isEqual = Equals(left, right);
                 Assert.True(
                     isEqual,
@@ -679,7 +679,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripTupleViaSerializer()
         {
-            var serializer = ServiceProvider.GetRequiredService<Serializer<(string, TValue, TValue, string)>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<(string, TValue?, TValue?, string)>>();
 
             var original = (Guid.NewGuid().ToString(), CreateValue(), CreateValue(), Guid.NewGuid().ToString());
             var originalCopy = (original.Item1, GetWriteCopy(original.Item2), GetWriteCopy(original.Item3), original.Item4);
@@ -756,7 +756,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaObjectSerializer()
         {
-            var serializer = ServiceProvider.GetRequiredService<Serializer<object>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<object?>>();
 
             var buffer = new byte[10240];
 
@@ -781,7 +781,7 @@ namespace Orleans.Serialization.TestKit
                 }
                 else if (typeof(TValue).IsEnum)
                 {
-                    var deserialized = (TValue)deserializedObject;
+                    var deserialized = (TValue)deserializedObject!;
                     var isEqual = Equals(original, deserialized);
                     Assert.True(
                         isEqual,
@@ -850,7 +850,7 @@ namespace Orleans.Serialization.TestKit
             }
         }
 
-        private void CanBeSkipped(TValue original)
+        private void CanBeSkipped(TValue? original)
         {
             var pipe = new Pipe();
             using var writerSession = _sessionPool.GetSession();
@@ -898,7 +898,7 @@ namespace Orleans.Serialization.TestKit
             pipe.Reader.Complete();
         }
 
-        private void TestRoundTrippedValue(TValue original)
+        private void TestRoundTrippedValue(TValue? original)
         {
             var pipe = new Pipe();
             using var writerSession = _sessionPool.GetSession();
@@ -927,9 +927,10 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Round-trips a value through the codec.
         /// </summary>
-        protected T RoundTripThroughCodec<T>(T original)
+        [return: MaybeNull]
+        protected T RoundTripThroughCodec<T>([AllowNull] T original)
         {
-            T result;
+            T? result;
             using (var readerSession = SessionPool.GetSession())
             using (var writeSession = SessionPool.GetSession())
             {
@@ -965,9 +966,10 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Round-trips a value through an untyped serializer.
         /// </summary>
-        protected object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream)
+        [return: NotNullIfNotNull(nameof(original))]
+        protected object? RoundTripThroughUntypedSerializer(object? original, out string formattedBitStream)
         {
-            object result;
+            object? result;
             using var readerSession = SessionPool.GetSession();
             using var writeSession = SessionPool.GetSession();
 
@@ -975,7 +977,7 @@ namespace Orleans.Serialization.TestKit
             var writer = Writer.Create(bufferWriter, writeSession);
             try
             {
-                var serializer = ServiceProvider.GetService<Serializer<object>>();
+                var serializer = ServiceProvider.GetService<Serializer<object>>()!;
                 serializer.Serialize(original, ref writer);
 
                 using var analyzerSession = SessionPool.GetSession();

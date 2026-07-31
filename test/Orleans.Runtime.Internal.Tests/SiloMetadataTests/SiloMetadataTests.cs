@@ -12,7 +12,7 @@ namespace UnitTests.SiloMetadataTests;
 [TestCategory("SiloMetadata")]
 public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixture<SiloMetadataTests.Fixture>
 {
-    private static readonly List<KeyValuePair<string, string>> Metadata =
+    private static readonly List<KeyValuePair<string, string?>> Metadata =
         [
             new("Orleans:Metadata:first", "1"),
             new("Orleans:Metadata:second", "2"),
@@ -21,7 +21,7 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
 
     public class Fixture : IAsyncLifetime
     {
-        public InProcessTestCluster Cluster { get; private set; }
+        public InProcessTestCluster Cluster { get; private set; } = null!;
         public async Task DisposeAsync()
         {
             if (Cluster is { } cluster)

@@ -5,7 +5,7 @@ namespace BenchmarkGrains.Ping
 {
     public class LoadGrain : Grain, ILoadGrain
     {
-        private Task<Report> runTask;
+        private Task<Report> runTask = null!;
         private bool end = false;
 
         public Task Generate(int run, int conncurrent)
@@ -69,7 +69,7 @@ namespace BenchmarkGrains.Ping
 
         private class Pending
         {
-            public IPingGrain Grain { get; set; }
+            public IPingGrain Grain { get; set; } = null!;
             public ValueTask PendingCall { get; set; }
         }
     }

@@ -2,7 +2,6 @@ using System;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Buffers
 {
     public ref partial struct Writer<TBufferWriter>
@@ -14,7 +13,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="expectedType">The expected type.</param>
         /// <param name="actualType">The actual type.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteStartObject(uint fieldId, Type expectedType, Type actualType) => WriteFieldHeader(fieldId, expectedType, actualType, WireType.TagDelimited);
+        public void WriteStartObject(uint fieldId, Type? expectedType, Type actualType) => WriteFieldHeader(fieldId, expectedType, actualType, WireType.TagDelimited);
 
         /// <summary>
         /// Writes the end object tag.

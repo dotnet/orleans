@@ -5,7 +5,6 @@ using Orleans.BroadcastChannel;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -23,7 +22,7 @@ namespace Orleans
         /// Gets the name of the channel identifier mapper.
         /// </summary>
         /// <value>The name of the channel identifier mapper.</value>
-        public string ChannelIdMapper { get; }
+        public string? ChannelIdMapper { get; }
 
         /// <summary>
         /// Used to subscribe to all stream namespaces.
@@ -38,7 +37,7 @@ namespace Orleans
         /// </summary>
         /// <param name="streamNamespace">The stream namespace to subscribe.</param>
         /// <param name="channelIdMapper">The name of the stream identity mapper.</param>
-        public ImplicitChannelSubscriptionAttribute(string streamNamespace, string channelIdMapper = null)
+        public ImplicitChannelSubscriptionAttribute(string streamNamespace, string? channelIdMapper = null)
         {
             Predicate = new ExactMatchChannelNamespacePredicate(streamNamespace.Trim());
             ChannelIdMapper = channelIdMapper;
@@ -50,9 +49,9 @@ namespace Orleans
         /// </summary>
         /// <param name="predicateType">The stream namespace predicate type.</param>
         /// <param name="channelIdMapper">The name of the stream identity mapper.</param>
-        public ImplicitChannelSubscriptionAttribute(Type predicateType, string channelIdMapper = null)
+        public ImplicitChannelSubscriptionAttribute(Type predicateType, string? channelIdMapper = null)
         {
-            Predicate = (IChannelNamespacePredicate) Activator.CreateInstance(predicateType);
+            Predicate = (IChannelNamespacePredicate) Activator.CreateInstance(predicateType)!;
             ChannelIdMapper = channelIdMapper;
         }
 
@@ -62,16 +61,16 @@ namespace Orleans
         /// </summary>
         /// <param name="predicate">The stream namespace predicate.</param>
         /// <param name="channelIdMapper">The name of the stream identity mapper.</param>
-        public ImplicitChannelSubscriptionAttribute(IChannelNamespacePredicate predicate, string channelIdMapper = null)
+        public ImplicitChannelSubscriptionAttribute(IChannelNamespacePredicate predicate, string? channelIdMapper = null)
         {
             Predicate = predicate;
             ChannelIdMapper = channelIdMapper;
         }
 
         /// <inheritdoc />
-        public IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
+        public IEnumerable<Dictionary<string, string?>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
         {
-            var binding = new Dictionary<string, string>
+            var binding = new Dictionary<string, string?>
             {
                 [WellKnownGrainTypeProperties.BindingTypeKey] = WellKnownGrainTypeProperties.BroadcastChannelBindingTypeValue,
                 [WellKnownGrainTypeProperties.BroadcastChannelBindingPatternKey] = this.Predicate.PredicatePattern,

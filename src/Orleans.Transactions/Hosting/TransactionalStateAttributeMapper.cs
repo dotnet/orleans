@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
-#nullable disable
 namespace Orleans.Transactions
 {
     public class TransactionalStateAttributeMapper : TransactionalStateAttributeMapper<TransactionalStateAttribute>
@@ -17,7 +16,7 @@ namespace Orleans.Transactions
     public abstract class TransactionalStateAttributeMapper<TAttribute> : IAttributeToFactoryMapper<TAttribute>
         where TAttribute : IFacetMetadata, ITransactionalStateConfiguration
     {
-        private static readonly MethodInfo create = typeof(ITransactionalStateFactory).GetMethod("Create");
+        private static readonly MethodInfo create = typeof(ITransactionalStateFactory).GetMethod("Create")!;
 
         public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TAttribute attribute)
         {
@@ -31,7 +30,7 @@ namespace Orleans.Transactions
         private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
             ITransactionalStateFactory factory = context.ActivationServices.GetRequiredService<ITransactionalStateFactory>();
-            return genericCreate.Invoke(factory, args);
+            return genericCreate.Invoke(factory, args)!;
         }
 
         protected abstract TransactionalStateConfiguration AttributeToConfig(TAttribute attribute);

@@ -11,7 +11,6 @@ using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -32,11 +31,11 @@ namespace Orleans.Runtime
         private readonly ILogger _logger;
 
         private long _lastUpdateDateTimeTicks;
-        private IDisposable _publishTimer;
+        private IDisposable? _publishTimer;
 
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => _periodicStats;
 
-        public SiloRuntimeStatistics LocalRuntimeStatistics { get; private set; }
+        public SiloRuntimeStatistics LocalRuntimeStatistics { get; private set; } = null!;
 
         public DeploymentLoadPublisher(
             ILocalSiloDetails siloDetails,
@@ -76,7 +75,7 @@ namespace Orleans.Runtime
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
                 var randomTimerOffset = RandomTimeSpan.Next(_statisticsRefreshTime);
                 _publishTimer = RegisterTimer(
-                    static state => ((DeploymentLoadPublisher)state).PublishStatistics(),
+                    static state => ((DeploymentLoadPublisher)state!).PublishStatistics(),
                     this,
                     randomTimerOffset,
                     _statisticsRefreshTime);
@@ -212,7 +211,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics stats)
+        private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics? stats)
         {
             lock (_siloStatisticsChangeListeners)
             {
@@ -257,7 +256,7 @@ namespace Orleans.Runtime
 
             Task DisposePublishTimer(CancellationToken ct)
             {
-                _publishTimer.Dispose();
+                _publishTimer!.Dispose(); // Preserve the existing lifecycle contract that publishing is enabled.
                 return Task.CompletedTask;
             }
         }

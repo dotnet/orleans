@@ -153,6 +153,7 @@ namespace AWSUtils.Tests.StorageTests
 
             var storage = await InitDynamoDBGrainStorage(useJson);
             var initialState = state.State;
+            Assert.NotNull(initialState);
 
             var entity = new GrainStateRecord();
 
@@ -181,7 +182,7 @@ namespace AWSUtils.Tests.StorageTests
                 Service = AWSTestConstants.DynamoDbService,
             };
 
-            var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
+            var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>()!;
             var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
             var jsonSerializer = new JsonGrainStorageSerializer(new OrleansJsonSerializer(jsonOptions));
 
@@ -196,7 +197,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
-            GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 
@@ -215,13 +216,15 @@ namespace AWSUtils.Tests.StorageTests
             this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
             var storedState = storedGrainState.State;
+            Assert.NotNull(grainState.State);
+            Assert.NotNull(storedState);
             Assert.Equal(grainState.State.A, storedState.A);
             Assert.Equal(grainState.State.B, storedState.B);
             Assert.Equal(grainState.State.C, storedState.C);
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            IGrainStorage store, GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 
@@ -245,6 +248,8 @@ namespace AWSUtils.Tests.StorageTests
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
             this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            Assert.NotNull(grainState.State);
+            Assert.NotNull(storedGrainState.State);
             Assert.Equal(grainState.State.A, storedGrainState.State.A);
             Assert.Equal(grainState.State.B, storedGrainState.State.B);
             Assert.Equal(grainState.State.C, storedGrainState.State.C);
@@ -253,7 +258,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+            IGrainStorage store, GrainState<TestStoreGrainState>? grainState = null, GrainId grainId = default)
         {
             var reference = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 

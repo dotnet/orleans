@@ -24,7 +24,7 @@ namespace UnitTests.Directory
 
         public IClusterMembershipService Target => this;
 
-        public MockClusterMembershipService(Dictionary<SiloAddress, (SiloStatus Status, string Name)> initialStatuses = null)
+        public MockClusterMembershipService(Dictionary<SiloAddress, (SiloStatus Status, string Name)>? initialStatuses = null)
         {
             this.statuses = initialStatuses ?? new Dictionary<SiloAddress, (SiloStatus Status, string Name)>();
             this.snapshot = ToSnapshot(this.statuses, ++version);

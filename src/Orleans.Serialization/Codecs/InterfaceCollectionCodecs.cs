@@ -5,7 +5,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs;
 
 internal static class InterfaceCollectionCodecHelpers
@@ -15,8 +14,8 @@ internal static class InterfaceCollectionCodecHelpers
     public static bool TryWriteRuntimeCodec<TBufferWriter, TField>(
         ref Writer<TBufferWriter> writer,
         uint fieldIdDelta,
-        Type expectedType,
-        TField value) where TBufferWriter : IBufferWriter<byte>
+        [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+        [System.Diagnostics.CodeAnalysis.AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
     {
         if (value is null)
         {
@@ -38,7 +37,7 @@ internal static class InterfaceCollectionCodecHelpers
         Field field,
         Type fallbackType,
         Type codecType,
-        out TField result)
+        out TField? result) where TField : class
     {
         if (field.WireType == WireType.Reference)
         {
@@ -53,7 +52,7 @@ internal static class InterfaceCollectionCodecHelpers
             && fieldType != codecType
             && reader.Session.CodecProvider.TryGetCodec(fieldType) is { } specificCodec)
         {
-            result = (TField)specificCodec.ReadValue(ref reader, field);
+            result = (TField?)specificCodec.ReadValue(ref reader, field);
             return true;
         }
 
@@ -63,9 +62,9 @@ internal static class InterfaceCollectionCodecHelpers
 
     public static bool TryCopyRuntime<TField>(
         IDeepCopierProvider copierProvider,
-        TField input,
+        TField? input,
         CopyContext context,
-        out TField result) where TField : class
+        out TField? result) where TField : class
     {
         if (input is null)
         {
@@ -79,7 +78,7 @@ internal static class InterfaceCollectionCodecHelpers
             return false;
         }
 
-        result = (TField)copier.DeepCopy(input, context);
+        result = (TField?)copier.DeepCopy(input, context);
         return true;
     }
 
@@ -119,7 +118,7 @@ internal static class InterfaceCollectionCodecHelpers
         return true;
     }
 
-    public static bool TryGetInterfaceTypeForCodecType(Type type, out Type interfaceType)
+    public static bool TryGetInterfaceTypeForCodecType(Type? type, out Type? interfaceType)
     {
         if (type is null || !type.IsConstructedGenericType)
         {
@@ -194,24 +193,25 @@ internal sealed class InterfaceCollectionCodecResolver(IServiceProvider serviceP
 {
     public bool IsSupportedType(Type type) => InterfaceCollectionCodecHelpers.TryGetInterfaceTypeForCodecType(type, out _);
 
-    public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+    public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (!InterfaceCollectionCodecHelpers.TryGetInterfaceTypeForCodecType(field.FieldType, out var interfaceType))
         {
             throw new InvalidOperationException($"Type {field.FieldType} is not a supported interface collection codec type.");
         }
 
-        return serviceProvider.GetRequiredService<ICodecProvider>().GetCodec(interfaceType).ReadValue(ref reader, field);
+        return serviceProvider.GetRequiredService<ICodecProvider>().GetCodec(interfaceType!).ReadValue(ref reader, field);
     }
 
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
     {
         if (!InterfaceCollectionCodecHelpers.TryGetInterfaceTypeForCodecType(expectedType, out var interfaceType))
         {
             throw new InvalidOperationException($"Type {expectedType} is not a supported interface collection codec type.");
         }
 
-        serviceProvider.GetRequiredService<ICodecProvider>().GetCodec(interfaceType).WriteField(ref writer, fieldIdDelta, interfaceType, value);
+        serviceProvider.GetRequiredService<ICodecProvider>().GetCodec(interfaceType!).WriteField(ref writer, fieldIdDelta, interfaceType!, value);
     }
 }
 
@@ -226,7 +226,7 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
         _elementCodec = elementCodec;
     }
 
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TInterface value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TInterface value) where TBufferWriter : IBufferWriter<byte>
     {
         if (InterfaceCollectionCodecHelpers.TryWriteRuntimeCodec(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -258,11 +258,12 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
         writer.WriteEndObject();
     }
 
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public TInterface ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, GetType(), out var result))
         {
-            return result;
+            return result!;
         }
 
         return (TInterface)(object)ReadFallback(ref reader, field);
@@ -288,7 +289,7 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        List<T> result = null;
+        List<T>? result = null;
         uint fieldId = 0;
         while (true)
         {
@@ -312,7 +313,7 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                     }
 
-                    result.Add(_elementCodec.ReadValue(ref reader, header));
+                    result.Add(_elementCodec.ReadValue(ref reader, header)!);
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -326,7 +327,7 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
         }
 
-        return result;
+        return result!;
     }
 }
 
@@ -343,7 +344,7 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
         _comparerCodec = comparerCodec;
     }
 
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TInterface value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TInterface value) where TBufferWriter : IBufferWriter<byte>
     {
         if (InterfaceCollectionCodecHelpers.TryWriteRuntimeCodec(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -375,11 +376,12 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
         writer.WriteEndObject();
     }
 
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public TInterface ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, GetType(), out var result))
         {
-            return result;
+            return result!;
         }
 
         return (TInterface)(object)ReadFallback(ref reader, field);
@@ -405,8 +407,8 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        HashSet<T> result = null;
-        IEqualityComparer<T> comparer = null;
+        HashSet<T>? result = null;
+        IEqualityComparer<T>? comparer = null;
         uint fieldId = 0;
         while (true)
         {
@@ -433,7 +435,7 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                     }
 
-                    result.Add(_elementCodec.ReadValue(ref reader, header));
+                    result.Add(_elementCodec.ReadValue(ref reader, header)!);
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -447,7 +449,7 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
         }
 
-        return result;
+        return result!;
     }
 }
 
@@ -472,7 +474,7 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
         _comparerCodec = comparerCodec;
     }
 
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TInterface value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TInterface value) where TBufferWriter : IBufferWriter<byte>
     {
         if (InterfaceCollectionCodecHelpers.TryWriteRuntimeCodec(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -504,11 +506,12 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
         writer.WriteEndObject();
     }
 
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public TInterface ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, GetType(), out var result))
         {
-            return result;
+            return result!;
         }
 
         return (TInterface)(object)ReadFallback(ref reader, field);
@@ -535,9 +538,9 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        Dictionary<TKey, TValue> result = null;
-        IEqualityComparer<TKey> comparer = null;
-        TKey key = default;
+        Dictionary<TKey, TValue>? result = null;
+        IEqualityComparer<TKey>? comparer = null;
+        TKey? key = default;
         var valueExpected = false;
         uint fieldId = 0;
         while (true)
@@ -572,7 +575,7 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
                     }
                     else
                     {
-                        result.Add(key, _valueCodec.ReadValue(ref reader, header));
+                        result.Add(key!, _valueCodec.ReadValue(ref reader, header)!);
                         valueExpected = false;
                     }
 
@@ -600,12 +603,12 @@ internal abstract class ListInterfaceCopier<TInterface, T>(IDeepCopierProvider c
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
-            return runtimeResult;
+            return runtimeResult!;
         }
 
         if (context.TryGetCopy<TInterface>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         var copy = InterfaceCollectionCodecHelpers.TryGetCount(input, out var count)
@@ -627,12 +630,12 @@ internal abstract class SetInterfaceCopier<TInterface, T>(IDeepCopierProvider co
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
-            return runtimeResult;
+            return runtimeResult!;
         }
 
         if (context.TryGetCopy<TInterface>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         var copy = InterfaceCollectionCodecHelpers.TryGetCount(input, out var count)
@@ -659,12 +662,12 @@ internal abstract class DictionaryInterfaceCopier<TInterface, TKey, TValue>(
     {
         if (InterfaceCollectionCodecHelpers.TryCopyRuntime(copierProvider, input, context, out var runtimeResult))
         {
-            return runtimeResult;
+            return runtimeResult!;
         }
 
         if (context.TryGetCopy<TInterface>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         var copy = InterfaceCollectionCodecHelpers.TryGetCount(input, out var count)

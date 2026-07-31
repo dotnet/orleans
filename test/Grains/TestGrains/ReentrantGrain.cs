@@ -10,7 +10,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class ReentrantGrain : Grain, IReentrantGrain
     {
-        private IReentrantGrain Self { get; set; }
+        private IReentrantGrain Self { get; set; } = null!;
 
         public Task<string> One()
         {
@@ -31,7 +31,7 @@ namespace UnitTests.Grains
 
     public class NonRentrantGrain : Grain, INonReentrantGrain
     {
-        private INonReentrantGrain Self { get; set; }
+        private INonReentrantGrain Self { get; set; } = null!;
 
         private readonly ILogger logger;
 
@@ -87,15 +87,15 @@ namespace UnitTests.Grains
             if (req.GetArgumentCount() == 0)
                 return false;
 
-            string arg = null;
+            string? arg = null;
 
             // assume single argument message
             if (req.GetArgumentCount() == 1)
-                arg = (string)UnwrapImmutable(req.GetArgument(0));
+                arg = (string?)UnwrapImmutable(req.GetArgument(0));
 
             // assume stream message
             if (req.GetArgumentCount() == 2)
-                arg = (string)UnwrapImmutable(req.GetArgument(1));
+                arg = (string?)UnwrapImmutable(req.GetArgument(1));
 
             if (arg == "err")
                 throw new ApplicationException("boom");
@@ -103,9 +103,9 @@ namespace UnitTests.Grains
             return arg == "reentrant";
         }
 
-        private static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
+        private static object? UnwrapImmutable(object? item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
 
-        private IMayInterleaveStaticPredicateGrain Self { get; set; }
+        private IMayInterleaveStaticPredicateGrain Self { get; set; } = null!;
 
         // this interleaves only when arg == "reentrant"
         // and test predicate will throw when arg = "err"
@@ -171,15 +171,15 @@ namespace UnitTests.Grains
             if (req.GetArgumentCount() == 0)
                 return false;
 
-            string arg = null;
+            string? arg = null;
 
             // assume single argument message
             if (req.GetArgumentCount() == 1)
-                arg = (string)UnwrapImmutable(req.GetArgument(0));
+                arg = (string?)UnwrapImmutable(req.GetArgument(0));
 
             // assume stream message
             if (req.GetArgumentCount() == 2)
-                arg = (string)UnwrapImmutable(req.GetArgument(1));
+                arg = (string?)UnwrapImmutable(req.GetArgument(1));
 
             if (arg == "err")
                 throw new ApplicationException("boom");
@@ -187,9 +187,9 @@ namespace UnitTests.Grains
             return arg == "reentrant";
         }
 
-        private static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
+        private static object? UnwrapImmutable(object? item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
 
-        private IMayInterleaveInstancedPredicateGrain Self { get; set; }
+        private IMayInterleaveInstancedPredicateGrain Self { get; set; } = null!;
 
         // this interleaves only when arg == "reentrant"
         // and test predicate will throw when arg = "err"

@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Reminders;
 
-#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
@@ -64,9 +63,9 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(result);
         }
 
-        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
-            ReminderEntry result = null;
+            ReminderEntry? result = null;
             if (_reminderTable.TryGetValue(grainId, out var reminders))
             {
                 reminders.TryGetValue(reminderName, out result);
@@ -84,7 +83,7 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(result);
         }
 
-        public Task<string> UpsertRow(ReminderEntry entry)
+        public Task<string?> UpsertRow(ReminderEntry entry)
         {
             entry.ETag = Guid.NewGuid().ToString();
             var d = CollectionsMarshal.GetValueRefOrAddDefault(_reminderTable, entry.GrainId, out _) ??= new();
@@ -94,7 +93,7 @@ namespace Orleans.Runtime.ReminderService
             entryRef = entry;
             LogTraceUpsertedEntry(entry, old);
 
-            return Task.FromResult(entry.ETag);
+            return Task.FromResult<string?>(entry.ETag);
         }
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
@@ -127,7 +126,7 @@ namespace Orleans.Runtime.ReminderService
 
         void IGrainMigrationParticipant.OnRehydrate(IRehydrationContext rehydrationContext)
         {
-            if (rehydrationContext.TryGetValue("table", out Dictionary<GrainId, Dictionary<string, ReminderEntry>> table))
+            if (rehydrationContext.TryGetValue("table", out Dictionary<GrainId, Dictionary<string, ReminderEntry>>? table))
             {
                 _reminderTable = table;
             }
@@ -189,7 +188,7 @@ namespace Orleans.Runtime.ReminderService
             Level = LogLevel.Trace,
             Message = "Upserted entry {Updated}, replaced {Replaced}"
         )]
-        private partial void LogTraceUpsertedEntry(ReminderEntry updated, ReminderEntry replaced);
+        private partial void LogTraceUpsertedEntry(ReminderEntry updated, ReminderEntry? replaced);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

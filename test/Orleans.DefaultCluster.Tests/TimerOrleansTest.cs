@@ -129,7 +129,7 @@ namespace DefaultCluster.Tests.TimerTests
             private readonly ConcurrentBag<TimerGrainCallbackEvents.DelayScheduled> delayScheduledEvents = new();
             private readonly object changeLock = new();
             private TaskCompletionSource changed = CreateCompletionSource();
-            private IDisposable subscription;
+            private IDisposable? subscription;
 
             public static TimerCallbackDiagnosticObserver Create()
             {
@@ -337,9 +337,9 @@ namespace DefaultCluster.Tests.TimerTests
             const string testName = "AsyncTimerTest_GrainCall";
             TimeSpan delay = OneShotTimerDelay;
 
-            ITimerCallGrain grain = null;
+            ITimerCallGrain? grain = null;
 
-            Exception error = null;
+            Exception? error = null;
             using var timerObserver = TimerDiagnosticObserver.Create();
             try
             {
@@ -352,7 +352,7 @@ namespace DefaultCluster.Tests.TimerTests
                 int tickCount = await grain.GetTickCount();
                 Assert.Equal(1, tickCount);
 
-                Exception err = await grain.GetException();
+                Exception? err = await grain.GetException();
                 Assert.Null(err); // Should be no exceptions during timer callback
             }
             catch (Exception exc)
@@ -600,9 +600,9 @@ namespace DefaultCluster.Tests.TimerTests
             const string testName = "AsyncTimerTest_GrainCall";
             TimeSpan delay = OneShotTimerDelay;
 
-            IPocoTimerCallGrain grain = null;
+            IPocoTimerCallGrain? grain = null;
 
-            Exception error = null;
+            Exception? error = null;
             using var timerObserver = TimerDiagnosticObserver.Create();
             try
             {
@@ -615,7 +615,7 @@ namespace DefaultCluster.Tests.TimerTests
                 int tickCount = await grain.GetTickCount();
                 Assert.Equal(1, tickCount);
 
-                Exception err = await grain.GetException();
+                Exception? err = await grain.GetException();
                 Assert.Null(err); // Should be no exceptions during timer callback
             }
             catch (Exception exc)

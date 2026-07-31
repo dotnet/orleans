@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 
 #pragma warning disable IDE0069 // Disposable fields should be disposed
 
-#nullable disable
 namespace Orleans.Dashboard.Implementation;
 
 internal sealed class DashboardLogger : ILoggerProvider, ILogger
@@ -22,7 +21,7 @@ internal sealed class DashboardLogger : ILoggerProvider, ILogger
 
     public ILogger CreateLogger(string categoryName) => this;
 
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         var currentActions = _actions;
 
@@ -41,7 +40,7 @@ internal sealed class DashboardLogger : ILoggerProvider, ILogger
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
-    public IDisposable BeginScope<TState>(TState state) => _scope;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => _scope;
 
     private sealed class NoopDisposable : IDisposable
     {

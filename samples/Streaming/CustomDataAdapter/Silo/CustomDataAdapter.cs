@@ -24,7 +24,7 @@ public class CustomDataAdapter : EventHubDataAdapter
         return StreamId.Create(ns, guid);
     }
 
-    public override EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+    public override EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         => throw new NotSupportedException("This adapter only supports read");
 
     protected override IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)

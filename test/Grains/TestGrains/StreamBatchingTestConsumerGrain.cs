@@ -27,7 +27,7 @@ namespace UnitTests.Grains.Batching
             await Task.Delay(500);
         }
 
-        private Task OnNext(string item, StreamSequenceToken token)
+        private Task OnNext(string item, StreamSequenceToken? token)
         {
             this.report.Consumed++;
             this.report.MaxBatchSize = 1;
@@ -35,4 +35,3 @@ namespace UnitTests.Grains.Batching
         }
     }
 }
-

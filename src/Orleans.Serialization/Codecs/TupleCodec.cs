@@ -5,7 +5,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -29,7 +28,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -44,6 +43,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -76,7 +76,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T>(item1);
+            var result = new Tuple<T>(item1!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -90,7 +90,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class TupleCopier<T> : IDeepCopier<Tuple<T>>, IOptionalDeepCopier
     {
         private readonly Type _fieldType = typeof(Tuple<T>);
-        private readonly IDeepCopier<T> _copier;
+        private readonly IDeepCopier<T>? _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T}"/> class.
@@ -103,11 +103,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T> DeepCopy(Tuple<T> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;
@@ -148,7 +148,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T1, T2> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -164,6 +164,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T1, T2> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -200,7 +201,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T1, T2>(item1, item2);
+            var result = new Tuple<T1, T2>(item1!, item2!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -215,8 +216,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class TupleCopier<T1, T2> : IDeepCopier<Tuple<T1, T2>>, IOptionalDeepCopier
     {
         private readonly Type _fieldType = typeof(Tuple<T1, T2>);
-        private readonly IDeepCopier<T1> _copier1;
-        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T1>? _copier1;
+        private readonly IDeepCopier<T2>? _copier2;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T1, T2}"/> class.
@@ -233,11 +234,11 @@ namespace Orleans.Serialization.Codecs
 
         public Tuple<T1, T2> DeepCopy(Tuple<T1, T2> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T1, T2> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T1, T2>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;
@@ -288,7 +289,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T1, T2, T3> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -305,6 +306,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T1, T2, T3> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -345,7 +347,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T1, T2, T3>(item1, item2, item3);
+            var result = new Tuple<T1, T2, T3>(item1!, item2!, item3!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -361,9 +363,9 @@ namespace Orleans.Serialization.Codecs
     public sealed class TupleCopier<T1, T2, T3> : IDeepCopier<Tuple<T1, T2, T3>>, IOptionalDeepCopier
     {
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3>);
-        private readonly IDeepCopier<T1> _copier1;
-        private readonly IDeepCopier<T2> _copier2;
-        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T1>? _copier1;
+        private readonly IDeepCopier<T2>? _copier2;
+        private readonly IDeepCopier<T3>? _copier3;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3}"/> class.
@@ -386,11 +388,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3> DeepCopy(Tuple<T1, T2, T3> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T1, T2, T3> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T1, T2, T3>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;
@@ -448,7 +450,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Tuple<T1, T2, T3, T4> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -466,6 +468,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T1, T2, T3, T4> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -510,7 +513,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T1, T2, T3, T4>(item1, item2, item3, item4);
+            var result = new Tuple<T1, T2, T3, T4>(item1!, item2!, item3!, item4!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -527,10 +530,10 @@ namespace Orleans.Serialization.Codecs
     public sealed class TupleCopier<T1, T2, T3, T4> : IDeepCopier<Tuple<T1, T2, T3, T4>>, IOptionalDeepCopier
     {
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4>);
-        private readonly IDeepCopier<T1> _copier1;
-        private readonly IDeepCopier<T2> _copier2;
-        private readonly IDeepCopier<T3> _copier3;
-        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T1>? _copier1;
+        private readonly IDeepCopier<T2>? _copier2;
+        private readonly IDeepCopier<T3>? _copier3;
+        private readonly IDeepCopier<T4>? _copier4;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4}"/> class.
@@ -556,11 +559,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4> DeepCopy(Tuple<T1, T2, T3, T4> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;
@@ -627,8 +630,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
-            Type expectedType,
-            Tuple<T1, T2, T3, T4, T5> value) where TBufferWriter : IBufferWriter<byte>
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -647,6 +650,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T1, T2, T3, T4, T5> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -695,7 +699,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T1, T2, T3, T4, T5>(item1, item2, item3, item4, item5);
+            var result = new Tuple<T1, T2, T3, T4, T5>(item1!, item2!, item3!, item4!, item5!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -713,11 +717,11 @@ namespace Orleans.Serialization.Codecs
     public sealed class TupleCopier<T1, T2, T3, T4, T5> : IDeepCopier<Tuple<T1, T2, T3, T4, T5>>, IOptionalDeepCopier
     {
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5>);
-        private readonly IDeepCopier<T1> _copier1;
-        private readonly IDeepCopier<T2> _copier2;
-        private readonly IDeepCopier<T3> _copier3;
-        private readonly IDeepCopier<T4> _copier4;
-        private readonly IDeepCopier<T5> _copier5;
+        private readonly IDeepCopier<T1>? _copier1;
+        private readonly IDeepCopier<T2>? _copier2;
+        private readonly IDeepCopier<T3>? _copier3;
+        private readonly IDeepCopier<T4>? _copier4;
+        private readonly IDeepCopier<T5>? _copier5;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5}"/> class.
@@ -746,11 +750,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5> DeepCopy(Tuple<T1, T2, T3, T4, T5> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;
@@ -824,8 +828,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
-            Type expectedType,
-            Tuple<T1, T2, T3, T4, T5, T6> value) where TBufferWriter : IBufferWriter<byte>
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5, T6> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -845,6 +849,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T1, T2, T3, T4, T5, T6> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -897,7 +902,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T1, T2, T3, T4, T5, T6>(item1, item2, item3, item4, item5, item6);
+            var result = new Tuple<T1, T2, T3, T4, T5, T6>(item1!, item2!, item3!, item4!, item5!, item6!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -916,12 +921,12 @@ namespace Orleans.Serialization.Codecs
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6>>, IOptionalDeepCopier
     {
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6>);
-        private readonly IDeepCopier<T1> _copier1;
-        private readonly IDeepCopier<T2> _copier2;
-        private readonly IDeepCopier<T3> _copier3;
-        private readonly IDeepCopier<T4> _copier4;
-        private readonly IDeepCopier<T5> _copier5;
-        private readonly IDeepCopier<T6> _copier6;
+        private readonly IDeepCopier<T1>? _copier1;
+        private readonly IDeepCopier<T2>? _copier2;
+        private readonly IDeepCopier<T3>? _copier3;
+        private readonly IDeepCopier<T4>? _copier4;
+        private readonly IDeepCopier<T5>? _copier5;
+        private readonly IDeepCopier<T6>? _copier6;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5, T6}"/> class.
@@ -953,11 +958,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;
@@ -1038,8 +1043,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
-            Type expectedType,
-            Tuple<T1, T2, T3, T4, T5, T6, T7> value) where TBufferWriter : IBufferWriter<byte>
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5, T6, T7> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -1061,6 +1066,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T1, T2, T3, T4, T5, T6, T7> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -1117,7 +1123,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T1, T2, T3, T4, T5, T6, T7>(item1, item2, item3, item4, item5, item6, item7);
+            var result = new Tuple<T1, T2, T3, T4, T5, T6, T7>(item1!, item2!, item3!, item4!, item5!, item6!, item7!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -1137,13 +1143,13 @@ namespace Orleans.Serialization.Codecs
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7>>, IOptionalDeepCopier
     {
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6, T7>);
-        private readonly IDeepCopier<T1> _copier1;
-        private readonly IDeepCopier<T2> _copier2;
-        private readonly IDeepCopier<T3> _copier3;
-        private readonly IDeepCopier<T4> _copier4;
-        private readonly IDeepCopier<T5> _copier5;
-        private readonly IDeepCopier<T6> _copier6;
-        private readonly IDeepCopier<T7> _copier7;
+        private readonly IDeepCopier<T1>? _copier1;
+        private readonly IDeepCopier<T2>? _copier2;
+        private readonly IDeepCopier<T3>? _copier3;
+        private readonly IDeepCopier<T4>? _copier4;
+        private readonly IDeepCopier<T5>? _copier5;
+        private readonly IDeepCopier<T6>? _copier6;
+        private readonly IDeepCopier<T7>? _copier7;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5, T6, T7}"/> class.
@@ -1178,11 +1184,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6, T7> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;
@@ -1216,7 +1222,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     /// <typeparam name="T8">The type of the tuple's eighth component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2, T3, T4, T5, T6, T7, T8> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>
+    public sealed class TupleCodec<T1, T2, T3, T4, T5, T6, T7, T8> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>> where T8 : notnull
     {
         private readonly Type ElementType1 = typeof(T1);
         private readonly Type ElementType2 = typeof(T2);
@@ -1270,8 +1276,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
-            Type expectedType,
-            Tuple<T1, T2, T3, T4, T5, T6, T7, T8> value) where TBufferWriter : IBufferWriter<byte>
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Tuple<T1, T2, T3, T4, T5, T6, T7, T8> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -1293,6 +1299,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Tuple<T1, T2, T3, T4, T5, T6, T7, T8> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -1353,7 +1360,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = new Tuple<T1, T2, T3, T4, T5, T6, T7, T8>(item1, item2, item3, item4, item5, item6, item7, item8);
+            var result = new Tuple<T1, T2, T3, T4, T5, T6, T7, T8>(item1!, item2!, item3!, item4!, item5!, item6!, item7!, item8!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
@@ -1371,17 +1378,17 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     /// <typeparam name="T8">The type of the tuple's eighth component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier
+    public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier where T8 : notnull
     {
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6, T7, T8>);
-        private readonly IDeepCopier<T1> _copier1;
-        private readonly IDeepCopier<T2> _copier2;
-        private readonly IDeepCopier<T3> _copier3;
-        private readonly IDeepCopier<T4> _copier4;
-        private readonly IDeepCopier<T5> _copier5;
-        private readonly IDeepCopier<T6> _copier6;
-        private readonly IDeepCopier<T7> _copier7;
-        private readonly IDeepCopier<T8> _copier8;
+        private readonly IDeepCopier<T1>? _copier1;
+        private readonly IDeepCopier<T2>? _copier2;
+        private readonly IDeepCopier<T3>? _copier3;
+        private readonly IDeepCopier<T4>? _copier4;
+        private readonly IDeepCopier<T5>? _copier5;
+        private readonly IDeepCopier<T6>? _copier6;
+        private readonly IDeepCopier<T7>? _copier7;
+        private readonly IDeepCopier<T8>? _copier8;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TupleCopier{T1, T2, T3, T4, T5, T6, T7, T8}"/> class.
@@ -1419,11 +1426,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public Tuple<T1, T2, T3, T4, T5, T6, T7, T8> DeepCopy(Tuple<T1, T2, T3, T4, T5, T6, T7, T8> input, CopyContext context)
         {
-            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8> existing))
-                return existing;
+            if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8>? existing))
+                return existing!;
 
             if (input.GetType() as object != _fieldType as object)
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
 
             if (IsShallowCopyable())
                 return input;

@@ -26,7 +26,7 @@ namespace UnitTests.StorageTests.Relational
         /// The value will be <em>null</em> if environment invariants have failed to hold upon
         /// storage provider creation.
         /// </summary>
-        private Dictionary<string, IGrainStorage> StorageProviders { get; set; } = new Dictionary<string, IGrainStorage>();
+        private Dictionary<string, IGrainStorage?> StorageProviders { get; set; } = new Dictionary<string, IGrainStorage?>();
 
         /// <summary>
         /// This is used to lock the storage providers dictionary.
@@ -46,7 +46,7 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// The underlying relational storage connection if used.
         /// </summary>
-        public RelationalStorageForTesting Storage { get; set; }
+        public RelationalStorageForTesting? Storage { get; set; }
 
         /// <summary>
         /// Constructor.
@@ -65,7 +65,7 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
         /// a <em>null</em> value will be provided.</remarks>
-        public async Task<IGrainStorage> GetStorageProvider(string storageInvariant)
+        public async Task<IGrainStorage?> GetStorageProvider(string storageInvariant)
         {
             return await GetStorageProvider(storageInvariant, deleteStateOnClear: false);
         }
@@ -77,7 +77,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="deleteStateOnClear">If <see langword="true"/>, the provider will delete the row from the database when clearing state.</param>
         /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
         /// a <em>null</em> value will be provided.</remarks>
-        public async Task<IGrainStorage> GetStorageProvider(string storageInvariant, bool deleteStateOnClear)
+        public async Task<IGrainStorage?> GetStorageProvider(string storageInvariant, bool deleteStateOnClear)
         {
             //Make sure the environment invariants hold before trying to give a functioning SUT instantiation.
             //This is done instead of the constructor to have more granularity on how the environment should be initialized.
@@ -100,9 +100,9 @@ namespace UnitTests.StorageTests.Relational
 
                             var options = new AdoNetGrainStorageOptions()
                             {
-                                ConnectionString = Storage.Storage.ConnectionString,
+                                ConnectionString = Storage!.Storage.ConnectionString,
                                 Invariant = storageInvariant,
-                                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()),
+                                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!),
                                 DeleteStateOnClear = deleteStateOnClear,
                             };
                             var clusterOptions = new ClusterOptions()

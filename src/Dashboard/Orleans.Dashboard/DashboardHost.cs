@@ -10,7 +10,6 @@ using Orleans.Dashboard.Implementation;
 using Microsoft.Extensions.Hosting;
 using Orleans.Dashboard.Core;
 
-#nullable disable
 namespace Orleans.Dashboard;
 
 internal sealed partial class DashboardHost(
@@ -20,7 +19,7 @@ internal sealed partial class DashboardHost(
     DashboardTelemetryExporter dashboardTelemetryExporter,
     ISiloGrainClient siloGrainClient) : IHostedService, IAsyncDisposable, IDisposable
 {
-    private MeterProvider _meterProvider;
+    private MeterProvider? _meterProvider;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -71,7 +70,7 @@ internal sealed partial class DashboardHost(
     {
         await DisposeAsync(_meterProvider).ConfigureAwait(false);
 
-        static async ValueTask DisposeAsync(object obj)
+        static async ValueTask DisposeAsync(object? obj)
         {
             try
             {
@@ -118,7 +117,7 @@ internal sealed partial class DashboardHost(
 
             if (assembly != null)
             {
-                return assembly.GetName().Version.ToString();
+                return assembly.GetName().Version!.ToString();
             }
         }
         catch

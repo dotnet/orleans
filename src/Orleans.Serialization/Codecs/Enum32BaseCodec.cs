@@ -16,7 +16,7 @@ namespace Orleans.Serialization.Codecs
         private readonly Type CodecFieldType = typeof(T);
 
         /// <inheritdoc/>
-        public unsafe void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T value) where TBufferWriter : IBufferWriter<byte>
+        public unsafe void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] T value) where TBufferWriter : IBufferWriter<byte>
         {
             HolderStruct holder;
             holder.Value = value;
@@ -25,6 +25,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public unsafe T ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             var intValue = Int32Codec.ReadValue(ref reader, field);

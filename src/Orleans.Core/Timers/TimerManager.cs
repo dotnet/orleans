@@ -1,11 +1,11 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Threading;
 
-#nullable disable
 namespace Orleans.Timers.Internal
 {
     /// <summary>
@@ -59,7 +59,7 @@ namespace Orleans.Timers.Internal
 
             public void OnCanceled() => this.completion.TrySetResult(false);
 
-            DelayTimer ILinkedListElement<DelayTimer>.Next { get; set; }
+            DelayTimer? ILinkedListElement<DelayTimer>.Next { get; set; }
         }
     }
 
@@ -92,13 +92,13 @@ namespace Orleans.Timers.Internal
         /// <summary>
         /// Collection of all thread-local timer queues.
         /// </summary>
-        private static ThreadLocalQueue[] allQueues = new ThreadLocalQueue[16];
+        private static ThreadLocalQueue?[] allQueues = new ThreadLocalQueue[16];
 
         /// <summary>
         /// The queue for the current thread.
         /// </summary>
         [ThreadStatic]
-        private static ThreadLocalQueue threadLocalQueue;
+        private static ThreadLocalQueue? threadLocalQueue;
 
         static TimerManager()
         {
@@ -111,7 +111,7 @@ namespace Orleans.Timers.Internal
         /// </summary>
         public static void Register(T timer)
         {
-            ExpiredTimers expired = null;
+            ExpiredTimers? expired = null;
             var queue = EnsureCurrentThreadHasQueue();
 
             try
@@ -184,7 +184,7 @@ namespace Orleans.Timers.Internal
 
         private static void CheckQueueInLock(ThreadLocalQueue queue, DateTime now, ExpiredTimers expired)
         {
-            var previous = default(T);
+            T? previous = default;
 
             for (var current = queue.Head; current != null; current = current.Next)
             {
@@ -253,9 +253,9 @@ namespace Orleans.Timers.Internal
             /// </summary>
             public int StarvationCount;
 
-            public T Head { get; set; }
+            public T? Head { get; set; }
 
-            public T Tail { get; set; }
+            public T? Tail { get; set; }
         }
 
         /// <summary>
@@ -263,9 +263,9 @@ namespace Orleans.Timers.Internal
         /// </summary>
         private sealed class ExpiredTimers : ILinkedList<T>
         {
-            public T Head { get; set; }
+            public T? Head { get; set; }
 
-            public T Tail { get; set; }
+            public T? Tail { get; set; }
 
             public void FireTimers()
             {
@@ -318,12 +318,14 @@ namespace Orleans.Timers.Internal
         /// Gets or sets the first element in the list.
         /// This value must never be accessed or modified by user code.
         /// </summary>
+        [MaybeNull, AllowNull]
         T Head { get; set; }
 
         /// <summary>
         /// Gets or sets the last element in the list.
         /// This value must never be accessed or modified by user code.
         /// </summary>
+        [MaybeNull, AllowNull]
         T Tail { get; set; }
     }
 
@@ -337,6 +339,7 @@ namespace Orleans.Timers.Internal
         /// The next element in the list.
         /// This value must never be accessed or modified by user code.
         /// </summary>
+        [MaybeNull, AllowNull]
         TSelf Next { get; set; }
     }
 
@@ -367,7 +370,7 @@ namespace Orleans.Timers.Internal
         /// <param name="list">The linked list.</param>
         /// <param name="previous">The element before <paramref name="current"/>.</param>
         /// <param name="current">The element to remove.</param>
-        public static void Remove<TList, TElement>(this TList list, TElement previous, TElement current)
+        public static void Remove<TList, TElement>(this TList list, TElement? previous, TElement current)
             where TList : class, ILinkedList<TElement> where TElement : class, ILinkedListElement<TElement>
         {
             var next = current.Next;

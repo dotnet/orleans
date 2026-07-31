@@ -203,7 +203,7 @@ namespace UnitTests.General
         private uint PickKey(SiloAddress responsibleSilo)
         {
             int iteration = 10000;
-            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
+            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary!);
             for (int i = 0; i < iteration; i++)
             {
                 double next = Random.Shared.NextDouble();
@@ -246,7 +246,7 @@ namespace UnitTests.General
 
         private async Task VerifyKey(uint key, List<SiloAddress> silos)
         {
-            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
+            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary!);
             SiloAddress truth = testHooks.GetConsistentRingPrimaryTargetSilo(key).Result; //expected;
             //if (truth == null) // if the truth isn't passed, we compute it here
             //{
@@ -285,7 +285,7 @@ namespace UnitTests.General
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
             {
                 SiloAddress siloAddress = siloHandle.SiloAddress;
-                if (siloAddress.Equals(this.HostedCluster.Primary.SiloAddress))
+                if (siloAddress.Equals(this.HostedCluster.Primary!.SiloAddress))
                 {
                     continue;
                 }
@@ -348,9 +348,9 @@ namespace UnitTests.General
             await AssertEventually(async () =>
             {
                 var primaryReport = await TestUtils.GetDetailedGrainReport(
-                    this.HostedCluster.InternalGrainFactory,
+                    this.HostedCluster.InternalGrainFactory!,
                     tableGrainId,
-                    this.HostedCluster.Primary);
+                    this.HostedCluster.Primary!);
 
                 if (primaryReport.PrimaryForGrain is not { } primaryForGrain)
                 {
@@ -364,7 +364,7 @@ namespace UnitTests.General
                 }
 
                 var directoryReport = await TestUtils.GetDetailedGrainReport(
-                    this.HostedCluster.InternalGrainFactory,
+                    this.HostedCluster.InternalGrainFactory!,
                     tableGrainId,
                     directorySilo);
 

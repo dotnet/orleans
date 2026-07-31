@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.Streams
 {
     /// <summary>
@@ -30,6 +32,6 @@ namespace Orleans.Streams
         /// <summary>
         /// Get the predicate matching the provided pattern. Returns <see langword="false"/> if this provider cannot match the predicate.
         /// </summary>
-        bool TryGetPredicate(string predicatePattern, out IStreamNamespacePredicate predicate);
+        bool TryGetPredicate(string predicatePattern, [MaybeNullWhen(false)] out IStreamNamespacePredicate predicate);
     }
 }

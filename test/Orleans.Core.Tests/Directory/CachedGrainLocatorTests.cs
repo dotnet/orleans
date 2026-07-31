@@ -156,8 +156,8 @@ namespace UnitTests.Directory
                 localSiloDetails: localSiloDetails,
                 loggerFactory: this.loggerFactory,
                 schedulingOptions: Options.Create(new SchedulingOptions()),
-                grainReferenceActivator: null,
-                timerRegistry: null,
+                grainReferenceActivator: null!,
+                timerRegistry: null!,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
                 grainInstruments: CreateGrainInstruments(),
@@ -212,8 +212,8 @@ namespace UnitTests.Directory
                 localSiloDetails: localSiloDetails,
                 loggerFactory: this.loggerFactory,
                 schedulingOptions: Options.Create(new SchedulingOptions()),
-                grainReferenceActivator: null,
-                timerRegistry: null,
+                grainReferenceActivator: null!,
+                timerRegistry: null!,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
                 grainInstruments: CreateGrainInstruments(),
@@ -280,8 +280,8 @@ namespace UnitTests.Directory
                 localSiloDetails: localSiloDetails,
                 loggerFactory: this.loggerFactory,
                 schedulingOptions: Options.Create(new SchedulingOptions()),
-                grainReferenceActivator: null,
-                timerRegistry: null,
+                grainReferenceActivator: null!,
+                timerRegistry: null!,
                 activations: new ActivationDirectory(CreateCatalogInstruments()),
                 schedulerInstruments: CreateSchedulerInstruments(),
                 grainInstruments: CreateGrainInstruments(),
@@ -590,7 +590,7 @@ namespace UnitTests.Directory
             await this.grainLocator.Register(outdatedAddr, previousAddress: null);
 
             // Simulate a dead silo
-            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.SiloAddress, SiloStatus.Dead, "old");
+            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.SiloAddress!, SiloStatus.Dead, "old");
 
             // Wait a bit for the update to be processed
             await WaitUntilClusterChangePropagated();
@@ -598,7 +598,7 @@ namespace UnitTests.Directory
             // Cleanup function from grain directory should have been called
             await this.grainDirectory
                 .Received(1)
-                .UnregisterSilos(Arg.Is<List<SiloAddress>>(list => list.Count == 1 && list.Contains(outdatedAddr.SiloAddress)));
+                .UnregisterSilos(Arg.Is<List<SiloAddress>>(list => list.Count == 1 && list.Contains(outdatedAddr.SiloAddress!)));
 
             // Cache should have been cleaned
             Assert.False(this.grainLocator.TryLookupInCache(outdatedAddr.GrainId, out var unused1));
@@ -787,7 +787,7 @@ namespace UnitTests.Directory
             Assert.True(this.grainLocator.TryLookupInCache(secondAddr.GrainId, out _));
         }
 
-        private GrainAddress GenerateGrainAddress(SiloAddress siloAddress = null, MembershipVersion? membershipVersion = null)
+        private GrainAddress GenerateGrainAddress(SiloAddress? siloAddress = null, MembershipVersion? membershipVersion = null)
         {
             return new GrainAddress
             {
@@ -952,7 +952,7 @@ namespace UnitTests.Directory
                     return true;
                 }
 
-                result = default;
+                result = default!;
                 version = default;
                 return false;
             }

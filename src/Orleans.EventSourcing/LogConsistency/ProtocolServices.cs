@@ -32,7 +32,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public string MyClusterId { get; }
 
-        public T DeepCopy<T>(T value) => this.deepCopier.Copy(value);
+        public T DeepCopy<T>(T value) => this.deepCopier.Copy(value)!;
 
         public void ProtocolError(string msg, bool throwexception)
         {

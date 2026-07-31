@@ -14,13 +14,13 @@ namespace Orleans.Serialization
         public const string WellKnownAlias = "msgpack";
         public MessagePackCodec(System.Collections.Generic.IEnumerable<Serializers.ICodecSelector> serializableTypeSelectors, System.Collections.Generic.IEnumerable<Serializers.ICopierSelector> copyableTypeSelectors, Microsoft.Extensions.Options.IOptions<MessagePackCodecOptions> options) { }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
 
         bool Cloning.IGeneralizedCopier.IsSupportedType(System.Type type) { throw null; }
 
-        object Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        object? Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        void Codecs.IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value) { }
+        void Codecs.IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value) { }
 
         bool? ITypeFilter.IsTypeAllowed(System.Type type) { throw null; }
 
@@ -31,17 +31,17 @@ namespace Orleans.Serialization
     {
         public bool AllowDataContractAttributes { get { throw null; } set { } }
 
-        public System.Func<System.Type, bool?> IsCopyableType { get { throw null; } set { } }
+        public System.Func<System.Type, bool?>? IsCopyableType { get { throw null; } set { } }
 
-        public System.Func<System.Type, bool?> IsSerializableType { get { throw null; } set { } }
+        public System.Func<System.Type, bool?>? IsSerializableType { get { throw null; } set { } }
 
         public MessagePack.MessagePackSerializerOptions SerializerOptions { get { throw null; } set { } }
     }
 
     public static partial class SerializationHostingExtensions
     {
-        public static ISerializerBuilder AddMessagePackSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable = null, System.Func<System.Type, bool> isCopyable = null, MessagePack.MessagePackSerializerOptions messagePackSerializerOptions = null) { throw null; }
+        public static ISerializerBuilder AddMessagePackSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool>? isSerializable = null, System.Func<System.Type, bool>? isCopyable = null, MessagePack.MessagePackSerializerOptions? messagePackSerializerOptions = null) { throw null; }
 
-        public static ISerializerBuilder AddMessagePackSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable, System.Func<System.Type, bool> isCopyable, System.Action<Microsoft.Extensions.Options.OptionsBuilder<MessagePackCodecOptions>> configureOptions = null) { throw null; }
+        public static ISerializerBuilder AddMessagePackSerializer(this ISerializerBuilder serializerBuilder, System.Func<System.Type, bool>? isSerializable, System.Func<System.Type, bool>? isCopyable, System.Action<Microsoft.Extensions.Options.OptionsBuilder<MessagePackCodecOptions>>? configureOptions = null) { throw null; }
     }
 }

@@ -6,35 +6,34 @@ using Azure;
 using Azure.Data.Tables;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.AzureUtils
 {
     internal class SiloInstanceTableEntry : ITableEntity
     {
-        public string DeploymentId { get; set; }    // PartitionKey
-        public string Address { get; set; }         // RowKey
-        public string Port { get; set; }            // RowKey
-        public string Generation { get; set; }      // RowKey
+        public string? DeploymentId { get; set; }    // PartitionKey
+        public string? Address { get; set; }         // RowKey
+        public string? Port { get; set; }            // RowKey
+        public string? Generation { get; set; }      // RowKey
 
-        public string HostName { get; set; }        // Mandatory
-        public string Status { get; set; }          // Mandatory
-        public string ProxyPort { get; set; }       // Optional
+        public string? HostName { get; set; }        // Mandatory
+        public string? Status { get; set; }          // Mandatory
+        public string? ProxyPort { get; set; }       // Optional
 
-        public string RoleName { get; set; }        // Optional - only for Azure role
-        public string SiloName { get; set; }
-        public string InstanceName { get; set; }    // For backward compatability we leave the old column, untill all clients update the code to new version.
-        public string UpdateZone { get; set; }         // Optional - only for Azure role
-        public string FaultZone { get; set; }          // Optional - only for Azure role
+        public string? RoleName { get; set; }        // Optional - only for Azure role
+        public string? SiloName { get; set; }
+        public string? InstanceName { get; set; }    // For backward compatability we leave the old column, untill all clients update the code to new version.
+        public string? UpdateZone { get; set; }         // Optional - only for Azure role
+        public string? FaultZone { get; set; }          // Optional - only for Azure role
 
-        public string SuspectingSilos { get; set; }          // For liveness
-        public string SuspectingTimes { get; set; }          // For liveness
+        public string? SuspectingSilos { get; set; }          // For liveness
+        public string? SuspectingTimes { get; set; }          // For liveness
 
-        public string StartTime       { get; set; }          // Time this silo was started. For diagnostics.
-        public string IAmAliveTime    { get; set; }           // Time this silo updated it was alive. For diagnostics.
-        public string MembershipVersion      { get; set; }               // Special version row (for serializing table updates). // We'll have a designated row with only MembershipVersion column.
+        public string? StartTime       { get; set; }          // Time this silo was started. For diagnostics.
+        public string? IAmAliveTime    { get; set; }           // Time this silo updated it was alive. For diagnostics.
+        public string? MembershipVersion      { get; set; }               // Special version row (for serializing table updates). // We'll have a designated row with only MembershipVersion column.
 
-        public string PartitionKey { get; set; }
-        public string RowKey { get; set; }
+        public string PartitionKey { get; set; } = null!;
+        public string RowKey { get; set; } = null!;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 

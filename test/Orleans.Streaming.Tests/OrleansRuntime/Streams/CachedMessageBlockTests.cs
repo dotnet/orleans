@@ -16,7 +16,7 @@ namespace UnitTests.OrleansRuntime.Streams
         private class TestQueueMessage
         {
             public Guid StreamGuid { get; set; }
-            public EventSequenceTokenV2 SequenceToken { get; set; }
+            public EventSequenceTokenV2 SequenceToken { get; set; } = null!;
         }
 
         [GenerateSerializer]
@@ -26,7 +26,7 @@ namespace UnitTests.OrleansRuntime.Streams
             public StreamId StreamId { get; set; }
 
             [Id(1)]
-            public StreamSequenceToken SequenceToken { get; set; }
+            public StreamSequenceToken SequenceToken { get; set; } = null!;
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
             {
@@ -58,7 +58,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
         {
-            var streamId = StreamId.Create(null, queueMessage.StreamGuid);
+            var streamId = StreamId.Create(null!, queueMessage.StreamGuid);
             StreamSequenceToken sequenceToken = queueMessage.SequenceToken;
             return new StreamPosition(streamId, sequenceToken);
         }

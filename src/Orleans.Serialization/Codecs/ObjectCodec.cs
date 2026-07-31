@@ -1,11 +1,11 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 
-#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -15,7 +15,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class ObjectCodec : IFieldCodec<object>
     {
         /// <inheritdoc/>
-        object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field)!;
 
         /// <summary>
         /// Reads a value.
@@ -24,7 +25,8 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
-        public static object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public static object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
             {
@@ -52,7 +54,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<object>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
         /// Writes a field.
@@ -63,7 +65,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -83,15 +85,15 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, object value) where TBufferWriter : IBufferWriter<byte>
-            => WriteField(ref writer, fieldIdDelta, null, value);
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, object? value) where TBufferWriter : IBufferWriter<byte>
+            => WriteField(ref writer, fieldIdDelta, null!, value);
 
-        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value)
         {
             // only the untyped writer will need to support actual object type values
             if (value is null || value.GetType() == typeof(object))
             {
-                if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+                if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
                 {
                     return;
                 }
@@ -118,19 +120,21 @@ namespace Orleans.Serialization.Codecs
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input" />.</returns>
-        public static object DeepCopy(object input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        public static object? DeepCopy(object? input, CopyContext context)
         {
-            return context.TryGetCopy<object>(input, out var result) ? result
-                : input.GetType() == typeof(object) ? input : context.DeepCopy(input);
+            return context.TryGetCopy<object>(input!, out var result) ? result
+                : input!.GetType() == typeof(object) ? input : context.DeepCopy(input);
         }
 
         object IDeepCopier<object>.DeepCopy(object input, CopyContext context)
         {
-            return context.TryGetCopy<object>(input, out var result) ? result
-                : input.GetType() == typeof(object) ? input : context.DeepCopy(input);
+            return context.TryGetCopy<object>(input, out var result) ? result!
+                : input.GetType() == typeof(object) ? input : context.DeepCopy(input)!;
         }
 
-        object IDeepCopier.DeepCopy(object input, CopyContext context)
+        [return: NotNullIfNotNull(nameof(input))]
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context)
             => input is null || input.GetType() == typeof(object) ? input : context.DeepCopy(input);
     }
 }

@@ -8,8 +8,8 @@ namespace UnitTests.Grains
     public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain, IStreamSubscriptionObserver
     {
         internal ILogger logger;
-        private List<ICounterObserver> consumerObservers;
-        private List<StreamSubscriptionHandle<IFruit>> consumerHandles;
+        private List<ICounterObserver> consumerObservers = null!;
+        private List<StreamSubscriptionHandle<IFruit>> consumerHandles = null!;
         private int onAddCalledCount;
 
         public Passive_ConsumerGrain(ILoggerFactory loggerFactory)
@@ -109,7 +109,7 @@ namespace UnitTests.Grains
             this.logger = logger;
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken token = null)
+        public Task OnNextAsync(T item, StreamSequenceToken? token = null)
         {
             this.NumConsumed++;
             this.logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", this.GetHashCode(), item, NumConsumed);

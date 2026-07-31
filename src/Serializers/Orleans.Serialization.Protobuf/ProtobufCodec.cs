@@ -8,10 +8,10 @@ using Orleans.Serialization.WireProtocol;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 [Alias(WellKnownAlias)]
@@ -41,9 +41,10 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     }
 
     /// <inheritdoc/>
-    public object DeepCopy(object input, CopyContext context)
+    [return: NotNullIfNotNull(nameof(input))]
+    public object? DeepCopy(object? input, CopyContext context)
     {
-        if (!context.TryGetCopy(input, out object result))
+        if (!context.TryGetCopy(input!, out object? result))
         {
             if (input is not IMessage protobufMessage)
             {
@@ -57,7 +58,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
 
             result = protobufMessage.Descriptor.Parser.ParseFrom(spanBuffer);
 
-            context.RecordCopy(input, result);
+            context.RecordCopy(input!, result);
         }
 
         return result;
@@ -151,7 +152,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     }
 
     /// <inheritdoc/>
-    object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.IsReference)
         {
@@ -161,8 +162,8 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        object result = null;
-        Type type = null;
+        object? result = null;
+        Type? type = null;
         uint fieldId = 0;
 
         while (true)
@@ -186,7 +187,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
                         ThrowTypeFieldMissing();
                     }
 
-                    if (!MessageParsers.TryGetValue(type.TypeHandle, out var messageParser))
+                    if (!MessageParsers.TryGetValue(type!.TypeHandle, out var messageParser))
                     {
                         throw new ArgumentException($"No parser found for the expected type {type.Name}", nameof(TInput));
                     }
@@ -214,7 +215,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     private static void ThrowTypeFieldMissing() => throw new RequiredFieldMissingException("Serialized value is missing its type field.");
 
     /// <inheritdoc/>
-    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
+    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] object? value)
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {

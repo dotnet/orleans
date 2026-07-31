@@ -4,7 +4,6 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Services;
 
-#nullable disable
 namespace Orleans.Runtime.Services
 {
     /// <summary>
@@ -35,7 +34,7 @@ namespace Orleans.Runtime.Services
         /// <summary>
         /// Gets a reference to the the currently executing grain.
         /// </summary>
-        protected GrainReference CurrentGrainReference => RuntimeContext.Current?.GrainReference;
+        protected GrainReference CurrentGrainReference => RuntimeContext.Current?.GrainReference!;
 
         /// <summary>
         /// Get a reference to the <see cref="GrainService"/> responsible for actioning the request based on the <paramref name="callingGrainId"/>.
@@ -50,7 +49,7 @@ namespace Orleans.Runtime.Services
         /// </summary>
         protected TGrainService GetGrainService(uint key)
         {
-            return GetGrainService(ringProvider.GetPrimaryTargetSilo(key));
+            return GetGrainService(ringProvider.GetPrimaryTargetSilo(key)!);
         }
 
         /// <summary>

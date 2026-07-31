@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -38,7 +37,7 @@ namespace Orleans.Streams
             List<QualifiedStreamId> streamIds = GetUsedStreamIds();
             foreach (QualifiedStreamId s in streamIds)
             {
-                IStreamControl streamControl = GetStreamControl(s);
+                IStreamControl? streamControl = GetStreamControl(s);
                 if (streamControl != null)
                     promises.Add(streamControl.Cleanup(cleanupProducers, cleanupConsumers));
             }
@@ -52,11 +51,9 @@ namespace Orleans.Streams
             allStreams.Clear();
         }
 
-        private IStreamControl GetStreamControl(QualifiedStreamId streamId)
+        private IStreamControl? GetStreamControl(QualifiedStreamId streamId)
         {
-            object streamObj;
-            bool ok = allStreams.TryGetValue(streamId, out streamObj);
-            return ok ? streamObj as IStreamControl : null;
+            return allStreams.TryGetValue(streamId, out var streamObj) ? streamObj as IStreamControl : null;
         }
 
         private List<QualifiedStreamId> GetUsedStreamIds()

@@ -8,16 +8,15 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 
-#nullable disable
 namespace Orleans.Streams
 {
     internal interface IStreamSubscriptionHandle
     {
-        Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
-        Task<StreamHandshakeToken> DeliverBatch(IBatchContainer item, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken?> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken);
+        Task<StreamHandshakeToken?> DeliverBatch(IBatchContainer item, StreamHandshakeToken? handshakeToken);
         Task CompleteStream();
         Task ErrorInStream(Exception exc);
-        StreamHandshakeToken GetSequenceToken();
+        StreamHandshakeToken? GetSequenceToken();
     }
 
     /// <summary>
@@ -41,9 +40,9 @@ namespace Orleans.Streams
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
         // then this will be not null, otherwise, it will be null
         [NonSerialized]
-        private readonly IStreamSubscriptionObserver streamSubscriptionObserver;
+        private readonly IStreamSubscriptionObserver? streamSubscriptionObserver;
 
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionObserver streamSubscriptionObserver = null)
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionObserver? streamSubscriptionObserver = null)
         {
             this.streamSubscriptionObserver = streamSubscriptionObserver;
             providerRuntime = providerRt;
@@ -53,10 +52,10 @@ namespace Orleans.Streams
         internal StreamSubscriptionHandleImpl<T> SetObserver<T>(
             GuidId subscriptionId,
             StreamImpl<T> stream,
-            IAsyncObserver<T> observer,
-            IAsyncBatchObserver<T> batchObserver,
-            StreamSequenceToken token,
-            string filterData)
+            IAsyncObserver<T>? observer,
+            IAsyncBatchObserver<T>? batchObserver,
+            StreamSequenceToken? token,
+            string? filterData)
         {
             if (null == stream) throw new ArgumentNullException(nameof(stream));
 
@@ -81,16 +80,15 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out _);
         }
 
-        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
         {
             return DeliverMutable(subscriptionId, streamId, item, currentToken, handshakeToken);
         }
 
-        public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
         {
             LogTraceDeliverItem(new(item), subscriptionId);
-            IStreamSubscriptionHandle observer;
-            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+            if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
             {
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
@@ -118,12 +116,11 @@ namespace Orleans.Streams
             return default;
         }
 
-        public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken? handshakeToken)
         {
             LogTraceDeliverBatch(batch, subscriptionId);
 
-            IStreamSubscriptionHandle observer;
-            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+            if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
             {
                 return await observer.DeliverBatch(batch, handshakeToken);
             }
@@ -155,8 +152,7 @@ namespace Orleans.Streams
         {
             LogTraceCompleteStream(subscriptionId);
 
-            IStreamSubscriptionHandle observer;
-            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+            if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
                 return observer.CompleteStream();
 
             LogWarningNoStreamForComplete(
@@ -172,8 +168,7 @@ namespace Orleans.Streams
         {
             LogTraceErrorInStream(subscriptionId, exc);
 
-            IStreamSubscriptionHandle observer;
-            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+            if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
                 return observer.ErrorInStream(exc);
 
             LogWarningNoStreamForError(
@@ -186,10 +181,9 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId)
+        public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
         {
-            IStreamSubscriptionHandle observer;
-            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
+            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out var observer) ? observer.GetSequenceToken() : null);
         }
 
         internal int DiagCountStreamObservers<T>(QualifiedStreamId streamId)
@@ -223,7 +217,7 @@ namespace Orleans.Streams
         {
             public override string ToString()
             {
-                var itemString = item.ToString();
+                var itemString = item.ToString()!;
                 return (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString[..MAXIMUM_ITEM_STRING_LOG_LENGTH] + "..." : itemString;
             }
         }

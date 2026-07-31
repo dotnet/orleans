@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
@@ -9,5 +8,5 @@ internal sealed class ReminderResponse
     public int Count { get; set; }
 
     [Id(1)]
-    public ReminderInfo[] Reminders { get; set; }
+    public ReminderInfo[] Reminders { get; set; } = null!;
 }

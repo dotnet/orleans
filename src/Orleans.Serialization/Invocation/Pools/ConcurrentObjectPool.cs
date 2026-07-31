@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.ObjectPool;
 
-#nullable disable
 namespace Orleans.Serialization.Invocation
 {
     internal sealed class ConcurrentObjectPool<T> : ConcurrentObjectPool<T, DefaultConcurrentObjectPoolPolicy<T>> where T : class, new()
@@ -27,7 +26,7 @@ namespace Orleans.Serialization.Invocation
         public override T Get()
         {
             ThrowIfDisposed();
-            var stack = _objects.Value;
+            var stack = _objects.Value!;
             if (stack.TryPop(out var result))
             {
                 return result;
@@ -48,7 +47,7 @@ namespace Orleans.Serialization.Invocation
                 Stack<T> stack;
                 try
                 {
-                    stack = _objects.Value;
+                    stack = _objects.Value!;
                 }
                 catch (ObjectDisposedException)
                 {

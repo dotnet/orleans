@@ -17,7 +17,7 @@ namespace NonSilo.Tests.Utilities
 
         public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
-            reason = default;
+            reason = default!;
             return true;
         }
 

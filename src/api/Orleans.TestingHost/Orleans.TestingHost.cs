@@ -10,7 +10,7 @@ namespace Orleans.Hosting
 {
     public static partial class FaultInjectionStorageServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>> configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TestingHost.FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>>? configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TestingHost.FaultInjectionGrainStorageOptions>>? configureFaultInjectionOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Configuration.MemoryGrainStorageOptions> configureOptions, System.Action<TestingHost.FaultInjectionGrainStorageOptions> configureFaultInjectionOptions) { throw null; }
     }
@@ -67,7 +67,7 @@ namespace Orleans.TestingHost
 
         public Microsoft.Extensions.Hosting.IHost SiloHost { get { throw null; } init { } }
 
-        public static System.Threading.Tasks.Task<InProcessSiloHandle> CreateAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) { throw null; }
+        public static System.Threading.Tasks.Task<InProcessSiloHandle> CreateAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder = null) { throw null; }
 
         protected override void Dispose(bool disposing) { }
 
@@ -110,7 +110,7 @@ namespace Orleans.TestingHost
 
         public InProcessSiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
@@ -262,14 +262,14 @@ namespace Orleans.TestingHost
 
     public static partial class SiloBuilderExtensions
     {
-        public static Hosting.ISiloBuilder AddFaultInjectionMemoryStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>> configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null) { throw null; }
+        public static Hosting.ISiloBuilder AddFaultInjectionMemoryStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>>? configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<FaultInjectionGrainStorageOptions>>? configureFaultInjectionOptions = null) { throw null; }
 
         public static Hosting.ISiloBuilder AddFaultInjectionMemoryStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Configuration.MemoryGrainStorageOptions> configureOptions, System.Action<FaultInjectionGrainStorageOptions> configureFaultInjectionOptions) { throw null; }
     }
 
     public abstract partial class SiloHandle : System.IDisposable, System.IAsyncDisposable
     {
-        public TestClusterOptions ClusterOptions { get { throw null; } set { } }
+        public TestClusterOptions? ClusterOptions { get { throw null; } set { } }
 
         public Runtime.SiloAddress GatewayAddress { get { throw null; } set { } }
 
@@ -358,7 +358,7 @@ namespace Orleans.TestingHost
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } }
 
-        public SiloHandle Primary { get { throw null; } }
+        public SiloHandle? Primary { get { throw null; } }
 
         public System.Collections.Generic.IReadOnlyList<SiloHandle> SecondarySilos { get { throw null; } }
 
@@ -388,7 +388,7 @@ namespace Orleans.TestingHost
 
         public SiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
@@ -449,7 +449,7 @@ namespace Orleans.TestingHost
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } set { } }
 
-        public System.Collections.Generic.Dictionary<string, string> Properties { get { throw null; } }
+        public System.Collections.Generic.Dictionary<string, string?> Properties { get { throw null; } }
 
         public TestClusterBuilder AddClientBuilderConfigurator<T>()
             where T : new() { throw null; }
@@ -470,7 +470,7 @@ namespace Orleans.TestingHost
     {
         public static Microsoft.Extensions.Configuration.IConfiguration GetConfiguration(this Microsoft.Extensions.Hosting.IHostBuilder builder) { throw null; }
 
-        public static string GetConfigurationValue(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder, string key) { throw null; }
+        public static string? GetConfigurationValue(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder, string key) { throw null; }
 
         public static TestClusterOptions GetTestClusterOptions(this Microsoft.Extensions.Configuration.IConfiguration config) { throw null; }
 
@@ -479,9 +479,9 @@ namespace Orleans.TestingHost
 
     public partial class TestClusterHostFactory
     {
-        public static Microsoft.Extensions.Hosting.IHost CreateClusterClient(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) { throw null; }
+        public static Microsoft.Extensions.Hosting.IHost CreateClusterClient(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder = null) { throw null; }
 
-        public static Microsoft.Extensions.Hosting.IHost CreateSiloHost(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) { throw null; }
+        public static Microsoft.Extensions.Hosting.IHost CreateSiloHost(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder = null) { throw null; }
 
         public static Microsoft.Extensions.Configuration.IConfiguration DeserializeConfiguration(string serializedSources) { throw null; }
 
@@ -490,7 +490,7 @@ namespace Orleans.TestingHost
 
     public partial class TestClusterOptions
     {
-        public string ApplicationBaseDirectory { get { throw null; } set { } }
+        public string? ApplicationBaseDirectory { get { throw null; } set { } }
 
         public bool AssumeHomogenousSilosForTesting { get { throw null; } set { } }
 
@@ -498,7 +498,7 @@ namespace Orleans.TestingHost
 
         public int BaseSiloPort { get { throw null; } set { } }
 
-        public System.Collections.Generic.List<string> ClientBuilderConfiguratorTypes { get { throw null; } }
+        public System.Collections.Generic.List<string?> ClientBuilderConfiguratorTypes { get { throw null; } }
 
         public string ClusterId { get { throw null; } set { } }
 
@@ -514,13 +514,13 @@ namespace Orleans.TestingHost
 
         public string ServiceId { get { throw null; } set { } }
 
-        public System.Collections.Generic.List<string> SiloBuilderConfiguratorTypes { get { throw null; } }
+        public System.Collections.Generic.List<string?> SiloBuilderConfiguratorTypes { get { throw null; } }
 
         public bool UseRealEnvironmentStatistics { get { throw null; } set { } }
 
         public bool UseTestClusterMembership { get { throw null; } set { } }
 
-        public System.Collections.Generic.Dictionary<string, string> ToDictionary() { throw null; }
+        public System.Collections.Generic.Dictionary<string, string?> ToDictionary() { throw null; }
     }
 
     public partial class TestClusterPortAllocator : ITestClusterPortAllocator, System.IDisposable
@@ -539,7 +539,7 @@ namespace Orleans.TestingHost
     {
         public int GatewayPort { get { throw null; } set { } }
 
-        public System.Net.IPEndPoint PrimarySiloEndPoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? PrimarySiloEndPoint { get { throw null; } set { } }
 
         public string SiloName { get { throw null; } set { } }
 
@@ -547,7 +547,7 @@ namespace Orleans.TestingHost
 
         public static TestSiloSpecificOptions Create(TestCluster testCluster, TestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false) { throw null; }
 
-        public System.Collections.Generic.Dictionary<string, string> ToDictionary() { throw null; }
+        public System.Collections.Generic.Dictionary<string, string?> ToDictionary() { throw null; }
     }
 
     public static partial class TimeProviderTestingExtensions
@@ -640,7 +640,7 @@ namespace Orleans.TestingHost.Logging
 
         public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) { throw null; }
 
-        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter) { }
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter) { }
     }
 
     public partial class FileLoggerProvider : Microsoft.Extensions.Logging.ILoggerProvider, System.IDisposable
@@ -663,7 +663,7 @@ namespace Orleans.TestingHost.Logging
 
         public void Dispose() { }
 
-        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter, string category) { }
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter, string category) { }
     }
 
     public sealed partial class InMemoryLogBuffer
@@ -781,9 +781,9 @@ namespace Orleans.TestingHost.Utils
 
         public bool Done { get { throw null; } set { } }
 
-        public System.Exception Exception { get { throw null; } set { } }
+        public System.Exception? Exception { get { throw null; } set { } }
 
-        public object Result { get { throw null; } set { } }
+        public object? Result { get { throw null; } set { } }
 
         public virtual void Reset() { }
 

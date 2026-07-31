@@ -17,16 +17,16 @@ namespace AWSUtils.Tests.StorageTests
         private const string STRING_DATA_FIELD = "StringData";
 
         [Orleans.Id(0)]
-        public string PartitionKey { get; set; }
+        public string? PartitionKey { get; set; }
         [Orleans.Id(1)]
-        public string RowKey { get; set; }
+        public string? RowKey { get; set; }
         [Orleans.Id(2)]
         public int ETag { get; set; }
         [Orleans.Id(3)]
-        public byte[] BinaryData { get; set; }
+        public byte[]? BinaryData { get; set; }
 
         [Orleans.Id(4)]
-        public string StringData { get; set; }
+        public string? StringData { get; set; }
 
         public UnitTestDynamoDBTableData()
         {

@@ -24,12 +24,12 @@ namespace UnitTests.GrainInterfaces
     public class ActivityData
     {
         [Id(0)]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [Id(1)]
-        public string TraceState { get; set; }
+        public string? TraceState { get; set; }
 
         [Id(2)]
-        public List<KeyValuePair<string, string>> Baggage { get; set; }
+        public List<KeyValuePair<string, string>>? Baggage { get; set; }
     }
 }

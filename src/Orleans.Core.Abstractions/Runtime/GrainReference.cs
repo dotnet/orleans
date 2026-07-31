@@ -409,7 +409,7 @@ namespace Orleans.Runtime
         /// <typeparam name="T">The underlying method return type.</typeparam>
         /// <param name="methodDescription">The method description.</param>
         /// <returns>The result of the invocation.</returns>
-        protected ValueTask<T> InvokeAsync<T>(IRequest methodDescription)
+        protected ValueTask<T?> InvokeAsync<T>(IRequest methodDescription)
         {
             return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
         }

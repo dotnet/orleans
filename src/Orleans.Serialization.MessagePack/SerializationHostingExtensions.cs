@@ -6,7 +6,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>
@@ -25,9 +24,9 @@ public static class SerializationHostingExtensions
     /// <param name="messagePackSerializerOptions">The MessagePack serializer options.</param>
     public static ISerializerBuilder AddMessagePackSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSerializable = null,
-        Func<Type, bool> isCopyable = null,
-        MessagePackSerializerOptions messagePackSerializerOptions = null)
+        Func<Type, bool>? isSerializable = null,
+        Func<Type, bool>? isCopyable = null,
+        MessagePackSerializerOptions? messagePackSerializerOptions = null)
     {
         return serializerBuilder.AddMessagePackSerializer(
             isSerializable,
@@ -51,9 +50,9 @@ public static class SerializationHostingExtensions
     /// <param name="configureOptions">A delegate used to configure the options for the MessagePack codec.</param>
     public static ISerializerBuilder AddMessagePackSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSerializable,
-        Func<Type, bool> isCopyable,
-        Action<OptionsBuilder<MessagePackCodecOptions>> configureOptions = null)
+        Func<Type, bool>? isSerializable,
+        Func<Type, bool>? isCopyable,
+        Action<OptionsBuilder<MessagePackCodecOptions>>? configureOptions = null)
     {
         var services = serializerBuilder.Services;
         if (configureOptions != null)

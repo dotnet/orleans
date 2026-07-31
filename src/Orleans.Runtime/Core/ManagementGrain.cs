@@ -14,7 +14,6 @@ using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 
-#nullable disable
 namespace Orleans.Runtime.Management
 {
     /// <summary>
@@ -144,7 +143,7 @@ namespace Orleans.Runtime.Management
             return await GetSimpleGrainStatistics(silos);
         }
 
-        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null)
+        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[]? types = null, SiloAddress[]? hostsIds = null)
         {
             if (hostsIds == null)
             {
@@ -217,18 +216,18 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
-        public Task<object[]> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable
+        public Task<object?[]> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable
         {
             return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider<T>(providerName, command, arg),
                 $"SendControlCommandToProvider of type {typeof(T).FullName} and name {providerName} command {command}.");
         }
 
-        public ValueTask<SiloAddress> GetActivationAddress(IAddressable reference)
+        public ValueTask<SiloAddress?> GetActivationAddress(IAddressable reference)
         {
             var grainReference = reference as GrainReference;
-            var grainId = grainReference.GrainId;
+            var grainId = grainReference!.GrainId;
 
-            GrainProperties grainProperties = default;
+            GrainProperties? grainProperties = default;
             if (!siloManifest.Grains.TryGetValue(grainId.Type, out grainProperties))
             {
                 var grainManifest = clusterManifest.AllGrainManifests
@@ -245,7 +244,7 @@ namespace Orleans.Runtime.Management
             }
 
             if (grainProperties != default &&
-                grainProperties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out string placementStrategy))
+                grainProperties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out string? placementStrategy))
             {
                 if (placementStrategy == nameof(StatelessWorkerPlacement))
                 {
@@ -257,12 +256,12 @@ namespace Orleans.Runtime.Management
 
             if (grainLocator.TryLookupInCache(grainId, out var result))
             {
-                return new ValueTask<SiloAddress>(result?.SiloAddress);
+                return new ValueTask<SiloAddress?>(result?.SiloAddress);
             }
 
             return LookupAsync(grainId, grainLocator);
 
-            static async ValueTask<SiloAddress> LookupAsync(GrainId grainId, GrainLocator grainLocator)
+            static async ValueTask<SiloAddress?> LookupAsync(GrainId grainId, GrainLocator grainLocator)
             {
                 var result = await grainLocator.Lookup(grainId);
                 return result?.SiloAddress;
@@ -305,20 +304,20 @@ namespace Orleans.Runtime.Management
             }
         }
 
-        private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)
+        private async Task<object?[]> ExecutePerSiloCall(Func<ISiloControl, Task<object?>> action, string actionToLog)
         {
             var silos = await GetHosts(true);
 
             LogDebugExecutingAction(actionToLog, new(silos));
 
-            var actionPromises = new List<Task<object>>();
+            var actionPromises = new List<Task<object?>>();
             foreach (SiloAddress siloAddress in silos.Keys.ToArray())
                 actionPromises.Add(action(GetSiloControlReference(siloAddress)));
 
             return await Task.WhenAll(actionPromises);
         }
 
-        private SiloAddress[] GetSiloAddresses(SiloAddress[] silos)
+        private SiloAddress[] GetSiloAddresses(SiloAddress[]? silos)
         {
             if (silos != null && silos.Length > 0)
                 return silos;
@@ -370,7 +369,7 @@ namespace Orleans.Runtime.Management
             return results;
         }
 
-        public async Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null)
+        public async Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[]? hostsIds = null)
         {
             if (hostsIds == null)
             {
@@ -399,7 +398,7 @@ namespace Orleans.Runtime.Management
             return results;
         }
 
-        public async ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null)
+        public async ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds = null)
         {
             if (hostsIds == null)
             {

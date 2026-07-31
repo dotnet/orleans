@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
@@ -35,7 +34,7 @@ namespace Orleans.TestingHost
             }
 
             var name = configuration["SiloName"];
-            using var host = TestClusterHostFactory.CreateSiloHost(name, configuration);
+            using var host = TestClusterHostFactory.CreateSiloHost(name!, configuration);
             try
             {
                 var cts = new CancellationTokenSource();
@@ -47,7 +46,7 @@ namespace Orleans.TestingHost
                 await host.StartAsync(cts.Token);
 
                 // This is a special marker line.
-                var localSiloDetails = (ILocalSiloDetails)host.Services.GetService(typeof(ILocalSiloDetails));
+                var localSiloDetails = (ILocalSiloDetails)host.Services.GetService(typeof(ILocalSiloDetails))!;
                 Console.WriteLine($"{SiloAddressLog}{localSiloDetails.SiloAddress.ToParsableString()}");
                 Console.WriteLine($"{GatewayAddressLog}{localSiloDetails.GatewayAddress.ToParsableString()}");
                 Console.WriteLine(StartedLog);
@@ -142,10 +141,10 @@ namespace Orleans.TestingHost
                 return Task.CompletedTask;
             }
 
-            var waitForCancellation = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var waitForCancellation = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(obj =>
             {
-                var tcs = (TaskCompletionSource<object>)obj;
+                var tcs = (TaskCompletionSource<object?>)obj!;
                 tcs.TrySetResult(null);
             }, waitForCancellation);
 

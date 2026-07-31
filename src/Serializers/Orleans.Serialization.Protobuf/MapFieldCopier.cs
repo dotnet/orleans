@@ -1,7 +1,6 @@
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Cloning;
 
-#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>
@@ -31,12 +30,12 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
     {
         if (context.TryGetCopy<MapField<TKey, TValue>>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         if (input.GetType() != typeof(MapField<TKey, TValue>))
         {
-            return context.DeepCopy(input);
+            return context.DeepCopy(input)!;
         }
 
         result = new MapField<TKey, TValue>();

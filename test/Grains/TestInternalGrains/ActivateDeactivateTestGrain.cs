@@ -9,7 +9,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
 
-        private IActivateDeactivateWatcherGrain watcher;
+        private IActivateDeactivateWatcherGrain watcher = null!;
 
         private bool doingActivate;
         private bool doingDeactivate;
@@ -64,7 +64,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
 
-        private IActivateDeactivateWatcherGrain watcher;
+        private IActivateDeactivateWatcherGrain watcher = null!;
 
         private bool doingActivate;
         private bool doingDeactivate;
@@ -127,7 +127,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
 
-        private IActivateDeactivateWatcherGrain watcher;
+        private IActivateDeactivateWatcherGrain watcher = null!;
 
         private bool doingActivate;
         private bool doingDeactivate;
@@ -212,7 +212,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
 
-        private IActivateDeactivateWatcherGrain watcher;
+        private IActivateDeactivateWatcherGrain watcher = null!;
 
         private bool doingActivate;
         private bool doingDeactivate;
@@ -408,7 +408,7 @@ namespace UnitTests.Grains
         private readonly ILogger logger;
 
         //private IEchoGrain orleansManagedGrain;
-        private ITestGrain grain;
+        private ITestGrain grain = null!;
 
         public CreateGrainReferenceTestGrain(ILoggerFactory loggerFactory)
         {

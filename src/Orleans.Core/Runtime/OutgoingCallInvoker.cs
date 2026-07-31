@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Serialization.Invocation;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -18,7 +17,7 @@ namespace Orleans.Runtime
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly int stages;
         private readonly GrainReference grainReference;
-        private readonly IOutgoingGrainCallFilter requestFilter;
+        private readonly IOutgoingGrainCallFilter? requestFilter;
         private int stage;
 
         /// <summary>
@@ -57,13 +56,13 @@ namespace Orleans.Runtime
 
         public MethodInfo InterfaceMethod => request.GetMethod();
 
-        public object Result { get => TypedResult; set => TypedResult = (TResult)value; }
+        public object? Result { get => TypedResult; set => TypedResult = (TResult?)value; }
 
-        public Response Response { get; set; }
+        public Response? Response { get; set; }
 
-        public TResult TypedResult { get => Response.GetResult<TResult>(); set => Response = Response.FromResult(value); }
+        public TResult? TypedResult { get => Response!.GetResult<TResult>(); set => Response = Response.FromResult(value); }
 
-        public IGrainContext SourceContext { get; }
+        public IGrainContext? SourceContext { get; }
 
         public GrainId? SourceId => SourceContext?.GrainId;
 
@@ -99,7 +98,7 @@ namespace Orleans.Runtime
                 else if (stage < this.stages)
                 {
                     stage++;
-                    await this.requestFilter.Invoke(this);
+                    await this.requestFilter!.Invoke(this);
 
                     // If Response is null some filter did not continue the call chain
                     if (this.Response is null)

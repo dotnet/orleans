@@ -10,7 +10,6 @@ using System.Collections.Generic;
 using System.Linq;
 using SQSMessage = Amazon.SQS.Model.Message;
 
-#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     [Serializable]
@@ -19,7 +18,7 @@ namespace OrleansAWSUtils.Streams
     {
         [JsonProperty]
         [Orleans.Id(0)]
-        private EventSequenceTokenV2 sequenceToken;
+        private EventSequenceTokenV2 sequenceToken = null!;
 
         [JsonProperty]
         [Orleans.Id(1)]
@@ -27,12 +26,12 @@ namespace OrleansAWSUtils.Streams
 
         [JsonProperty]
         [Orleans.Id(2)]
-        private readonly Dictionary<string, object> requestContext;
+        private readonly Dictionary<string, object>? requestContext;
 
         [NonSerialized]
         // Need to store reference to the original SQS Message to be able to delete it later on.
         // Don't need to serialize it, since we are never interested in sending it to stream consumers.
-        internal SQSMessage Message;
+        internal SQSMessage Message = null!;
 
         [Orleans.Id(3)]
         public StreamId StreamId { get; private set; }
@@ -46,14 +45,14 @@ namespace OrleansAWSUtils.Streams
         private SQSBatchContainer(
             StreamId streamId,
             List<object> events,
-            Dictionary<string, object> requestContext,
+            Dictionary<string, object>? requestContext,
             EventSequenceTokenV2 sequenceToken)
             : this(streamId, events, requestContext)
         {
             this.sequenceToken = sequenceToken;
         }
 
-        private SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+        private SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object>? requestContext)
         {
             if (events == null) throw new ArgumentNullException(nameof(events), "Message contains no events");
 
@@ -71,7 +70,7 @@ namespace OrleansAWSUtils.Streams
             Serializer<SQSBatchContainer> serializer,
             StreamId streamId,
             IEnumerable<T> events,
-            Dictionary<string, object> requestContext)
+            Dictionary<string, object>? requestContext)
         {
             var sqsBatchMessage = new SQSBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
             var rawBytes = serializer.SerializeToArray(sqsBatchMessage);
@@ -88,7 +87,8 @@ namespace OrleansAWSUtils.Streams
         internal static SQSBatchContainer FromSQSMessage(Serializer<SQSBatchContainer> serializer, SQSMessage msg, long sequenceId)
         {
             var json = JObject.Parse(msg.Body);
-            var sqsBatch = serializer.Deserialize(json["payload"].ToObject<byte[]>());
+            // A valid SQS stream message contains a serialized batch payload.
+            var sqsBatch = serializer.Deserialize(json["payload"]!.ToObject<byte[]>()!)!;
             sqsBatch.Message = msg;
             sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
             return sqsBatch;

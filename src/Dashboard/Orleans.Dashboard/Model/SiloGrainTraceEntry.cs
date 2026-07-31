@@ -1,4 +1,3 @@
-#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
@@ -6,10 +5,10 @@ namespace Orleans.Dashboard.Model;
 internal class SiloGrainTraceEntry
 {
     [Id(0)]
-    public string Grain { get; set; }
+    public string Grain { get; set; } = null!;
 
     [Id(1)]
-    public string Method { get; set; }
+    public string Method { get; set; } = null!;
 
     [Id(2)]
     public long Count { get; set; }

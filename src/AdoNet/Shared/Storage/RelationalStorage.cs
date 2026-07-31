@@ -7,8 +7,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -153,7 +151,7 @@ namespace Orleans.Tests.SqlUtils
         ///}).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand>? parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if (query == null)
@@ -191,7 +189,7 @@ namespace Orleans.Tests.SqlUtils
         /// }).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
+        public async Task<int> ExecuteAsync(string query, Action<IDbCommand>? parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if (query == null)
@@ -259,7 +257,7 @@ namespace Orleans.Tests.SqlUtils
 
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
             string query,
-            Action<DbCommand> parameterProvider,
+            Action<DbCommand>? parameterProvider,
             Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
             Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
             CommandBehavior commandBehavior,
@@ -291,13 +289,13 @@ namespace Orleans.Tests.SqlUtils
         }
 
 
-        private static void CommandCancellation(object state)
+        private static void CommandCancellation(object? state)
         {
             //The MSDN documentation tells that DbCommand.Cancel() should not be called for SqlCommand if the reader has been closed
             //in order to avoid a race condition that would cause the SQL Server to stream the result set
             //despite the connection already closed. Source: https://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlcommand.cancel(v=vs.110).aspx.
             //Enforcing this behavior across all providers does not seem to hurt.
-            var stateTuple = (Tuple<DbDataReader, DbCommand>)state;
+            var stateTuple = (Tuple<DbDataReader, DbCommand>)state!;
             if (!stateTuple.Item1.IsClosed)
             {
                 stateTuple.Item2.Cancel();

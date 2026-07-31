@@ -44,7 +44,7 @@ namespace Tester
     /// </summary>
     public class GatewayConnectionTests : TestClusterPerTest
     {
-        private OutsideRuntimeClient runtimeClient;
+        private OutsideRuntimeClient runtimeClient = null!;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -67,8 +67,8 @@ namespace Tester
                 hostBuilder.ConfigureServices((context, services) =>
                 {
                     var cfg = context.Configuration;
-                    var siloPort = int.Parse(cfg[nameof(TestClusterOptions.BaseSiloPort)]);
-                    var gatewayPort = int.Parse(cfg[nameof(TestClusterOptions.BaseGatewayPort)]);
+                    var siloPort = int.Parse(cfg[nameof(TestClusterOptions.BaseSiloPort)]!);
+                    var gatewayPort = int.Parse(cfg[nameof(TestClusterOptions.BaseGatewayPort)]!);
                     services.Configure<EndpointOptions>(options =>
                     {
                         options.SiloPort = siloPort;
@@ -82,7 +82,7 @@ namespace Tester
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                var basePort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
+                var basePort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]!);
                 var primaryGw = new IPEndPoint(IPAddress.Loopback, basePort).ToGatewayUri();
                 clientBuilder.Configure<GatewayOptions>(options =>
                 {
@@ -119,11 +119,11 @@ namespace Tester
             var timeoutCount = 0;
 
             // Fake Gateway
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
             var port = gateways.First().Port + 2;
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
-            var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>();
+            var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>()!;
             evt.Completed += (sender, args) =>
             {
                 connectionCount++;
@@ -166,8 +166,8 @@ namespace Tester
         public async Task ConnectionFromDifferentClusterIsRejected()
         {
             // Arange
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
-            var gwEndpoint  = gateways.First().ToIPEndPoint();
+            var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
+            var gwEndpoint  = gateways.First().ToIPEndPoint()!;
             var exceptions = new List<Exception>();
 
             Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)

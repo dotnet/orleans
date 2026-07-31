@@ -3,7 +3,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 
-#nullable disable
 namespace Orleans.Hosting
 {
     public static class AzureTableTransactionSiloBuilderExtensions
@@ -27,7 +26,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure table storage as the default transactional grain storage.
         /// </summary>
-        public static ISiloBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)
+        public static ISiloBuilder AddAzureTableTransactionalStateStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureTableTransactionalStateOptions>>? configureOptions = null)
         {
             return builder.AddAzureTableTransactionalStateStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -35,7 +34,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure table storage for transactional grain storage.
         /// </summary>
-        public static ISiloBuilder AddAzureTableTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)
+        public static ISiloBuilder AddAzureTableTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureTableTransactionalStateOptions>>? configureOptions = null)
         {
             return builder.ConfigureServices(services => services.AddAzureTableTransactionalStateStorage(name, configureOptions));
         }

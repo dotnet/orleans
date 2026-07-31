@@ -44,7 +44,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
 
-    private static string _invariant;
+    private static string _invariant = null!;
 
     protected AdoNetStreamingTests(string invariant)
     {
@@ -52,8 +52,8 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
         RelationalStorageForTesting.CheckPreconditionsOrThrow(_invariant);
     }
 
-    private static RelationalStorageForTesting _testing;
-    private SingleStreamTestRunner _runner;
+    private static RelationalStorageForTesting _testing = null!;
+    private SingleStreamTestRunner _runner = null!;
 
     public override async Task InitializeAsync()
     {

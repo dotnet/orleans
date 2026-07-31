@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
 
-#nullable enable
 namespace Orleans.TestingHost;
 
 internal static class ClusterManifestStabilizationHelper
