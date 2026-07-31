@@ -19,9 +19,9 @@ internal sealed class ControllableReminderTable(
         return result;
     }
 
-    public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName) => inner.ReadRow(grainId, reminderName);
+    public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => inner.ReadRow(grainId, reminderName);
 
-    public Task<string> UpsertRow(ReminderEntry entry) => inner.UpsertRow(entry);
+    public Task<string?> UpsertRow(ReminderEntry entry) => inner.UpsertRow(entry);
 
     public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => inner.RemoveRow(grainId, reminderName, eTag);
 

@@ -7,7 +7,7 @@ internal sealed class ReminderInstruments(OrleansInstruments instruments)
 {
     private readonly Histogram<double> _tardinessSeconds = instruments.Meter.CreateHistogram<double>(InstrumentNames.REMINDERS_TARDINESS, "seconds");
     private readonly Counter<int> _ticksDelivered = instruments.Meter.CreateCounter<int>(InstrumentNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
-    private ObservableGauge<int> _activeReminders;
+    private ObservableGauge<int>? _activeReminders;
 
     internal bool TardinessSecondsEnabled => _tardinessSeconds.Enabled;
 
