@@ -7,7 +7,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Eviction strategy that evicts data based off of age.
     /// </summary>
-    public partial class ChronologicalEvictionStrategy : IEvictionStrategy
+    public partial class ChronologicalEvictionStrategy : IEvictionStrategy, IDisposable
     {
         private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
@@ -156,6 +156,39 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
             //report metrics
+            if (memoryReleasedInByte > 0)
+            {
+                this.cacheSizeInByte -= memoryReleasedInByte;
+                this.cacheMonitor?.TrackMemoryReleased(memoryReleasedInByte);
+            }
+        }
+
+        /// <summary>
+        /// Releases all buffers when the associated cache is empty.
+        /// </summary>
+        public void ReleaseAllBuffers()
+        {
+            if (!this.PurgeObservable.IsEmpty)
+            {
+                throw new InvalidOperationException("Cannot release buffers while the cache contains messages.");
+            }
+
+            ReleaseBuffers();
+        }
+
+        /// <inheritdoc />
+        public void Dispose() => ReleaseBuffers();
+
+        private void ReleaseBuffers()
+        {
+            var memoryReleasedInByte = 0;
+            while (this.inUseBuffers.Count > 0)
+            {
+                var buffer = this.inUseBuffers.Dequeue();
+                memoryReleasedInByte += buffer.SizeInByte;
+                buffer.Dispose();
+            }
+
             if (memoryReleasedInByte > 0)
             {
                 this.cacheSizeInByte -= memoryReleasedInByte;
