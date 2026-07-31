@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Metadata;
+using Orleans.Runtime.Dissemination;
 
 #nullable disable
 namespace Orleans.Runtime
@@ -7,11 +9,14 @@ namespace Orleans.Runtime
     internal sealed class ClusterManifestSystemTarget : SystemTarget, IClusterManifestSystemTarget, ISiloManifestSystemTarget, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly GrainManifest _siloManifest;
+        private readonly ManifestHash _siloManifestHash;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private readonly ClusterManifestUpdate _noUpdate = default;
         private MembershipVersion _cachedMembershipVersion;
         private ClusterManifestUpdate _cachedUpdate;
+        private MajorMinorVersion _cachedHashSummaryVersion;
+        private ClusterManifestHashSummary _cachedHashSummary;
 
         public ClusterManifestSystemTarget(
             IClusterMembershipService clusterMembershipService,
@@ -20,12 +25,40 @@ namespace Orleans.Runtime
             : base(Constants.ManifestProviderType, shared)
         {
             _siloManifest = clusterManifestProvider.LocalGrainManifest;
+            _siloManifestHash = ManifestHashCalculator.ComputeHash(_siloManifest);
             _clusterMembershipService = clusterMembershipService;
             _clusterManifestProvider = clusterManifestProvider;
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         public ValueTask<ClusterManifest> GetClusterManifest() => new(_clusterManifestProvider.Current);
+
+        public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary()
+        {
+            var manifest = _clusterManifestProvider.Current;
+
+            // Recompute the per-silo hashes only when the manifest version changes, so the SHA-256 over every
+            // silo manifest is not repeated on each summary request.
+            if (_cachedHashSummary is null || manifest.Version != _cachedHashSummaryVersion)
+            {
+                var hashes = new Dictionary<SiloAddress, ManifestHash>();
+                foreach (var siloManifest in manifest.Silos)
+                {
+                    hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
+                }
+
+                _cachedHashSummary = new ClusterManifestHashSummary(manifest.Version, hashes);
+                _cachedHashSummaryVersion = manifest.Version;
+            }
+
+            return new(_cachedHashSummary);
+        }
+
+        public ValueTask<ManifestHash> GetSiloManifestHash() => new(_siloManifestHash);
+
+        public ValueTask<GrainManifest> GetSiloManifestByHash(ManifestHash hash) =>
+            new(hash == _siloManifestHash ? _siloManifest : null);
+
         public ValueTask<ClusterManifestUpdate> GetClusterManifestUpdate(MajorMinorVersion version)
         {
             var manifest = _clusterManifestProvider.Current;

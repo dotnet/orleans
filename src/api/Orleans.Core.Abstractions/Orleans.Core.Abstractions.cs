@@ -2929,7 +2929,7 @@ namespace Orleans.Runtime
     [System.Text.Json.Serialization.JsonConverter(typeof(SiloAddressConverter))]
     [System.Diagnostics.DebuggerDisplay("SiloAddress {ToString()}")]
     [SuppressReferenceTracking]
-    public sealed partial class SiloAddress : System.IEquatable<SiloAddress>, System.IComparable<SiloAddress>, System.ISpanFormattable, System.IFormattable, System.IParsable<SiloAddress>, System.IUtf8SpanParsable<SiloAddress>
+    public sealed partial class SiloAddress : System.IEquatable<SiloAddress>, System.IComparable<SiloAddress>, System.IComparable, System.ISpanFormattable, System.IFormattable, System.IParsable<SiloAddress>, System.IUtf8SpanParsable<SiloAddress>
     {
         internal SiloAddress() { }
 

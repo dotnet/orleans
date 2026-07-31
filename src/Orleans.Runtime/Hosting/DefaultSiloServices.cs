@@ -20,6 +20,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Messaging;
@@ -172,8 +173,15 @@ namespace Orleans.Hosting
 
             services.AddSingleton<DeploymentLoadPublisher>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DeploymentLoadPublisher>();
+            services.AddSingleton<DeploymentLoadStatisticsDisseminationNamespace>();
+            services.AddFromExisting<IDisseminationNamespace, DeploymentLoadStatisticsDisseminationNamespace>();
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
+
+            services.AddSingleton<DisseminationMembership>();
+            services.AddSingleton<DisseminationSystemTarget>();
+            services.AddFromExisting<IDisseminationService, DisseminationSystemTarget>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DisseminationSystemTarget>();
 
             services.TryAddSingleton<IMembershipManager, MembershipTableManager>();
             services.AddFromExisting<IHealthCheckParticipant, IMembershipManager>();
@@ -182,6 +190,8 @@ namespace Orleans.Hosting
             services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipSystemTarget>();
             services.AddSingleton<IMembershipGossiper, MembershipGossiper>();
+            services.AddSingleton<MembershipDisseminationNamespace>();
+            services.AddFromExisting<IDisseminationNamespace, MembershipDisseminationNamespace>();
             services.AddSingleton<IRemoteSiloProber, RemoteSiloProber>();
             services.AddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
@@ -344,6 +354,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<LoadSheddingOptions>();
             services.ConfigureFormatter<EndpointOptions>();
             services.ConfigureFormatter<ClusterOptions>();
+            services.ConfigureFormatter<DisseminationOptions>();
 
             // This validator needs to construct the IMembershipOracle and the IMembershipTable
             // so move it in the end so other validator are called first
@@ -352,6 +363,9 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
             services.AddTransient<IValidateOptions<SiloMessagingOptions>, SiloMessagingOptionsValidator>();
+            services.AddTransient<IValidateOptions<DisseminationOptions>, DisseminationOptionsValidator>();
+            services.AddTransient<IValidateOptions<DeploymentLoadPublisherOptions>, DeploymentLoadPublisherOptionsValidator>();
+            services.AddTransient<IValidateOptions<ClusterMembershipOptions>, ClusterMembershipOptionsDisseminationValidator>();
             services.AddTransient<IOptions<MessagingOptions>>(static sp => sp.GetRequiredService<IOptions<SiloMessagingOptions>>());
 
             // Enable hosted client.
