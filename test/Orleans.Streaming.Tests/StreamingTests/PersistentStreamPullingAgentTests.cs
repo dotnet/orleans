@@ -117,6 +117,25 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_TreatsNullReceiverResultAsEmpty()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            // Simulate a receiver binary compiled before the return value was annotated as non-null.
+            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>(null!));
+            var agent = CreateAgent(pubSub: null, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            var readResult = await testAccessor.ReadFromQueue(queueId, receiver, 1);
+
+            Assert.False(readResult);
+            await receiver.Received(1).GetQueueMessagesAsync(1);
+            Assert.Empty(await testAccessor.GetPubSubCache());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_RemovesCacheEntryWhenProducerRegistrationTerminates()
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);

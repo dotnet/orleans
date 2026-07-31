@@ -68,6 +68,7 @@ public class EventHubCheckpointerTests
         }
 
         public int DisposeCount { get; private set; }
+        public int AddCount { get; private set; }
         public string? PurgeOffsetToReport { get; set; }
         public object Cursor { get; } = new();
         public object? RefreshedCursor { get; private set; }
@@ -75,7 +76,11 @@ public class EventHubCheckpointerTests
 
         public int GetMaxAddCount() => 1_000;
 
-        public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc) => [];
+        public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc)
+        {
+            AddCount++;
+            return [];
+        }
 
         public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken) => Cursor;
 
@@ -123,6 +128,20 @@ public class EventHubCheckpointerTests
             CloseCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class NullReturningEventHubReceiver : IEventHubReceiver
+    {
+        public int ReceiveCount { get; private set; }
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        {
+            ReceiveCount++;
+            // Simulate a receiver binary compiled before the return value was annotated as non-null.
+            return Task.FromResult<IEnumerable<EventData>>(null!);
+        }
+
+        public Task CloseAsync() => Task.CompletedTask;
     }
 
     private sealed class BlockingEventHubReceiver : IEventHubReceiver
@@ -194,6 +213,20 @@ public class EventHubCheckpointerTests
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         return receiver;
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_TreatsNullReceiverResultAsEmpty()
+    {
+        var cache = new TestEventHubQueueCache();
+        var eventHubReceiver = new NullReturningEventHubReceiver();
+        var receiver = await CreateReceiver(new TestCheckpointer(), cache, eventHubReceiver);
+
+        var messages = await receiver.GetQueueMessagesAsync(10);
+
+        Assert.Empty(messages);
+        Assert.Equal(1, eventHubReceiver.ReceiveCount);
+        Assert.Equal(0, cache.AddCount);
     }
 
     [Fact, TestCategory("BVT")]

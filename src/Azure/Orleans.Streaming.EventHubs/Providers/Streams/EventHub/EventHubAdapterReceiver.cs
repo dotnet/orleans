@@ -149,11 +149,12 @@ namespace Orleans.Streaming.EventHubs
                 }
             }
             var watch = Stopwatch.StartNew();
-            List<EventData> messages;
+            List<EventData>? messages;
             try
             {
 
-                messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout)).ToList();
+                // Receivers built against older Orleans versions can still return null.
+                messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
                 watch.Stop();
 
                 this.monitor?.TrackRead(true, watch.Elapsed, null);
@@ -167,7 +168,7 @@ namespace Orleans.Streaming.EventHubs
             }
 
             var batches = new List<IBatchContainer>();
-            if (messages.Count == 0)
+            if (messages is null || messages.Count == 0)
             {
                 this.monitor?.TrackMessagesReceived(0, null, null);
                 return batches;

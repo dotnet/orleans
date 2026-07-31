@@ -489,7 +489,7 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                var table = await reminderTable.ReadRows(range.Begin, range.End); // get all reminders, even the ones we already have
+                ReminderTableData? table = await reminderTable.ReadRows(range.Begin, range.End); // get all reminders, even the ones we already have
 
                 if (rangeSerialNumberCopy < RangeSerialNumber)
                 {
@@ -498,6 +498,9 @@ namespace Orleans.Runtime.ReminderService
                 }
 
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
+
+                // Providers built against older Orleans versions can still return null.
+                if (table is null) return;
 
                 var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>(); // shallow copy
                 foreach (var r in localReminders)
