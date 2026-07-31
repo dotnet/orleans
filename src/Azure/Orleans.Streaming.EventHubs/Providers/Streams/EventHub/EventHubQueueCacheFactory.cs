@@ -14,14 +14,17 @@ namespace Orleans.Streaming.EventHubs
     public class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
         private readonly EventHubStreamCachePressureOptions cacheOptions;
+        private readonly EventHubStreamCacheMemoryOptions cacheMemoryOptions;
         private readonly StreamCacheEvictionOptions evictionOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly IEventHubDataAdapter dataAdater;
         private readonly TimePurgePredicate timePurge;
         private readonly EventHubMonitorAggregationDimensions sharedDimensions;
         private readonly OrleansInstruments orleansInstruments;
-        private IObjectPool<FixedSizeBuffer> bufferPool = null!;
+        private volatile IObjectPool<FixedSizeBuffer> bufferPool = null!;
         private string bufferPoolId = null!;
+        private readonly object bufferPoolLock = new();
+        private readonly EventHubCacheMemoryController memoryController;
 
         /// <summary>
         /// Create a cache monitor to report performance metrics.
@@ -47,14 +50,42 @@ namespace Orleans.Streaming.EventHubs
             OrleansInstruments instruments,
             Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor>? cacheMonitorFactory = null,
             Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor>? blockPoolMonitorFactory = null)
+            : this(
+                cacheOptions,
+                new EventHubStreamCacheMemoryOptions(),
+                evictionOptions,
+                statisticOptions,
+                dataAdater,
+                sharedDimensions,
+                instruments,
+                cacheMonitorFactory,
+                blockPoolMonitorFactory)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubQueueCacheFactory"/> class.
+        /// </summary>
+        public EventHubQueueCacheFactory(
+            EventHubStreamCachePressureOptions cacheOptions,
+            EventHubStreamCacheMemoryOptions cacheMemoryOptions,
+            StreamCacheEvictionOptions evictionOptions,
+            StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdater,
+            EventHubMonitorAggregationDimensions sharedDimensions,
+            OrleansInstruments instruments,
+            Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor>? cacheMonitorFactory = null,
+            Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor>? blockPoolMonitorFactory = null)
         {
             this.cacheOptions = cacheOptions;
+            this.cacheMemoryOptions = cacheMemoryOptions;
             this.evictionOptions = evictionOptions;
             this.statisticOptions = statisticOptions;
             this.dataAdater = dataAdater;
             this.timePurge = new TimePurgePredicate(evictionOptions.DataMinTimeInCache, evictionOptions.DataMaxAgeInCache);
             this.sharedDimensions = sharedDimensions;
             this.orleansInstruments = instruments;
+            this.memoryController = new EventHubCacheMemoryController(cacheMemoryOptions.MaxActiveCacheMemory);
             this.CacheMonitorFactory = cacheMonitorFactory ?? ((dimensions, logger) => new DefaultEventHubCacheMonitor(dimensions, this.orleansInstruments));
             this.BlockPoolMonitorFactory = blockPoolMonitorFactory ?? ((dimensions, logger) => new DefaultEventHubBlockPoolMonitor(dimensions, this.orleansInstruments));
         }
@@ -80,12 +111,19 @@ namespace Orleans.Streaming.EventHubs
         {
             if (this.bufferPool == null)
             {
-                var bufferSize = 1 << 20;
-                this.bufferPoolId = $"BlockPool-{new Guid().ToString()}-BlockSize-{bufferSize}";
-                var monitorDimensions = new EventHubBlockPoolMonitorDimensions(sharedDimensions, this.bufferPoolId);
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(monitorDimensions, loggerFactory), bufferSize);
-                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(bufferSize),
-                    objectPoolMonitor, statisticOptions.StatisticMonitorWriteInterval);
+                lock (bufferPoolLock)
+                {
+                    if (this.bufferPool == null)
+                    {
+                        this.bufferPoolId = $"AdaptiveBlockPool-{Guid.NewGuid()}";
+                        var monitorDimensions = new EventHubBlockPoolMonitorDimensions(sharedDimensions, this.bufferPoolId);
+                        this.bufferPool = new EventHubCacheBufferPool(
+                            this.memoryController,
+                            this.cacheMemoryOptions.MaxBufferPoolMemory,
+                            this.BlockPoolMonitorFactory(monitorDimensions, loggerFactory),
+                            statisticOptions.StatisticMonitorWriteInterval);
+                    }
+                }
             }
             blockPoolId = this.bufferPoolId;
             return this.bufferPool;
@@ -146,9 +184,73 @@ namespace Orleans.Streaming.EventHubs
             var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory);
             var logger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{sharedDimensions.EventHubPath}.{partition}");
-            var evictionStrategy = new ChronologicalEvictionStrategy(logger, timePurge, cacheMonitor, statisticOptions.StatisticMonitorWriteInterval);
-            return new EventHubQueueCache(partition, EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdatper, evictionStrategy, checkpointer, logger,
-                cacheMonitor, statisticOptions.StatisticMonitorWriteInterval, streamCacheEvictionOptions.MetadataMinTimeInCache);
+            var cacheMemoryController = bufferPool is IEventHubCacheBufferPool ? this.memoryController : null;
+            var evictionStrategy = cacheMemoryController is null
+                ? new ChronologicalEvictionStrategy(logger, timePurge, cacheMonitor, statisticOptions.StatisticMonitorWriteInterval)
+                : new EventHubCacheEvictionStrategy(
+                    logger,
+                    timePurge,
+                    cacheMonitor,
+                    statisticOptions.StatisticMonitorWriteInterval);
+            return new EventHubQueueCache(
+                partition,
+                EventHubAdapterReceiver.MaxMessagesPerRead,
+                bufferPool,
+                dataAdatper,
+                evictionStrategy,
+                checkpointer,
+                logger,
+                cacheMonitor,
+                statisticOptions.StatisticMonitorWriteInterval,
+                streamCacheEvictionOptions.MetadataMinTimeInCache,
+                cacheMemoryController);
+        }
+
+        internal sealed class EventHubCacheEvictionStrategy(
+            ILogger logger,
+            TimePurgePredicate timePurge,
+            ICacheMonitor? cacheMonitor,
+            TimeSpan? monitorWriteInterval)
+            : ChronologicalEvictionStrategy(logger, timePurge, cacheMonitor, monitorWriteInterval), IMemoryPressureEvictionStrategy
+        {
+            private bool purgingForMemoryPressure;
+            private bool oldestBufferInitialized;
+            private object? oldestBuffer;
+
+            public void PerformMemoryPressurePurge(DateTime nowUtc)
+            {
+                purgingForMemoryPressure = true;
+                oldestBufferInitialized = false;
+                try
+                {
+                    PerformPurge(nowUtc);
+                }
+                finally
+                {
+                    purgingForMemoryPressure = false;
+                    oldestBufferInitialized = false;
+                    oldestBuffer = null;
+                }
+            }
+
+            protected override bool ShouldPurge(
+                ref CachedMessage cachedMessage,
+                ref CachedMessage newestCachedMessage,
+                DateTime nowUtc)
+            {
+                if (purgingForMemoryPressure)
+                {
+                    if (!oldestBufferInitialized)
+                    {
+                        oldestBuffer = cachedMessage.Segment.Array;
+                        oldestBufferInitialized = true;
+                    }
+
+                    return ReferenceEquals(cachedMessage.Segment.Array, oldestBuffer);
+                }
+                return base.ShouldPurge(ref cachedMessage, ref newestCachedMessage, nowUtc);
+            }
+            }
         }
     }
 }

@@ -37,6 +37,16 @@ namespace Orleans.Hosting.Developer
         {
             configurator.Configure(configureOptions);
         }
+
+        /// <summary>
+        /// Configures cache memory limits for the Event Data generator stream provider.
+        /// </summary>
+        /// <param name="configurator">The stream provider configurator.</param>
+        /// <param name="configureOptions">The configuration delegate.</param>
+        public static void ConfigureCacheMemory(this IEventDataGeneratorStreamConfigurator configurator, Action<OptionsBuilder<EventHubStreamCacheMemoryOptions>> configureOptions)
+        {
+            configurator.Configure(configureOptions);
+        }
     }
 
     /// <summary>
@@ -53,10 +63,12 @@ namespace Orleans.Hosting.Developer
             Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, EventDataGeneratorAdapterFactory.Create)
         {
-            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
-                .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
-                .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
-                .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
+            this.ConfigureDelegate(services => services            .ConfigureNamedOptionForLogging<EventHubOptions>(name)
+            .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
+            .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
+            .ConfigureNamedOptionForLogging<EventHubStreamCacheMemoryOptions>(name)
+            .AddTransient<IConfigurationValidator>(sp => new EventHubStreamCacheMemoryOptionsValidator(sp.GetOptionsByName<EventHubStreamCacheMemoryOptions>(name), name))
+            .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
         }
     }
 }

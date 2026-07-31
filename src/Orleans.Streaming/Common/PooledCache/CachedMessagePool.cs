@@ -14,27 +14,55 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="cacheDataAdapter">The cache data adapter.</param>
         public CachedMessagePool(ICacheDataAdapter cacheDataAdapter)
+            : this(cacheDataAdapter, 16 * 1024, 16 * 1024, int.MaxValue)
+        {
+        }
+
+        public CachedMessagePool(
+            ICacheDataAdapter cacheDataAdapter,
+            int initialBlockSize,
+            int maxBlockSize,
+            int maxRetainedBlocks)
         {
             messagePool = new ObjectPool<CachedMessageBlock>(
-                () => new CachedMessageBlock());
+                () => new CachedMessageBlock(initialBlockSize, maxBlockSize),
+                maxRetainedBlocks);
         }
 
         /// <summary>
         /// Allocates a message in a block and returns the block the message is in.
         /// </summary>
         /// <returns>The cached message block which the message was allocated in.</returns>
-        public CachedMessageBlock AllocateMessage(CachedMessage message)
+        public CachedMessageBlock AllocateMessage(CachedMessage message, out int allocatedSizeDelta)
         {
-            CachedMessageBlock returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
-            returnBlock.Add(message);
-
-            // blocks at capacity are eligable for purge, so we don't want to be holding on to them.
-            if (!currentMessageBlock.HasCapacity)
+            allocatedSizeDelta = 0;
+            if (currentMessageBlock == null)
             {
                 currentMessageBlock = messagePool.Allocate();
+                allocatedSizeDelta = currentMessageBlock.AllocatedSizeInBytes;
+            }
+
+            CachedMessageBlock returnBlock = currentMessageBlock;
+            var previousSize = returnBlock.AllocatedSizeInBytes;
+            returnBlock.Add(message);
+            allocatedSizeDelta += returnBlock.AllocatedSizeInBytes - previousSize;
+            if (!currentMessageBlock.HasCapacity)
+            {
+                currentMessageBlock = null;
             }
 
             return returnBlock;
+        }
+
+        public void ReleaseCurrentBlock(CachedMessageBlock block)
+        {
+            if (!ReferenceEquals(currentMessageBlock, block))
+            {
+                throw new InvalidOperationException("The supplied block is not the current message block.");
+            }
+
+            currentMessageBlock = null;
+            block.Dispose();
         }
     }
 }
