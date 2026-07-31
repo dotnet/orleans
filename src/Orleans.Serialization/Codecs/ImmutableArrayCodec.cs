@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -58,6 +59,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context)
         {
             if (_copier is null)

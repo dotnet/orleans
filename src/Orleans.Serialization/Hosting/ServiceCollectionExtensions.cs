@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -200,6 +201,7 @@ namespace Orleans.Serialization
 
             public T DeepCopy(T original, CopyContext context) => Value.DeepCopy(original, context);
 
+            [return: NotNullIfNotNull(nameof(original))]
             public object? DeepCopy(object? original, CopyContext context) => ((IDeepCopier)Value).DeepCopy(original, context);
 
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;

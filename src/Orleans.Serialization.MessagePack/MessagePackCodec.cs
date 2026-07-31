@@ -182,6 +182,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
     }
 
     /// <inheritdoc/>
+    [return: NotNullIfNotNull(nameof(input))]
     object? IDeepCopier.DeepCopy(object? input, CopyContext context)
     {
         if (context.TryGetCopy(input!, out object? result))
@@ -197,14 +198,15 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
             msgPackWriter.Flush();
 
             var sequence = bufferWriter.Value.AsReadOnlySequence();
-            result = MessagePackSerializer.Deserialize(input.GetType(), sequence, _options.SerializerOptions);
+            result = MessagePackSerializer.Deserialize(input.GetType(), sequence, _options.SerializerOptions)
+                ?? throw new SerializationException($"MessagePack returned null while deep copying an instance of type '{input.GetType()}'.");
         }
         finally
         {
             bufferWriter.Value.Dispose();
         }
 
-        context.RecordCopy(input!, result!);
+        context.RecordCopy(input!, result);
         return result;
     }
 

@@ -2311,6 +2311,17 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(ArrayList? left, ArrayList? right) => ReferenceEquals(left, right) || left!.ToArray().SequenceEqual(right!.ToArray());
         protected override ArrayList[] TestValues => [null!, new ArrayList(), CreateValue(), CreateValue(), CreateValue()];
+
+        [Fact]
+        public void ConvertFromDefaultSurrogateReturnsEmptyCollection()
+        {
+            var surrogate = default(ArrayListSurrogate);
+            var codec = new ArrayListCodec(null!);
+
+            var result = codec.ConvertFromSurrogate(ref surrogate);
+
+            Assert.Empty(result);
+        }
     }
 
     public class ArrayListCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ArrayList, ArrayListCopier>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -3108,6 +3119,56 @@ namespace Orleans.Serialization.UnitTests
         protected override NameValueCollection[] TestValues => [null!, new NameValueCollection(), CreateValue(), CreateValue(), CreateValue()];
         protected override bool Equals(NameValueCollection? left, NameValueCollection? right) => ReferenceEquals(left, right)
             || (left!.AllKeys.OrderBy(key => key).SequenceEqual(right!.AllKeys.OrderBy(key => key)) && left.AllKeys.All(key => string.Equals(left[key], right[key], StringComparison.Ordinal)));
+
+        [Fact]
+        public void RoundTripsNullKeyAndNullValue()
+        {
+            var original = new NameValueCollection
+            {
+                { null, "null-key-value" },
+                { "null-value", null },
+                { "normal", "value" }
+            };
+
+            var result = RoundTripThroughCodec(original);
+
+            Assert.NotNull(result);
+            Assert.Equal(original.Count, result.Count);
+            Assert.Equal("null-key-value", result[null]);
+            Assert.Null(result["null-value"]);
+            Assert.Equal("value", result["normal"]);
+        }
+
+        [Fact]
+        public void ConvertFromDefaultSurrogateReturnsEmptyCollection()
+        {
+            var surrogate = default(NameValueCollectionSurrogate);
+            var codec = new NameValueCollectionCodec(null!);
+
+            var result = codec.ConvertFromSurrogate(ref surrogate);
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void ConvertFromLegacySurrogateReadsValues()
+        {
+            var surrogate = new NameValueCollectionSurrogate
+            {
+                Values = new Dictionary<string, string?>
+                {
+                    ["key"] = "value",
+                    ["null-value"] = null
+                }
+            };
+            var codec = new NameValueCollectionCodec(null!);
+
+            var result = codec.ConvertFromSurrogate(ref surrogate);
+
+            Assert.Equal(2, result.Count);
+            Assert.Equal("value", result["key"]);
+            Assert.Null(result["null-value"]);
+        }
     }
 
     public class NameValueCollectionCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<NameValueCollection, NameValueCollectionCopier>(output, fixture), IClassFixture<SerializationTesterFixture>

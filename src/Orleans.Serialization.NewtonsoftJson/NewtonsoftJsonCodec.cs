@@ -156,6 +156,7 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
     }
 
     /// <inheritdoc/>
+    [return: NotNullIfNotNull(nameof(input))]
     object? IDeepCopier.DeepCopy(object? input, CopyContext context)
     {
         if (context.TryGetCopy(input!, out object? result))
@@ -174,14 +175,15 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
 
             var streamReader = new StreamReader(stream);
             using var jsonReader = new JsonTextReader(streamReader);
-            result = _serializer.Deserialize(jsonReader, type);
+            result = _serializer.Deserialize(jsonReader, type)
+                ?? throw new JsonSerializationException($"Newtonsoft.Json returned null while deep copying an instance of type '{type}'.");
         }
         finally
         {
             PooledBufferStream.Return(stream);
         }
 
-        context.RecordCopy(input!, result!);
+        context.RecordCopy(input!, result);
         return result;
     }
 

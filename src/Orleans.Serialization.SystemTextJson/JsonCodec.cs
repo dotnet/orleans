@@ -208,6 +208,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     }
 
     /// <inheritdoc/>
+    [return: NotNullIfNotNull(nameof(input))]
     object? IDeepCopier.DeepCopy(object? input, CopyContext context)
     {
         if (context.TryGetCopy(input!, out object? result))
@@ -231,14 +232,15 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 
             var sequence = bufferWriter.Value.AsReadOnlySequence();
             var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
-            result = JsonSerializer.Deserialize(ref jsonReader, input!.GetType(), _options.SerializerOptions);
+            result = JsonSerializer.Deserialize(ref jsonReader, input!.GetType(), _options.SerializerOptions)
+                ?? throw new JsonException($"System.Text.Json returned null while deep copying an instance of type '{input.GetType()}'.");
         }
         finally
         {
             bufferWriter.Value.Dispose();
         }
 
-        context.RecordCopy(input!, result!);
+        context.RecordCopy(input!, result);
         return result;
     }
 

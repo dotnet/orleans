@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -167,6 +168,7 @@ namespace Orleans.Serialization.Codecs
     internal sealed class MultiDimensionalArrayCopier<T> : IGeneralizedCopier
     {
         /// <inheritdoc/>
+        [return: NotNullIfNotNull(nameof(original))]
         public object? DeepCopy(object? original, CopyContext context)
         {
             if (context.TryGetCopy<Array>(original!, out var result))

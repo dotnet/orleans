@@ -41,6 +41,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     }
 
     /// <inheritdoc/>
+    [return: NotNullIfNotNull(nameof(input))]
     public object? DeepCopy(object? input, CopyContext context)
     {
         if (!context.TryGetCopy(input!, out object? result))

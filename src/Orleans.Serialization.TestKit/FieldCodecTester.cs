@@ -106,6 +106,7 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected virtual Action<Action<TValue>>? ValueProvider { get; }
 
+        [return: NotNullIfNotNull(nameof(input))]
         protected virtual TValue? GetWriteCopy(TValue? input) => input;
 
         /// <summary>
@@ -965,6 +966,7 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Round-trips a value through an untyped serializer.
         /// </summary>
+        [return: NotNullIfNotNull(nameof(original))]
         protected object? RoundTripThroughUntypedSerializer(object? original, out string formattedBitStream)
         {
             object? result;

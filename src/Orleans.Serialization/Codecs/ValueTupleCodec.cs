@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -112,6 +113,7 @@ namespace Orleans.Serialization.Codecs
         public bool IsShallowCopyable() => true;
 
         /// <inheritdoc />
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input;
 
         /// <inheritdoc />
@@ -136,6 +138,7 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public bool IsShallowCopyable() => _copier is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((ValueTuple<T>)input!, context);
 
         /// <inheritdoc />
@@ -242,6 +245,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2))input!, context);
 
         /// <inheritdoc />
@@ -366,6 +370,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3))input!, context);
 
         /// <inheritdoc />
@@ -504,6 +509,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4))input!, context);
 
         /// <inheritdoc />
@@ -655,6 +661,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5))input!, context);
 
         /// <inheritdoc />
@@ -821,6 +828,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5, T6))input!, context);
 
         /// <inheritdoc />
@@ -1002,6 +1010,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy(((T1, T2, T3, T4, T5, T6, T7))input!, context);
 
         /// <inheritdoc />
@@ -1197,6 +1206,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier1 is null && _copier2 is null && _copier3 is null && _copier4 is null && _copier5 is null && _copier6 is null && _copier7 is null && _copier8 is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>)input!, context);
 
         /// <inheritdoc />

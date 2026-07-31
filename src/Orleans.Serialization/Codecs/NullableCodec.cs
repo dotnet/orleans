@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -80,6 +81,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() => _copier is null;
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input, context);
 
         /// <inheritdoc/>

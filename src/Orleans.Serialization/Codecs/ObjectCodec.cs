@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -119,6 +120,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input" />.</returns>
+        [return: NotNullIfNotNull(nameof(input))]
         public static object? DeepCopy(object? input, CopyContext context)
         {
             return context.TryGetCopy<object>(input!, out var result) ? result
@@ -131,6 +133,7 @@ namespace Orleans.Serialization.Codecs
                 : input.GetType() == typeof(object) ? input : context.DeepCopy(input)!;
         }
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context)
             => input is null || input.GetType() == typeof(object) ? input : context.DeepCopy(input);
     }

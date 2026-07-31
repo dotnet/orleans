@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
@@ -37,6 +38,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     internal sealed class VoidCopier : IDeepCopier
     {
+        [return: NotNullIfNotNull(nameof(input))]
         public object? DeepCopy(object? input, CopyContext context)
         {
             if (context.TryGetCopy<object>(input!, out var result))
