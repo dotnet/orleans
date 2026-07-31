@@ -1744,6 +1744,8 @@ namespace Orleans.Serialization
 
     public partial class OrleansJsonSerializationBinder : Newtonsoft.Json.Serialization.DefaultSerializationBinder
     {
+        public OrleansJsonSerializationBinder(TypeSystem.TypeConverter typeConverter, TypeSystem.TypeResolver typeResolver, bool allowAllTypes = false) { }
+
         public OrleansJsonSerializationBinder(TypeSystem.TypeResolver typeResolver) { }
 
         public override System.Type BindToType(string assemblyName, string typeName) { throw null; }
@@ -1767,6 +1769,8 @@ namespace Orleans.Serialization
 
     public partial class OrleansJsonSerializerOptions
     {
+        public bool AllowAllTypes { get { throw null; } set { } }
+
         public Newtonsoft.Json.JsonSerializerSettings JsonSerializerSettings { get { throw null; } set { } }
     }
 
