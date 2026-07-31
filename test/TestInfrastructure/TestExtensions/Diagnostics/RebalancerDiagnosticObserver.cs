@@ -331,11 +331,13 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
         public void StartTimeout(TimeSpan timeout, Action callback)
         {
-            _timeoutTimer = new System.Threading.Timer(
+            var timer = new System.Threading.Timer(
                 static state => ((Action)state!).Invoke(),
                 callback,
-                timeout,
+                System.Threading.Timeout.InfiniteTimeSpan,
                 System.Threading.Timeout.InfiniteTimeSpan);
+            Interlocked.Exchange(ref _timeoutTimer, timer)?.Dispose();
+            timer.Change(timeout, System.Threading.Timeout.InfiniteTimeSpan);
         }
 
         public void StopTimeout()

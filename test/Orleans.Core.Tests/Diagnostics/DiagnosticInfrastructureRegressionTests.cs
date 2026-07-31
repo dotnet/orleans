@@ -112,7 +112,7 @@ public class DiagnosticInfrastructureRegressionTests
         using var observer = RebalancerDiagnosticObserver.Create();
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12002), 3);
 
-        await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForSessionStopAsync(TimeSpan.FromMilliseconds(100)));
+        await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForSessionStopAsync(TimeSpan.Zero));
 
         var waitTask = observer.WaitForSessionStopAsync();
         ActivationRebalancerEvents.EmitSessionStop(siloAddress, "latest", 1);
