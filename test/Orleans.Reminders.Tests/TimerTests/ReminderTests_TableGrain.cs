@@ -154,26 +154,22 @@ namespace UnitTests.TimerTests
             Assert.Equal(0, observer.GetTickCount(grainId, reminderName));
 
             var activatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
-            await AdvanceReminderTimeAsync(MaximumInitialRefreshStagger, cts.Token);
-            await activatedTask;
+            await AdvanceUntilAsync(activatedTask, cts.Token);
             await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
 
-            var firstTickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+            var firstTickTask = observer.WaitForTickCountAsync(grainId, 1, cts.Token, reminderName);
             var firstEvictionTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cts.Token);
-            await AdvanceReminderTimeAsync(dueTime - MaximumInitialRefreshStagger, cts.Token);
-            await firstTickTask;
+            await AdvanceUntilAsync(firstTickTask, cts.Token);
             await firstEvictionTask;
 
             Assert.NotNull(await grain.GetReminderObject(reminderName));
 
             var reactivatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
-            await AdvanceReminderTimeAsync(period - ReminderLoadingWindow + ReminderRefreshPeriod, cts.Token);
-            await reactivatedTask;
+            await AdvanceUntilAsync(reactivatedTask, cts.Token);
 
-            var secondTickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+            var secondTickTask = observer.WaitForTickCountAsync(grainId, 2, cts.Token, reminderName);
             var secondEvictionTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cts.Token);
-            await AdvanceReminderTimeAsync(ReminderLoadingWindow - ReminderRefreshPeriod, cts.Token);
-            await secondTickTask;
+            await AdvanceUntilAsync(secondTickTask, cts.Token);
             await secondEvictionTask;
 
             await grain.StopReminder(reminderName);
