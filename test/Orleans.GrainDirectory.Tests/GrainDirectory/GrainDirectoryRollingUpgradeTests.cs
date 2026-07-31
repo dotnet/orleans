@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -1051,7 +1052,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             for (var partitionIndex = 0; partitionIndex < membershipService.PartitionsPerSilo; partitionIndex++)
             {
                 distributedPartitions.Add(
-                    cluster.InternalClient.GetSystemTarget<IGrainDirectoryTestHooks>(
+                    cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                         GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId));
             }
         }
@@ -1431,7 +1432,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 try
                 {
-                    var siloControl = cluster.InternalClient.GetSystemTarget<ISiloControl>(
+                    var siloControl = cluster.InternalClient!.GetSystemTarget<ISiloControl>(
                         Constants.SiloControlType,
                         silo.SiloAddress);
                     var report = await siloControl.GetDetailedGrainReport(grainId).WaitAsync(cancellation.Token);
@@ -1936,6 +1937,6 @@ internal sealed class TrackingGrainDirectoryCache : IGrainDirectoryCache
         _inner.Clear();
     }
 
-    public bool LookUp(GrainId key, out GrainAddress result, out int version) =>
+    public bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version) =>
         _inner.LookUp(key, out result, out version);
 }
