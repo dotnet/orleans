@@ -149,7 +149,14 @@ namespace Orleans.Runtime.Placement
 
             if (_manifestUpdatesTask is Task manifestUpdatesTask)
             {
-                await manifestUpdatesTask.WaitAsync(cancellationToken).SuppressThrowing();
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    await manifestUpdatesTask.SuppressThrowing();
+                }
+                else
+                {
+                    await manifestUpdatesTask.WaitAsync(cancellationToken).SuppressThrowing();
+                }
             }
 
             _siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
@@ -247,9 +254,30 @@ namespace Orleans.Runtime.Placement
 
         private SiloAddress[] GetUnfilteredCompatibleSilos(GrainType grainType, GrainInterfaceType interfaceType, ushort interfaceVersion)
         {
-            var generation = Volatile.Read(ref _placementCacheGeneration);
-            var key = new CompatibleSilosCacheKey(grainType, interfaceType, interfaceVersion, generation);
-            return _compatibleSilosCache.GetOrAdd(key, key => ComputeUnfilteredCompatibleSilos(key.GrainType, key.InterfaceType, key.InterfaceVersion));
+            if (interfaceVersion == 0)
+            {
+                interfaceType = default;
+            }
+
+            while (true)
+            {
+                var generation = Volatile.Read(ref _placementCacheGeneration);
+                var key = new CompatibleSilosCacheKey(grainType, interfaceType, interfaceVersion, generation);
+                var result = _compatibleSilosCache.GetOrAdd(
+                    key,
+                    static (key, placementService) => placementService.ComputeUnfilteredCompatibleSilos(
+                        key.GrainType,
+                        key.InterfaceType,
+                        key.InterfaceVersion),
+                    this);
+
+                if (generation == Volatile.Read(ref _placementCacheGeneration))
+                {
+                    return result;
+                }
+
+                _compatibleSilosCache.TryRemove(key, out _);
+            }
         }
 
         private SiloAddress[] ComputeUnfilteredCompatibleSilos(GrainType grainType, GrainInterfaceType interfaceType, ushort interfaceVersion)

@@ -132,6 +132,23 @@ namespace UnitTests.Runtime
         }
 
         [Fact]
+        public async Task GetCompatibleSilos_WithoutInterfaceVersion_ReusesCacheAcrossInterfaces()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos);
+            var firstTarget = CreatePlacementTarget(interfaceType: GrainInterfaceType.Create("test.interface.one"));
+            var secondTarget = CreatePlacementTarget(interfaceType: GrainInterfaceType.Create("test.interface.two"));
+
+            var first = fixture.Target.GetCompatibleSilos(firstTarget);
+            var second = fixture.Target.GetCompatibleSilos(secondTarget);
+
+            Assert.Same(first, second);
+            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
         public async Task GetCompatibleSilos_MembershipChange_InvalidatesCachedResult()
         {
             var silos = CreateSilos(2);
@@ -213,8 +230,14 @@ namespace UnitTests.Runtime
             return new PlacementServiceFixture().Target;
         }
 
-        private static PlacementTarget CreatePlacementTarget(Dictionary<string, object>? requestContextData = null) =>
-            new(GrainId.Create(TestGrainType, "grain-1"), requestContextData ?? new Dictionary<string, object>(), TestInterfaceType, 0);
+        private static PlacementTarget CreatePlacementTarget(
+            Dictionary<string, object>? requestContextData = null,
+            GrainInterfaceType? interfaceType = null) =>
+            new(
+                GrainId.Create(TestGrainType, "grain-1"),
+                requestContextData ?? new Dictionary<string, object>(),
+                interfaceType ?? TestInterfaceType,
+                0);
 
         private static PlacementService CreateTarget(
             IOptionsMonitor<SiloMessagingOptions> optionsMonitor,
