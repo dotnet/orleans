@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -1066,6 +1065,7 @@ namespace Orleans.Runtime.ReminderService
 
                 ReminderEvents.EmitLocalReminderScheduleChanged(entry.GrainId, entry.ReminderName, this, scheduleVersion, _shared.Silo);
                 scheduleChangedCancellation.Cancel();
+                scheduleChangedCancellation.Dispose();
             }
 
             public Task StopAsync(ReminderEvents.LocalReminderStopReason reason, long? localSequenceNumber = null)
