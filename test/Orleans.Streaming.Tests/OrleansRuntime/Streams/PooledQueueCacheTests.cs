@@ -276,6 +276,33 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AdaptiveCacheReleasesPartialBlockWhenDrained()
+        {
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, null, 2, 8, 1);
+            var streamId = StreamId.Create("test", "stream");
+            cache.Add(
+                [
+                    new CachedMessage
+                    {
+                        StreamId = streamId,
+                        SequenceNumber = 1,
+                        EnqueueTimeUtc = DateTime.UtcNow,
+                        DequeueTimeUtc = DateTime.UtcNow,
+                    }
+                ],
+                DateTime.UtcNow);
+
+            Assert.True(cache.AllocatedSizeInBytes > 0);
+            cache.RemoveOldestMessage();
+
+            Assert.True(cache.IsEmpty);
+            Assert.Equal(0, cache.AllocatedSizeInBytes);
+            var cursor = cache.GetCursor(streamId, null);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void AvoidCacheMissNotEmptyCache()
         {
             AvoidCacheMiss(false);

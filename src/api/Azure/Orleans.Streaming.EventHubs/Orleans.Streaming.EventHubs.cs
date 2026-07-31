@@ -61,6 +61,22 @@ namespace Orleans.Configuration
         public bool StartFromNow { get { throw null; } set { } }
     }
 
+    public partial class EventHubStreamCacheMemoryOptions
+    {
+        public const long DefaultMaxActiveCacheMemory = 536870912L;
+        public const long DefaultMaxBufferPoolMemory = 67108864L;
+        public long MaxActiveCacheMemory { get { throw null; } set { } }
+
+        public long MaxBufferPoolMemory { get { throw null; } set { } }
+    }
+
+    public partial class EventHubStreamCacheMemoryOptionsValidator : IConfigurationValidator
+    {
+        public EventHubStreamCacheMemoryOptionsValidator(EventHubStreamCacheMemoryOptions options, string name) { }
+
+        public void ValidateConfiguration() { }
+    }
+
     public partial class EventHubStreamCachePressureOptions
     {
         public double? AveragingCachePressureMonitorFlowControlThreshold { get { throw null; } set { } }
@@ -125,6 +141,8 @@ namespace Orleans.Hosting
 
     public static partial class SiloEventHubStreamConfiguratorExtensions
     {
+        public static void ConfigureCacheMemory(this ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubStreamCacheMemoryOptions>> configureOptions) { }
+
         public static void ConfigureCachePressuring(this ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubStreamCachePressureOptions>> configureOptions) { }
 
         public static void ConfigureCheckpointer<TOptions>(this ISiloEventHubStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Streams.IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>> configureOptions)
@@ -140,6 +158,8 @@ namespace Orleans.Hosting.Developer
 {
     public static partial class EventDataGeneratorConfiguratorExtensions
     {
+        public static void ConfigureCacheMemory(this IEventDataGeneratorStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubStreamCacheMemoryOptions>> configureOptions) { }
+
         public static void ConfigureCachePressuring(this IEventDataGeneratorStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubStreamCachePressureOptions>> configureOptions) { }
 
         public static void UseDataAdapter(this IEventDataGeneratorStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Streaming.EventHubs.IEventHubDataAdapter> factory) { }
@@ -269,6 +289,8 @@ namespace Orleans.Streaming.EventHubs
         protected System.Func<EventHubPartitionSettings, string, Microsoft.Extensions.Logging.ILogger, IEventHubReceiver> EventHubReceiverFactory;
         protected Microsoft.Extensions.Logging.ILogger logger;
         protected readonly System.IServiceProvider serviceProvider;
+        public EventHubAdapterFactory(string name, Configuration.EventHubOptions ehOptions, Configuration.EventHubReceiverOptions receiverOptions, Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.EventHubStreamCacheMemoryOptions cacheMemoryOptions, Configuration.StreamCacheEvictionOptions cacheEvictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdapter, System.IServiceProvider serviceProvider, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider) { }
+
         public EventHubAdapterFactory(string name, Configuration.EventHubOptions ehOptions, Configuration.EventHubReceiverOptions receiverOptions, Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions cacheEvictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdapter, System.IServiceProvider serviceProvider, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider) { }
 
         protected System.Func<string, Streams.IStreamQueueCheckpointer<string>, Microsoft.Extensions.Logging.ILoggerFactory, IEventHubQueueCache> CacheFactory { get { throw null; } set { } }
@@ -450,7 +472,7 @@ namespace Orleans.Streaming.EventHubs
     public partial class EventHubQueueCache : IEventHubQueueCache, Streams.IQueueFlowController, System.IDisposable
     {
         protected readonly Providers.Streams.Common.PooledQueueCache cache;
-        public EventHubQueueCache(string partition, int defaultMaxAddCount, Providers.Streams.Common.IObjectPool<Providers.Streams.Common.FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, Providers.Streams.Common.IEvictionStrategy evictionStrategy, Streams.IStreamQueueCheckpointer<string> checkpointer, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor cacheMonitor, System.TimeSpan? cacheMonitorWriteInterval, System.TimeSpan? metadataMinTimeInCache) { }
+        public EventHubQueueCache(string partition, int defaultMaxAddCount, Providers.Streams.Common.IObjectPool<Providers.Streams.Common.FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, Providers.Streams.Common.IEvictionStrategy evictionStrategy, Streams.IStreamQueueCheckpointer<string> checkpointer, Microsoft.Extensions.Logging.ILogger logger, Providers.Streams.Common.ICacheMonitor? cacheMonitor, System.TimeSpan? cacheMonitorWriteInterval, System.TimeSpan? metadataMinTimeInCache) { }
 
         public string Partition { get { throw null; } }
 
@@ -473,6 +495,8 @@ namespace Orleans.Streaming.EventHubs
 
     public partial class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
+        public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.EventHubStreamCacheMemoryOptions cacheMemoryOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, Runtime.OrleansInstruments instruments, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor>? cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor>? blockPoolMonitorFactory = null) { }
+
         public EventHubQueueCacheFactory(Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdater, EventHubMonitorAggregationDimensions sharedDimensions, Runtime.OrleansInstruments instruments, System.Func<EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.ICacheMonitor>? cacheMonitorFactory = null, System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor>? blockPoolMonitorFactory = null) { }
 
         public System.Func<EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Providers.Streams.Common.IBlockPoolMonitor> BlockPoolMonitorFactory { get { throw null; } set { } }
@@ -606,6 +630,8 @@ namespace Orleans.Streaming.EventHubs.Testing
 {
     public partial class EventDataGeneratorAdapterFactory : EventHubAdapterFactory, Providers.IControllable
     {
+        public EventDataGeneratorAdapterFactory(string name, Configuration.EventDataGeneratorStreamOptions options, Configuration.EventHubOptions ehOptions, Configuration.EventHubReceiverOptions receiverOptions, Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.EventHubStreamCacheMemoryOptions cacheMemoryOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdapter, System.IServiceProvider serviceProvider, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider) : base(default!, default!, default!, default!, default!, default!, default!, default!, default!, default!) { }
+
         public EventDataGeneratorAdapterFactory(string name, Configuration.EventDataGeneratorStreamOptions options, Configuration.EventHubOptions ehOptions, Configuration.EventHubReceiverOptions receiverOptions, Configuration.EventHubStreamCachePressureOptions cacheOptions, Configuration.StreamCacheEvictionOptions evictionOptions, Configuration.StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdapter, System.IServiceProvider serviceProvider, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider) : base(default!, default!, default!, default!, default!, default!, default!, default!, default!, default!) { }
 
         public new static EventDataGeneratorAdapterFactory Create(System.IServiceProvider services, string name) { throw null; }
