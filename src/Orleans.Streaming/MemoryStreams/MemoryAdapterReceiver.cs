@@ -33,7 +33,7 @@ namespace Orleans.Providers
             return Task.CompletedTask;
         }
 
-        public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
             var watch = Stopwatch.StartNew();
             List<IBatchContainer> batches;

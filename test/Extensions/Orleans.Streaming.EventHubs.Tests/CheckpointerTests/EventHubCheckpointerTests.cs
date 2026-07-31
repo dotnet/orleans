@@ -113,9 +113,9 @@ public class EventHubCheckpointerTests
     {
         public int CloseCount { get; private set; }
 
-        public Task<IEnumerable<EventData>?> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
-            return Task.FromResult<IEnumerable<EventData>?>([]);
+            return Task.FromResult<IEnumerable<EventData>>([]);
         }
 
         public Task CloseAsync()
@@ -129,9 +129,9 @@ public class EventHubCheckpointerTests
     {
         public int CloseCount { get; private set; }
 
-        public Task<IEnumerable<EventData>?> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
-            return Task.FromResult<IEnumerable<EventData>?>([]);
+            return Task.FromResult<IEnumerable<EventData>>([]);
         }
 
         public Task CloseAsync() => CloseAsync(CancellationToken.None);

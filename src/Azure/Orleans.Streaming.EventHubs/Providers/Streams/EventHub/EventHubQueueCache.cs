@@ -178,7 +178,7 @@ namespace Orleans.Streaming.EventHubs
             }
             if (lastItemPurged.HasValue)
             {
-                checkpointer.Update(this.dataAdapter.GetOffset(lastItemPurged.Value)!, DateTime.UtcNow);
+                checkpointer.Update(this.dataAdapter.GetOffset(lastItemPurged.Value), DateTime.UtcNow);
             }
         }
 

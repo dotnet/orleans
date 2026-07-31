@@ -86,8 +86,8 @@ namespace Tester.AzureUtils
             queueName = "Test-2-".ToLower() + Guid.NewGuid();
             AzureQueueDataManager manager = await GetTableManager(queueName);
 
-            IEnumerable<QueueMessage>? msgs = await manager.GetQueueMessages();
-            Assert.True(msgs == null || !msgs.Any());
+            IEnumerable<QueueMessage> msgs = await manager.GetQueueMessages();
+            Assert.Empty(msgs);
 
             int numMsgs = 10;
             List<Task> promises = new List<Task>();

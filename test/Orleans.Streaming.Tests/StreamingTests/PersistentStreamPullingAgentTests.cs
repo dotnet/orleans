@@ -33,7 +33,7 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             // Use Arg.Any<int>() to match regardless of the maxCacheAddCount value.
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>?>(
+                .Returns(Task.FromResult<IList<IBatchContainer>>(
                 [
                     new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
                 ]));
@@ -73,7 +73,7 @@ namespace UnitTests.StreamingTests
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>?>(
+                .Returns(Task.FromResult<IList<IBatchContainer>>(
                 [
                     new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
                 ]));
@@ -475,7 +475,7 @@ namespace UnitTests.StreamingTests
 
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>?>([new TestBatchContainer(streamId, newToken)]));
+                .Returns(Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId, newToken)]));
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache);
@@ -528,8 +528,8 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(
-                    Task.FromResult<IList<IBatchContainer>?>([new TestBatchContainer(streamId, attemptedToken)]),
-                    Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
+                    Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId, attemptedToken)]),
+                    Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new ScriptedQueueCache();
@@ -645,7 +645,7 @@ namespace UnitTests.StreamingTests
         public async Task Shutdown_WaitsForInFlightPumpWork()
         {
             var queueReadStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var queueReadReleased = new TaskCompletionSource<IList<IBatchContainer>?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var queueReadReleased = new TaskCompletionSource<IList<IBatchContainer>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
@@ -695,7 +695,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var agent = CreateAgent(pubSub: null, queueId, receiver);
@@ -720,7 +720,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
@@ -770,7 +770,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();
@@ -824,10 +824,10 @@ namespace UnitTests.StreamingTests
             var receiverShutdownStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(
-                    Task.FromResult<IList<IBatchContainer>?>([
+                    Task.FromResult<IList<IBatchContainer>>([
                         new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
                     ]),
-                    Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
+                    Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(_ =>
             {
                 receiverShutdownStarted.SetResult(true);
@@ -874,7 +874,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             receiver.GetQueueMessagesAsync(Arg.Any<int>())
-                .Returns(Task.FromResult<IList<IBatchContainer>?>(new List<IBatchContainer>()));
+                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueCache = new RecordingQueueCache();

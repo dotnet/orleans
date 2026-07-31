@@ -68,7 +68,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             }
         }
 
-        public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
             const int MaxNumberOfMessagesToPeek = 32;
 
@@ -82,10 +82,10 @@ namespace Orleans.Providers.Streams.AzureQueue
 
                 var task = queueRef.GetQueueMessages(count);
                 outstandingTask = task;
-                IEnumerable<QueueMessage>? messages = await task;
+                IEnumerable<QueueMessage> messages = await task;
 
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
-                foreach (var message in messages!)
+                foreach (var message in messages)
                 {
                     IBatchContainer container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
                     azureQueueMessages.Add(container);

@@ -112,12 +112,12 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="beginHash">The begin hash.</param>
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData?> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
+        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
         {
             var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
             // Collection queries only yield rows containing reminder data; the selector is nullable for single-row outer joins.
-            return ReadAsync<ReminderEntry, ReminderTableData?>(query, record => GetReminderEntry(record)!, command =>
+            return ReadAsync<ReminderEntry, ReminderTableData>(query, record => GetReminderEntry(record)!, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }

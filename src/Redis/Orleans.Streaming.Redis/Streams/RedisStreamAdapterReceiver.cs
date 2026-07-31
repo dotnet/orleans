@@ -29,7 +29,7 @@ internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
         }
     }
 
-    public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
+    public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
     {
         try
         {

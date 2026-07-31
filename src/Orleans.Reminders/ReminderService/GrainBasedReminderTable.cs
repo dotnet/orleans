@@ -47,7 +47,7 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(result);
         }
 
-        public Task<ReminderTableData?> ReadRows(uint begin, uint end)
+        public Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             var range = RangeFactory.CreateRange(begin, end);
 
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.ReminderService
 
             var result = new ReminderTableData(list);
             LogDebugReadReminders(result.Reminders.Count, new(result.Reminders));
-            return Task.FromResult<ReminderTableData?>(result);
+            return Task.FromResult(result);
         }
 
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)

@@ -130,7 +130,7 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
             if (this.receiverState == ReceiverShutdown || maxCount <= 0)
             {
@@ -149,11 +149,11 @@ namespace Orleans.Streaming.EventHubs
                 }
             }
             var watch = Stopwatch.StartNew();
-            List<EventData>? messages;
+            List<EventData> messages;
             try
             {
 
-                messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
+                messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout)).ToList();
                 watch.Stop();
 
                 this.monitor?.TrackRead(true, watch.Elapsed, null);
@@ -167,7 +167,7 @@ namespace Orleans.Streaming.EventHubs
             }
 
             var batches = new List<IBatchContainer>();
-            if (messages == null || messages.Count == 0)
+            if (messages.Count == 0)
             {
                 this.monitor?.TrackMessagesReceived(0, null, null);
                 return batches;

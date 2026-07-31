@@ -70,7 +70,7 @@ namespace OrleansAWSUtils.Streams
             }
         }
 
-        public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
             try
             {
@@ -82,8 +82,8 @@ namespace OrleansAWSUtils.Streams
 
                 var task = queueRef.GetMessages(count);
                 outstandingTask = task;
-                IEnumerable<SQSMessage>? messages = await task;
-                if (messages == null || !messages.Any())
+                IEnumerable<SQSMessage> messages = await task;
+                if (!messages.Any())
                     return Array.Empty<IBatchContainer>();
 
                 List<IBatchContainer> messageBatch = messages

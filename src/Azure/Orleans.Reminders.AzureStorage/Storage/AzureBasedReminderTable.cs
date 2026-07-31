@@ -175,7 +175,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<ReminderTableData?> ReadRows(uint begin, uint end)
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             try
             {

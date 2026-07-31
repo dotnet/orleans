@@ -499,9 +499,6 @@ namespace Orleans.Runtime.ReminderService
 
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
-                // If null is a valid value, it means that there's nothing to do.
-                if (table is null) return;
-
                 var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>(); // shallow copy
                 foreach (var r in localReminders)
                     if (range.InRange(r.Key.GrainId))

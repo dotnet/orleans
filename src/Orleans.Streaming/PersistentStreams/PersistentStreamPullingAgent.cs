@@ -523,14 +523,14 @@ namespace Orleans.Streams
             }
 
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
-            IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
+            IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
 
             if (IsShutdown || cancellationToken.IsCancellationRequested)
             {
                 return false;
             }
 
-            if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
+            if (multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;

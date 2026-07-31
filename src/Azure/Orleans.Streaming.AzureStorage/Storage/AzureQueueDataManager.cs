@@ -266,7 +266,7 @@ namespace Orleans.AzureUtils
         /// Gets a number of new messages from the queue.
         /// </summary>
         /// <param name="count">Number of messages to get from the queue.</param>
-        public async Task<IEnumerable<QueueMessage>?> GetQueueMessages(int? count = null)
+        public async Task<IEnumerable<QueueMessage>> GetQueueMessages(int? count = null)
         {
             var startTime = DateTime.UtcNow;
             if (count == -1)
@@ -284,7 +284,7 @@ namespace Orleans.AzureUtils
             catch (Exception exc)
             {
                 ReportErrorAndRethrow(exc, "GetQueueMessages", AzureQueueErrorCode.AzureQueue_10);
-                return null; // Dummy statement to keep compiler happy
+                throw new InvalidOperationException("Unable to retrieve messages from the queue.");
             }
             finally
             {

@@ -46,7 +46,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     }
 
     /// <inheritdoc />
-    public async Task<IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount)
+    public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
     {
         // if shutdown has been called then we refuse further requests gracefully
         if (_shutdown)

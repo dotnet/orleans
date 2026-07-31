@@ -21,7 +21,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="maxCount">Max amount of message which should be delivered in this request</param>
         /// <param name="waitTime">Wait time of this request</param>
         /// <returns></returns>
-        Task<IEnumerable<EventData>?> ReceiveAsync(int maxCount, TimeSpan waitTime);
+        Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime);
 
         /// <summary>
         /// Send a clean up message
@@ -84,7 +84,7 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        public async Task<IEnumerable<EventData>?> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
             return await client.ReceiveBatchAsync(maxCount, waitTime);
         }

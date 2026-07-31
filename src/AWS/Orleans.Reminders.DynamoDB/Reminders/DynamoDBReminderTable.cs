@@ -164,7 +164,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="begin"></param>
         /// <param name="end"></param>
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData?> ReadRows(uint begin, uint end)
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             Dictionary<string, AttributeValue>? expressionValues = null;
 

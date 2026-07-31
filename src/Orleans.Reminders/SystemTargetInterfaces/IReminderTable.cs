@@ -44,7 +44,7 @@ namespace Orleans
         /// <param name="begin">The exclusive lower bound.</param>
         /// <param name="end">The inclusive upper bound.</param>
         /// <returns>The reminder table entries which fall within the specified range.</returns>
-        Task<ReminderTableData?> ReadRows(uint begin, uint end);
+        Task<ReminderTableData> ReadRows(uint begin, uint end);
 
         /// <summary>
         /// Reads the specified entry.
@@ -91,7 +91,7 @@ namespace Orleans
     {
         Task<ReminderTableData> ReadRows(GrainId grainId);
 
-        Task<ReminderTableData?> ReadRows(uint begin, uint end);
+        Task<ReminderTableData> ReadRows(uint begin, uint end);
 
         Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 

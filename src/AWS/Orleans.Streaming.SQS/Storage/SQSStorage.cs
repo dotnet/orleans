@@ -182,7 +182,7 @@ namespace OrleansAWSUtils.Storage
         /// </summary>
         /// <param name="count">The number of messages to peak. Min 1 and max 10</param>
         /// <returns>Collection with messages from the queue</returns>
-        public async Task<IEnumerable<SQSMessage>?> GetMessages(int count = 1)
+        public async Task<IEnumerable<SQSMessage>> GetMessages(int count = 1)
         {
             try
             {
@@ -200,7 +200,7 @@ namespace OrleansAWSUtils.Storage
             {
                 ReportErrorAndRethrow(exc, "GetMessages");
             }
-            return null;
+            throw new InvalidOperationException("Unable to retrieve messages from the queue.");
         }
 
         /// <summary>

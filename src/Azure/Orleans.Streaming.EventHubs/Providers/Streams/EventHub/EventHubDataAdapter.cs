@@ -83,11 +83,11 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Get offset from cached message.  Left to derived class, as only it knows how to get this from the cached message.
         /// </summary>
-        public virtual string? GetOffset(CachedMessage lastItemPurged)
+        public virtual string GetOffset(CachedMessage lastItemPurged)
         {
-            // TODO figure out how to get this from the adapter
             int readOffset = 0;
-            return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset
+            return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset)
+                ?? throw new InvalidOperationException("Cached Event Hub message is missing its offset.");
         }
 
         /// <summary>

@@ -22,7 +22,7 @@ namespace Orleans.Streaming.EventHubs.Testing
             this.generator = generator;
         }
         /// <inheritdoc />
-        public async Task<IEnumerable<EventData>?> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
             IEnumerable<EventData>? events;
             //mimic real life response time
