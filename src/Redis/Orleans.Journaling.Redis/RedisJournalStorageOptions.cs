@@ -85,7 +85,7 @@ public sealed class RedisJournalStorageOptions
 
 internal sealed class RedactRedisConfigurationOptionsAttribute : RedactAttribute
 {
-    public override string Redact(object value) => value is ConfigurationOptions configuration
+    public override string Redact(object? value) => value is ConfigurationOptions configuration
         ? configuration.ToString(includePassword: false)
         : base.Redact(value);
 }
