@@ -16,6 +16,11 @@ internal static class ReminderOptionsDefaults
     public const uint RefreshReminderListPeriodMinutes = 5;
 
     /// <summary>
+    /// The amount of time (in minutes) before their next tick that reminders are loaded into memory.
+    /// </summary>
+    public const uint ReminderLoadingWindowMinutes = 2 * RefreshReminderListPeriodMinutes;
+
+    /// <summary>
     /// The maximum amount of time (in minutes) to attempt to initialize reminders giving up <see cref="ReminderOptions.InitializationTimeout"/>.
     /// </summary>
     public const uint InitializationTimeoutMinutes = 5;

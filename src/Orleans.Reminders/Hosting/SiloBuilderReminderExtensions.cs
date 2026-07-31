@@ -30,6 +30,7 @@ public static class SiloBuilderReminderExtensions
         }
 
         services.TryAddSingleton<ReminderInstruments>();
+        services.AddSingleton<IConfigurationValidator, ReminderOptionsValidator>();
         services.AddSingleton<LocalReminderService>();
         services.AddFromExisting<IGrainService, LocalReminderService>();
         services.AddFromExisting<IReminderService, LocalReminderService>();

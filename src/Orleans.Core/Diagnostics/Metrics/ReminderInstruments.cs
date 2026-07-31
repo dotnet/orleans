@@ -13,7 +13,10 @@ internal sealed class ReminderInstruments(OrleansInstruments instruments)
 
     internal void RegisterActiveRemindersObserve(Func<int> observeValue)
     {
-        _activeReminders = instruments.Meter.CreateObservableGauge(InstrumentNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, observeValue);
+        _activeReminders = instruments.Meter.CreateObservableGauge(
+            InstrumentNames.REMINDERS_NUMBER_ACTIVE_REMINDERS,
+            observeValue,
+            description: "Upper bound on the number of reminders tracked locally, including temporary tombstones");
     }
 
     internal void OnTardiness(TimeSpan tardiness) => _tardinessSeconds.Record(tardiness.TotalSeconds);

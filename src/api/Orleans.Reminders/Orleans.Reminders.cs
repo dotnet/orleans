@@ -102,6 +102,8 @@ namespace Orleans.Hosting
         public System.TimeSpan MinimumReminderPeriod { get { throw null; } set { } }
 
         public System.TimeSpan RefreshReminderListPeriod { get { throw null; } set { } }
+
+        public System.TimeSpan ReminderLoadingWindow { get { throw null; } set { } }
     }
 
     public static partial class SiloBuilderReminderExtensions
@@ -200,7 +202,8 @@ namespace Orleans.Reminders.Diagnostics
             Replaced = 2,
             RemovedFromRange = 3,
             RemovedFromTable = 4,
-            ServiceStopped = 5
+            ServiceStopped = 5,
+            OutsideLoadingWindow = 6
         }
 
         public sealed partial class LocalReminderTickWaitArmed : ReminderEvent

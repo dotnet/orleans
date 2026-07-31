@@ -26,6 +26,16 @@ public sealed class ReminderOptions
     public TimeSpan RefreshReminderListPeriod { get; set; } = TimeSpan.FromMinutes(ReminderOptionsDefaults.RefreshReminderListPeriodMinutes);
 
     /// <summary>
+    /// Gets or sets the amount of time before their next tick that reminders are loaded into memory.
+    /// </summary>
+    /// <remarks>
+    /// Reminders outside this window remain only in reminder storage. If reminder storage cannot be refreshed for longer than this window,
+    /// reminders can be delivered late. Increase this value to tolerate longer storage outages at the cost of higher memory usage.
+    /// </remarks>
+    /// <value>Load reminders 10 minutes before their next tick by default.</value>
+    public TimeSpan ReminderLoadingWindow { get; set; } = TimeSpan.FromMinutes(ReminderOptionsDefaults.ReminderLoadingWindowMinutes);
+
+    /// <summary>
     /// Gets or sets the maximum amount of time to attempt to initialize reminders before giving up.
     /// </summary>
     /// <value>Attempt to initialize for 5 minutes before giving up by default.</value>
@@ -61,6 +71,23 @@ internal sealed partial class ReminderOptionsValidator : IConfigurationValidator
         if (options.Value.MinimumReminderPeriod < TimeSpan.Zero)
         {
             throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MinimumReminderPeriod)} must not be less than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.RefreshReminderListPeriod <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.RefreshReminderListPeriod)} must be greater than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.ReminderLoadingWindow <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.ReminderLoadingWindow)} must be greater than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.ReminderLoadingWindow < options.Value.RefreshReminderListPeriod)
+        {
+            throw new OrleansConfigurationException(
+                $"{nameof(ReminderOptions)}.{nameof(ReminderOptions.ReminderLoadingWindow)} must not be less than "
+                + $"{nameof(ReminderOptions)}.{nameof(ReminderOptions.RefreshReminderListPeriod)}");
         }
 
         if (options.Value.MinimumReminderPeriod.TotalMinutes < ReminderOptionsDefaults.MinimumReminderPeriodMinutes)
