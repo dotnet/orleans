@@ -101,6 +101,29 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AdaptiveBlockGrowsAndShrinks()
+        {
+            var block = new CachedMessageBlock(2, 8);
+            var initialSize = block.AllocatedSizeInBytes;
+
+            block.Add(default);
+            block.Add(default);
+            Assert.Equal(initialSize, block.AllocatedSizeInBytes);
+
+            block.Add(default);
+            Assert.Equal(initialSize * 2, block.AllocatedSizeInBytes);
+
+            while (!block.IsEmpty)
+            {
+                block.Remove();
+            }
+
+            block.OnResetState();
+            Assert.Equal(initialSize, block.AllocatedSizeInBytes);
+            Assert.Equal(0, block.ItemCount);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Add2Remove1UntilFull()
         {
             IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
