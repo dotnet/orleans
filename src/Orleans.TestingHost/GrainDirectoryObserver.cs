@@ -27,6 +27,9 @@ internal sealed class GrainDirectoryObserver : IObserver<GrainDirectoryEvents.Gr
         _subscription = GrainDirectoryEvents.AllEvents.Subscribe(this);
     }
 
+    public static bool CanObserve(IReadOnlyCollection<InProcessSiloHandle> activeSilos) =>
+        activeSilos.All(static silo => TryCreateTarget(silo, out _));
+
     public async Task<bool> WaitForConvergenceAsync(
         IReadOnlyCollection<InProcessSiloHandle> activeSilos,
         TimeSpan timeout)
@@ -145,12 +148,29 @@ internal sealed class GrainDirectoryObserver : IObserver<GrainDirectoryEvents.Gr
 
     private static Target CreateTarget(InProcessSiloHandle silo)
     {
+        if (TryCreateTarget(silo, out var target))
+        {
+            return target;
+        }
+
+        throw new InvalidOperationException(
+            $"The default grain directory on silo {silo.SiloAddress} does not emit grain directory convergence events.");
+    }
+
+    private static bool TryCreateTarget(InProcessSiloHandle silo, out Target target)
+    {
         var services = silo.ServiceProvider;
         var membershipVersion = services.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Version;
-        var distributedPartitionCount = services.GetService<DistributedGrainDirectory>() is not null
-            ? services.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo
-            : 0;
-        return new(silo.SiloAddress, membershipVersion, distributedPartitionCount);
+        var defaultDirectory = services.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+        var distributedPartitionCount = defaultDirectory switch
+        {
+            null => 0,
+            DistributedGrainDirectory => services.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo,
+            _ => -1
+        };
+
+        target = new(silo.SiloAddress, membershipVersion, distributedPartitionCount);
+        return distributedPartitionCount >= 0;
     }
 
     private static void UpdateVersion<TKey>(

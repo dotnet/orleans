@@ -366,9 +366,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
         var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
-        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence = Options.UseTestClusterGrainDirectory
-            ? null
-            : timeout => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, timeout);
+        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
+            GrainDirectoryObserver.CanObserve(activeSilos)
+                ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, timeout)
+                : null;
         WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
         if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
             activeSilos,

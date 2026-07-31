@@ -428,7 +428,7 @@ namespace Orleans.TestingHost
             var gatewayManager = this.InternalClient.ServiceProvider.GetRequiredService<GatewayManager>();
             var inProcessSilos = activeSilos.OfType<InProcessSiloHandle>().ToArray();
             Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
-                inProcessSilos.Length == activeSilos.Length
+                inProcessSilos.Length == activeSilos.Length && GrainDirectoryObserver.CanObserve(inProcessSilos)
                     ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(inProcessSilos, timeout)
                     : null;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
