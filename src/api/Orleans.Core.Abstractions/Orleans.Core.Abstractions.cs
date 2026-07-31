@@ -2358,7 +2358,7 @@ namespace Orleans.Runtime
 
         readonly bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
-        public override readonly string? ToString() { throw null; }
+        public override readonly string ToString() { throw null; }
 
         public static byte[]? UnsafeGetArray(GrainType id) { throw null; }
     }

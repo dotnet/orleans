@@ -1335,7 +1335,7 @@ namespace Orleans.Runtime
 
         public readonly GenericGrainType GetUnconstructedGrainType() { throw null; }
 
-        public override readonly string? ToString() { throw null; }
+        public override readonly string ToString() { throw null; }
 
         public static bool TryParse(GrainType grainType, out GenericGrainType result) { throw null; }
     }

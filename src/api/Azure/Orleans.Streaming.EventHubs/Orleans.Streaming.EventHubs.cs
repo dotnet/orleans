@@ -382,7 +382,7 @@ namespace Orleans.Streaming.EventHubs
 
         protected virtual Streams.IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage) { throw null; }
 
-        public virtual string? GetOffset(Providers.Streams.Common.CachedMessage lastItemPurged) { throw null; }
+        public virtual string GetOffset(Providers.Streams.Common.CachedMessage lastItemPurged) { throw null; }
 
         public virtual string GetPartitionKey(Runtime.StreamId streamId) { throw null; }
 
@@ -530,7 +530,7 @@ namespace Orleans.Streaming.EventHubs
     public partial interface IEventHubDataAdapter : Streams.IQueueDataAdapter<Azure.Messaging.EventHubs.EventData>, Providers.Streams.Common.ICacheDataAdapter
     {
         Providers.Streams.Common.CachedMessage FromQueueMessage(Streams.StreamPosition position, Azure.Messaging.EventHubs.EventData queueMessage, System.DateTime dequeueTime, System.Func<int, System.ArraySegment<byte>> getSegment);
-        string? GetOffset(Providers.Streams.Common.CachedMessage cachedMessage);
+        string GetOffset(Providers.Streams.Common.CachedMessage cachedMessage);
         string GetPartitionKey(Runtime.StreamId streamId);
         Runtime.StreamId GetStreamIdentity(Azure.Messaging.EventHubs.EventData queueMessage);
         Streams.StreamPosition GetStreamPosition(string partition, Azure.Messaging.EventHubs.EventData queueMessage);
@@ -562,7 +562,7 @@ namespace Orleans.Streaming.EventHubs
     {
         System.Threading.Tasks.Task CloseAsync();
         System.Threading.Tasks.Task CloseAsync(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>?> ReceiveAsync(int maxCount, System.TimeSpan waitTime);
+        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime);
     }
 
     public partial class SlowConsumingPressureMonitor : ICachePressureMonitor
@@ -658,7 +658,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public void ConfigureDataGeneratorForStream(Runtime.StreamId streamId) { }
 
-        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>?> ReceiveAsync(int maxCount, System.TimeSpan waitTime) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime) { throw null; }
 
         public void StopProducingOnStream(Runtime.StreamId streamId) { }
     }

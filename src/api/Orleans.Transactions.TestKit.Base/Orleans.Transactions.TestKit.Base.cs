@@ -136,7 +136,7 @@ namespace Orleans.Transactions.TestKit
 
         public System.Threading.Tasks.Task<Abstractions.TransactionalStorageLoadResponse<TState>> Load() { throw null; }
 
-        public System.Threading.Tasks.Task<string?> Store(string? expectedETag, Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Abstractions.PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter) { throw null; }
+        public System.Threading.Tasks.Task<string> Store(string? expectedETag, Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Abstractions.PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter) { throw null; }
     }
 
     [GenerateSerializer]

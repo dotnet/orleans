@@ -23,7 +23,7 @@ namespace Orleans.Connections.Security
         public static System.Security.Cryptography.X509Certificates.X509Certificate2 LoadFromStoreCert(string subject, string storeName, System.Security.Cryptography.X509Certificates.StoreLocation storeLocation, bool allowInvalid, bool server) { throw null; }
     }
 
-    public delegate System.Security.Cryptography.X509Certificates.X509Certificate ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate? remoteCertificate, string[] acceptableIssuers);
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate? remoteCertificate, string[] acceptableIssuers);
     public partial interface ITlsApplicationProtocolFeature
     {
         System.ReadOnlyMemory<byte> ApplicationProtocol { get; }

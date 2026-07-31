@@ -1472,7 +1472,7 @@ namespace Orleans.Streams
 
     public partial interface IQueueAdapterReceiver
     {
-        System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>?> GetQueueMessagesAsync(int maxCount);
+        System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
         System.Threading.Tasks.Task Initialize(System.TimeSpan timeout);
         System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages);
         System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout);

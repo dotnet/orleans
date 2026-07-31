@@ -28,7 +28,7 @@ namespace Orleans.AzureUtils
 
         public System.Threading.Tasks.Task<Azure.Storage.Queues.Models.QueueMessage?> GetQueueMessage() { throw null; }
 
-        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Storage.Queues.Models.QueueMessage>?> GetQueueMessages(int? count = null) { throw null; }
+        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Storage.Queues.Models.QueueMessage>> GetQueueMessages(int? count = null) { throw null; }
 
         public System.Threading.Tasks.Task InitQueueAsync() { throw null; }
 

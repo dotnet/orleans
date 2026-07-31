@@ -110,7 +110,7 @@ namespace Orleans.Runtime.ReminderService
 
         public System.Threading.Tasks.Task<ReminderTableData> ReadRows(GrainId grainId) { throw null; }
 
-        public System.Threading.Tasks.Task<ReminderTableData?> ReadRows(uint begin, uint end) { throw null; }
+        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end) { throw null; }
 
         public System.Threading.Tasks.Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) { throw null; }
 

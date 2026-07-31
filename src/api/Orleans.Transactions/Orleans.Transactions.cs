@@ -708,7 +708,7 @@ namespace Orleans.Transactions.Abstractions
 
     public partial interface INamedTransactionalStateStorageFactory
     {
-        ITransactionalStateStorage<TState>? Create<TState>(string? storageName, string stateName)
+        ITransactionalStateStorage<TState> Create<TState>(string? storageName, string stateName)
             where TState : class, new();
     }
 
@@ -780,7 +780,7 @@ namespace Orleans.Transactions.Abstractions
         where TState : class, new()
     {
         System.Threading.Tasks.Task<TransactionalStorageLoadResponse<TState>> Load();
-        System.Threading.Tasks.Task<string?> Store(string? expectedETag, TransactionalStateMetaData metadata, System.Collections.Generic.List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter);
+        System.Threading.Tasks.Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, System.Collections.Generic.List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter);
     }
 
     public partial interface ITransactionalState<TState>

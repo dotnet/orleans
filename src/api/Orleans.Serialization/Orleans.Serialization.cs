@@ -1441,7 +1441,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ArrayListSurrogate
     {
         [Id(0)]
-        public object?[] Values;
+        public object?[]? Values;
     }
 
     [RegisterSerializer]
@@ -2421,8 +2421,12 @@ namespace Orleans.Serialization.Codecs
     [GenerateSerializer]
     public partial struct NameValueCollectionSurrogate
     {
+        [Id(1)]
+        public bool HasNullKey;
+        [Id(2)]
+        public string? NullKeyValue;
         [Id(0)]
-        public System.Collections.Generic.Dictionary<string, string?> Values;
+        public System.Collections.Generic.Dictionary<string, string?>? Values;
     }
 
     [RegisterSerializer]

@@ -413,13 +413,15 @@ namespace Orleans.EventSourcing.LogStorage
         [Id(1)]
         public string? ETag { get { throw null; } set { } }
 
+        LogStateWithMetaData<TEntry>? IGrainState<LogStateWithMetaData<TEntry>>.State { get { throw null; } set { } }
+
         [Id(2)]
         public bool RecordExists { get { throw null; } set { } }
 
-        public LogStateWithMetaData<TEntry>? State { get { throw null; } set { } }
+        public LogStateWithMetaData<TEntry> State { get { throw null; } set { } }
 
         [Id(0)]
-        public LogStateWithMetaData<TEntry>? StateAndMetaData { get { throw null; } set { } }
+        public LogStateWithMetaData<TEntry> StateAndMetaData { get { throw null; } set { } }
 
         public override string ToString() { throw null; }
     }
@@ -454,13 +456,15 @@ namespace Orleans.EventSourcing.StateStorage
         [Id(1)]
         public string? ETag { get { throw null; } set { } }
 
+        GrainStateWithMetaData<TView>? IGrainState<GrainStateWithMetaData<TView>>.State { get { throw null; } set { } }
+
         [Id(2)]
         public bool RecordExists { get { throw null; } set { } }
 
-        public GrainStateWithMetaData<TView>? State { get { throw null; } set { } }
+        public GrainStateWithMetaData<TView> State { get { throw null; } set { } }
 
         [Id(0)]
-        public GrainStateWithMetaData<TView>? StateAndMetaData { get { throw null; } set { } }
+        public GrainStateWithMetaData<TView> StateAndMetaData { get { throw null; } set { } }
 
         public override string ToString() { throw null; }
     }
