@@ -46,6 +46,8 @@ namespace Orleans.Runtime.Placement
         {
             Task[] WorkerTasks { get; }
 
+            int CompatibleSilosCacheCount { get; }
+
             Task<SiloAddress> GetOrPlaceActivationAsync(Message message);
         }
 
@@ -79,6 +81,7 @@ namespace Orleans.Runtime.Placement
             _clusterManifestProvider = clusterManifestProvider;
             _assumeHomogeneousSilosForTesting = siloMessagingOptions.CurrentValue.AssumeHomogenousSilosForTesting;
             _siloStatusOracle.SubscribeToSiloStatusEvents(this);
+            _versionSelectorManager.CacheInvalidated += InvalidatePlacementCaches;
             _workers = new PlacementWorker[PlacementWorkerCount];
             for (var i = 0; i < PlacementWorkerCount; i++)
             {
@@ -91,6 +94,8 @@ namespace Orleans.Runtime.Placement
         public SiloStatus LocalSiloStatus => _siloStatusOracle.CurrentStatus;
 
         Task[] ITestAccessor.WorkerTasks => _workers.Select(static worker => worker.CompletionTask).ToArray();
+
+        int ITestAccessor.CompatibleSilosCacheCount => _compatibleSilosCache.Count;
 
         Task<SiloAddress> ITestAccessor.GetOrPlaceActivationAsync(Message message)
         {
@@ -148,6 +153,7 @@ namespace Orleans.Runtime.Placement
             }
 
             _siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
+            _versionSelectorManager.CacheInvalidated -= InvalidatePlacementCaches;
         }
 
         /// <summary>

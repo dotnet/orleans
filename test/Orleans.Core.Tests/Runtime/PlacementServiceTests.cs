@@ -151,6 +151,25 @@ namespace UnitTests.Runtime
         }
 
         [Fact]
+        public async Task GetCompatibleSilos_VersionSelectorCacheReset_InvalidatesCachedResult()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos);
+            var placementTarget = CreatePlacementTarget();
+
+            fixture.Target.GetCompatibleSilos(placementTarget);
+            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+
+            fixture.VersionSelectorManager.ResetCache();
+
+            Assert.Equal(0, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+            fixture.Target.GetCompatibleSilos(placementTarget);
+            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
         public async Task GetCompatibleSilos_ManifestUpdate_InvalidatesCachedResult()
         {
             var silos = CreateSilos(2);
@@ -202,7 +221,8 @@ namespace UnitTests.Runtime
             ILocalSiloDetails localSiloDetails,
             ISiloStatusOracle siloStatusOracle,
             TestClusterManifestProvider clusterManifestProvider,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            CachedVersionSelectorManager versionSelectorManager)
         {
             var grainVersionManifest = new GrainVersionManifest(clusterManifestProvider);
             var filterStrategyResolver = new PlacementFilterStrategyResolver(serviceProvider, new GrainPropertiesResolver(clusterManifestProvider));
@@ -215,7 +235,7 @@ namespace UnitTests.Runtime
                 NullLoggerFactory.Instance.CreateLogger<PlacementService>(),
                 grainLocator: null!,
                 grainInterfaceVersions: grainVersionManifest,
-                versionSelectorManager: null!,
+                versionSelectorManager,
                 clusterManifestProvider,
                 directorResolver: null!,
                 strategyResolver: null!,
@@ -342,6 +362,7 @@ namespace UnitTests.Runtime
                 SetActiveSilos(activeSilos);
 
                 ClusterManifestProvider = manifestProvider ?? new TestClusterManifestProvider(CreateClusterManifest(manifestSilos, useFilter));
+                VersionSelectorManager = new CachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider), null!, null!);
                 FilterDirector = useFilter ? new TestPlacementFilterDirector() : null;
                 ServiceProvider = CreateServiceProvider(FilterDirector);
 
@@ -357,7 +378,7 @@ namespace UnitTests.Runtime
                 SiloStatusOracle.SubscribeToSiloStatusEvents(Arg.Do<ISiloStatusListener>(listener => StatusListener = listener)).Returns(true);
                 SiloStatusOracle.UnSubscribeFromSiloStatusEvents(Arg.Any<ISiloStatusListener>()).Returns(true);
 
-                Target = CreateTarget(optionsMonitor, localSiloDetails, SiloStatusOracle, ClusterManifestProvider, ServiceProvider);
+                Target = CreateTarget(optionsMonitor, localSiloDetails, SiloStatusOracle, ClusterManifestProvider, ServiceProvider, VersionSelectorManager);
             }
 
             public PlacementService Target { get; }
@@ -367,6 +388,8 @@ namespace UnitTests.Runtime
             public TestClusterManifestProvider ClusterManifestProvider { get; }
 
             public ServiceProvider ServiceProvider { get; }
+
+            public CachedVersionSelectorManager VersionSelectorManager { get; }
 
             public TestPlacementFilterDirector? FilterDirector { get; }
 
