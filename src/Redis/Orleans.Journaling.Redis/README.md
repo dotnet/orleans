@@ -4,7 +4,7 @@
 
 Microsoft Orleans Journaling for Redis provides a Redis-backed implementation of the Orleans Journaling storage and catalog abstractions. Orleans Durable Jobs can use Orleans Journaling as a backing store, so this provider can persist durable job state through the journaling layer.
 
-The provider stores each journal as Redis string data plus Redis hash metadata, and maintains a Redis set catalog of journal ids. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
+The provider stores each journal as Redis string data plus Redis hash metadata. Per-journal reads and mutations use atomic Lua scripts. Journal discovery scans metadata keys on each connected primary Redis server and reads the canonical journal id from each hash. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
 
 ## Getting Started
 

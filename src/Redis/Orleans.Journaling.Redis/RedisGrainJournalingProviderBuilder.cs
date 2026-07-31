@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -44,9 +45,24 @@ internal sealed class RedisGrainJournalingProviderBuilder : IProviderBuilder<ISi
             }
 
             var compactionThresholdBytes = configurationSection[nameof(RedisJournalStorageOptions.CompactionThresholdBytes)];
-            if (!string.IsNullOrWhiteSpace(compactionThresholdBytes) && long.TryParse(compactionThresholdBytes, out var parsedCompactionThresholdBytes))
+            if (!string.IsNullOrWhiteSpace(compactionThresholdBytes)
+                && long.TryParse(compactionThresholdBytes, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedCompactionThresholdBytes))
             {
                 options.CompactionThresholdBytes = parsedCompactionThresholdBytes;
+            }
+
+            var readChunkSize = configurationSection[nameof(RedisJournalStorageOptions.ReadChunkSize)];
+            if (!string.IsNullOrWhiteSpace(readChunkSize)
+                && int.TryParse(readChunkSize, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedReadChunkSize))
+            {
+                options.ReadChunkSize = parsedReadChunkSize;
+            }
+
+            var initStage = configurationSection[nameof(RedisJournalStorageOptions.InitStage)];
+            if (!string.IsNullOrWhiteSpace(initStage)
+                && int.TryParse(initStage, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedInitStage))
+            {
+                options.InitStage = parsedInitStage;
             }
         });
 
