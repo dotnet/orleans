@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -606,8 +605,9 @@ public class TypeConverter
 
     private bool? InspectGenericArguments(Type type)
     {
-        foreach (var result in type.GenericTypeArguments.Select(InspectTypeCore))
+        foreach (var parameter in type.GenericTypeArguments)
         {
+            var result = InspectTypeCore(parameter);
             if (result != true)
             {
                 return result;
