@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit.Abstractions;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Providers;
 using TestExtensions;
@@ -246,7 +247,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
             DeleteStateOnClear = true,
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
             ProjectId = id,
-            GrainStorageSerializer = this._providerRuntime.ServiceProvider.GetRequiredService<IGrainStorageSerializer>(),
+            GrainStorageSerializer = new OrleansGrainStorageSerializer(this._providerRuntime.ServiceProvider.GetRequiredService<Serializer>()),
         };
 
         var store = ActivatorUtilities.CreateInstance<GoogleFirestoreStorage>(this._providerRuntime.ServiceProvider, "StorageProviderTests", options);

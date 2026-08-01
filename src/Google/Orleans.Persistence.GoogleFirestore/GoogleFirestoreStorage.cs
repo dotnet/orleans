@@ -251,9 +251,9 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
         lifecycle.Subscribe(OptionFormattingUtilities.Name<GoogleFirestoreStorage>(this._name), ServiceLifecycleStage.ApplicationServices, Init, Close);
 }
 
-public static class GoogleFirestoreStorageFactory
+internal static class GoogleFirestoreStorageFactory
 {
-    public static IGrainStorage Create(IServiceProvider services, string name)
+    public static GoogleFirestoreStorage Create(IServiceProvider services, string name)
     {
         var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<FirestoreStateStorageOptions>>();
         var clusterOptions = services.GetProviderClusterOptions(name);
