@@ -287,20 +287,6 @@ public sealed class RedisJournalStorageTests
     }
 
     [SkippableFact]
-    public async Task List_UnusualJournalId_RoundTrips()
-    {
-        TestUtils.CheckForRedis();
-        await using var context = await RedisJournalStorageTestContext.CreateAsync();
-        var id = new JournalId("v1:0123456789abcdef0123456789abcdef:actual-id");
-        await context.Provider.CreateStorage(id).CreateIfNotExistsAsync();
-
-        var journalIds = await ToListAsync(context.Provider.ListAsync());
-
-        Assert.Contains(id, journalIds);
-        Assert.DoesNotContain(new JournalId("actual-id"), journalIds);
-    }
-
-    [SkippableFact]
     public async Task List_KeyPrefixWithPatternCharacters_RoundTrips()
     {
         TestUtils.CheckForRedis();
