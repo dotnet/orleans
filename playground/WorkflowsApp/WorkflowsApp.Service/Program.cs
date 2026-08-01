@@ -1,47 +1,25 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration.Internal;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling;
 using Azure.Storage.Blobs;
 using Azure.Core.Pipeline;
 using Azure.Core;
 using System.Diagnostics;
-using Newtonsoft.Json;
 using System.Distributed.DurableTasks;
-using Orleans.DurableTasks;
 using Orleans.Runtime.DurableTasks;
-using WorkflowsApp.Service.Samples.HelloWorld;
 using WorkflowsApp.Service.Samples.CancelWorld;
-using WorkflowsApp.Service.Samples.Bank;
+using WorkflowsApp.Service.Samples.Counter;
+using WorkflowsApp.Service.Samples.MessageQueue;
+using WorkflowsApp.Service.Samples.OrderSaga;
 using WorkflowsApp.Service.Samples.Parallelism;
+using WorkflowsApp.Service.Samples.TagTracker;
+using WorkflowsApp.Service.Samples.TodoList;
+using WorkflowsApp.Service.Samples.Bank;
+using WorkflowsApp.Service.Samples.HelloWorld;
 using WorkflowsApp.Service.Samples.HumanInTheLoop;
 
 namespace WorkflowsApp.Service;
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-
-public static class DurableTaskHostingExtensions
-{
-    public static ISiloBuilder AddVolatileDurableTaskStorage(this ISiloBuilder siloBuilder)
-    {
-        siloBuilder.Services.AddTransient<VolatileDurableTaskGrainStorage>();
-        siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, VolatileDurableTaskGrainStorage>();
-        return siloBuilder;
-    }
-
-    public static ISiloBuilder AddJournaledDurableTaskStorage(this ISiloBuilder siloBuilder)
-    {
-        siloBuilder.Services.TryAddSingleton<DurableTaskGrainStorageShared>();
-        siloBuilder.Services.TryAddScoped<DurableTaskGrainStorage>();
-        siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, DurableTaskGrainStorage>();
-        return siloBuilder;
-    }
-}
 
 public class Program
 {
-
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
@@ -59,7 +37,6 @@ public class Program
                     => options.ConfigureBlobServiceClient(ct => Task.FromResult(serviceProvider.GetRequiredKeyedService<BlobServiceClient>("state"))));
             });
 
-        //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
         builder.Logging.SetMinimumLevel(LogLevel.Information);
         builder.Logging.AddFilter("Azure.Core", LogLevel.Error);
         using var app = builder.Build();
@@ -71,18 +48,32 @@ public class Program
 
         app.MapDefaultEndpoints();
 
-        // log.LogInformation("==== Starting HumanInTheLoop sample ===");
-        //await HumanInTheLoop.RunAsync(app.Services);
-        
+        log.LogInformation("==== Starting HelloWorld sample ===");
+        await HelloWorld.RunAsync(app.Services);
+
         log.LogInformation("==== Starting SumOfSquares sample ===");
         await SumOfSquares.RunAsync(app.Services);
 
         log.LogInformation("==== Starting Bank sample ===");
         await Bank.RunAsync(app.Services);
-        log.LogInformation("==== Starting HelloWorld sample ===");
-        await HelloWorld.RunAsync(app.Services);
+
         log.LogInformation("==== Starting CancelWorld sample ===");
         await CancelWorld.RunAsync(app.Services);
+
+        log.LogInformation("==== Starting Counter sample (IDurableValue) ===");
+        await Counter.RunAsync(app.Services);
+
+        log.LogInformation("==== Starting TodoList sample (IDurableList) ===");
+        await TodoList.RunAsync(app.Services);
+
+        log.LogInformation("==== Starting MessageQueue sample (IDurableQueue) ===");
+        await MessageQueue.RunAsync(app.Services);
+
+        log.LogInformation("==== Starting TagTracker sample (IDurableSet) ===");
+        await TagTracker.RunAsync(app.Services);
+
+        log.LogInformation("==== Starting OrderSaga sample (DurableTask Workflows) ===");
+        await OrderSaga.RunAsync(app.Services);
 
         var client = app.Services.GetRequiredService<IClusterClient>();
 
