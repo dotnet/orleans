@@ -27,7 +27,7 @@ internal class KeyEntity
             this.Timestamp = DateTimeOffset.FromUnixTimeSeconds(long.Parse(timestamp.N));
 
         if (fields.TryGetValue(DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, out var etag))
-            this.ETag = int.Parse(etag.N);
+            this.ETag = long.Parse(etag.N);
     }
 
     public KeyEntity(string partitionKey)
@@ -40,7 +40,7 @@ internal class KeyEntity
 
     public string PartitionKey { get; set; } = null!;
 
-    public string RowKey { get; set; }
+    public string RowKey { get; set; } = RK;
 
     public long CommittedSequenceId { get; set; }
 

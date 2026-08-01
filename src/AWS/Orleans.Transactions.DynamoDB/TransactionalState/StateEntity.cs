@@ -44,7 +44,7 @@ internal class StateEntity
             this.State = state.B.ToArray();
 
         if (fields.TryGetValue(DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, out var etag))
-            this.ETag = int.Parse(etag.N);
+            this.ETag = long.Parse(etag.N);
     }
 
     public static string MakeRowKey(long sequenceId)

@@ -29,7 +29,11 @@ namespace Orleans.Transactions.DynamoDB
     /// <summary>
     /// Wrapper around AWS DynamoDB SDK.
     /// </summary>
+#if TRANSACTIONS_DYNAMODB
     public partial class DynamoDBStorage
+#else
+    internal partial class DynamoDBStorage
+#endif
     {
         private readonly string? _accessKey;
         private readonly string? _token;
