@@ -93,26 +93,45 @@ internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, 
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
-    public ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
+    public ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        GrainAddress? currentRegistration,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = _directory.DirectoryPartition.AddSingleActivation(address, currentRegistration);
         return new(DirectoryResult.FromResult(result.Address!, version));
     }
 
-    public ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(MembershipVersion version, GrainId grainId)
+    public ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
+        MembershipVersion version,
+        GrainId grainId,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = _directory.DirectoryPartition.LookUpActivation(grainId);
         return new(DirectoryResult.FromResult<GrainAddress?>(result.Address, version));
     }
 
-    public ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address)
+    public ValueTask<DirectoryResult<bool>> DeregisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _directory.DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, UnregistrationCause.Force);
         return new(DirectoryResult.FromResult(true, version));
     }
 
-    public ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
+    public ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(
+        MembershipVersion version,
+        MembershipVersion rangeVersion,
+        RingRange range,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         // LocalGrainDirectory stores entries using the legacy single-ring ownership scheme, so this local
         // partition cannot produce a complete snapshot for a distributed virtual partition range.
         return new((GrainDirectoryPartitionSnapshot?)null);
