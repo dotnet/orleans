@@ -295,49 +295,49 @@ public class Base_PersistenceGrainTests_GoogleStorage : OrleansTestingBase
         Assert.Equal(2, val);  // "Value after Re-Read"
     }
 
-    protected void Persistence_Perf_Activate()
+    protected async Task Persistence_Perf_Activate()
     {
         const string testName = "Persistence_Perf_Activate";
         int n = LoopIterations_Grain;
         TimeSpan target = TimeSpan.FromMilliseconds(MaxReadTime * n);
 
         // Timings for Activate
-        RunPerfTest(n, testName, target,
+        await RunPerfTest(n, testName, target,
             grainNoState => grainNoState.PingAsync(),
             grainMemory => grainMemory.DoSomething(),
             grainMemoryStore => grainMemoryStore.GetValue(),
             grainGoogleStore => grainGoogleStore.GetValue());
     }
 
-    protected void Persistence_Perf_Write()
+    protected async Task Persistence_Perf_Write()
     {
         const string testName = "Persistence_Perf_Write";
         int n = LoopIterations_Grain;
         TimeSpan target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
 
         // Timings for Write
-        RunPerfTest(n, testName, target,
+        await RunPerfTest(n, testName, target,
             grainNoState => grainNoState.EchoAsync(testName),
             grainMemory => grainMemory.DoWrite(n),
             grainMemoryStore => grainMemoryStore.DoWrite(n),
             grainGoogleStore => grainGoogleStore.DoWrite(n));
     }
 
-    protected void Persistence_Perf_Write_Reread()
+    protected async Task Persistence_Perf_Write_Reread()
     {
         const string testName = "Persistence_Perf_Write_Read";
         int n = LoopIterations_Grain;
         TimeSpan target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
 
         // Timings for Write
-        RunPerfTest(n, testName + "--Write", target,
+        await RunPerfTest(n, testName + "--Write", target,
             grainNoState => grainNoState.EchoAsync(testName),
             grainMemory => grainMemory.DoWrite(n),
             grainMemoryStore => grainMemoryStore.DoWrite(n),
             grainGoogleStore => grainGoogleStore.DoWrite(n));
 
         // Timings for Activate
-        RunPerfTest(n, testName + "--ReRead", target,
+        await RunPerfTest(n, testName + "--ReRead", target,
             grainNoState => grainNoState.GetLastEchoAsync(),
             grainMemory => grainMemory.DoRead(),
             grainMemoryStore => grainMemoryStore.DoRead(),
@@ -346,7 +346,7 @@ public class Base_PersistenceGrainTests_GoogleStorage : OrleansTestingBase
 
     // ---------- Utility functions ----------
 
-    protected void RunPerfTest(int n, string testName, TimeSpan target,
+    protected async Task RunPerfTest(int n, string testName, TimeSpan target,
         Func<IEchoTaskGrain, Task> actionNoState,
         Func<IPersistenceTestGrain, Task> actionMemory,
         Func<IMemoryStorageTestGrain, Task> actionMemoryStore,
@@ -368,16 +368,16 @@ public class Base_PersistenceGrainTests_GoogleStorage : OrleansTestingBase
 
         TimeSpan baseline, elapsed;
 
-        elapsed = baseline = TestUtils.TimeRun(n, TimeSpan.Zero, testName + " (No state)",
+        elapsed = baseline = await TestUtils.TimeRunAsync(n, TimeSpan.Zero, testName + " (No state)",
             () => RunIterations(testName, n, i => actionNoState(noStateGrains[i])));
 
-        elapsed = TestUtils.TimeRun(n, baseline, testName + " (Local Memory Store)",
+        elapsed = await TestUtils.TimeRunAsync(n, baseline, testName + " (Local Memory Store)",
             () => RunIterations(testName, n, i => actionMemory(memoryGrains[i])));
 
-        elapsed = TestUtils.TimeRun(n, baseline, testName + " (Dev Store Grain Store)",
+        elapsed = await TestUtils.TimeRunAsync(n, baseline, testName + " (Dev Store Grain Store)",
             () => RunIterations(testName, n, i => actionMemoryStore(memoryStoreGrains[i])));
 
-        elapsed = TestUtils.TimeRun(n, baseline, testName + " (Google Table Store)",
+        elapsed = await TestUtils.TimeRunAsync(n, baseline, testName + " (Google Table Store)",
             () => RunIterations(testName, n, i => actionGoogleTable(GoogleStoreGrains[i])));
 
         if (elapsed > target.Multiply(_timingFactor))
@@ -386,7 +386,7 @@ public class Base_PersistenceGrainTests_GoogleStorage : OrleansTestingBase
 
             if (elapsed > target.Multiply(2.0 * _timingFactor))
             {
-                Assert.True(false, msg);
+                Assert.Fail(msg);
             }
             else
             {
@@ -395,7 +395,7 @@ public class Base_PersistenceGrainTests_GoogleStorage : OrleansTestingBase
         }
     }
 
-    private void RunIterations(string testName, int n, Func<int, Task> action)
+    private async Task RunIterations(string testName, int n, Func<int, Task> action)
     {
         List<Task> promises = new List<Task>();
         Stopwatch sw = Stopwatch.StartNew();
@@ -406,13 +406,13 @@ public class Base_PersistenceGrainTests_GoogleStorage : OrleansTestingBase
             promises.Add(promise);
             if ((i % BatchSize) == 0 && i > 0)
             {
-                Task.WaitAll(promises.ToArray());
+                await Task.WhenAll(promises);
                 promises.Clear();
                 //output.WriteLine("{0} has done {1} iterations  in {2} at {3} RPS",
                 //                  testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
             }
         }
-        Task.WaitAll(promises.ToArray());
+        await Task.WhenAll(promises);
         sw.Stop();
         _output.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
                           testName, n, sw.Elapsed, n / sw.Elapsed.TotalSeconds);

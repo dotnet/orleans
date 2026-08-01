@@ -460,6 +460,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "GoogleStorage")]
     public class GoogleStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
         IGoogleStorageGenericGrain<T>
+        where T : notnull
     {
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -468,7 +469,7 @@ namespace UnitTests.Grains
 
         public Task<T> GetValue()
         {
-            return Task.FromResult(State.Field1);
+            return Task.FromResult(State.Field1!);
         }
 
         public Task DoWrite(T val)
@@ -480,7 +481,7 @@ namespace UnitTests.Grains
         public async Task<T> DoRead()
         {
             await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
+            return State.Field1!;
         }
 
         public Task DoDelete()
@@ -505,9 +506,9 @@ namespace UnitTests.Grains
 
         public Task<string> GetExtendedKeyValue()
         {
-            string extKey;
+            string? extKey;
             _ = this.GetPrimaryKey(out extKey);
-            return Task.FromResult(extKey);
+            return Task.FromResult(extKey!);
         }
 
         public Task DoWrite(int val)

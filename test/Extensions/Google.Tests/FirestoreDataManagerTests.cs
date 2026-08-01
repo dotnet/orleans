@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Grpc.Core;
 using Google.Cloud.Firestore;
 using Orleans.Tests.GoogleFirestore;
+using Utils = Orleans.Tests.GoogleFirestore.Utils;
 
 namespace Orleans.Tests.Google;
 
@@ -24,7 +25,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
             var data2 = data.Clone();
             data2.Age = 99;
             await this._manager.CreateEntity(data2);
-            Assert.True(false, "Should have thrown RpcException.");
+            Assert.Fail("Should have thrown RpcException.");
         }
         catch (RpcException exc)
         {
@@ -73,7 +74,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         try
         {
             await this._manager.Update(data);
-            Assert.True(false, "Should have thrown RpcException.");
+            Assert.Fail("Should have thrown RpcException.");
         }
         catch (RpcException exc)
         {
@@ -91,7 +92,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         try
         {
             eTag2 = await this._manager.Update(data2);
-            Assert.True(false, "Should have thrown RpcException.");
+            Assert.Fail("Should have thrown RpcException.");
         }
         catch (RpcException exc)
         {
@@ -219,7 +220,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         {
             entities[0].ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
             await this._manager.DeleteEntities(entities);
-            Assert.True(false, "Should have thrown RpcException.");
+            Assert.Fail("Should have thrown RpcException.");
         }
         catch (RpcException exc)
         {

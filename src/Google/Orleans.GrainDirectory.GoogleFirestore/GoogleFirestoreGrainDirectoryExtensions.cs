@@ -5,6 +5,7 @@ using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.GoogleFirestore;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Hosting;
 
@@ -21,12 +22,10 @@ public static class GoogleFirestoreGrainDirectoryExtensions
                 new FirestoreOptionsValidator<FirestoreOptions>(
                     sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>().Get(name), name))
             .ConfigureNamedOptionForLogging<FirestoreOptions>(name)
-            .AddSingletonNamedService<IGrainDirectory>(name,
+            .AddGrainDirectory(name,
                 (sp, name) =>
                     ActivatorUtilities.CreateInstance<GoogleFirestoreGrainDirectory>(sp,
-                        sp.GetOptionsByName<FirestoreOptions>(name)))
-            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name,
-                (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
+                        sp.GetOptionsByName<FirestoreOptions>(name)));
 
         return services;
     }

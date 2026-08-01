@@ -106,6 +106,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     public interface IGoogleStorageGenericGrain<T> : IGrainWithIntegerKey
+        where T : notnull
     {
         Task<T> GetValue();
         Task DoWrite(T val);

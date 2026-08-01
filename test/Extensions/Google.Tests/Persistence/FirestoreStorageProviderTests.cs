@@ -102,6 +102,8 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         this._output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
         var storedState = storedGrainState.State;
+        Assert.NotNull(grainState.State);
+        Assert.NotNull(storedState);
         Assert.Equal(grainState.State.A, storedState.A);
         Assert.Equal(grainState.State.B, storedState.B);
         Assert.Equal(grainState.State.C, storedState.C);
@@ -129,6 +131,8 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
         var readTime = sw.Elapsed;
         this._output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        Assert.NotNull(grainState.State);
+        Assert.NotNull(storedGrainState.State);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
         Assert.Equal(grainState.State.B, storedGrainState.State.B);
         Assert.Equal(grainState.State.C, storedGrainState.State.C);

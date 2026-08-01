@@ -1,9 +1,9 @@
 using System;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Storage;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Providers;
 using Orleans.Configuration;
 using Orleans.Persistence.GoogleFirestore;
@@ -50,13 +50,7 @@ public static class FirestoreStorageHostingExtensions
         services.AddTransient<IConfigurationValidator>(sp => new FirestoreStateStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<FirestoreStateStorageOptions>>().Get(name), name));
         services.ConfigureNamedOptionForLogging<FirestoreStateStorageOptions>(name);
 
-        if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-        {
-            services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-        }
-
-        return services.AddSingletonNamedService(name, GoogleFirestoreStorageFactory.Create)
-            .AddSingletonNamedService(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+        return services.AddGrainStorage(name, GoogleFirestoreStorageFactory.Create);
     }
 
     /// <summary>

@@ -11,12 +11,14 @@ namespace Orleans.Tests.Google;
  TestCategory("GoogleCloud")]
 public class FirestoreGrainDirectoryTests : GrainDirectoryTests<GoogleFirestoreGrainDirectory>, IAsyncLifetime
 {
+    private GoogleFirestoreGrainDirectory? _grainDirectory;
+
     public FirestoreGrainDirectoryTests(ITestOutputHelper testOutput) : base(testOutput)
     {
     }
 
-    // Dummy implementation, will get the directory from IAsyncLifetime.InitializeAsync();
-    protected override GoogleFirestoreGrainDirectory GetGrainDirectory() => default!;
+    protected override GoogleFirestoreGrainDirectory CreateGrainDirectory() =>
+        _grainDirectory ?? throw new InvalidOperationException("The grain directory has not been initialized.");
 
     [SkippableFact]
     public async Task UnregisterMany()
@@ -36,7 +38,7 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<GoogleFirestoreG
                 MembershipVersion = new MembershipVersion(51)
             };
             addresses.Add(addr);
-            await this.grainDirectory.Register(addr);
+            await GrainDirectory.Register(addr);
         }
 
         // Modify the Rth entry locally, to simulate another activation tentative by another silo
@@ -51,20 +53,20 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<GoogleFirestoreG
         };
 
         // Batch unregister
-        await this.grainDirectory.UnregisterMany(addresses);
+        await GrainDirectory.UnregisterMany(addresses);
 
         // Now we should only find the old Rth entry
         for (int i = 0; i < N; i++)
         {
             if (i == R)
             {
-                var addr = await this.grainDirectory.Lookup(addresses[i].GrainId);
+                var addr = await GrainDirectory.Lookup(addresses[i].GrainId);
                 Assert.NotNull(addr);
                 Assert.Equal(oldActivation, addr.ActivationId);
             }
             else
             {
-                Assert.Null(await this.grainDirectory.Lookup(addresses[i].GrainId));
+                Assert.Null(await GrainDirectory.Lookup(addresses[i].GrainId));
             }
         }
     }
@@ -95,9 +97,9 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<GoogleFirestoreG
             ProjectId = GoogleEmulatorHost.ProjectId, EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
 
-        this.grainDirectory =
+        _grainDirectory =
             new GoogleFirestoreGrainDirectory(Options.Create(clusterOptions), Options.Create(options), loggerFactory);
-        await this.grainDirectory.Init();
+        await _grainDirectory.Init();
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
