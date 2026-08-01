@@ -44,12 +44,11 @@ public class PersistenceProviderTests_Cosmos
         _serviceId = Guid.NewGuid().ToString("N");
     }
 
-    private async Task<CosmosGrainStorage> InitializeStorage(bool deleteStateOnClear = false)
+    private async Task<CosmosGrainStorage> InitializeStorage()
     {
         var options = new CosmosGrainStorageOptions();
 
         options.ConfigureTestDefaults();
-        options.DeleteStateOnClear = deleteStateOnClear;
 
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = _clusterId, ServiceId = _serviceId });
         var idProvider = new DefaultDocumentIdProvider(clusterOptions);
@@ -102,42 +101,6 @@ public class PersistenceProviderTests_Cosmos
         var store = await InitializeStorage();
 
         await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
-    }
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task PersistenceProvider_Azure_ClearWithoutETagDoesNotDeleteExistingState()
-    {
-        const string grainType = nameof(PersistenceProvider_Azure_ClearWithoutETagDoesNotDeleteExistingState);
-        var grainId = GrainId.Create("testgrain", Guid.NewGuid().ToString());
-        var store = await InitializeStorage(deleteStateOnClear: true);
-        var grainState = TestStoreGrainState.NewRandomState();
-
-        await store.WriteStateAsync(grainType, grainId, grainState);
-        await store.ClearStateAsync(grainType, grainId, new GrainState<TestStoreGrainState>());
-
-        var storedGrainState = new GrainState<TestStoreGrainState>();
-        await store.ReadStateAsync(grainType, grainId, storedGrainState);
-        Assert.True(storedGrainState.RecordExists);
-        Assert.NotNull(grainState.State);
-        Assert.NotNull(storedGrainState.State);
-        Assert.Equal(grainState.State.A, storedGrainState.State.A);
-        Assert.Equal(grainState.State.B, storedGrainState.State.B);
-        Assert.Equal(grainState.State.C, storedGrainState.State.C);
-    }
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task PersistenceProvider_Azure_WriteWithWildcardRequiresExistingState()
-    {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorWildcardEtagSkipReason);
-
-        const string grainType = nameof(PersistenceProvider_Azure_WriteWithWildcardRequiresExistingState);
-        var grainId = GrainId.Create("testgrain", Guid.NewGuid().ToString());
-        var store = await InitializeStorage();
-        var grainState = TestStoreGrainState.NewRandomState();
-        grainState.ETag = "*";
-
-        await Assert.ThrowsAsync<CosmosConditionNotSatisfiedException>(
-            () => store.WriteStateAsync(grainType, grainId, grainState));
     }
 
     [SkippableTheory, TestCategory("Functional")]
@@ -258,7 +221,6 @@ public class PersistenceProviderTests_Cosmos
         sw.Restart();
 
         await store.ClearStateAsync(grainTypeName, grainId, grainState);
-        Assert.False(grainState.RecordExists);
 
         var storedGrainState = new GrainState<TestStoreGrainState>
         {

@@ -63,6 +63,7 @@ public class CosmosHostingExtensionsTests
         Assert.Equal("first", identifiers.PartitionKey);
         Assert.Equal("service__type_key", identifiers.DocumentId);
     }
+
 #pragma warning restore CS0618 // Type or member is obsolete
 
     private sealed class FirstDocumentIdProvider : IDocumentIdProvider
