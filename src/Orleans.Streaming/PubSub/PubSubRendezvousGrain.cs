@@ -262,12 +262,7 @@ namespace Orleans.Streams
                 if (State.Producers.Count != initialProducerCount)
                 {
                     await WriteStateAsync();
-                    if (_streamInstruments.PubSubConsumersTotal.Enabled)
-                    {
-                        tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
-                        _streamInstruments.PubSubConsumersTotal.Add(
-                            -(initialProducerCount - State.Producers.Count), tags.Value);
-                    }
+                    RecordRemovedProducers(producers);
                 }
 
                 if (exception is not null)
@@ -294,6 +289,23 @@ namespace Orleans.Streams
             LogWarningProducerIsDead(producer, producer.Stream);
 
             State.Producers.Remove(producer);
+        }
+
+        private void RecordRemovedProducers(IEnumerable<PubSubPublisherState> producers)
+        {
+            if (!_streamInstruments.PubSubProducersTotal.Enabled)
+            {
+                return;
+            }
+
+            foreach (var producer in producers)
+            {
+                if (!State.Producers.Contains(producer))
+                {
+                    var tags = StreamInstrumentsTagUtils.InitializeTags(producer.Stream, producer.Producer);
+                    _streamInstruments.PubSubProducersTotal.Add(-1, tags);
+                }
+            }
         }
 
         public async Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
@@ -476,13 +488,17 @@ namespace Orleans.Streams
                 LogDebugNotifyProducersOfRemovedConsumer(numProducersBeforeNotify);
 
                 // Notify producers about unregistered consumer.
-                List<Task> tasks = State.Producers
+                var producers = State.Producers.ToList();
+                List<Task> tasks = producers
                     .Select(producerState => ExecuteProducerTask(producerState, p => p.RemoveSubscriber(subscriptionId, streamId)))
                     .ToList();
                 await Task.WhenAll(tasks);
                 //if producers got removed
                 if (State.Producers.Count < numProducersBeforeNotify)
+                {
                     await WriteStateAsync();
+                    RecordRemovedProducers(producers);
+                }
             }
         }
 
