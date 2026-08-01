@@ -19,10 +19,7 @@ public class GrainStateEntity : FirestoreEntity
             { "Name", this.Name }
         };
 
-        if (this.Payload is not null)
-        {
-            fields.Add("Payload", this.Payload);
-        }
+        fields.Add("Payload", this.Payload is null ? FieldValue.Delete : this.Payload);
 
         return fields;
     }

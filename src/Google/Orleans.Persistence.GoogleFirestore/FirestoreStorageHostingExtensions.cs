@@ -48,6 +48,7 @@ public static class FirestoreStorageHostingExtensions
     {
         configureOptions?.Invoke(services.AddOptions<FirestoreStateStorageOptions>(name));
         services.AddTransient<IConfigurationValidator>(sp => new FirestoreStateStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<FirestoreStateStorageOptions>>().Get(name), name));
+        services.AddTransient<IPostConfigureOptions<FirestoreStateStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<FirestoreStateStorageOptions>>();
         services.ConfigureNamedOptionForLogging<FirestoreStateStorageOptions>(name);
 
         return services.AddGrainStorage(name, GoogleFirestoreStorageFactory.Create);

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using Google.Cloud.Firestore;
 using Orleans.Runtime;
@@ -20,10 +21,7 @@ namespace Orleans.GrainDirectory.GoogleFirestore;
 
 public static partial class Utils
 {
-    private const string PERCENTAGE_SYMBOL = "%";
-    private const string PERCENTAGE_SYMBOL_ENCODED = "%25";
-    private const string FORWARD_SLASH_SYMBOL = "/";
-    private const string FORWARD_SLASH_SYMBOL_ENCODED = "%2F";
+    private const string ENCODED_ID_PREFIX = "id-";
 
     public static string FormatDateTime(DateTimeOffset dto) => dto.ToString("O", CultureInfo.InvariantCulture);
     public static DateTimeOffset ParseDateTime(string dto) => DateTimeOffset.ParseExact(dto, "O", CultureInfo.InvariantCulture);
@@ -45,15 +43,33 @@ public static partial class Utils
     }
 
     public static string SanitizeGrainId(GrainId grainId) => SanitizeId(grainId.ToString());
+
     public static string SanitizeId(string id)
     {
-        return ForbiddenIdRegex().IsMatch(id)
-            ? throw new OrleansException($"Id {id} contains forbidden characters")
-            : id.Replace(PERCENTAGE_SYMBOL, PERCENTAGE_SYMBOL_ENCODED).Replace(FORWARD_SLASH_SYMBOL, FORWARD_SLASH_SYMBOL_ENCODED);
+        ArgumentNullException.ThrowIfNull(id);
+
+        return ENCODED_ID_PREFIX + Convert.ToBase64String(Encoding.UTF8.GetBytes(id))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 
-    public static GrainId ParseGrainId(string grainId) =>
-        GrainId.Parse(grainId.Replace(PERCENTAGE_SYMBOL_ENCODED, PERCENTAGE_SYMBOL).Replace(FORWARD_SLASH_SYMBOL_ENCODED, FORWARD_SLASH_SYMBOL));
+    public static string ParseId(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        if (!id.StartsWith(ENCODED_ID_PREFIX, StringComparison.Ordinal))
+        {
+            throw new FormatException("The value is not a valid encoded Firestore identifier.");
+        }
+
+        var encoded = id[ENCODED_ID_PREFIX.Length..]
+            .Replace('-', '+')
+            .Replace('_', '/');
+        encoded = encoded.PadRight(encoded.Length + ((4 - encoded.Length % 4) % 4), '=');
+        return Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+    }
+
+    public static GrainId ParseGrainId(string grainId) => GrainId.Parse(ParseId(grainId));
 
     [GeneratedRegex("__.*__", RegexOptions.CultureInvariant)]
     internal static partial Regex ForbiddenIdRegex();

@@ -63,6 +63,71 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         await Test_PersistenceProvider_WriteClearRead(testName, this._storage, grainState);
     }
 
+    [SkippableFact]
+    public async Task StateNamesUseIndependentRecords()
+    {
+        var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
+        var first = TestStoreGrainState.NewRandomState();
+        var second = TestStoreGrainState.NewRandomState();
+
+        await this._storage.WriteStateAsync("first", grainId, first);
+        await this._storage.WriteStateAsync("second", grainId, second);
+
+        var firstRead = new GrainState<TestStoreGrainState>(new());
+        var secondRead = new GrainState<TestStoreGrainState>(new());
+        await this._storage.ReadStateAsync("first", grainId, firstRead);
+        await this._storage.ReadStateAsync("second", grainId, secondRead);
+
+        var firstState = Assert.IsType<TestStoreGrainState>(first.State);
+        var secondState = Assert.IsType<TestStoreGrainState>(second.State);
+        var firstReadState = Assert.IsType<TestStoreGrainState>(firstRead.State);
+        var secondReadState = Assert.IsType<TestStoreGrainState>(secondRead.State);
+        Assert.Equal(firstState.A, firstReadState.A);
+        Assert.Equal(firstState.B, firstReadState.B);
+        Assert.Equal(firstState.C, firstReadState.C);
+        Assert.Equal(secondState.A, secondReadState.A);
+        Assert.Equal(secondState.B, secondReadState.B);
+        Assert.Equal(secondState.C, secondReadState.C);
+    }
+
+    [SkippableFact]
+    public async Task MissingReadResetsState()
+    {
+        var grainState = TestStoreGrainState.NewRandomState();
+        grainState.ETag = "stale";
+        grainState.RecordExists = true;
+
+        await this._storage.ReadStateAsync(
+            "missing",
+            GrainId.Create("test", Guid.NewGuid().ToString("N")),
+            grainState);
+
+        Assert.False(grainState.RecordExists);
+        Assert.Null(grainState.ETag);
+        var state = Assert.IsType<TestStoreGrainState>(grainState.State);
+        Assert.Equal(default, state.A);
+        Assert.Equal(default, state.B);
+        Assert.Equal(default, state.C);
+    }
+
+    [SkippableFact]
+    public async Task ClearBeforeWriteSucceeds()
+    {
+        var grainState = TestStoreGrainState.NewRandomState();
+
+        await this._storage.ClearStateAsync(
+            "never-written",
+            GrainId.Create("test", Guid.NewGuid().ToString("N")),
+            grainState);
+
+        Assert.False(grainState.RecordExists);
+        Assert.Null(grainState.ETag);
+        var state = Assert.IsType<TestStoreGrainState>(grainState.State);
+        Assert.Equal(default, state.A);
+        Assert.Equal(default, state.B);
+        Assert.Equal(default, state.C);
+    }
+
     [SkippableTheory, TestCategory("Functional")]
     [InlineData(null, true, false)]
     [InlineData(null, false, true)]
@@ -181,6 +246,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
             DeleteStateOnClear = true,
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
             ProjectId = id,
+            GrainStorageSerializer = this._providerRuntime.ServiceProvider.GetRequiredService<IGrainStorageSerializer>(),
         };
 
         var store = ActivatorUtilities.CreateInstance<GoogleFirestoreStorage>(this._providerRuntime.ServiceProvider, "StorageProviderTests", options);
