@@ -9,7 +9,6 @@ namespace Orleans.Persistence.Cosmos;
 
 public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
-    private const string ANY_ETAG = "*";
     private const string GRAINTYPE_PARTITION_KEY_PATH = "/GrainType";
     private readonly ILogger _logger;
     private readonly CosmosGrainStorageOptions _options;
@@ -113,7 +112,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             };
 
             var pk = new PartitionKey(partitionKey);
-            if (string.IsNullOrWhiteSpace(grainState.ETag))
+            if (string.IsNullOrEmpty(grainState.ETag))
             {
                 response = await _executor.ExecuteOperation(
                     static args =>
@@ -122,17 +121,6 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                         return self._container.CreateItemAsync(entity, pk);
                     },
                     (this, entity, pk)).ConfigureAwait(false);
-            }
-            else if (grainState.ETag == ANY_ETAG)
-            {
-                var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
-                response = await _executor.ExecuteOperation(
-                    static args =>
-                    {
-                        var (self, entity, pk, requestOptions) = args;
-                        return self._container.UpsertItemAsync(entity, pk, requestOptions);
-                    },
-                    (this, entity, pk, requestOptions)).ConfigureAwait(false);
             }
             else
             {
@@ -175,36 +163,19 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             {
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                 {
-                    try
-                    {
-                        var entity = await _executor.ExecuteOperation(static args =>
-                        {
-                            var (self, id, pk) = args;
-                            return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
-                        },
-                        (this, id, pk)).ConfigureAwait(false);
-
-                        // State exists but the current activation has not observed state creation. Therefore, we have inconsistent
-                        // state and should throw to give the grain a chance to deactivate and recover.
-                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "None", entity.ETag);
-                    }
-                    catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
-                    {
-                        // Ignore, since this is the expected outcome.
-                        // All other exceptions will be handled by the outer catch blocks.
-                    }
+                    grainState.RecordExists = false;
+                    return;
                 }
-                else
+
+                await _executor.ExecuteOperation(static args =>
                 {
-                    await _executor.ExecuteOperation(static args =>
-                    {
-                        var (self, id, pk, requestOptions) = args;
-                        return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
-                    },
-                    (this, id, pk, requestOptions));
-                }
+                    var (self, id, pk, requestOptions) = args;
+                    return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
+                },
+                (this, id, pk, requestOptions));
 
-                ResetGrainState(grainState);
+                grainState.ETag = null;
+                grainState.RecordExists = false;
             }
             else
             {
@@ -220,18 +191,14 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                 var response = await _executor.ExecuteOperation(static args =>
                 {
                     var (self, grainState, entity, pk, requestOptions) = args;
-                    return grainState.ETag switch
-                    {
-                        null or { Length: 0 } => self._container.CreateItemAsync(entity, pk),
-                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
-                        _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
-                    };
+                    return string.IsNullOrEmpty(grainState.ETag)
+                        ? self._container.CreateItemAsync(entity, pk)
+                        : self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions);
                 },
                 (this, grainState, entity, pk, requestOptions)).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
                 grainState.RecordExists = false;
-                grainState.State = CreateInstance<T>();
             }
         }
         catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict or HttpStatusCode.NotFound)

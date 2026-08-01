@@ -4,7 +4,7 @@ using Orleans.Storage;
 namespace Orleans.Persistence.Cosmos;
 
 /// <summary>
-/// Exception thrown when a storage provider detects an Etag inconsistency when attempting to perform a WriteStateAsync operation.
+/// Exception thrown when a storage provider detects an Etag inconsistency when attempting to write or clear state.
 /// </summary>
 [Serializable]
 [GenerateSerializer]

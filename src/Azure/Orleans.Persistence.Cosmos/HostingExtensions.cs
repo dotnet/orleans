@@ -264,7 +264,7 @@ public static class HostingExtensions
         services.TryAddSingleton<IPartitionKeyProvider, DefaultPartitionKeyProvider>();
 #pragma warning restore CS0618 // Type or member is obsolete
         services.TryAddSingleton<DefaultDocumentIdProvider>();
-        services.TryAddFromExisting<IDocumentIdProvider, DefaultDocumentIdProvider>();
+        services.TryAddSingleton<IDocumentIdProvider>(sp => sp.GetRequiredService<DefaultDocumentIdProvider>());
         return services.AddGrainStorage(name, CosmosStorageFactory.Create);
     }
 
