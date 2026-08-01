@@ -37,6 +37,8 @@ namespace UnitTests.TimerTests
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
+                // The controlled-read tests validate ordering within one reminder owner.
+                builder.Options.InitialSilosCount = 1;
                 _reminderClock = builder.AddReminderTestClock();
                 builder.ConfigureSilo((_, siloBuilder) =>
                 {
