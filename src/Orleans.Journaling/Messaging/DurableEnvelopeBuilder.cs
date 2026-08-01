@@ -58,6 +58,22 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     private (int Offset, int Length) _bodySlice;
     private bool _bodyWritten;
 
+    internal DurableEnvelopeBuilder()
+    {
+    }
+
+    /// <summary>
+    /// Initializes a builder for a message sent by the specified grain.
+    /// </summary>
+    /// <param name="sessionPool">The serializer session pool used to encode the message.</param>
+    /// <param name="senderId">The identity of the sending grain.</param>
+    public DurableEnvelopeBuilder(SerializerSessionPool sessionPool, GrainId senderId)
+    {
+        ArgumentNullException.ThrowIfNull(sessionPool);
+        SessionPool = sessionPool;
+        SenderId = senderId;
+    }
+
     /// <summary>
     /// Sets the target grain and route key for this envelope.
     /// </summary>
