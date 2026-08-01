@@ -167,7 +167,10 @@
     <Project Path="test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
-    <Project Path="test/Extensions/Google.Tests/Google.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Clustering.GoogleFirestore.Tests/Orleans.Clustering.GoogleFirestore.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.GrainDirectory.GoogleFirestore.Tests/Orleans.GrainDirectory.GoogleFirestore.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Persistence.GoogleFirestore.Tests/Orleans.Persistence.GoogleFirestore.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Reminders.GoogleFirestore.Tests/Orleans.Reminders.GoogleFirestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Azure.Tests/Orleans.Azure.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.DurableJobs.AzureStorage.Tests/Orleans.DurableJobs.AzureStorage.Tests.csproj" />

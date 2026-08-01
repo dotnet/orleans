@@ -6,7 +6,7 @@ using Orleans.Messaging;
 using UnitTests.MembershipTests;
 using Orleans.Clustering.GoogleFirestore;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Clustering.GoogleFirestore.Tests;
 
 [TestCategory("Functional"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
 public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFixture<TestEnvironmentFixture>

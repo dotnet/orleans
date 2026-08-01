@@ -237,6 +237,10 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -1011,11 +1015,11 @@ jobs:
         distribution: temurin
         java-version: '21'
     - name: Setup Google Emulators
-      working-directory: test/Extensions/Google.Tests/Emulators
+      working-directory: test/Extensions/GoogleFirestore/Emulators
       run: |
         set -euo pipefail
 
-        curl -sL firebase.tools | bash
+        npm install --global firebase-tools@15.24.0
         firebase setup:emulators:storage
         firebase setup:emulators:firestore
         firebase setup:emulators:pubsub

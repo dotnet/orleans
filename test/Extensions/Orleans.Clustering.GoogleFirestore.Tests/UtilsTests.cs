@@ -2,7 +2,7 @@ using Orleans.Runtime;
 using FirestoreDataManager = Orleans.Tests.GoogleFirestore.FirestoreDataManager;
 using FirestoreUtils = Orleans.Tests.GoogleFirestore.Utils;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Clustering.GoogleFirestore.Tests;
 
 public class UtilsTests
 {

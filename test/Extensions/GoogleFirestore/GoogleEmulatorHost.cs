@@ -1,6 +1,6 @@
 using System.Net.Sockets;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Tests.GoogleFirestore;
 
 public static class GoogleEmulatorHost
 {
@@ -68,6 +68,13 @@ public static class GoogleEmulatorHost
             throw new SkipException();
         }
 
-        client.EndConnect(result);
+        try
+        {
+            client.EndConnect(result);
+        }
+        catch (SocketException)
+        {
+            throw new SkipException();
+        }
     }
 }

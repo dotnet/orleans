@@ -4,8 +4,6 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);GOOGLE_TESTS</DefineConstants>
     <Nullable>enable</Nullable>
-    <RootNamespace>Orleans.Tests.Google</RootNamespace>
-    <AssemblyName>Orleans.Tests.Google</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,9 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Clustering.GoogleFirestore\Orleans.Clustering.GoogleFirestore.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Persistence.GoogleFirestore\Orleans.Persistence.GoogleFirestore.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.GoogleFirestore\Orleans.Reminders.GoogleFirestore.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.GrainDirectory.GoogleFirestore\Orleans.GrainDirectory.GoogleFirestore.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
   </ItemGroup>
 
@@ -27,10 +22,7 @@
     <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreOptions.cs" Link="Shared\Storage\FirestoreOptions.cs" />
     <Compile Include="$(SourceRoot)src\Google\Shared\Storage\GoogleCloudOptions.cs" Link="Shared\Storage\GoogleCloudOptions.cs" />
     <Compile Include="$(SourceRoot)src\Google\Shared\Utils\Utils.cs" Link="Shared\Utils\Utils.cs" />
+    <Compile Include="$(SourceRoot)test\Extensions\GoogleFirestore\GoogleEmulatorHost.cs" Link="GoogleEmulatorHost.cs" />
+    <Compile Include="$(SourceRoot)test\Extensions\GoogleFirestore\Usings.cs" Link="Usings.cs" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Emulators/" />
-  </ItemGroup>
-  
 </Project>

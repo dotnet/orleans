@@ -7,7 +7,7 @@ using Orleans.Reminders.GoogleFirestore;
 using Orleans.Runtime;
 
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Reminders.GoogleFirestore.Tests;
 
 [TestCategory("Reminders"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]

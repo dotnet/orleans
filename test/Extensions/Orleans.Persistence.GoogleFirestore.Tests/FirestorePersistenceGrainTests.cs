@@ -2,7 +2,7 @@ using Orleans.TestingHost;
 using Xunit.Abstractions;
 
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Persistence.GoogleFirestore.Tests;
 
 [TestCategory("Persistence"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
 public class FirestorePersistenceGrainTests : Base_PersistenceGrainTests_GoogleStorage, IClassFixture<FirestorePersistenceGrainTests.Fixture>

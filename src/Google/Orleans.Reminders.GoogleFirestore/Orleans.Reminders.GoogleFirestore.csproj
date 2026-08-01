@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Reminders.GoogleFirestore</PackageId>
-    <Title>Microsoft Orleans Google Cloud Storage Reminders Provider</Title>
-    <Description>Microsoft Orleans reminders provider backed by Google Cloud Storage</Description>
-    <PackageTags>$(PackageTags) Google Cloud Storage</PackageTags>
+    <Title>Microsoft Orleans Google Cloud Firestore Reminders Provider</Title>
+    <Description>Microsoft Orleans reminders provider backed by Google Cloud Firestore</Description>
+    <PackageTags>$(PackageTags) Google Cloud Firestore</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Reminders.GoogleFirestore</AssemblyName>
     <RootNamespace>Orleans.Reminders.GoogleFirestore</RootNamespace>
@@ -27,9 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>Orleans.Tests.Google</_Parameter1>
-    </AssemblyAttribute>
+    <InternalsVisibleTo Include="Orleans.Reminders.GoogleFirestore.Tests" />
   </ItemGroup>
 
 </Project>

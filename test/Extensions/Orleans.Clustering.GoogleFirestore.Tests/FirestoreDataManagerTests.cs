@@ -6,7 +6,7 @@ using Google.Cloud.Firestore;
 using Orleans.Tests.GoogleFirestore;
 using Utils = Orleans.Tests.GoogleFirestore.Utils;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Clustering.GoogleFirestore.Tests;
 
 [TestCategory("Functional"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
 public class FirestoreDataManagerTests : IAsyncLifetime

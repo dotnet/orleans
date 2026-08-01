@@ -24,7 +24,9 @@
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
     <InternalsVisibleTo Include="Orleans.Cosmos.Tests" />
     <InternalsVisibleTo Include="Orleans.Redis.Tests" />
-    <InternalsVisibleTo Include="Orleans.Tests.Google" />
+    <InternalsVisibleTo Include="Orleans.Clustering.GoogleFirestore.Tests" />
+    <InternalsVisibleTo Include="Orleans.Persistence.GoogleFirestore.Tests" />
+    <InternalsVisibleTo Include="Orleans.Reminders.GoogleFirestore.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
   </ItemGroup>
 </Project>
