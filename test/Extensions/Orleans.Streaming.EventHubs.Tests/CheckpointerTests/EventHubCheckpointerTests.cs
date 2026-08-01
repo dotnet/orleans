@@ -25,6 +25,7 @@ public class EventHubCheckpointerTests
         public bool CheckpointExists => true;
         public string? LastOffset { get; private set; }
         public int UpdateCount { get; private set; }
+        public string? FlushedOffset { get; private set; }
         public int FlushCount { get; private set; }
 
         public Task<string> Load() => Task.FromResult("-1");
@@ -43,6 +44,7 @@ public class EventHubCheckpointerTests
 
         public virtual Task FlushAsync(CancellationToken cancellationToken)
         {
+            FlushedOffset = LastOffset;
             FlushCount++;
             return Task.CompletedTask;
         }
@@ -306,6 +308,22 @@ public class EventHubCheckpointerTests
         UpdateDeliveryProgress(receiver, MakeToken(100));
 
         Assert.Equal("100", checkpointer.LastOffset);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task Shutdown_FlushesLatestDeliveryProgress()
+    {
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
+
+        UpdateDeliveryProgress(receiver, MakeToken(100));
+        Assert.Equal("100", checkpointer.LastOffset);
+        Assert.Equal(0, checkpointer.FlushCount);
+
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, checkpointer.FlushCount);
+        Assert.Equal("100", checkpointer.FlushedOffset);
     }
 
     [Fact, TestCategory("BVT")]
