@@ -94,7 +94,9 @@ namespace Orleans.Transactions.DynamoDB.Tests
                     .ConfigureServices(svc =>
                     {
                         svc.AddScoped<ITransactionFaultInjector, SimpleAzureStorageExceptionInjector>()
-                        .AddScoped<IControlledTransactionFaultInjector>(sp => sp.GetService<ITransactionFaultInjector>() as IControlledTransactionFaultInjector);
+                        .AddScoped<IControlledTransactionFaultInjector>(sp =>
+                            sp.GetRequiredService<ITransactionFaultInjector>() as IControlledTransactionFaultInjector
+                            ?? throw new InvalidOperationException("The transaction fault injector must support controlled injection."));
                     });
             }
         }

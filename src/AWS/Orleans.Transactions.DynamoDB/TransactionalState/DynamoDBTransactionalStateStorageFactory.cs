@@ -34,7 +34,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
     private readonly ClusterOptions clusterOptions;
     private readonly ILoggerFactory loggerFactory;
 
-    private DynamoDBStorage storage;
+    private DynamoDBStorage storage = null!;
 
     public DynamoDBTransactionalStateStorageFactory(
         string name,
@@ -57,7 +57,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 
     public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
     {
-        if (this.storage == null)
+        if (this.storage is null)
         {
             throw new ArgumentException("DynamoDBStorage client is not initialized");
         }

@@ -38,7 +38,7 @@ internal class KeyEntity
 
     public const string RK = "key";
 
-    public string PartitionKey { get; set; }
+    public string PartitionKey { get; set; } = null!;
 
     public string RowKey { get; set; }
 

@@ -41,13 +41,16 @@ namespace Orleans.Hosting
         }
 
         internal static IServiceCollection AddFaultInjectionDynamoDBTransactionalStateStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<DynamoDBTransactionalStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<DynamoDBTransactionalStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<DynamoDBTransactionalStorageOptions>(name));
             services.AddTransient<IPostConfigureOptions<DynamoDBTransactionalStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<DynamoDBTransactionalStorageOptions>>();
 
-            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => FaultInjectionDynamoDBTransactionStateStorageFactory.Create(sp, key as string));
+            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetRequiredKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) =>
+                FaultInjectionDynamoDBTransactionStateStorageFactory.Create(
+                    sp,
+                    key as string ?? throw new InvalidOperationException("The transactional state storage provider name is required.")));
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(name));
 
             return services;

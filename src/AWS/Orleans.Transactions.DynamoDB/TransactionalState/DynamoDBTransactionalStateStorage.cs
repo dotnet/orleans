@@ -31,8 +31,8 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     private readonly ILogger<DynamoDBTransactionalStateStorage<TState>> logger;
 
     // Caches loaded data for this storage instance
-    private KeyEntity key;
-    private List<KeyValuePair<long, StateEntity>> states;
+    private KeyEntity key = null!;
+    private List<KeyValuePair<long, StateEntity>> states = null!;
 
     public DynamoDBTransactionalStateStorage(DynamoDBStorage storage, DynamoDBTransactionalStorageOptions options, string partitionKey, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
     {
@@ -47,11 +47,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     {
         try
         {
-            // Load key record and all prepared state records
-            var keyEntityTask = LoadKeyEntityAsync();
-            var stateEntitiesTask = LoadStateEntitiesAsync();
-            key = await keyEntityTask.ConfigureAwait(false);
-            states = await stateEntitiesTask.ConfigureAwait(false);
+            (key, states) = await LoadSnapshotAsync().ConfigureAwait(false);
 
             if (string.IsNullOrEmpty(key.ETag.ToString()))
             {
@@ -112,7 +108,9 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
             LogDebugLoadedPartitionKeyRows(this.partitionKey, this.key.CommittedSequenceId, new(states));
 
-            TransactionalStateMetaData metadata = this.ConvertFromStorageFormat<TransactionalStateMetaData>(this.key.Metadata);
+            var metadata = this.key.Metadata is { Length: > 0 }
+                ? this.ConvertFromStorageFormat<TransactionalStateMetaData>(this.key.Metadata)
+                : new TransactionalStateMetaData();
             return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
         }
         catch (Exception ex)
@@ -122,13 +120,14 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         }
     }
 
-    public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+    public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
     {
-        var transactItems = new List<(TransactWriteItem Item, string PartitionKey, string RowKey)>();
+        var batchOperation = new BatchOperation(this.storage, this.tableName, this.key, this.logger);
+        var keyWasNew = !this.key.ETag.HasValue;
 
         try
         {
-            var keyETag = key.ETag.ToString();
+            var keyETag = key.ETag?.ToString();
             if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) &&
                 keyETag != expectedETag)
             {
@@ -156,7 +155,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         }
                     };
 
-                    transactItems.Add((new TransactWriteItem { Delete = delete }, entity.PartitionKey, entity.RowKey));
+                    await batchOperation.Add(new TransactWriteItem { Delete = delete }, entity.PartitionKey, entity.RowKey).ConfigureAwait(false);
 
                     states.RemoveAt(states.Count - 1);
                     LogTraceDeleteTransaction(entity.PartitionKey, entity.RowKey, entity.TransactionId);
@@ -181,7 +180,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                             existing.SetState(s.State, this.serializer);
                             existing.ETag = existing.ETag + 1;
 
-                            transactItems.Add((new TransactWriteItem
+                            await batchOperation.Add(new TransactWriteItem
                             {
                                 Put = new Put
                                 {
@@ -194,17 +193,23 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                                         [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = currentETag }
                                     }
                                 }
-                            }, existing.PartitionKey, existing.RowKey));
+                            }, existing.PartitionKey, existing.RowKey).ConfigureAwait(false);
 
                             LogTraceUpdateTransaction(partitionKey, existing.RowKey, existing.TransactionId);
                         }
                         else
                         {
                             var entity = StateEntity.Create(this.serializer, this.partitionKey, s);
-                            transactItems.Add((new TransactWriteItem
+                            await batchOperation.Add(new TransactWriteItem
                             {
-                                Put = new Put { TableName = this.tableName, Item = entity.ToStorageFormat(), }
-                            }, entity.PartitionKey, entity.RowKey));
+                                Put = new Put
+                                {
+                                    TableName = this.tableName,
+                                    Item = entity.ToStorageFormat(),
+                                    ConditionExpression =
+                                        $"attribute_not_exists({DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME}) AND attribute_not_exists({DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME})"
+                                }
+                            }, entity.PartitionKey, entity.RowKey).ConfigureAwait(false);
 
                             states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
                             LogTraceInsertTransaction(partitionKey, entity.RowKey, entity.TransactionId);
@@ -220,30 +225,14 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 key.CommittedSequenceId = commitUpTo.Value;
             }
 
-            var existingETag = key.ETag.ToString();
-            if (string.IsNullOrWhiteSpace(existingETag))
+            batchOperation.MarkKeyChanged();
+            if (keyWasNew)
             {
-                this.key.ETag = 0;
-                var keyPutRequest = new Put
-                {
-                    TableName = this.tableName,
-                    Item = key.ToStorageFormat(),
-                };
-                transactItems.Add((new TransactWriteItem { Put = keyPutRequest }, this.partitionKey, KeyEntity.RK));
                 LogTraceInsertWithCount(partitionKey, KeyEntity.RK, this.key.CommittedSequenceId,
                     metadata.CommitRecords.Count);
             }
             else
             {
-                this.key.ETag = this.key.ETag + 1;
-                var keyPutRequest = new Put
-                {
-                    TableName = this.tableName,
-                    Item = key.ToStorageFormat(),
-                    ConditionExpression = $"ETag = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
-                    ExpressionAttributeValues = new Dictionary<string, AttributeValue> { [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = existingETag } }
-                };
-                transactItems.Add((new TransactWriteItem { Put = keyPutRequest }, this.partitionKey, KeyEntity.RK));
                 LogTraceUpdateWithCount(partitionKey, KeyEntity.RK, this.key.CommittedSequenceId,
                     metadata.CommitRecords.Count);
             }
@@ -265,7 +254,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                             [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = stateToDelete.Value.ETag.ToString() }
                         }
                     };
-                    transactItems.Add((new TransactWriteItem { Delete = delRequest }, stateToDelete.Value.PartitionKey, stateToDelete.Value.RowKey));
+                    await batchOperation.Add(
+                        new TransactWriteItem { Delete = delRequest },
+                        stateToDelete.Value.PartitionKey,
+                        stateToDelete.Value.RowKey).ConfigureAwait(false);
 
                     LogTraceDeleteTransaction(this.partitionKey, states[i].Value.RowKey, states[i].Value.TransactionId);
                 }
@@ -273,30 +265,13 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 states.RemoveRange(0, pos);
             }
 
-            this.logger.LogInformation("Storing {Count} items in DynamoDB for partition {PartitionKey}", transactItems.Count, this.partitionKey);
-
-            const int txChunkSize = 100;
-            var txItems = transactItems.Select(item => item.Item).ToList();
-            for (int i = 0; i < txItems.Count; i += txChunkSize)
-            {
-                var batch = txItems.Skip(i).Take(txChunkSize).ToList();
-                await this.storage.WriteTxAsync(batch).ConfigureAwait(false);
-                LogTraceBatchOpOk(logger, transactItems[i].PartitionKey, transactItems[i].RowKey, batch.Count);
-            }
+            await batchOperation.Flush().ConfigureAwait(false);
 
             LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
-            return key.ETag.ToString();
+            return key.ETag!.Value.ToString();
         }
         catch (Exception ex)
         {
-            if (logger.IsEnabled(LogLevel.Trace))
-            {
-                for (int i = 0; i < transactItems.Count; i++)
-                {
-                    LogTraceBatchOpFailed(logger, transactItems[i].PartitionKey, transactItems[i].RowKey, i);
-                }
-            }
-
             LogErrorTransactionalStateStoreFailed(logger, ex);
             throw;
         }
@@ -327,6 +302,20 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             keyAttributes,
             (item) => new KeyEntity(item)).ConfigureAwait(false);
         return keyEntity ?? new KeyEntity(this.partitionKey);
+    }
+
+    private async Task<(KeyEntity Key, List<KeyValuePair<long, StateEntity>> States)> LoadSnapshotAsync()
+    {
+        while (true)
+        {
+            var keyBefore = await LoadKeyEntityAsync().ConfigureAwait(false);
+            var stateEntities = await LoadStateEntitiesAsync().ConfigureAwait(false);
+            var keyAfter = await LoadKeyEntityAsync().ConfigureAwait(false);
+            if (keyBefore.ETag == keyAfter.ETag)
+            {
+                return (keyAfter, stateEntities);
+            }
+        }
     }
 
     /// <summary>
@@ -363,18 +352,18 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
     private T ConvertFromStorageFormat<T>(StateEntity entity)
     {
-        T dataValue = default;
+        T dataValue = default!;
         try
         {
             if (entity.State is { Length: > 0 })
-                dataValue = this.serializer.Deserialize<T>(entity.State);
+                dataValue = this.serializer.Deserialize<T>(entity.State)!;
         }
         catch (Exception exc)
         {
             var sb = new StringBuilder();
             sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", entity.State);
 
-            if (dataValue != null)
+            if (dataValue is not null)
             {
                 sb.Append($"Data Value={dataValue} Type={dataValue.GetType()}");
             }
@@ -389,12 +378,12 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
     private T ConvertFromStorageFormat<T>(byte[] value)
     {
-        T dataValue = default;
+        T dataValue = default!;
 
         try
         {
             if (value is { Length: > 0 })
-                dataValue = this.serializer.Deserialize<T>(value);
+                dataValue = this.serializer.Deserialize<T>(value)!;
         }
         catch (Exception exc)
         {
@@ -425,6 +414,120 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             }
         }
         return false;
+    }
+
+    private sealed class BatchOperation(
+        DynamoDBStorage storage,
+        string tableName,
+        KeyEntity key,
+        ILogger logger)
+    {
+        private const int MaxDataOperations = 99;
+        private readonly List<(TransactWriteItem Item, string PartitionKey, string RowKey)> operations = [];
+        private bool keyChanged;
+
+        public async ValueTask Add(TransactWriteItem operation, string partitionKey, string rowKey)
+        {
+            this.operations.Add((operation, partitionKey, rowKey));
+            if (this.operations.Count == MaxDataOperations)
+            {
+                await FlushCore().ConfigureAwait(false);
+            }
+        }
+
+        public void MarkKeyChanged() => this.keyChanged = true;
+
+        public Task Flush() => this.operations.Count > 0 || this.keyChanged ? FlushCore() : Task.CompletedTask;
+
+        private async Task FlushCore()
+        {
+            var currentETag = key.ETag;
+            var nextETag = currentETag.GetValueOrDefault(-1) + 1;
+            key.ETag = nextETag;
+            var keyItem = key.ToStorageFormat();
+            key.ETag = currentETag;
+
+            var keyPut = new Put
+            {
+                TableName = tableName,
+                Item = keyItem
+            };
+
+            if (currentETag.HasValue)
+            {
+                keyPut.ConditionExpression =
+                    $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}";
+                keyPut.ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = currentETag.Value.ToString() }
+                };
+            }
+            else
+            {
+                keyPut.ConditionExpression =
+                    $"attribute_not_exists({DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME}) AND attribute_not_exists({DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME})";
+            }
+
+            var transaction = this.operations.Select(operation => operation.Item).ToList();
+            transaction.Add(new TransactWriteItem { Put = keyPut });
+
+            try
+            {
+                await storage.WriteTxAsync(transaction).ConfigureAwait(false);
+                key.ETag = nextETag;
+                this.keyChanged = false;
+
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    for (var i = 0; i < this.operations.Count; i++)
+                    {
+                        var operation = this.operations[i];
+                        LogTraceBatchOpOk(logger, operation.PartitionKey, operation.RowKey, i);
+                    }
+
+                    LogTraceBatchOpOk(logger, key.PartitionKey, key.RowKey, this.operations.Count);
+                }
+
+                this.operations.Clear();
+            }
+            catch (TransactionCanceledException exception) when (IsStorageConflict(exception))
+            {
+                LogFailures();
+                throw new InconsistentStateException(
+                    "DynamoDB transactional state storage conflict.",
+                    storedEtag: "Unknown",
+                    currentEtag: currentETag?.ToString() ?? "null",
+                    exception);
+            }
+            catch
+            {
+                LogFailures();
+                throw;
+            }
+        }
+
+        private void LogFailures()
+        {
+            if (!logger.IsEnabled(LogLevel.Trace))
+            {
+                return;
+            }
+
+            for (var i = 0; i < this.operations.Count; i++)
+            {
+                var operation = this.operations[i];
+                LogTraceBatchOpFailed(logger, operation.PartitionKey, operation.RowKey, i);
+            }
+
+            LogTraceBatchOpFailed(logger, key.PartitionKey, key.RowKey, this.operations.Count);
+        }
+
+        private static bool IsStorageConflict(TransactionCanceledException exception)
+        {
+            return exception.CancellationReasons?.Any(
+                reason => string.Equals(reason.Code, "ConditionalCheckFailed", StringComparison.Ordinal)) is true
+                || exception.Message.Contains("ConditionalCheckFailed", StringComparison.Ordinal);
+        }
     }
 
     [LoggerMessage(

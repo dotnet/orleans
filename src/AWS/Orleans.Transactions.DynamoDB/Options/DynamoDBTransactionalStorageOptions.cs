@@ -49,9 +49,9 @@ namespace Orleans.Configuration
 
         /// <summary>
         /// DynamoDB table name.
-        /// Defaults to 'OrleansGrainState'.
+        /// Defaults to 'OrleansTransactionalState'.
         /// </summary>
-        public string TableName { get; set; } = "OrleansGrainState";
+        public string TableName { get; set; } = "OrleansTransactionalState";
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
@@ -59,7 +59,7 @@ namespace Orleans.Configuration
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
     }
 
     /// <summary>

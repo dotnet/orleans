@@ -71,25 +71,25 @@ internal class StateEntity
         return result;
     }
 
-    public string PartitionKey { get; set; }
+    public string PartitionKey { get; set; } = null!;
 
-    public string RowKey { get; set; }
+    public string RowKey { get; set; } = null!;
 
     public long SequenceId => long.Parse(this.RowKey.Substring(ROW_KEY_PREFIX.Length), NumberStyles.AllowHexSpecifier);
 
-    public string TransactionId { get; set; }
+    public string TransactionId { get; set; } = string.Empty;
 
     public DateTime TransactionTimestamp { get; set; }
 
     public byte[] TransactionManager { get; set; } = [];
 
-    public byte[] State { get; set; }
+    public byte[] State { get; set; } = [];
 
     public long? ETag { get; set; }
 
     public void SetState<TState>(TState state, IGrainStorageSerializer serializer) where TState : class, new()
     {
-        this.State = state == null ? null : serializer.Serialize(state).ToArray();
+        this.State = serializer.Serialize(state).ToArray();
     }
 
     public Dictionary<string, AttributeValue> ToStorageFormat()

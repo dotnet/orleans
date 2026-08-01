@@ -20,9 +20,9 @@ namespace Orleans.Transactions.DynamoDB.Tests
     {
         public int State { get; set; }
 
-        public bool Equals(TestState other)
+        public bool Equals(TestState? other)
         {
-            return other == null?false:this.State.Equals(other.State);
+            return other is not null && this.State.Equals(other.State);
         }
     }
 
