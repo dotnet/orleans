@@ -93,12 +93,18 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return CurrentView;
     }
 
-    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryPartition.GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
+    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryPartition.GetSnapshotAsync(
+        MembershipVersion version,
+        MembershipVersion rangeVersion,
+        RingRange range,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         LogTraceGetSnapshotAsync(_logger, version, rangeVersion, range);
 
         // Wait for the range to be unlocked.
-        await WaitForRange(range, version);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ShutdownToken);
+        await WaitForRange(range, version, linkedCts.Token);
 
         ShutdownToken.ThrowIfCancellationRequested();
         List<GrainAddress> partitionAddresses = [];
@@ -194,15 +200,19 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     private bool IsOwner(DirectoryMembershipSnapshot view, GrainId grainId) => view.TryGetOwner(grainId, out _, out var partitionReference) && GrainId.Equals(partitionReference.GetGrainId());
 
-    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
+    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) =>
+        WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
 
-    private ValueTask WaitForRange(RingRange range, MembershipVersion version)
+    private ValueTask WaitForRange(RingRange range, MembershipVersion version) =>
+        WaitForRange(range, version, ShutdownToken);
+
+    private ValueTask WaitForRange(RingRange range, MembershipVersion version, CancellationToken cancellationToken)
     {
         GrainRuntime.CheckRuntimeContext(this);
         Task? completion = null;
         if (CurrentView.Version < version || TryGetIntersectingLock(range, version, out completion))
         {
-            return WaitForRangeCore(range, version, completion);
+            return WaitForRangeCore(range, version, completion, cancellationToken);
         }
 
         return ValueTask.CompletedTask;
@@ -222,21 +232,25 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             return false;
         }
 
-        async ValueTask WaitForRangeCore(RingRange range, MembershipVersion version, Task? task)
+        async ValueTask WaitForRangeCore(
+            RingRange range,
+            MembershipVersion version,
+            Task? task,
+            CancellationToken cancellationToken)
         {
             if (task is not null)
             {
-                await task;
+                await task.WaitAsync(cancellationToken);
             }
 
             if (CurrentView.Version < version)
             {
-                await RefreshViewAsync(version, ShutdownToken);
+                await RefreshViewAsync(version, cancellationToken);
             }
 
             while (TryGetIntersectingLock(range, version, out var completion))
             {
-                await completion.WaitAsync(ShutdownToken);
+                await completion.WaitAsync(cancellationToken);
             }
         }
     }
@@ -554,11 +568,27 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 }
 
                 // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-                var snapshot = await partition.GetSnapshotAsync(current.Version, previousVersion, queryRange).AsTask().WaitAsync(ShutdownToken);
+                var snapshot = await InvokeOnClusterMember(
+                    previousOwner,
+                    cancellationToken => partition.GetSnapshotAsync(
+                        current.Version,
+                        previousVersion,
+                        queryRange,
+                        cancellationToken).AsTask(),
+                    default(GrainDirectoryPartitionSnapshot?),
+                    nameof(IGrainDirectoryPartition.GetSnapshotAsync));
 
                 if (snapshot is null)
                 {
-                    LogWarningExpectedValidSnapshot(_logger, previousOwner, queryRange);
+                    if (_owner.GetClusterMemberCancellationToken(previousOwner).IsCancellationRequested)
+                    {
+                        LogWarningRemoteHostUnavailable(_logger, queryRange);
+                    }
+                    else
+                    {
+                        LogWarningExpectedValidSnapshot(_logger, previousOwner, queryRange);
+                    }
+
                     return false;
                 }
 

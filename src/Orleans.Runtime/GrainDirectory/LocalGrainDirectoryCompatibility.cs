@@ -111,8 +111,14 @@ internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, 
         return new(DirectoryResult.FromResult(true, version));
     }
 
-    public ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
+    public ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(
+        MembershipVersion version,
+        MembershipVersion rangeVersion,
+        RingRange range,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         // LocalGrainDirectory stores entries using the legacy single-ring ownership scheme, so this local
         // partition cannot produce a complete snapshot for a distributed virtual partition range.
         return new((GrainDirectoryPartitionSnapshot?)null);

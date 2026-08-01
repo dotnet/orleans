@@ -18,7 +18,11 @@ internal interface IGrainDirectoryPartition : ISystemTarget
     ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address);
 
     [Alias("GetSnapshotAsync")]
-    ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
+    ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(
+        MembershipVersion version,
+        MembershipVersion rangeVersion,
+        RingRange range,
+        CancellationToken cancellationToken = default);
 
     [Alias("AcknowledgeSnapshotTransferAsync")]
     ValueTask<bool> AcknowledgeSnapshotTransferAsync(
