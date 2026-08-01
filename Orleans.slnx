@@ -33,6 +33,7 @@
   <Folder Name="/playground/WorkflowsApp/">
     <Project Path="playground/WorkflowsApp/WorkflowsApp.AppHost/WorkflowsApp.AppHost.csproj" />
     <Project Path="playground/WorkflowsApp/WorkflowsApp.Service/WorkflowsApp.Service.csproj" />
+    <Project Path="playground/WorkflowsApp/WorkflowsApp.Service.Tests/WorkflowsApp.Service.Tests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

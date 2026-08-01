@@ -28,4 +28,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="WorkflowsApp.Service.Tests" />
+  </ItemGroup>
+
 </Project>

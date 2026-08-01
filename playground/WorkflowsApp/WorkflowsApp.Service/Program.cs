@@ -1,20 +1,21 @@
-using Orleans.Journaling;
-using Azure.Storage.Blobs;
-using Azure.Core.Pipeline;
-using Azure.Core;
 using System.Diagnostics;
 using System.Distributed.DurableTasks;
+using Azure.Core;
+using Azure.Core.Pipeline;
+using Azure.Storage.Blobs;
+using Orleans.Journaling;
 using Orleans.Runtime.DurableTasks;
+using WorkflowsApp.Service.Samples.Bank;
 using WorkflowsApp.Service.Samples.CancelWorld;
 using WorkflowsApp.Service.Samples.Counter;
+using WorkflowsApp.Service.Samples.HelloWorld;
+using WorkflowsApp.Service.Samples.HumanInTheLoop;
+using WorkflowsApp.Service.Samples.InventoryReservation;
 using WorkflowsApp.Service.Samples.MessageQueue;
 using WorkflowsApp.Service.Samples.OrderSaga;
 using WorkflowsApp.Service.Samples.Parallelism;
 using WorkflowsApp.Service.Samples.TagTracker;
 using WorkflowsApp.Service.Samples.TodoList;
-using WorkflowsApp.Service.Samples.Bank;
-using WorkflowsApp.Service.Samples.HelloWorld;
-using WorkflowsApp.Service.Samples.HumanInTheLoop;
 
 namespace WorkflowsApp.Service;
 
@@ -30,6 +31,7 @@ public class Program
             {
                 siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDurableTasks();
+                siloBuilder.AddDurableMessaging();
                 siloBuilder.AddStateMachineStorage();
                 siloBuilder.AddJournaledDurableTaskStorage();
                 siloBuilder.AddAzureAppendBlobStateMachineStorage();
@@ -74,6 +76,9 @@ public class Program
 
         log.LogInformation("==== Starting OrderSaga sample (DurableTask Workflows) ===");
         await OrderSaga.RunAsync(app.Services);
+
+        log.LogInformation("==== Starting InventoryReservation sample (Inbox/Outbox + IDurableDictionary) ===");
+        await InventoryReservation.RunAsync(app.Services);
 
         var client = app.Services.GetRequiredService<IClusterClient>();
 

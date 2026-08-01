@@ -1,9 +1,12 @@
 ﻿using Orleans.Journaling;
+using Orleans.Journaling.Messaging;
 
 namespace WorkflowsApp.Service;
 
 public abstract class DurableGrain : Grain, IGrainBase
 {
+    private readonly IDurableOutbox _outbox;
+
     protected DurableGrain()
     {
         StateMachineManager = ServiceProvider.GetRequiredService<IStateMachineManager>();
@@ -14,6 +17,7 @@ public abstract class DurableGrain : Grain, IGrainBase
 
         // Currently, we need to initialize this in the constructor so that it's registered when logs start being read.
         _ = ServiceProvider.GetRequiredService<DurableTaskGrainStorage>();
+        _outbox = ServiceProvider.GetRequiredService<IDurableOutbox>();
     }
 
     protected IStateMachineManager StateMachineManager { get; }
@@ -34,5 +38,12 @@ public abstract class DurableGrain : Grain, IGrainBase
         return result;
     }
 
-    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => StateMachineManager.WriteStateAsync(cancellationToken);
+    protected async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
+    {
+        await StateMachineManager.WriteStateAsync(cancellationToken);
+        if (_outbox.Count > 0)
+        {
+            await _outbox.DeliverPendingMessagesAsync(cancellationToken);
+        }
+    }
 }
