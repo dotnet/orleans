@@ -71,6 +71,24 @@ public class LocalReminderServiceTests
     }
 
     [Fact, TestCategory("BVT")]
+    public void IsReminderWithinLoadingWindow_UsesKnownNextTickAfterCurrentOccurrenceFires()
+    {
+        var now = new DateTime(2026, 1, 1, 0, 10, 0, DateTimeKind.Utc);
+        var period = TimeSpan.FromHours(1);
+        var loadingWindow = TimeSpan.FromMinutes(10);
+        var entry = CreateReminderEntry(now, period);
+        var nextTickTime = now + period;
+
+        Assert.True(LocalReminderService.IsReminderWithinLoadingWindow(entry, now, loadingWindow));
+        Assert.False(LocalReminderService.IsReminderWithinLoadingWindow(entry, now, loadingWindow, nextTickTime));
+        Assert.True(LocalReminderService.ShouldRetainOutsideLoadingWindowTombstone(entry, now, loadingWindow, nextTickTime));
+
+        now += TimeSpan.FromTicks(1);
+        Assert.False(LocalReminderService.IsReminderWithinLoadingWindow(entry, now, loadingWindow));
+        Assert.False(LocalReminderService.ShouldRetainOutsideLoadingWindowTombstone(entry, now, loadingWindow, nextTickTime));
+    }
+
+    [Fact, TestCategory("BVT")]
     public void ReminderOptions_DefaultLoadingWindowIsTwiceDefaultRefreshPeriod()
     {
         var options = new ReminderOptions();
