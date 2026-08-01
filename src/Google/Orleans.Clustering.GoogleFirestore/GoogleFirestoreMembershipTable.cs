@@ -41,7 +41,13 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
         }
     }
 
-    public Task DeleteMembershipTableEntries(string clusterId) => this._instanceManager.DeleteTableEntries();
+    public async Task DeleteMembershipTableEntries(string clusterId)
+    {
+        var manager = clusterId == this._clusterId
+            ? this._instanceManager
+            : await OrleansSiloInstanceManager.GetManager(Utils.SanitizeId(clusterId), this._loggerFactory, this._options);
+        await manager.DeleteTableEntries();
+    }
 
     public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this._instanceManager.CleanupDefunctSiloEntries(beforeDate);
 

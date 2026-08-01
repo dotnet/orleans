@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Google.Cloud.Firestore;
+using Grpc.Core;
 using Orleans.Runtime;
 
 namespace Orleans.Clustering.GoogleFirestore;
@@ -94,14 +95,15 @@ internal class OrleansSiloInstanceManager
 
         try
         {
-            var e = await this._storage.ReadAllEntities<SiloInstanceEntity>();
             var results = await this._storage.QueryEntities<SiloInstanceEntity>(
                 silo => silo
                     .WhereEqualTo(nameof(SiloInstanceEntity.Status), INSTANCE_STATUS_ACTIVE)
-                    .WhereGreaterThan(nameof(SiloInstanceEntity.ProxyPort), 0)
                 );
 
-            var gatewaySiloInstances = results.Select(ConvertToGatewayUri).ToList();
+            var gatewaySiloInstances = results
+                .Where(silo => silo.ProxyPort > 0)
+                .Select(ConvertToGatewayUri)
+                .ToList();
 
             this._logger.LogInformation((int)ErrorCode.Runtime_Error_100278, "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}.", gatewaySiloInstances.Count, this._clusterId);
             return gatewaySiloInstances;
@@ -119,23 +121,17 @@ internal class OrleansSiloInstanceManager
 
     internal async Task<int> DeleteTableEntries()
     {
-        var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>();
-
-        if (entities.Length > 0)
-        {
-            await this.DeleteEntriesBatch(entities);
-        }
-
-        return entities.Length;
+        return await this._storage.ClearCollection();
     }
 
     public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
     {
-        var entities = await this._storage.QueryEntities<SiloInstanceEntity>(
-            silo => silo
-                .WhereLessThan(nameof(SiloInstanceEntity.IAmAliveTime), beforeDate)
-                .WhereNotEqualTo(nameof(SiloInstanceEntity.Status), INSTANCE_STATUS_ACTIVE)
-            );
+        var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>();
+        entities = entities
+            .Where(entity => entity.Id != this._clusterId)
+            .Where(entity => entity.Status != INSTANCE_STATUS_ACTIVE)
+            .Where(entity => GetEffectiveUpdateTime(entity) < beforeDate)
+            .ToArray();
 
         if (entities.Length > 0)
         {
@@ -176,20 +172,31 @@ internal class OrleansSiloInstanceManager
 
     internal async Task<(SiloInstanceEntity Silo, ClusterVersionEntity Version)> FindSiloAndVersionEntities(SiloAddress siloAddress)
     {
-        var version = await this._storage.ReadEntity<ClusterVersionEntity>(this._clusterId) ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._clusterId}");
-        var silo = await this._storage.ReadEntity<SiloInstanceEntity>(siloAddress.ToParsableString()) ?? throw new KeyNotFoundException($"Could not find silo entry for {siloAddress.ToParsableString()}");
-
-        return (silo, version);
+        var collection = this._storage.GetCollection();
+        return await this._storage.ExecuteTransaction(async transaction =>
+        {
+            var versionSnapshot = await transaction.GetSnapshotAsync(collection.Document(this._clusterId));
+            var siloSnapshot = await transaction.GetSnapshotAsync(collection.Document(siloAddress.ToParsableString()));
+            if (!versionSnapshot.Exists) throw new KeyNotFoundException($"Could not find cluster version entry for {this._clusterId}");
+            if (!siloSnapshot.Exists) throw new KeyNotFoundException($"Could not find silo entry for {siloAddress.ToParsableString()}");
+            return (siloSnapshot.ConvertTo<SiloInstanceEntity>(), versionSnapshot.ConvertTo<ClusterVersionEntity>());
+        });
     }
 
     internal async Task<(SiloInstanceEntity[] Silos, ClusterVersionEntity Version)> FindAllSiloEntries()
     {
-        var version = await this._storage.ReadEntity<ClusterVersionEntity>(this._clusterId) ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._clusterId}");
-
-        var silos = await this._storage.ReadAllEntities<SiloInstanceEntity>();
-        silos = silos.Where(e => e.Id != this._clusterId).ToArray(); // Exclude the cluster version entry
-
-        return (silos, version);
+        var collection = this._storage.GetCollection();
+        return await this._storage.ExecuteTransaction(async transaction =>
+        {
+            var snapshot = await transaction.GetSnapshotAsync(collection);
+            var versionSnapshot = snapshot.Documents.SingleOrDefault(document => document.Id == this._clusterId)
+                ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._clusterId}");
+            var silos = snapshot.Documents
+                .Where(document => document.Id != this._clusterId)
+                .Select(document => document.ConvertTo<SiloInstanceEntity>())
+                .ToArray();
+            return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
+        });
     }
 
     /// <summary>
@@ -207,10 +214,8 @@ internal class OrleansSiloInstanceManager
 
             return true;
         }
-        catch (Exception exc)
+        catch (RpcException exc) when (exc.StatusCode == StatusCode.AlreadyExists)
         {
-            this._logger.LogError(exc, "Unable to create cluster version entry for deployment {DeploymentId} ", this._clusterId);
-
             return false;
         }
     }
@@ -226,22 +231,19 @@ internal class OrleansSiloInstanceManager
         var siloReference = collection.Document(silo.Id);
         var versionReference = collection.Document(this._clusterId);
 
-        var result = false;
-
         try
         {
-            result = await this._storage.ExecuteTransaction(trx =>
+            return await this._storage.ExecuteTransaction(trx =>
             {
                 trx.Create(siloReference, silo);
                 trx.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag!.Value));
                 return Task.FromResult(true);
             });
         }
-        catch (Exception ex)
+        catch (RpcException ex) when (IsContention(ex))
         {
-            this._logger.LogError(ex, "Unable to insert silo entry for silo {SiloAddress} ", silo.Id);
+            return false;
         }
-        return result;
     }
 
     internal async Task<bool> UpdateSiloEntryConditionally(SiloInstanceEntity silo, ClusterVersionEntity version)
@@ -250,21 +252,36 @@ internal class OrleansSiloInstanceManager
         var siloReference = collection.Document(silo.Id);
         var versionReference = collection.Document(this._clusterId);
 
-        var result = false;
-
         try
         {
-            result = await this._storage.ExecuteTransaction(trx =>
+            return await this._storage.ExecuteTransaction(trx =>
             {
                 trx.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag!.Value));
                 trx.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag!.Value));
                 return Task.FromResult(true);
             });
         }
-        catch (Exception ex)
+        catch (RpcException ex) when (IsContention(ex))
         {
-            this._logger.LogError(ex, "Unable to update silo entry for silo {SiloAddress} ", silo.Id);
+            return false;
         }
+    }
+
+    private static bool IsContention(RpcException exception) =>
+        exception.StatusCode is StatusCode.Aborted or StatusCode.AlreadyExists or StatusCode.FailedPrecondition or StatusCode.NotFound;
+
+    private static DateTimeOffset GetEffectiveUpdateTime(SiloInstanceEntity entity)
+    {
+        var result = entity.StartTime > entity.IAmAliveTime ? entity.StartTime : entity.IAmAliveTime;
+        if (entity.SuspectingSilos is { Count: > 0 })
+        {
+            var latestSuspectTime = entity.SuspectingSilos.Values.Max();
+            if (latestSuspectTime > result)
+            {
+                result = latestSuspectTime;
+            }
+        }
+
         return result;
     }
 }

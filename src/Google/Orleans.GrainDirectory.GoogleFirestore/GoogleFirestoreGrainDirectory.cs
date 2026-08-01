@@ -112,7 +112,10 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
 
             if (entities.Count > 0)
             {
-                await this._dataManager.DeleteEntities(entities.ToArray()).ConfigureAwait(false);
+                foreach (var chunk in entities.Chunk(FirestoreDataManager.MAX_BATCH_ENTRIES))
+                {
+                    await this._dataManager.DeleteEntities(chunk).ConfigureAwait(false);
+                }
             }
         }
         catch (Exception ex)
@@ -155,7 +158,10 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
 
             if (entities.Count > 0)
             {
-                await this._dataManager.DeleteEntities(entities.ToArray()).ConfigureAwait(false);
+                foreach (var chunk in entities.Chunk(FirestoreDataManager.MAX_BATCH_ENTRIES))
+                {
+                    await this._dataManager.DeleteEntities(chunk).ConfigureAwait(false);
+                }
             }
         }
         catch (Exception ex)

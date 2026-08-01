@@ -36,7 +36,7 @@ internal class GoogleFirestoreGatewayListProvider : IGatewayListProvider
     public async Task InitializeGatewayListProvider()
     {
         this._siloInstanceManager = await OrleansSiloInstanceManager.GetManager(
-            this._clusterId,
+            Utils.SanitizeId(this._clusterId),
             this._loggerFactory,
             this._options);
     }

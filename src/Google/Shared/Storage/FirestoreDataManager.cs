@@ -42,7 +42,8 @@ internal class FirestoreDataManager
             ? new FirestoreDbBuilder
             {
                 ProjectId = this._options.ProjectId,
-                EmulatorDetection = EmulatorDetection.EmulatorOrProduction
+                Endpoint = GetEmulatorEndpoint(this._options.EmulatorHost),
+                ChannelCredentials = ChannelCredentials.Insecure
             }.Build()
             : FirestoreDb.Create(this._options.ProjectId);
     }
@@ -83,12 +84,12 @@ internal class FirestoreDataManager
     /// <summary>
     /// Clears the collection.
     /// </summary>
-    public async Task ClearCollection()
+    public async Task<int> ClearCollection()
     {
         var collection = this.GetCollection();
         var colSnapshot = await collection.GetSnapshotAsync();
 
-        if (colSnapshot.Count == 0) return;
+        if (colSnapshot.Count == 0) return 0;
 
         foreach (var chunk in colSnapshot.Documents.Chunk(MAX_BATCH_ENTRIES))
         {
@@ -101,6 +102,8 @@ internal class FirestoreDataManager
 
             await batch.CommitAsync();
         }
+
+        return colSnapshot.Count;
     }
 
     /// <summary>
@@ -160,7 +163,7 @@ internal class FirestoreDataManager
         {
             var docRef = collection.Document(id);
 
-            var result = await docRef.SetAsync(fields, SetOptions.MergeAll);
+            var result = await docRef.UpdateAsync(fields, Precondition.MustExist);
             return Utils.FormatTimestamp(result.UpdateTime);
         }
         catch (Exception ex)
@@ -369,6 +372,12 @@ internal class FirestoreDataManager
 
     public Task<TEntity> ExecuteTransaction<TEntity>(Func<Transaction, Task<TEntity>> transactionScope) => this._db.RunTransactionAsync(transactionScope);
 
+    public Task<bool> EntityExists(string id)
+    {
+        var document = this.GetCollection().Document(id);
+        return this.ExecuteTransaction(async transaction => (await transaction.GetSnapshotAsync(document)).Exists);
+    }
+
     private static void ValidateEntity<TEntity>(TEntity entity, bool updating = false) where TEntity : FirestoreEntity, new()
     {
         if (entity.Id == default) throw new InvalidOperationException("Id is required to create or update an entity");
@@ -381,6 +390,13 @@ internal class FirestoreDataManager
 
     public CollectionReference GetCollection() =>
         this._db.Collection($"{this._options.RootCollectionName}").Document(this._group).Collection(this._partition);
+
+    internal static string GetEmulatorEndpoint(string endpoint) =>
+        endpoint.Contains("://", StringComparison.Ordinal)
+        && Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
+        && !string.IsNullOrEmpty(uri.Authority)
+            ? uri.Authority
+            : endpoint;
 
     private void LogError(Exception ex, string operation) =>
         this.Logger.LogError(ex, "Error on {operation} on collection {collection}", operation, this._partition);

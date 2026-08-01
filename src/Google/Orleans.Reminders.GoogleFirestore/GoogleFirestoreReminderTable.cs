@@ -149,7 +149,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
             {
                 var results = await this._dataManager.QueryEntities<ReminderEntity>(
                     reminder => reminder
-                        .WhereGreaterThanOrEqualTo(nameof(ReminderEntity.GrainHash), begin)
+                        .WhereGreaterThan(nameof(ReminderEntity.GrainHash), begin)
                         .WhereLessThanOrEqualTo(nameof(ReminderEntity.GrainHash), end)
                     ).ConfigureAwait(false);
 
@@ -224,7 +224,8 @@ internal class GoogleFirestoreReminderTable : IReminderTable
     }
 
     private static string FormatReminderId(ReminderEntry entry) => FormatReminderId(entry.ReminderName, entry.GrainId);
-    private static string FormatReminderId(string reminderName, GrainId grainId) => Utils.SanitizeId($"{reminderName}__{grainId}");
+    private static string FormatReminderId(string reminderName, GrainId grainId) =>
+        $"{Utils.SanitizeId(reminderName)}.{Utils.SanitizeGrainId(grainId)}";
 
     private ReminderTableData ConvertFromEntities(IEnumerable<ReminderEntity> entities)
     {
@@ -252,7 +253,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
         {
             return new ReminderEntry
             {
-                GrainId = Utils.ParseGrainId(entity.GrainId),
+                GrainId = GrainId.Parse(entity.GrainId),
                 ReminderName = entity.Name,
                 StartAt = entity.StartAt.UtcDateTime,
                 Period = TimeSpan.FromTicks(entity.Period),

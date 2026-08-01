@@ -32,6 +32,15 @@ internal class SiloInstanceEntity : MembershipEntity
     [FirestoreProperty("SiloName")]
     public string SiloName { get; set; } = default!;
 
+    [FirestoreProperty("RoleName")]
+    public string? RoleName { get; set; }
+
+    [FirestoreProperty("UpdateZone")]
+    public int UpdateZone { get; set; }
+
+    [FirestoreProperty("FaultZone")]
+    public int FaultZone { get; set; }
+
     [FirestoreProperty("SuspectingSilos")]
     public Dictionary<string, DateTimeOffset>? SuspectingSilos { get; set; }
 
@@ -51,6 +60,9 @@ internal class SiloInstanceEntity : MembershipEntity
         fields.Add("Status", this.Status);
         fields.Add("ProxyPort", this.ProxyPort);
         fields.Add("SiloName", this.SiloName);
+        fields.Add("RoleName", this.RoleName);
+        fields.Add("UpdateZone", this.UpdateZone);
+        fields.Add("FaultZone", this.FaultZone);
         fields.Add("SuspectingSilos", this.SuspectingSilos);
         fields.Add("StartTime", this.StartTime);
         fields.Add("IAmAliveTime", this.IAmAliveTime);
@@ -97,6 +109,9 @@ internal class SiloInstanceEntity : MembershipEntity
             ProxyPort = this.ProxyPort,
             SiloAddress = SiloAddress.New(IPAddress.Parse(this.Address), this.Port, this.Generation),
             SiloName = this.SiloName,
+            RoleName = this.RoleName,
+            UpdateZone = this.UpdateZone,
+            FaultZone = this.FaultZone,
             StartTime = this.StartTime.UtcDateTime,
             IAmAliveTime = this.IAmAliveTime.UtcDateTime,
         };
@@ -125,6 +140,9 @@ internal class SiloInstanceEntity : MembershipEntity
             Status = entry.Status.ToString(),
             ProxyPort = entry.ProxyPort,
             SiloName = entry.SiloName,
+            RoleName = entry.RoleName,
+            UpdateZone = entry.UpdateZone,
+            FaultZone = entry.FaultZone,
             StartTime = entry.StartTime,
             IAmAliveTime = entry.IAmAliveTime,
         };

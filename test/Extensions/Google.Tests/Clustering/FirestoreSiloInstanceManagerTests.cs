@@ -141,6 +141,9 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
             HostName = myEndpoint.Address.ToString(),
             ProxyPort = 30000,
             SiloName = "MyInstance",
+            RoleName = "MyRole",
+            UpdateZone = 3,
+            FaultZone = 5,
             StartTime = DateTimeOffset.UtcNow
         };
 
@@ -160,6 +163,9 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         Assert.Equal(referenceEntry.HostName, entry.HostName);
         Assert.Equal(referenceEntry.ProxyPort, entry.ProxyPort);
         Assert.Equal(referenceEntry.SiloName, entry.SiloName);
+        Assert.Equal(referenceEntry.RoleName, entry.RoleName);
+        Assert.Equal(referenceEntry.UpdateZone, entry.UpdateZone);
+        Assert.Equal(referenceEntry.FaultZone, entry.FaultZone);
         Assert.Equal(referenceEntry.IAmAliveTime, entry.IAmAliveTime);
 
         Assert.Equal(referenceEntry.SuspectingSilos, entry.SuspectingSilos);

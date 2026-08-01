@@ -4,6 +4,7 @@ using UnitTests;
 using TestExtensions;
 using UnitTests.RemindersTest;
 using Orleans.Reminders.GoogleFirestore;
+using Orleans.Runtime;
 
 
 namespace Orleans.Tests.Google;
@@ -54,5 +55,32 @@ public class FirestoreRemindersTests : ReminderTableTestsBase
     public async Task Simple()
     {
         await ReminderSimple();
+    }
+
+    [SkippableFact]
+    public async Task ReminderIdsDoNotCollide()
+    {
+        var startAt = DateTime.UtcNow;
+        var period = TimeSpan.FromMinutes(1);
+        var first = new ReminderEntry
+        {
+            GrainId = GrainId.Parse("b__c/d"),
+            ReminderName = "a",
+            StartAt = startAt,
+            Period = period,
+        };
+        var second = new ReminderEntry
+        {
+            GrainId = GrainId.Parse("c/d"),
+            ReminderName = "a__b",
+            StartAt = startAt,
+            Period = period,
+        };
+
+        await RemindersTable.UpsertRow(first);
+        await RemindersTable.UpsertRow(second);
+
+        Assert.Equal(first.ReminderName, (await RemindersTable.ReadRow(first.GrainId, first.ReminderName))?.ReminderName);
+        Assert.Equal(second.ReminderName, (await RemindersTable.ReadRow(second.GrainId, second.ReminderName))?.ReminderName);
     }
 }

@@ -1,8 +1,8 @@
 using System;
-using System.Text.Json;
 using System.Threading;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +10,7 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Persistence.GoogleFirestore;
 
@@ -22,17 +23,22 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
     private readonly ILogger _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly string _name;
+    private readonly IActivatorProvider _activatorProvider;
+    private readonly IGrainStorageSerializer _grainStorageSerializer;
     private FirestoreDataManager _dataManager = default!;
 
     public GoogleFirestoreStorage(
         string name,
         FirestoreStateStorageOptions options,
         IOptions<ClusterOptions> clusterOptions,
+        IActivatorProvider activatorProvider,
         ILoggerFactory loggerFactory)
     {
         this._name = name;
         this._options = options;
         this._clusterOptions = clusterOptions.Value;
+        this._activatorProvider = activatorProvider;
+        this._grainStorageSerializer = options.GrainStorageSerializer;
         this._logger = loggerFactory.CreateLogger<GoogleFirestoreStorage>();
         this._loggerFactory = loggerFactory;
     }
@@ -46,25 +52,23 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
                 stateName,
                 grainId);
 
-        var entity = await this._dataManager.ReadEntity<GrainStateEntity>(Utils.SanitizeGrainId(grainId)).ConfigureAwait(false);
+        var entity = await this._dataManager.ReadEntity<GrainStateEntity>(GetDocumentId(stateName, grainId)).ConfigureAwait(false);
 
-        if (entity is null)
+        if (entity?.Payload is not { Length: > 0 })
         {
             if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace(
                     "Read: GrainId={GrainId} from Firestore returned no data",
                     grainId);
+            ResetGrainState(grainState);
+            if (entity?.ETag is { } etag)
+            {
+                grainState.ETag = Utils.FormatTimestamp(etag);
+            }
         }
         else
         {
-            if (entity.Payload is not null)
-            {
-                grainState.RecordExists = true;
-                grainState.State = JsonSerializer.Deserialize<T>(entity.Payload, this._options.SerializerOptions)!;
-            }
-            else
-            {
-                grainState.State = Activator.CreateInstance<T>();
-            }
+            grainState.RecordExists = true;
+            grainState.State = this._grainStorageSerializer.Deserialize<T>(entity.Payload);
             grainState.ETag = Utils.FormatTimestamp(entity.ETag!.Value);
         }
     }
@@ -81,17 +85,16 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
 
         var entity = new GrainStateEntity
         {
-            Id = Utils.SanitizeGrainId(grainId),
+            Id = GetDocumentId(stateName, grainId),
             Name = stateName,
-            Payload = JsonSerializer.SerializeToUtf8Bytes(grainState.State, this._options.SerializerOptions)
+            Payload = this._grainStorageSerializer.Serialize(grainState.State).ToArray()
         };
 
         try
         {
-            string? newETag = null;
-            if (grainState.RecordExists)
+            string newETag;
+            if (!string.IsNullOrWhiteSpace(grainState.ETag))
             {
-                ArgumentNullException.ThrowIfNull(grainState.ETag);
                 entity.ETag = Utils.ParseTimestamp(grainState.ETag);
                 newETag = await this._dataManager.Update(entity).ConfigureAwait(false);
             }
@@ -102,6 +105,10 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             
             grainState.ETag = newETag;
             grainState.RecordExists = true;
+        }
+        catch (RpcException ex) when (IsConcurrencyFailure(ex))
+        {
+            throw CreateInconsistentStateException(nameof(WriteStateAsync), stateName, grainId, grainState.ETag, ex);
         }
         catch (Exception ex)
         {
@@ -127,20 +134,40 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             if (this._options.DeleteStateOnClear)
             {
                 operation = "Deleting";
-                await this._dataManager.DeleteEntity(Utils.SanitizeGrainId(grainId), grainState.ETag).ConfigureAwait(false);
+                var documentId = GetDocumentId(stateName, grainId);
+                if (string.IsNullOrWhiteSpace(grainState.ETag))
+                {
+                    if (await this._dataManager.EntityExists(documentId).ConfigureAwait(false))
+                    {
+                        throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag);
+                    }
+                }
+                else if (!await this._dataManager.DeleteEntity(documentId, grainState.ETag).ConfigureAwait(false))
+                {
+                    throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag);
+                }
+
+                grainState.ETag = null;
             }
             else
             {
-                ArgumentNullException.ThrowIfNull(grainState.ETag);
                 var entity = new GrainStateEntity
                 {
-                    Id = Utils.SanitizeGrainId(grainId),
+                    Id = GetDocumentId(stateName, grainId),
                     Name = stateName,
-                    ETag = Utils.ParseTimestamp(grainState.ETag)
                 };
 
-                await this._dataManager.Update(entity).ConfigureAwait(false);
+                grainState.ETag = string.IsNullOrWhiteSpace(grainState.ETag)
+                    ? await this._dataManager.CreateEntity(entity).ConfigureAwait(false)
+                    : await UpdateClearedEntity(entity, grainState.ETag).ConfigureAwait(false);
             }
+
+            grainState.RecordExists = false;
+            grainState.State = CreateInstance<T>();
+        }
+        catch (RpcException ex) when (IsConcurrencyFailure(ex))
+        {
+            throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag, ex);
         }
         catch (Exception ex)
         {
@@ -154,6 +181,40 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
 
             throw;
         }
+    }
+
+    private async Task<string> UpdateClearedEntity(GrainStateEntity entity, string etag)
+    {
+        entity.ETag = Utils.ParseTimestamp(etag);
+        return await this._dataManager.Update(entity).ConfigureAwait(false);
+    }
+
+    private static string GetDocumentId(string stateName, GrainId grainId) =>
+        Utils.SanitizeId($"{stateName}\0{grainId}");
+
+    private void ResetGrainState<T>(IGrainState<T> grainState)
+    {
+        grainState.ETag = null;
+        grainState.RecordExists = false;
+        grainState.State = CreateInstance<T>();
+    }
+
+    private T CreateInstance<T>() => this._activatorProvider.GetActivator<T>().Create();
+
+    private static bool IsConcurrencyFailure(RpcException exception) =>
+        exception.StatusCode is StatusCode.Aborted or StatusCode.AlreadyExists or StatusCode.FailedPrecondition or StatusCode.NotFound;
+
+    private InconsistentStateException CreateInconsistentStateException(
+        string operation,
+        string stateName,
+        GrainId grainId,
+        string? etag,
+        Exception? exception = null)
+    {
+        var message = $"Version conflict ({operation}): ServiceId={this._clusterOptions.ServiceId} ProviderName={this._name} StateName={stateName} GrainId={grainId} ETag={etag}.";
+        return exception is null
+            ? new InconsistentStateException(message, "Unknown", etag)
+            : new InconsistentStateException(message, "Unknown", etag, exception);
     }
 
     private async Task Init(CancellationToken ct)

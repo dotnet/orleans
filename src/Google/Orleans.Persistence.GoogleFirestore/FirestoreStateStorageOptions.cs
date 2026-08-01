@@ -1,20 +1,18 @@
-using System.Text.Json;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 
 namespace Orleans.Persistence.GoogleFirestore;
 
-public class FirestoreStateStorageOptions : FirestoreOptions
+public class FirestoreStateStorageOptions : FirestoreOptions, IStorageProviderSerializerOptions
 {
     /// <summary>
     /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
     /// </summary>
     public bool DeleteStateOnClear { get; set; }
 
-    /// <summary>
-    /// The System.Text.Json serializer options
-    /// </summary>
-    public JsonSerializerOptions SerializerOptions { get; set; } = new();
+    /// <inheritdoc/>
+    public IGrainStorageSerializer GrainStorageSerializer { get; set; } = default!;
 }
 
 /// <summary>
