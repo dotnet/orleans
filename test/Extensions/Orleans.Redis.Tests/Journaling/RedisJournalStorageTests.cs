@@ -358,6 +358,67 @@ public sealed class RedisJournalStorageTests
     }
 
     [SkippableFact]
+    public async Task CurrentSchemaVersion_IsStored()
+    {
+        TestUtils.CheckForRedis();
+        await using var context = await RedisJournalStorageTestContext.CreateAsync();
+        var id = JournalId.Create("redis", "schema-version");
+        await context.Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+
+        var schemaVersion = await context.Database.HashGetAsync(
+            context.GetMetadataKey(id),
+            RedisJournalStorage.SchemaVersionMetadataKey);
+
+        Assert.Equal(RedisJournalStorage.CurrentSchemaVersion, schemaVersion.ToString());
+    }
+
+    [SkippableTheory]
+    [InlineData(null)]
+    [InlineData("2")]
+    public async Task MissingOrUnsupportedSchemaVersion_BlocksAccessAndMutations(string? schemaVersion)
+    {
+        TestUtils.CheckForRedis();
+        await using var context = await RedisJournalStorageTestContext.CreateAsync();
+        var id = JournalId.Create("redis", "unsupported-schema", schemaVersion ?? "missing");
+        var storage = context.Provider.CreateStorage(id);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        var metadata = await storage.GetMetadataAsync();
+        var metadataKey = context.GetMetadataKey(id);
+        if (schemaVersion is null)
+        {
+            await context.Database.HashDeleteAsync(metadataKey, RedisJournalStorage.SchemaVersionMetadataKey);
+        }
+        else
+        {
+            await context.Database.HashSetAsync(metadataKey, RedisJournalStorage.SchemaVersionMetadataKey, schemaVersion);
+        }
+
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => context.Provider.CreateStorage(id).GetMetadataAsync().AsTask());
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => context.Provider.CreateStorage(id).ReadAsync(new CapturingJournalStorageConsumer(), CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => storage.ReplaceAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => storage.UpdateMetadataAsync(
+                new Dictionary<string, string> { ["owner"] = "unsupported" },
+                expectedETag: metadata!.ETag).AsTask());
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => storage.DeleteAsync(CancellationToken.None).AsTask());
+
+        await context.Database.HashSetAsync(
+            metadataKey,
+            RedisJournalStorage.SchemaVersionMetadataKey,
+            RedisJournalStorage.CurrentSchemaVersion);
+        var consumer = new CapturingJournalStorageConsumer();
+        await context.Provider.CreateStorage(id).ReadAsync(consumer, CancellationToken.None);
+        Assert.Equal([1], consumer.Bytes);
+        Assert.False((await storage.GetMetadataAsync())!.Properties.ContainsKey("owner"));
+    }
+
+    [SkippableFact]
     public async Task CallerMayUseFormatMetadata()
     {
         TestUtils.CheckForRedis();
