@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Providers
             this.runtimeClient = runtimeClient;
             this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
-            var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
+            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
