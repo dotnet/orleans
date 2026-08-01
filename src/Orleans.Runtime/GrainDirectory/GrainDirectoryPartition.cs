@@ -106,7 +106,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ShutdownToken);
         await WaitForRange(range, version, linkedCts.Token);
 
-        ShutdownToken.ThrowIfCancellationRequested();
+        linkedCts.Token.ThrowIfCancellationRequested();
         List<GrainAddress> partitionAddresses = [];
         foreach (var partitionSnapshot in _partitionSnapshots)
         {
