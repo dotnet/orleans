@@ -6,6 +6,7 @@ using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Internal;
+using Orleans.Reminders;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -77,6 +78,19 @@ namespace UnitTests.TimerTests
         private readonly ReminderTableReadController _readController;
 
         // Basic tests
+
+        [Fact]
+        public void ReminderTestClock_IsScopedToReminderService()
+        {
+            foreach (var silo in HostedCluster.Silos)
+            {
+                var unkeyedProvider = silo.ServiceProvider.GetRequiredService<TimeProvider>();
+                var reminderProvider = silo.ServiceProvider.GetRequiredKeyedService<TimeProvider>(ReminderTimeProviderNames.Reminders);
+
+                Assert.Same(TimeProvider.System, unkeyedProvider);
+                Assert.NotSame(unkeyedProvider, reminderProvider);
+            }
+        }
 
         /// <summary>
         /// Tests basic reminder operations including stopping reminders by reference.
