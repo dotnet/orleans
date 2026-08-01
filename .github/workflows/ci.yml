@@ -1005,15 +1005,46 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
-    - name: Setup Google Emulators      
+    - name: Setup Java
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Setup Google Emulators
       working-directory: test/Extensions/Google.Tests/Emulators
       run: |
+        set -euo pipefail
+
         curl -sL firebase.tools | bash
         firebase setup:emulators:storage
         firebase setup:emulators:firestore
         firebase setup:emulators:pubsub
-        firebase emulators:start --only firestore,pubsub,storage --project orleans-test &
-        sleep 10
+        firebase emulators:start --only firestore,pubsub,storage --project orleans-test > firebase-emulators.log 2>&1 &
+        emulator_pid=$!
+
+        for attempt in {1..60}; do
+          if ! kill -0 "$emulator_pid" 2>/dev/null; then
+            cat firebase-emulators.log
+            exit 1
+          fi
+
+          ready=true
+          for port in 8080 8085 9199; do
+            if ! (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null; then
+              ready=false
+              break
+            fi
+          done
+
+          if $ready; then
+            exit 0
+          fi
+
+          sleep 1
+        done
+
+        cat firebase-emulators.log
+        exit 1
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
