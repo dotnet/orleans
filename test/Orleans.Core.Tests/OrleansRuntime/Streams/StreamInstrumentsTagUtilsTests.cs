@@ -14,13 +14,14 @@ public class StreamInstrumentsTagUtilsTests
     public void GrainTagsUseStableLowCardinalityDimensions()
     {
         var firstStreamId = new QualifiedStreamId("ProviderName", StreamId.Create("Orders", "user-1"));
-        var secondStreamId = new QualifiedStreamId("ProviderName", StreamId.Create("Orders", "user-2"));
+        var secondStreamId = new QualifiedStreamId("ProviderName", StreamId.Create("Payments", "user-2"));
         var firstGrainId = GrainId.Create("UnitTests.Streaming.OrderProducerGrain", "user-1");
         var secondGrainId = GrainId.Create("UnitTests.Streaming.OrderProducerGrain", "user-2");
 
         var firstTags = ToTagDictionary(StreamInstrumentsTagUtils.InitializeTags(firstStreamId, firstGrainId));
         var secondTags = ToTagDictionary(StreamInstrumentsTagUtils.InitializeTags(secondStreamId, secondGrainId));
 
+        Assert.Equal(2, firstTags.Count);
         Assert.Equal(firstTags.Count, secondTags.Count);
         foreach (var tag in firstTags)
         {
@@ -29,8 +30,8 @@ public class StreamInstrumentsTagUtilsTests
         }
 
         Assert.Equal("ProviderName", firstTags["provider"]);
-        Assert.Equal("Orders", firstTags["namespace"]);
         Assert.Equal("UnitTests.Streaming.OrderProducerGrain", firstTags["grain_type"]);
+        Assert.DoesNotContain("namespace", firstTags.Keys);
         Assert.DoesNotContain("stream", firstTags.Keys);
         Assert.DoesNotContain("producer", firstTags.Keys);
         Assert.DoesNotContain("subscription", firstTags.Keys);
@@ -43,9 +44,10 @@ public class StreamInstrumentsTagUtilsTests
 
         var tags = ToTagDictionary(StreamInstrumentsTagUtils.InitializeTags(streamId));
 
+        Assert.Equal(2, tags.Count);
         Assert.Equal("ProviderName", tags["provider"]);
-        Assert.Equal("Orders", tags["namespace"]);
         Assert.Equal("unknown", tags["grain_type"]);
+        Assert.DoesNotContain("namespace", tags.Keys);
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]

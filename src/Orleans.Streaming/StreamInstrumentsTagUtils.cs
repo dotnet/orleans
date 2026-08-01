@@ -8,7 +8,6 @@ namespace Orleans.Streaming;
 
 internal static class StreamInstrumentsTagUtils
 {
-    private const string StreamNamespaceTagName = "namespace";
     private const string StreamProviderNameTagName = "provider";
     private const string GrainTypeTagName = "grain_type";
     private const string QueueIdTagName = "queue";
@@ -35,7 +34,6 @@ internal static class StreamInstrumentsTagUtils
         new()
         {
             { StreamProviderNameTagName, streamId.ProviderName },
-            { StreamNamespaceTagName, streamId.StreamId.GetNamespace() ?? string.Empty },
             { GrainTypeTagName, grainType }
         };
 }
