@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -21,7 +22,7 @@ namespace Orleans.Runtime.Placement
     /// <summary>
     /// Central point for placement decisions.
     /// </summary>
-    internal partial class PlacementService : IPlacementContext, ILifecycleParticipant<ISiloLifecycle>, PlacementService.ITestAccessor
+    internal partial class PlacementService : IPlacementContext, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>, PlacementService.ITestAccessor
     {
         private const int PlacementWorkerCount = 16;
         private readonly PlacementStrategyResolver _strategyResolver;
@@ -31,15 +32,21 @@ namespace Orleans.Runtime.Placement
         private readonly GrainVersionManifest _grainInterfaceVersions;
         private readonly CachedVersionSelectorManager _versionSelectorManager;
         private readonly ISiloStatusOracle _siloStatusOracle;
+        private readonly IClusterManifestProvider _clusterManifestProvider;
         private readonly bool _assumeHomogeneousSilosForTesting;
         private readonly PlacementWorker[] _workers;
         private readonly PlacementFilterStrategyResolver _filterStrategyResolver;
         private readonly PlacementFilterDirectorResolver _placementFilterDirectoryResolver;
+        private readonly ConcurrentDictionary<CompatibleSilosCacheKey, SiloAddress[]> _compatibleSilosCache = new();
         private readonly CancellationTokenSource _shutdownCts = new();
+        private long _placementCacheGeneration;
+        private Task? _manifestUpdatesTask;
 
         internal interface ITestAccessor
         {
             Task[] WorkerTasks { get; }
+
+            int CompatibleSilosCacheCount { get; }
 
             Task<SiloAddress> GetOrPlaceActivationAsync(Message message);
         }
@@ -55,6 +62,7 @@ namespace Orleans.Runtime.Placement
             GrainLocator grainLocator,
             GrainVersionManifest grainInterfaceVersions,
             CachedVersionSelectorManager versionSelectorManager,
+            IClusterManifestProvider clusterManifestProvider,
             PlacementDirectorResolver directorResolver,
             PlacementStrategyResolver strategyResolver,
             PlacementFilterStrategyResolver filterStrategyResolver,
@@ -70,7 +78,10 @@ namespace Orleans.Runtime.Placement
             _grainInterfaceVersions = grainInterfaceVersions;
             _versionSelectorManager = versionSelectorManager;
             _siloStatusOracle = siloStatusOracle;
+            _clusterManifestProvider = clusterManifestProvider;
             _assumeHomogeneousSilosForTesting = siloMessagingOptions.CurrentValue.AssumeHomogenousSilosForTesting;
+            _siloStatusOracle.SubscribeToSiloStatusEvents(this);
+            _versionSelectorManager.CacheInvalidated += InvalidatePlacementCaches;
             _workers = new PlacementWorker[PlacementWorkerCount];
             for (var i = 0; i < PlacementWorkerCount; i++)
             {
@@ -83,6 +94,8 @@ namespace Orleans.Runtime.Placement
         public SiloStatus LocalSiloStatus => _siloStatusOracle.CurrentStatus;
 
         Task[] ITestAccessor.WorkerTasks => _workers.Select(static worker => worker.CompletionTask).ToArray();
+
+        int ITestAccessor.CompatibleSilosCacheCount => _compatibleSilosCache.Count;
 
         Task<SiloAddress> ITestAccessor.GetOrPlaceActivationAsync(Message message)
         {
@@ -102,10 +115,14 @@ namespace Orleans.Runtime.Placement
             lifecycle.Subscribe(
                 nameof(PlacementService),
                 ServiceLifecycleStage.RuntimeInitialize + 1,
-                NoOpStart,
+                StartAsync,
                 StopAsync);
+        }
 
-            static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
+        private Task StartAsync(CancellationToken cancellationToken)
+        {
+            _manifestUpdatesTask = Task.Run(ProcessClusterManifestUpdates);
+            return Task.CompletedTask;
         }
 
         private async Task StopAsync(CancellationToken cancellationToken)
@@ -129,6 +146,21 @@ namespace Orleans.Runtime.Placement
             {
                 await completionTask.WaitAsync(cancellationToken).SuppressThrowing();
             }
+
+            if (_manifestUpdatesTask is Task manifestUpdatesTask)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    await manifestUpdatesTask.SuppressThrowing();
+                }
+                else
+                {
+                    await manifestUpdatesTask.WaitAsync(cancellationToken).SuppressThrowing();
+                }
+            }
+
+            _siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
+            _versionSelectorManager.CacheInvalidated -= InvalidatePlacementCaches;
         }
 
         /// <summary>
@@ -170,9 +202,7 @@ namespace Orleans.Runtime.Placement
             // with the current silo
             var compatibleSilos = _assumeHomogeneousSilosForTesting
                 ? _siloStatusOracle.GetActiveSilos()
-                : target.InterfaceVersion > 0
-                    ? _versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
-                    : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
+                : GetUnfilteredCompatibleSilos(grainType, target.InterfaceType, target.InterfaceVersion);
 
             if (!_assumeHomogeneousSilosForTesting)
             {
@@ -222,6 +252,43 @@ namespace Orleans.Runtime.Placement
             return compatibleSilos;
         }
 
+        private SiloAddress[] GetUnfilteredCompatibleSilos(GrainType grainType, GrainInterfaceType interfaceType, ushort interfaceVersion)
+        {
+            if (interfaceVersion == 0)
+            {
+                interfaceType = default;
+            }
+
+            while (true)
+            {
+                var generation = Volatile.Read(ref _placementCacheGeneration);
+                var key = new CompatibleSilosCacheKey(grainType, interfaceType, interfaceVersion, generation);
+                var result = _compatibleSilosCache.GetOrAdd(
+                    key,
+                    static (key, placementService) => placementService.ComputeUnfilteredCompatibleSilos(
+                        key.GrainType,
+                        key.InterfaceType,
+                        key.InterfaceVersion),
+                    this);
+
+                if (generation == Volatile.Read(ref _placementCacheGeneration))
+                {
+                    return result;
+                }
+
+                _compatibleSilosCache.TryRemove(key, out _);
+            }
+        }
+
+        private SiloAddress[] ComputeUnfilteredCompatibleSilos(GrainType grainType, GrainInterfaceType interfaceType, ushort interfaceVersion)
+        {
+            var silos = interfaceVersion > 0
+                ? _versionSelectorManager.GetSuitableSilos(grainType, interfaceType, interfaceVersion).SuitableSilos
+                : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
+
+            return silos;
+        }
+
         public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
         {
             if (target.InterfaceVersion == 0)
@@ -236,6 +303,33 @@ namespace Orleans.Runtime.Placement
                 .SuitableSilosByVersion;
 
             return silos;
+        }
+
+        void ISiloStatusListener.SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status) => InvalidatePlacementCaches();
+
+        private async Task ProcessClusterManifestUpdates()
+        {
+            try
+            {
+                await foreach (var _ in _clusterManifestProvider.Updates.WithCancellation(_shutdownCts.Token))
+                {
+                    InvalidatePlacementCaches();
+                }
+            }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+                // Ignore during shutdown.
+            }
+            catch (Exception exception)
+            {
+                LogErrorProcessingClusterManifestUpdates(exception);
+            }
+        }
+
+        private void InvalidatePlacementCaches()
+        {
+            Interlocked.Increment(ref _placementCacheGeneration);
+            _compatibleSilosCache.Clear();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -619,6 +713,12 @@ namespace Orleans.Runtime.Placement
         private partial void LogTraceAddressMessageSelectTarget(Message message);
 
         [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error processing cluster manifest updates."
+        )]
+        private partial void LogErrorProcessingClusterManifestUpdates(Exception exception);
+
+        [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Invalidating {Count} cached entries for message {Message}"
         )]
@@ -629,5 +729,11 @@ namespace Orleans.Runtime.Placement
             Message = "Error in placement worker."
         )]
         private static partial void LogWarnInPlacementWorker(ILogger logger, Exception exception);
+
+        private readonly record struct CompatibleSilosCacheKey(
+            GrainType GrainType,
+            GrainInterfaceType InterfaceType,
+            ushort InterfaceVersion,
+            long CacheGeneration);
     }
 }
