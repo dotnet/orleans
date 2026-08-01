@@ -9,13 +9,23 @@ namespace Orleans.Runtime.GrainDirectory;
 internal interface IGrainDirectoryPartition : ISystemTarget
 {
     [Alias("RegisterAsync")]
-    ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration);
+    ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        GrainAddress? currentRegistration,
+        CancellationToken cancellationToken = default);
 
     [Alias("LookupAsync")]
-    ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(MembershipVersion version, GrainId grainId);
+    ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
+        MembershipVersion version,
+        GrainId grainId,
+        CancellationToken cancellationToken = default);
 
     [Alias("DeregisterAsync")]
-    ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address);
+    ValueTask<DirectoryResult<bool>> DeregisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        CancellationToken cancellationToken = default);
 
     [Alias("GetSnapshotAsync")]
     ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(

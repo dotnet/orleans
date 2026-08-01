@@ -8,12 +8,17 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class GrainDirectoryPartition
 {
-    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
+    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        GrainAddress? currentRegistration,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogRegisterAsync(version, address, currentRegistration);
 
-        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version);
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
         if (!IsOwner(currentView, address.GrainId))
         {
             return DirectoryResult.RefreshRequired<GrainAddress>(currentView.Version);
@@ -23,11 +28,15 @@ internal sealed partial class GrainDirectoryPartition
         return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version);
     }
 
-    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId)
+    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(
+        MembershipVersion version,
+        GrainId grainId,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         LogLookupAsync(version, grainId);
 
-        var currentView = await WaitForOwnershipViewAsync(grainId, version);
+        var currentView = await WaitForOwnershipViewAsync(grainId, version, cancellationToken);
         if (!IsOwner(currentView, grainId))
         {
             return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version);
@@ -36,12 +45,16 @@ internal sealed partial class GrainDirectoryPartition
         return DirectoryResult.FromResult(LookupCore(grainId), version);
     }
 
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(MembershipVersion version, GrainAddress address)
+    async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogDeregisterAsync(version, address);
 
-        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version);
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
         if (!IsOwner(currentView, address.GrainId))
         {
             return DirectoryResult.RefreshRequired<bool>(currentView.Version);
@@ -71,15 +84,20 @@ internal sealed partial class GrainDirectoryPartition
         return null;
     }
 
-    private async ValueTask<DirectoryMembershipSnapshot> WaitForOwnershipViewAsync(GrainId grainId, MembershipVersion version)
+    private async ValueTask<DirectoryMembershipSnapshot> WaitForOwnershipViewAsync(
+        GrainId grainId,
+        MembershipVersion version,
+        CancellationToken cancellationToken)
     {
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ShutdownToken);
         while (true)
         {
             // Requests which arrive with a stale membership version must still wait for any in-flight ownership
             // transition in the current view before deciding whether this partition can serve them.
             var currentView = CurrentView;
             var waitVersion = currentView.Version > version ? currentView.Version : version;
-            await WaitForRange(grainId, waitVersion);
+            await WaitForRange(grainId, waitVersion, linkedCts.Token);
+            linkedCts.Token.ThrowIfCancellationRequested();
             if (ReferenceEquals(currentView, CurrentView))
             {
                 return currentView;

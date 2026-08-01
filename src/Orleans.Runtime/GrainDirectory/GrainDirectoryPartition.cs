@@ -203,6 +203,9 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) =>
         WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
 
+    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version, CancellationToken cancellationToken) =>
+        WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version, cancellationToken);
+
     private ValueTask WaitForRange(RingRange range, MembershipVersion version) =>
         WaitForRange(range, version, ShutdownToken);
 

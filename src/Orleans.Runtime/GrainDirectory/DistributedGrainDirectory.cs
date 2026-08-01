@@ -113,35 +113,35 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         DistributedRemoteGrainDirectory.Create(this, membershipService, shared);
     }
 
-    public async Task<GrainAddress?> Lookup(GrainId grainId) => await LookupAsync(grainId, CancellationToken.None);
+    public async Task<GrainAddress?> Lookup(GrainId grainId) => await LookupAsync(grainId, _stoppedCts.Token);
 
-    public async Task<GrainAddress?> Register(GrainAddress address) => await RegisterAsync(address, null, CancellationToken.None);
+    public async Task<GrainAddress?> Register(GrainAddress address) => await RegisterAsync(address, null, _stoppedCts.Token);
 
     public async Task Unregister(GrainAddress address) => await InvokeAsync(
         address.GrainId,
-        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address),
+        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken),
         address,
-        CancellationToken.None);
+        _stoppedCts.Token);
 
-    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await RegisterAsync(address, previousAddress, CancellationToken.None);
+    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await RegisterAsync(address, previousAddress, _stoppedCts.Token);
 
     public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
 
     internal Task<GrainAddress?> LookupAsync(GrainId grainId, CancellationToken cancellationToken) => InvokeAsync(
         grainId,
-        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId),
+        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId, cancellationToken),
         grainId,
         cancellationToken);
 
     internal async Task<GrainAddress?> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, CancellationToken cancellationToken) => await InvokeAsync(
         address.GrainId,
-        static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress),
+        static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress, cancellationToken),
         (Address: address, PreviousAddress: previousAddress),
         cancellationToken);
 
     internal Task UnregisterAsync(GrainAddress address, CancellationToken cancellationToken) => InvokeAsync(
         address.GrainId,
-        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address),
+        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken),
         address,
         cancellationToken);
 
@@ -184,9 +184,15 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             try
             {
                 RequestContext.Set("gid", partitionReference.GetGrainId());
-                invokeResult = await func(partitionReference, view.Version, state, cancellationToken);
+                using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    GetClusterMemberCancellationToken(owner));
+                invokeResult = await func(partitionReference, view.Version, state, requestCts.Token);
             }
-            catch (OrleansMessageRejectionException) when (attempts < MaxAttempts && !cancellationToken.IsCancellationRequested)
+            catch (Exception exception) when (
+                exception is OrleansMessageRejectionException or OperationCanceledException
+                && attempts < MaxAttempts
+                && !cancellationToken.IsCancellationRequested)
             {
                 // This likely indicates that the target silo has been declared dead.
                 ++attempts;
@@ -448,7 +454,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         var view = _membershipService.CurrentView;
         if (view.TryGetOwner(grainId, out var owner, out var partitionReference) && Silo.Equals(owner))
         {
-            var result = await partitionReference.LookupAsync(view.Version, grainId);
+            var result = await partitionReference.LookupAsync(view.Version, grainId, _stoppedCts.Token);
             if (result.TryGetResult(view.Version, out var address))
             {
                 return address;
