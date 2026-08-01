@@ -37,6 +37,9 @@ namespace UnitTests.TimerTests
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
+                // These tests advance reminder time in large jumps and assert exact local lifecycle state.
+                // Use one owner so a second silo's queued refresh cannot span two clock advances.
+                builder.Options.InitialSilosCount = 1;
                 _reminderClock = builder.AddReminderTestClock();
                 builder.ConfigureSilo((_, siloBuilder) =>
                 {
