@@ -19,6 +19,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
     internal const string ETagMetadataKey = "$etag";
     internal const string FormatMetadataKey = "$format";
     internal const string JournalIdMetadataKey = "$journal-id";
+    internal const string SchemaVersionMetadataKey = "$schema-version";
+    internal const string CurrentSchemaVersion = "1";
 
     private const int MissingStatus = 0;
     private const int SuccessStatus = 1;
@@ -26,6 +28,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
     private const int ConflictStatus = -1;
     private const int CollisionStatus = -2;
     private const int InvalidMetadataStatus = -3;
+    private const int UnsupportedSchemaVersionStatus = -4;
 
     private const string CreateIfNotExistsScript =
         """
@@ -37,7 +40,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
                 '$etag',
                 '$content-etag',
                 '$append-length',
-                '$format')
+                '$format',
+                '$schema-version')
             local appendLength = tonumber(state[4])
             if state[1] == false
                 or state[2] == false
@@ -51,6 +55,9 @@ internal sealed class RedisJournalStorage : IJournalStorage
                 or state[5] == false
                 or state[5] == '' then
                 return { -3 }
+            end
+            if state[6] ~= '1' then
+                return { -4 }
             end
             if state[1] ~= ARGV[3] then
                 return { -2 }
@@ -72,7 +79,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
             '$content-etag', ARGV[1],
             '$journal-id', ARGV[3],
             '$append-length', 0,
-            '$format', ARGV[2])
+            '$format', ARGV[2],
+            '$schema-version', '1')
 
         local count = tonumber(ARGV[4])
         local index = 5
@@ -138,7 +146,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
                 '$content-etag', ARGV[3],
                 '$journal-id', ARGV[6],
                 '$append-length', appendLength,
-                '$format', ARGV[5])
+                '$format', ARGV[5],
+                '$schema-version', '1')
             return { 1, appendLength }
         end
 
@@ -149,7 +158,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
             '$etag',
             '$content-etag',
             '$append-length',
-            '$format')
+            '$format',
+            '$schema-version')
         local appendLength = tonumber(state[4])
         if state[1] == false
             or state[2] == false
@@ -163,6 +173,9 @@ internal sealed class RedisJournalStorage : IJournalStorage
             or state[5] == false
             or state[5] == '' then
             return { -3 }
+        end
+        if state[6] ~= '1' then
+            return { -4 }
         end
         if state[1] ~= ARGV[6] then
             return { -2 }
@@ -201,7 +214,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
                 '$content-etag', ARGV[3],
                 '$journal-id', ARGV[6],
                 '$append-length', 0,
-                '$format', ARGV[5])
+                '$format', ARGV[5],
+                '$schema-version', '1')
             return { 1, 0 }
         end
 
@@ -212,7 +226,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
             '$etag',
             '$content-etag',
             '$append-length',
-            '$format')
+            '$format',
+            '$schema-version')
         local appendLength = tonumber(state[4])
         if state[1] == false
             or state[2] == false
@@ -226,6 +241,9 @@ internal sealed class RedisJournalStorage : IJournalStorage
             or state[5] == false
             or state[5] == '' then
             return { -3 }
+        end
+        if state[6] ~= '1' then
+            return { -4 }
         end
         if state[1] ~= ARGV[6] then
             return { -2 }
@@ -268,13 +286,17 @@ internal sealed class RedisJournalStorage : IJournalStorage
             KEYS[2],
             '$journal-id',
             '$etag',
-            '$content-etag')
+            '$content-etag',
+            '$schema-version')
         if state[1] == false
             or state[2] == false
             or state[2] == ''
             or state[3] == false
             or state[3] == '' then
             return { -3 }
+        end
+        if state[4] ~= '1' then
+            return { -4 }
         end
         if state[1] ~= ARGV[3] then
             return { -2 }
@@ -301,7 +323,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
             '$etag',
             '$content-etag',
             '$append-length',
-            '$format')
+            '$format',
+            '$schema-version')
         local appendLength = tonumber(state[4])
         if state[1] == false
             or state[2] == false
@@ -315,6 +338,9 @@ internal sealed class RedisJournalStorage : IJournalStorage
             or state[5] == false
             or state[5] == '' then
             return { -3 }
+        end
+        if state[6] ~= '1' then
+            return { -4 }
         end
         if state[1] ~= ARGV[4] then
             return { -2 }
@@ -651,6 +677,9 @@ internal sealed class RedisJournalStorage : IJournalStorage
             case InvalidMetadataStatus:
                 throw new InvalidOperationException(
                     $"Redis journal '{_journalId}' has missing or invalid provider metadata.");
+            case UnsupportedSchemaVersionStatus:
+                throw new NotSupportedException(
+                    $"Redis journal '{_journalId}' does not use supported storage schema version '{CurrentSchemaVersion}'.");
             default:
                 throw new InvalidOperationException(
                     $"The Redis journal storage {operation} script returned unexpected status {status}.");
@@ -670,6 +699,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         string? eTag = null;
         string? format = null;
         string? journalId = null;
+        string? schemaVersion = null;
         for (var i = startIndex; i < result.Length; i += 2)
         {
             var key = ((RedisValue)result[i]).ToString();
@@ -691,17 +721,27 @@ internal sealed class RedisJournalStorage : IJournalStorage
                 case AppendLengthMetadataKey:
                     appendLengthValue = value.ToString();
                     break;
+                case SchemaVersionMetadataKey:
+                    schemaVersion = value.ToString();
+                    break;
                 default:
                     if (!IsProviderMetadataKey(key))
                     {
                         properties ??= new(
-                            Math.Max(1, (result.Length - startIndex) / 2 - 5),
+                            Math.Max(1, (result.Length - startIndex) / 2 - 6),
                             StringComparer.Ordinal);
                         properties[key] = value.ToString();
                     }
 
                     break;
             }
+        }
+
+        if (!string.Equals(schemaVersion, CurrentSchemaVersion, StringComparison.Ordinal))
+        {
+            throw new NotSupportedException(
+                $"Redis journal '{_journalId}' uses storage schema version '{schemaVersion ?? "<missing>"}'; "
+                + $"supported version is '{CurrentSchemaVersion}'.");
         }
 
         if (string.IsNullOrWhiteSpace(eTag)
