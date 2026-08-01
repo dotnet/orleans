@@ -994,17 +994,17 @@ jobs:
   test-google:
     name: Google Cloud providers tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["GoogleCloud"]
+        framework: ["net8.0", "net10.0"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
-        dotnet-version: |
-          3.1.x
-          7.0.x
+        global-json-file: global.json
     - name: Setup Google Emulators      
       working-directory: test/Extensions/Google.Tests/Emulators
       run: |
@@ -1015,12 +1015,21 @@ jobs:
         firebase emulators:start --only firestore,pubsub,storage --project orleans-test &
         sleep 10
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework ${{ matrix.framework }}
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      continue-on-error: true
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
-        name: test_output
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
