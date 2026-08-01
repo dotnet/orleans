@@ -189,6 +189,11 @@ namespace UnitTests.GrainInterfaces
         Task ScheduleDelayedPingToSelfAndDeactivate(IGenericPingSelf<T> target, T t, TimeSpan delay);
     }
 
+    public interface ILongRunningTaskObserver : IGrainObserver
+    {
+        void OnCallStarted(Guid callId);
+    }
+
     public interface ILongRunningTaskGrain<T> : IGrainWithGuidKey
     {
         Task<string> GetRuntimeInstanceId();
@@ -201,6 +206,7 @@ namespace UnitTests.GrainInterfaces
         [AlwaysInterleave]
         Task LongWaitGrainCancellationInterleaving(GrainCancellationToken tc, TimeSpan delay, Guid callId);
         Task LongWait(CancellationToken tc, TimeSpan delay, Guid callId);
+        Task LongWaitWithStartNotification(TimeSpan delay, Guid callId, ILongRunningTaskObserver observer, CancellationToken cancellationToken);
         [AlwaysInterleave]
         Task LongWaitInterleaving(CancellationToken tc, TimeSpan delay, Guid callId);
         Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay, Guid callId);

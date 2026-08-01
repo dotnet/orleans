@@ -785,6 +785,13 @@ namespace UnitTests.Grains
         }
 
         public Task LongWaitInterleaving(CancellationToken ct, TimeSpan delay, Guid callId) => LongWait(ct, delay, callId);
+
+        public Task LongWaitWithStartNotification(TimeSpan delay, Guid callId, ILongRunningTaskObserver observer, CancellationToken cancellationToken)
+        {
+            observer.OnCallStarted(callId);
+            return LongWait(cancellationToken, delay, callId);
+        }
+
         public async Task LongWait(CancellationToken ct, TimeSpan delay, Guid callId)
         {
             try
