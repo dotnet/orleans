@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Persistence.GoogleFirestore</PackageId>
-    <Title>Microsoft Orleans Google Firestore Persistence Provider</Title>
-    <Description>Microsoft Orleans persistence providers backed by Google Firestore</Description>
-    <PackageTags>$(PackageTags) Google Firestore</PackageTags>
+    <Title>Microsoft Orleans Google Cloud Firestore Persistence Provider</Title>
+    <Description>Microsoft Orleans persistence provider backed by Google Cloud Firestore</Description>
+    <PackageTags>$(PackageTags) Google Cloud Firestore</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Persistence.GoogleFirestore</AssemblyName>
     <RootNamespace>Orleans.Persistence.GoogleFirestore</RootNamespace>
@@ -27,9 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>Orleans.Tests.Google</_Parameter1>
-    </AssemblyAttribute>
+    <InternalsVisibleTo Include="Orleans.Persistence.GoogleFirestore.Tests" />
   </ItemGroup>
 
 </Project>

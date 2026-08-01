@@ -5,7 +5,7 @@ using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.GrainDirectory.GoogleFirestore;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.GrainDirectory.GoogleFirestore.Tests;
 
 [TestCategory("GrainDirectory"), TestCategory("Functional"), TestCategory("GoogleFirestore"),
  TestCategory("GoogleCloud")]

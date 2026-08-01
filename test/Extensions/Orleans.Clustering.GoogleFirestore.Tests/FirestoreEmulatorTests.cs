@@ -2,10 +2,10 @@ using Google.Api.Gax;
 using Google.Protobuf;
 using Google.Cloud.Firestore;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Clustering.GoogleFirestore.Tests;
 
 [TestCategory("GoogleCloud"), TestCategory("Functional")]
-public class GoogleEmulatorTest
+public class FirestoreEmulatorTests
 {
     [SkippableFact]
     public async Task EnsureFirestoreTest()

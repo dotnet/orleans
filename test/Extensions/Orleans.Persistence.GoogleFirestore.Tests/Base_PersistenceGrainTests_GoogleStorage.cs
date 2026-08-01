@@ -7,7 +7,7 @@ using UnitTests.GrainInterfaces;
 using Orleans.TestingHost;
 
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Persistence.GoogleFirestore.Tests;
 
 public class Base_PersistenceGrainTests_GoogleStorage : OrleansTestingBase
 {

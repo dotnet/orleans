@@ -4,7 +4,7 @@ using TestExtensions;
 using Orleans.Runtime;
 using Orleans.Clustering.GoogleFirestore;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Clustering.GoogleFirestore.Tests;
 
 [TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 public class FirestoreSiloInstanceManagerTests : IAsyncLifetime

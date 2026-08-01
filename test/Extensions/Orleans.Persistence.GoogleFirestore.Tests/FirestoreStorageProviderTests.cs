@@ -10,7 +10,7 @@ using TestExtensions;
 using UnitTests.Persistence;
 using Orleans.Persistence.GoogleFirestore;
 
-namespace Orleans.Tests.Google;
+namespace Orleans.Persistence.GoogleFirestore.Tests;
 
 [TestCategory("Persistence"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
