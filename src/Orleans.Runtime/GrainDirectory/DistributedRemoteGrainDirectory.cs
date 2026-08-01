@@ -150,19 +150,6 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
         }
     }
 
-    private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<GrainAddress>>? duplicates)
-    {
-        if (duplicates is null || duplicates.Count == 0)
-        {
-            return;
-        }
-
-        EnqueueOperation(
-            nameof(DestroyDuplicateActivations),
-            duplicates,
-            static (self, state) => self.DestroyDuplicateActivationsAsync((Dictionary<SiloAddress, List<GrainAddress>>)state));
-    }
-
     private async Task DestroyDuplicateActivationsAsync(Dictionary<SiloAddress, List<GrainAddress>> duplicates)
     {
         while (duplicates.Count > 0)
@@ -205,7 +192,6 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
             }
         });
 
-        Dictionary<SiloAddress, List<GrainAddress>>? duplicates = null;
         Exception? failure = null;
         for (var i = pendingRegistrations.Count - 1; i >= 0; i--)
         {
@@ -221,10 +207,10 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
             {
                 if (registration.SiloAddress is { } siloAddress)
                 {
-                    if (duplicates is null || !duplicates.TryGetValue(siloAddress, out var activations))
+                    if (!batch.DuplicateActivations.TryGetValue(siloAddress, out var activations))
                     {
                         activations = [];
-                        (duplicates ??= []).Add(siloAddress, activations);
+                        batch.DuplicateActivations.Add(siloAddress, activations);
                     }
 
                     activations.Add(registration);
@@ -234,7 +220,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
             pendingRegistrations.RemoveAt(i);
         }
 
-        DestroyDuplicateActivations(duplicates);
+        await DestroyDuplicateActivationsAsync(batch.DuplicateActivations);
 
         if (failure is not null)
         {
@@ -243,6 +229,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
         }
 
         LogInformationAcceptSplitPartitionCompleted(_logger, Silo, batch.InitialCount);
+        batch.Completion.TrySetResult();
     }
 
     public async Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
@@ -337,15 +324,29 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
     public Task AcceptSplitPartition(List<GrainAddress> singleActivations)
     {
         LogInformationAcceptSplitPartitionStarted(_logger, Silo, singleActivations.Count);
-        if (singleActivations.Count > 0)
+        if (singleActivations.Count == 0)
         {
-            EnqueueOperation(
-                nameof(AcceptSplitPartition),
-                new SplitPartitionRegistrationBatch([.. singleActivations]),
-                static (self, state) => self.ProcessSplitPartitionRegistrationsAsync((SplitPartitionRegistrationBatch)state));
+            return Task.CompletedTask;
         }
 
-        return Task.CompletedTask;
+        lock (_pendingOperations)
+        {
+            foreach (var operation in _pendingOperations)
+            {
+                if (operation.State is SplitPartitionRegistrationBatch existingBatch
+                    && existingBatch.Matches(singleActivations))
+                {
+                    return existingBatch.Completion.Task.WaitAsync(_directory.OnStoppedToken);
+                }
+            }
+
+            var batch = new SplitPartitionRegistrationBatch(singleActivations);
+            EnqueueOperation(
+                nameof(AcceptSplitPartition),
+                batch,
+                static (self, state) => self.ProcessSplitPartitionRegistrationsAsync((SplitPartitionRegistrationBatch)state));
+            return batch.Completion.Task.WaitAsync(_directory.OnStoppedToken);
+        }
     }
 
     [LoggerMessage(
@@ -378,9 +379,15 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
     )]
     private static partial void LogWarningOperationFailedRetry(ILogger logger, Exception exception, string operation);
 
-    private sealed class SplitPartitionRegistrationBatch(List<GrainAddress> pendingRegistrations)
+    private sealed class SplitPartitionRegistrationBatch(List<GrainAddress> registrations)
     {
-        public int InitialCount { get; } = pendingRegistrations.Count;
-        public List<GrainAddress> PendingRegistrations { get; } = pendingRegistrations;
+        private readonly List<GrainAddress> _registrations = [.. registrations];
+
+        public int InitialCount => _registrations.Count;
+        public List<GrainAddress> PendingRegistrations { get; } = [.. registrations];
+        public Dictionary<SiloAddress, List<GrainAddress>> DuplicateActivations { get; } = [];
+        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool Matches(List<GrainAddress> registrations) => _registrations.SequenceEqual(registrations);
     }
 }
