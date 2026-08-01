@@ -91,6 +91,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             string? newETag = null;
             if (grainState.RecordExists)
             {
+                ArgumentNullException.ThrowIfNull(grainState.ETag);
                 entity.ETag = Utils.ParseTimestamp(grainState.ETag);
                 newETag = await this._dataManager.Update(entity).ConfigureAwait(false);
             }
@@ -130,6 +131,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             }
             else
             {
+                ArgumentNullException.ThrowIfNull(grainState.ETag);
                 var entity = new GrainStateEntity
                 {
                     Id = Utils.SanitizeGrainId(grainId),

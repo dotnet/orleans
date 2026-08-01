@@ -56,7 +56,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
         }
     }
 
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string?> UpsertRow(ReminderEntry entry)
     {
         try
         {

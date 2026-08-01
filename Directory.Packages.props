@@ -30,9 +30,9 @@
     <PackageVersion Include="coverlet.msbuild" Version="8.0.0" />
     <PackageVersion Include="CsCheck" Version="4.5.0" />
     <PackageVersion Include="FSharp.Core" Version="9.0.303" />
-    <PackageVersion Include="Google.Cloud.Firestore" Version="3.3.0" />
-    <PackageVersion Include="Google.Cloud.PubSub.V1" Version="3.5.1" />
-    <PackageVersion Include="Google.Cloud.Storage.V1" Version="4.5.0" />
+    <PackageVersion Include="Google.Cloud.Firestore" Version="4.3.0" />
+    <PackageVersion Include="Google.Cloud.PubSub.V1" Version="3.36.0" />
+    <PackageVersion Include="Google.Cloud.Storage.V1" Version="4.15.0" />
     <PackageVersion Include="Google.Protobuf" Version="3.33.5" />
     <PackageVersion Include="Grpc.Tools" Version="2.78.0" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />

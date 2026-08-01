@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Google.Cloud.Firestore" />
   </ItemGroup>
 
@@ -18,7 +18,7 @@
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Persistence.GoogleFirestore\Orleans.Persistence.GoogleFirestore.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.GoogleFirestore\Orleans.Reminders.GoogleFirestore.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.GrainDirectory.GoogleFirestore\Orleans.GrainDirectory.GoogleFirestore.csproj" />
-    <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>

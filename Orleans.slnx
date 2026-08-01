@@ -101,6 +101,12 @@
   <Folder Name="/src/Extensions/Cassandra/">
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
   </Folder>
+  <Folder Name="/src/Extensions/Google/">
+    <Project Path="src/Google/Orleans.Clustering.GoogleFirestore/Orleans.Clustering.GoogleFirestore.csproj" />
+    <Project Path="src/Google/Orleans.GrainDirectory.GoogleFirestore/Orleans.GrainDirectory.GoogleFirestore.csproj" />
+    <Project Path="src/Google/Orleans.Persistence.GoogleFirestore/Orleans.Persistence.GoogleFirestore.csproj" />
+    <Project Path="src/Google/Orleans.Reminders.GoogleFirestore/Orleans.Reminders.GoogleFirestore.csproj" />
+  </Folder>
   <Folder Name="/src/Extensions/NATS/">
     <Project Path="src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" />
   </Folder>
@@ -161,6 +167,7 @@
     <Project Path="test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
+    <Project Path="test/Extensions/Google.Tests/Google.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Azure.Tests/Orleans.Azure.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.DurableJobs.AzureStorage.Tests/Orleans.DurableJobs.AzureStorage.Tests.csproj" />

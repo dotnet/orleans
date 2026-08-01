@@ -35,7 +35,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
             loggerFactory.CreateLogger<FirestoreDataManager>());
     }
 
-    public async Task<GrainAddress> Lookup(GrainId grainId)
+    public async Task<GrainAddress?> Lookup(GrainId grainId)
     {
         try
         {
@@ -43,7 +43,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
                 .ReadEntity<GrainDirectoryEntity>(Utils.SanitizeGrainId(grainId))
                 .ConfigureAwait(false);
 
-            return result is null ? default! : GetGrainAddress(result);
+            return result is null ? null : GetGrainAddress(result);
         }
         catch (Exception ex)
         {
@@ -52,7 +52,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
         }
     }
 
-    public async Task<GrainAddress> Register(GrainAddress address)
+    public async Task<GrainAddress?> Register(GrainAddress address)
     {
         try
         {
@@ -63,7 +63,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
         catch (RpcException)
         {
             var result = await this.Lookup(address.GrainId);
-            return result is null ? default! : result;
+            return result;
         }
         catch (Exception ex)
         {

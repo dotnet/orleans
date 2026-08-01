@@ -105,7 +105,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
         {
             this._logger.LogWarning(
                 exc,
-                "Intermediate error inserting entry {Data} tableVersion {TableVersion} to Firestore}.", entry.ToString(), tableVersion == null ? "null" : tableVersion.ToString());
+                "Intermediate error inserting entry {Data} tableVersion {TableVersion} to Firestore.", entry.ToString(), tableVersion == null ? "null" : tableVersion.ToString());
             throw;
         }
     }

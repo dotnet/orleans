@@ -115,12 +115,12 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         await RegisterSiloInstance();
 
         var gateways = await this._manager.FindAllGatewayProxyEndpoints();
-        Assert.Equal(0, gateways.Count);  // "Number of gateways before Silo.Activate"
+        Assert.Empty(gateways);  // "Number of gateways before Silo.Activate"
 
         await this._manager.ActivateSiloInstance(this._entity);
 
         gateways = await this._manager.FindAllGatewayProxyEndpoints();
-        Assert.Equal(1, gateways.Count);  // "Number of gateways after Silo.Activate"
+        Assert.Single(gateways);  // "Number of gateways after Silo.Activate"
 
         Uri myGateway = gateways.First();
         Assert.Equal(this._entity.Address, myGateway.Host.ToString());  // "Gateway address"

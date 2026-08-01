@@ -90,20 +90,20 @@ public class FirestorePersistenceGrainTests : Base_PersistenceGrainTests_GoogleS
     }
 
     [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-    public void Persistence_Perf_Activate_GoogleFirestoreStore()
+    public async Task Persistence_Perf_Activate_GoogleFirestoreStore()
     {
-        base.Persistence_Perf_Activate();
+        await base.Persistence_Perf_Activate();
     }
 
     [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-    public void Persistence_Perf_Write_GoogleFirestoreStore()
+    public async Task Persistence_Perf_Write_GoogleFirestoreStore()
     {
-        base.Persistence_Perf_Write();
+        await base.Persistence_Perf_Write();
     }
 
     [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-    public void Persistence_Perf_Write_Reread_GoogleFirestoreStore()
+    public async Task Persistence_Perf_Write_Reread_GoogleFirestoreStore()
     {
-        base.Persistence_Perf_Write_Reread();
+        await base.Persistence_Perf_Write_Reread();
     }
 }
