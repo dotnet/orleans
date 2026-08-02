@@ -33,14 +33,7 @@ namespace Orleans.Serialization.Configuration
         {
             if (options.TypeManifestProviders.Add(Key))
             {
-                try
-                {
-                    ConfigureInner(options);
-                }
-                catch (Exception exception)
-                {
-                    throw new InvalidOperationException($"Error configuring Orleans.Serialization for '{Key}'. See InnerException for details.", exception);
-                }
+                ConfigureInner(options);
             }
         }
 

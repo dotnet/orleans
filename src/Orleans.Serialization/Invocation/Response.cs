@@ -72,6 +72,7 @@ namespace Orleans.Serialization.Invocation
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract T GetResult<T>();
 
+        /// <inheritdoc />
         public abstract void Dispose();
 
         /// <inheritdoc />

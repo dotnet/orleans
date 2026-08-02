@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
     <InternalsVisibleTo Include="Orleans.DurableTasks.Tests" />
   </ItemGroup>
 
