@@ -1,31 +1,40 @@
 ---
-title: Big and small thinking
-description: Learn how Orleans applies to both big and small distributed applications.
-ms.date: 07/03/2024
+title: Orleans for systems big and small
+description: Understand how Orleans applies from one process to distributed clusters.
+ms.date: 08/02/2026
+ms.topic: conceptual
 ---
 
-# Big and small thinking
+# Orleans for systems big and small
 
-You don't need hundreds of servers to benefit from Orleans. A handful is enough.
+You don't need a very large deployment to benefit from Orleans. The virtual actor model addresses problems which appear as soon as state and work cross process boundaries: identity, placement, concurrency, messaging, membership, and recovery.
 
-When Orleans was officially announced as a public preview, some of the initial questions and discussions at //build/ were around what type of services the Orleans programming model is suitable for. I heard statements that Orleans is for super-high scale systems.
+## Start in one process
 
-## Applicability spectrum
+An Orleans application can host a silo and its callers in one process. This is useful for development and can be appropriate for a small deployment. Grain identity and turn-based execution can still provide useful structure and isolation.
 
-One extreme of the Orleans applicability spectrum is a single machine application. Some people see the isolation of actors and safe concurrency as big enough benefits that they are worth the price of message passing. That's not the use case we optimized for while building Orleans, but it's a legitimate usage pattern, just not very interesting in the cloud context.
+A single process isn't fault tolerant, and localhost or memory providers don't become production infrastructure merely because the application uses Orleans. Choose providers and deployment topology based on the required durability and availability.
 
-At the other end of the spectrum, we find massive deployments that span thousands of servers. We tested Orleans on deployments of hundreds of servers, and I'm sure it will run fine on thousands, even if that will require some configuration tweaks. However, I'm personally rather skeptical about how many products need a single cloud service spanning thousands of servers as opposed to running multiple related services interacting with each other where each service instance is deployed on tens or hundreds of servers.
+## Scale by partitioning
 
-## Distributed systems have the same problems regardless of size
+Orleans applications usually partition domain entities across many grain keys. As the cluster grows, Orleans can place activations on available silos and route calls without changing grain references.
 
-The moment a system moves from a single server to multiple servers, developers face very much the same set of challenges, regardless of its size&mdash;whether it's a 3-5, 30-50, or 300-500 server system. They now have to deal with the distribution of their computations, coordination between them, scalability, fault tolerance and reconfigurations, diagnostics, etc. They are building a distributed system now, which is never easy. And building a stateful distributed system is even harder.
+Adding silos provides more cluster capacity only when the workload can use it. A single hot grain, shared external dependency, or global coordination point remains a bottleneck. Measure the key distribution and design explicit partitions where needed.
 
-Orleans was designed to help with building such systems by providing an easy-to-use set of abstractions that greatly simplifies developers' lives and help them avoid common distributed systems pitfalls. The distributed runtime was built to perform most of the heavy lifting. Developers can equally benefit from these features of Orleans when building services of different sizes because the problems Orleans solves for them are the same. The abstraction of grains simplifies reasoning about your system while encouraging fine-grain partitioning of state for scalability. The virtual actor feature helps with resource management and fault tolerance. Automatic propagation of exceptions minimizes error handling code without losing failures. The distributed runtime takes care of server failures, messaging, routing, single-threaded execution, and other system-level guarantees. You don't need hundreds of servers to start reaping the developer productivity gains.
+## The same distributed concerns remain
 
-## Elasticity
+Whether a cluster has two silos or many, applications must account for:
 
-Predicting load for your future system is hard and often simply impossible. Every startup dreams of getting slashdotted one day, which is a blessing for the business and a curse for the system. Or your CMO may like your BI data so much that she suddenly wants to have it in 5-second aggregates instead of 30 minutes. Building for a high load that may never materialize is expensive. The Orleans model helps solve the elasticity problem by encouraging designing your system in a scalable way so that you can start with a small deployment and stay small or scale out big if needed without changing your application code.
+- Calls which can fail, time out, or be retried.
+- Membership changes and in-flight work during process failure.
+- Durable state, provider availability, and recovery.
+- Serialization and contract compatibility.
+- Capacity, overload, observability, deployment, and rollback.
 
-## Bottom line
+Orleans supplies a consistent model and runtime services for these concerns. It doesn't eliminate them or guarantee that an application scales by configuration alone.
 
-You should be able to benefit from Orleans the moment you go from a single-server setup to a distributed system, whether it's 2 or 3 servers or thousands of them. You can even start building your single-server solution with Orleans if you believe you may need one day to scale it out or make it fault-tolerant. The beauty here is that your code won't need to change. Just add more servers and your grains will spread across them.
+## Grow without encoding locations
+
+Grain contracts identify entities by key rather than server. This allows a single-process application and a multi-silo deployment to use the same domain interfaces. Moving to a cluster primarily changes hosting, provider, security, and operations configuration.
+
+That location-independent model is useful at modest scale and remains useful as demand grows. Start with the simplest topology which meets current requirements, retain representative load tests, and scale based on observed bottlenecks.

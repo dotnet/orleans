@@ -1,87 +1,84 @@
 ---
 title: Frequently asked questions
-description: Explore the frequently asked questions for .NET Orleans.
-ms.date: 07/03/2024
+description: Answers to common questions about Orleans 10.
+ms.date: 08/02/2026
+ms.topic: faq
 ---
 
-# Frequently Asked Questions
+# Frequently asked questions
 
-In this article, you will find answers to the most common questions about .NET Orleans. If you have a question that is not answered here, please ask the product team by posting an issue on the [GitHub repository](https://github.com/dotnet/orleans/issues).
+## Availability and support
 
-## Availability
+### Can I use Orleans in my project?
 
-### Can I freely use Orleans in my project?
+Yes. Orleans is open source under the [MIT license](https://github.com/dotnet/orleans/blob/main/LICENSE), and official packages are published on [NuGet.org](https://www.nuget.org/profiles/Orleans).
 
-Absolutely. The source code is licensed under the [MIT license](https://github.com/dotnet/orleans/blob/main/LICENSE). NuGet packages are published on [nuget.org](https://www.nuget.org/profiles/Orleans).
+### Is Orleans production ready?
 
-### Is Orleans production ready? I heard it's a research project.
+Yes. Orleans began in Microsoft Research and has powered production services since 2011. The project is developed in the open at [dotnet/orleans](https://github.com/dotnet/orleans).
 
-Orleans started as a research project within Microsoft Research. It later grew into a production-ready product and has been used in production within Microsoft (since 2011) and by other companies (since it was publicly released in 2015). Orleans powers many highly available systems and cloud services.
+### Which .NET versions does Orleans 10 support?
 
-### Does Microsoft support Orleans?
+Orleans 10 libraries target .NET 8 and .NET 10. New Orleans applications should target .NET 10.
 
-Microsoft released the source code of Orleans under an MIT license on [GitHub](https://github.com/dotnet/orleans). Microsoft continues to invest in Orleans and accepts community contributions to the codebase.
+### Where do I get help?
 
-## Positioning
+Use [GitHub issues](https://github.com/dotnet/orleans/issues) for reproducible bugs and feature proposals. Use [GitHub Discussions](https://github.com/dotnet/orleans/discussions) or [Discord](https://aka.ms/orleans-discord) for questions and design conversations.
 
-### Is Orleans a server product? How do I run Orleans?
+## Hosting
 
-Orleans is a framework, a set of libraries, that helps you build an application. Orleans-based applications can be run in various hosting environments, in the Cloud or on on-premises clusters, or even on a single machine. It is the responsibility of application developers to build, deploy, and run an Orleans-based application in their target hosting environment.
+### Is Orleans a server product?
 
-### Where can I run Orleans?
+Orleans is a set of .NET libraries used to build an application. An application hosts one or more Orleans silos in processes which it deploys and operates.
 
-Orleans can run in any environment where .NET application can run. Before Orleans 2.0, it required the full .NET Framework. Starting with 2.0, Orleans conforms to .NET Standard 2.0, and hence can run on .NET Core in Windows and non-Windows environments that support .NET Core.
+### Where can Orleans run?
 
-### Is Orleans built for Azure?
+Orleans runs wherever its supported .NET targets run, including Linux and Windows hosts, containers, Kubernetes, Azure services, AWS, other clouds, on-premises environments, and developer machines.
 
-No. We believe that you should be able to run Orleans anywhere you need, the way you need. Orleans is very flexible and has several optional providers that help host it in cloud environments, such as Azure, AWS or GCP, or on on-premises clusters, with a choice of technologies to support Orleans' clustering protocol.
+### Is Orleans tied to Azure?
 
-### What is the difference between Orleans and other actor languages and frameworks, such as Erlang or Akka?
+No. Orleans has optional Azure providers, but also includes providers for relational databases, DynamoDB, Redis, Cassandra, Consul, ZooKeeper, NATS, SQS, and other infrastructure. Applications can implement custom providers where needed.
 
-While based on the same base principles of the Actor Model, Orleans took a step forward and introduced a notion of Virtual Actors that greatly simplifies developers' experience and is much more suitable for cloud services and high-scale systems.
+### Can browsers or mobile apps connect directly to silos?
 
-## Design
+Don't expose Orleans silo or gateway endpoints directly to untrusted public clients. Put an authenticated application protocol such as HTTPS, SignalR, or another API layer in front of the cluster.
 
-### How big or how small should a grain be in my application?
+## Grains
 
-The grain isolation model makes them very good at representing independently isolated contexts of state and computation. In most cases, grains naturally map to such application entities as users, sessions, accounts. Those entities are generally isolated from each other, can be accessed and updated independently, and expose a well-defined set of supported operations. This works well with the intuitive "one entity, one grain" modeling.
+### How large should a grain be?
 
-An application entity may be too big to be efficiently represented by a single grain if it encapsulates too much state, and as a result, has to handle a high rate of requests to it. Even though a single grain can generally handle up to a few thousand trivial calls per second, the rule of thumb is to be wary of individual grain receiving hundreds of requests per second. That may be a sign of the grain being too large, and decomposing it into a set of smaller grains may lead to a more stable and balanced system.
+Model a grain around a domain entity or consistency boundary. A grain is probably too large if one key becomes a throughput bottleneck or owns excessive state. It might be too small if one operation requires many chatty calls between grains. Measure representative workloads rather than relying on a fixed state-size or calls-per-second rule.
 
-An application entity may be too small to be a grain if that would cause constant interaction of other grains with it, and as a result, cause too much of a messaging overhead. In such cases, it may make more sense to make those closely interacting entities part of a single grain, so that they would invoke each other directly.
+### Does Orleans replicate grain state automatically?
 
-### How should you avoid grain hot spots?
+No. An ordinary stateful grain normally has one activation in the cluster. Volatile state is lost if that process fails. Durable recovery requires a configured storage provider and successful writes by the grain. Applications which need replicas or caches must design and operate them explicitly.
 
-The throughput of a grain is limited by a single thread that its activation can execute on. Therefore, it is advisable to avoid designs where a single grain receives a disproportionate share of requests or is involved in processing requests to other grains. Various patterns help prevent the overloading of a single grain even when logically it is a central point of communication.
+### How do I avoid hot grains?
 
-For example, if a grain is an aggregator of some counters or statistics that are reported by a large number of grains regularly, one proven approach is to add a controlled number of intermediate aggregator grains and assign each of the reporting grains (using a modulo on a key or a hash) to an intermediate aggregator, so that the load is more or less evenly distributed across all intermediate aggregator grains that in their turn periodically report partial aggregates to the central aggregator grain.
+Partition work across keys, use hierarchical aggregation, batch calls, or use stateless workers for suitable stateless operations. Changing placement can move a hot activation but doesn't increase the throughput of that single activation.
 
-## How to
+### Can I choose where a grain activates?
 
-### How do I tear down a grain?
+Yes. Orleans includes placement strategies and supports custom placement. Prefer location transparency unless the application has a measured locality or resource requirement, since restrictive placement can reduce the runtime's options during failures and scaling.
 
-In general, there is no need for application logic to force the deactivation of a grain, as the Orleans runtime automatically detects and deactivates idle activations of a grain to reclaim system resources. Letting Orleans do that is more efficient because it batches deactivation operations instead of executing them one by one. In the rare cases when you think you do need to expedite the deactivation of a grain, the grain can do that by calling the <xref:Orleans.Grain.DeactivateOnIdle>` method.
+### How do I deactivate a grain?
 
-### Can I tell Orleans where to activate a grain?
+Usually, let Orleans deactivate idle activations. When a grain knows it should be removed after the current turn, it can call <xref:Orleans.Grain.DeactivateOnIdle*>.
 
-It is possible to do so using restrictive placement strategies, but we generally consider this a rather advanced pattern that requires careful consideration. By doing what the question suggests, the application would take on the burden of resource management without necessarily having enough information about the global state of the system to do so well. This is especially counter-productive in cases of silo restarts, which in cloud environments may happen regularly for OS patching. Thus, specific placement may hurt your application's scalability as well as resilience to system failure.
+## Failures and calls
 
-That being said, for the rare cases where the application indeed knows where a particular grain should be activated, for example, if it knows the locality of grain's persistent state, in 1.5.0 we introduced custom placement policies and directors.
+### What happens when a silo fails during a call?
 
-### How do you version grains or add new grain classes and interfaces?
+The call can fail or time out. After the cluster detects the failed silo, a later call can activate the grain on a healthy silo. The caller should use bounded retries only when the operation is safe to retry. Durable state is available only if it was written successfully to an available durable provider.
 
-You can add silos with new grain classes or new versions of existing grain classes to a running cluster.
+### Are grain calls exactly once?
 
-### Can I Connect to Orleans silos from the public Internet?
+No. Orleans uses at-most-once message delivery by default. Network failures can leave a caller uncertain whether an operation ran, so retryable operations should be idempotent or carry an application-level deduplication identity.
 
-Orleans is designed to be hosted as the back-end part of a service, and you are expected to create a front-end tier to which external clients will connect. It can be an HTTP-based Web API project, a socket server, a SignalR server, or anything else that fits the needs of the application. You can connect to Orleans from the Internet if you expose TCP endpoints of silos to it, but it is not a good practice from the security point of view.
+### What happens when grain code runs too long?
 
-### What happens if a silo fails before my grain call returns a response for my call?
+Orleans uses cooperative scheduling and doesn't preempt grain code. Long synchronous work blocks other turns on that scheduler. Keep turns short, await I/O, and move substantial CPU-bound work to an appropriate execution model.
 
-In case of a silo failure in the middle of a grain call, you'll receive an exception that you can catch in your code and retry or do something else to handle the error according to your application logic. The grain that failed with the silo will get automatically re-instantiated upon the next call to it. The Orleans runtime does not eagerly recreate grains from a failed silo because many of them may not be needed immediately or at all. Instead, the runtime recreates such grains individually and only when a new request arrives for a particular grain. For each grain it picks one of the available silos as a new host.
+### How do I upgrade an existing application?
 
-The benefit of this approach is that the recovery process is performed only for grains that are being used and it is spread in time and across all available silos, which improves the responsiveness of the system and the speed of recovery. Note also that there is a delay between the time when a silo fails and when the Orleans cluster detects the failure. The delay is a configurable trade-off between the speed of detection and the probability of false positives. During this transition period, all calls to the grain will fail, but after the detection of the failure the grain will be created, upon a new call to it, on another silo, so it will be eventually available.
-
-### What happens if a grain call takes too long to execute?
-
-Since Orleans uses a cooperative multitasking model, it will not preempt the execution of a grain automatically but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multitasking has a much better throughput compared to preemptive multitasking. Keep in mind that grain calls should not execute any long-running tasks like IO operations synchronously and should not block other tasks to complete. All waiting should be done asynchronously using the `await` keyword or other asynchronous waiting mechanisms. Grains should return as soon as possible to let other grains execute for maximum throughput.
+Follow the [migration guide](../migration-guide.md), which contains the version-specific upgrade history. Current conceptual and tutorial documentation describes Orleans 10 only.

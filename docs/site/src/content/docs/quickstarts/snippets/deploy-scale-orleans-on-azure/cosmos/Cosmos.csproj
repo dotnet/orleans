@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Cosmos" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Cosmos" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.0.0" />
+  </ItemGroup>
+</Project>

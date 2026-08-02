@@ -9,7 +9,7 @@ metadata:
     description: Samples, tutorials, and education for .NET Orleans. Microsoft's cloud native and distributed systems platform.
     ms.topic: hub-page
     ms.service: dotnet-orleans
-    ms.date: 07/03/2024
+    ms.date: 08/02/2026
 
 highlightedContent:
     # itemType: architecture | concept | deploy | download | get-started | how-to-guide | learn | overview | quickstart | reference | tutorial | whats-new
@@ -20,8 +20,11 @@ highlightedContent:
         - itemType: deploy
           title: Deploy Orleans apps
           url: deployment/index.md
+        - itemType: quickstart
+          title: Build your first Orleans app
+          url: quickstarts/build-your-first-orleans-app.md
         - itemType: whats-new
-          title: "Migrate from Orleans 3.x to 7.0"
+          title: Upgrade to Orleans 10
           url: migration-guide.md
         - itemType: concept
           title: Why Orleans?
@@ -187,9 +190,9 @@ additionalContent:
                     - text: Orleans on GitHub
                       url: https://github.com/dotnet/orleans
                     - text: Orleans samples on GitHub
-                      url: https://github.com/dotnet/samples/tree/main/orleans
-                    - text: .NET samples
-                      url: https://github.com/dotnet/samples
+                      url: https://github.com/dotnet/orleans/tree/main/samples
+                    - text: Orleans sample catalog
+                      url: https://github.com/dotnet/orleans/blob/main/samples/README.md
                     - text: .NET Platform
                       url: https://github.com/dotnet
               - title: Interact

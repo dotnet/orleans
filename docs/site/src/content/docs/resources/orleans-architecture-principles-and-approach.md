@@ -1,37 +1,46 @@
 ---
 title: Orleans architecture design principles
-description: Explore the architecture design principles for .NET Orleans.
-ms.date: 07/03/2024
+description: Understand the design principles behind Orleans 10.
+ms.date: 08/02/2026
+ms.topic: conceptual
 ---
 
 # Orleans architecture design principles
 
-Orleans is an open-source project, and it's important to be clear about the goals and principles. These goals and principles have motivated the design decisions behind Orleans so that new changes either fit within that framework or explicitly and intentionally revise those goals and principles.
+Orleans is designed to help .NET developers build stateful distributed applications without making every application implement identity, placement, lifecycle, messaging, and membership from first principles.
 
-The goal for the Orleans project was to produce a framework that would allow mainstream developers to easily build scalable distributed (cloud) applications. To break this down a bit:
+## Familiar programming model
 
-- The target audience shouldn't exclude programmers who haven't done distributed systems development. We want to enable all developers, whether cloud experts or cloud beginners, to focus on their application logic and features&mdash;which is to say, what provides business value&mdash;rather than on generic distributed systems issues.
+Orleans represents distributed entities using .NET interfaces and classes. Calls are asynchronous to make the network boundary explicit, while dependency injection, hosting, configuration, logging, and testing use standard .NET patterns.
 
-- The goal is to allow mainstream developers to build cloud applications easily. *Easily* means that they shouldn't have to think about distribution any more than is required. *Easily* also means that Orleans should present as familiar a facade to the developer as possible; in a .NET context, that means C# objects and interfaces.
+Familiarity doesn't make a grain call equivalent to a local method call. Serialization, latency, partial failure, cancellation, and retries remain part of API design.
 
-- Those applications should be _scalable by default_. Since the target users aren't necessarily distributed systems experts, we want to provide them with a framework that leads them to build scalable applications without explicitly thinking about it. This means that the framework has to make a lot of decisions for them to guarantee an acceptable degree of scalability, even if that means that the scalability isn't optimal for every application.
+## Identity independent of activation
 
-We supplemented this goal with a set of architectural principles:
+A grain's logical identity is stable even when no activation is in memory. Orleans can activate it on demand, place it on a silo, route calls to it, and remove the activation when idle.
 
-- We're focused on the 80% case. There are certain applications that Orleans isn't appropriate for; that's OK. There are applications that Orleans is a reasonable fit for, but where you can get somewhat better performance by a bunch of hand-tuning that Orleans doesn't allow; that's OK too. The 80% that Orleans fits well and performs well enough on covers a lot of interesting applications, and we'd rather do a great job on 80% than a lousy job on 99%.
+This indirection is the foundation for location transparency and resource management. It also means applications should avoid encoding process locations in domain contracts.
 
-- Scalability is paramount. We'll trade off raw performance if that gets us better scaling.
+## Isolation and partitioning
 
-- Availability is paramount. A cloud application should be like a utility: always there when you want it.
+Grains encapsulate state and process turns one at a time by default. This favors designs made of many independently addressable entities and reduces shared-memory coordination.
 
-- Detect and fix problems, don't assume you can 100% prevent them. At cloud scale, bad things happen often, and even impossible bad things happen, just less often. This has led us to what is often termed "recovery-oriented computing", rather than trying to be fault-tolerant. Experience has shown that fault tolerance is fragile and often illusory. Even mathematically proven protocols don't protect against random bit flips in memory or disk controllers that fail while reporting success&mdash;both examples that have occurred in the real world.
+Orleans provides scalable building blocks, not automatic scalability for every model. Grain boundaries, key distribution, call patterns, external dependencies, and storage choices determine how an application scales.
 
-The previous principles have led us to certain practices:
+## Recovery-oriented operation
 
-- API-first design: if we don't know how we're going to expose a feature to the developer, then we don't build it. Of course, the best way is for a feature to have no developer exposure at all.
+Processes and networks fail. Orleans detects membership changes and can reactivate grains on healthy silos after failures. In-flight calls can still fail, and volatile state is lost with its process.
 
-- Make it easy to do the right thing: keep things as simple as possible (but no simpler), don't provide a hammer if a screwdriver is the right tool. As one of our early adopters put it, we try to help our customers "fall into the pit of success". If there is a standard pattern that will work well for 80% of the applications out there, then don't worry about enabling every possible alternative. Orleans' embrace of asynchrony is a good example of this.
+Applications therefore need explicit durability, idempotency, bounded retries, observability, and operational procedures. The runtime handles common mechanics but doesn't invent application-level recovery semantics.
 
-- Make it easy for developers to extend the framework without breaking it. Custom serialization and persistence providers are a couple of examples of this. A custom task scheduling extension would be an anti-example.
+## Extensible providers
 
-- Follow the principle of least surprise: as much as possible, things should be as familiar, but everything should behave the way it looks.
+Clustering, persistence, reminders, streams, durable jobs, serialization, and related services expose provider models. Applications can select infrastructure which fits their environment or implement a custom provider.
+
+The provider boundary keeps the programming model portable, but each backend retains its own limits, consistency, availability, authentication, and operational characteristics.
+
+## Make the safe path straightforward
+
+Orleans APIs aim to guide applications toward asynchronous execution, isolated state, stable serialization contracts, and managed lifecycle. Defaults target broadly useful behavior while leaving advanced placement, concurrency, and provider customization available when requirements justify them.
+
+The design priority is a coherent foundation for common stateful distributed applications, not a universal abstraction for every distributed workload.
