@@ -3,7 +3,6 @@ using System.Threading;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
-using static Orleans.Persistence.Cosmos.CosmosIdSanitizer;
 using Orleans.Serialization.Serializers;
 
 namespace Orleans.Persistence.Cosmos;
@@ -11,7 +10,6 @@ namespace Orleans.Persistence.Cosmos;
 public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string ANY_ETAG = "*";
-    private const string KEY_STRING_SEPARATOR = "__";
     private const string GRAINTYPE_PARTITION_KEY_PATH = "/GrainType";
     private readonly ILogger _logger;
     private readonly CosmosGrainStorageOptions _options;
@@ -19,7 +17,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     private readonly IServiceProvider _serviceProvider;
     private readonly string _serviceId;
     private string _partitionKeyPath;
-    private readonly IPartitionKeyProvider _partitionKeyProvider;
+    private readonly IDocumentIdProvider _documentIdProvider;
     private readonly IActivatorProvider _activatorProvider;
     private readonly ICosmosOperationExecutor _executor;
     private CosmosClient _client = default!;
@@ -31,7 +29,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
         IOptions<ClusterOptions> clusterOptions,
-        IPartitionKeyProvider partitionKeyProvider,
+        IDocumentIdProvider documentIdProvider,
         IActivatorProvider activatorProvider)
     {
         _logger = loggerFactory.CreateLogger<CosmosGrainStorage>();
@@ -39,7 +37,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         _name = name;
         _serviceProvider = serviceProvider;
         _serviceId = clusterOptions.Value.ServiceId;
-        _partitionKeyProvider = partitionKeyProvider;
+        _documentIdProvider = documentIdProvider;
         _activatorProvider = activatorProvider;
         _executor = options.OperationExecutor;
         _partitionKeyPath = _options.PartitionKeyPath;
@@ -47,8 +45,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
 
     public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
-        var id = GetKeyString(grainId);
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
 
         LogTraceReadingState(grainType, id, grainId, _options.ContainerName, partitionKey);
 
@@ -98,9 +95,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
 
     public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
-        var id = GetKeyString(grainId);
-
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
 
         LogTraceWritingState(grainType, id, grainId, grainState.ETag, _options.ContainerName, partitionKey);
 
@@ -168,8 +163,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
 
     public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
     {
-        var id = GetKeyString(grainId);
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var (id, partitionKey) = await _documentIdProvider.GetDocumentIdentifiers(grainType, grainId);
 
         LogTraceClearingState(grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.ContainerName, partitionKey);
 
@@ -257,11 +251,6 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         lifecycle.Subscribe(OptionFormattingUtilities.Name<CosmosGrainStorage>(_name), _options.InitStage, Init);
     }
 
-    private string GetKeyString(GrainId grainId) => $"{Sanitize(_serviceId)}{KEY_STRING_SEPARATOR}{Sanitize(grainId.Type.ToString()!)}{SeparatorChar}{Sanitize(grainId.Key.ToString()!)}";
-
-    private ValueTask<string> BuildPartitionKey(string grainType, GrainId grainId) =>
-        _partitionKeyProvider.GetPartitionKey(grainType, grainId);
-
     private async Task Init(CancellationToken ct)
     {
         var stopWatch = Stopwatch.StartNew();
@@ -340,8 +329,8 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                 var container = containerResponse.Resource;
                 _partitionKeyPath = container.PartitionKeyPath;
                 if (_partitionKeyPath == GRAINTYPE_PARTITION_KEY_PATH &&
-                    _partitionKeyProvider is not DefaultPartitionKeyProvider)
-                    throw new OrleansConfigurationException("Custom partition key provider is not compatible with partition key path set to /GrainType");
+                    (_documentIdProvider is not DefaultDocumentIdProvider defaultProvider || defaultProvider.HasCustomPartitionKeyProvider))
+                    throw new OrleansConfigurationException("Custom document id or partition key providers are not compatible with partition key path set to /GrainType");
             }
 
             if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || containerResponse.StatusCode == HttpStatusCode.Created)
@@ -462,10 +451,20 @@ public static class CosmosStorageFactory
     public static CosmosGrainStorage Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
-        var partitionKeyProvider = services.GetKeyedService<IPartitionKeyProvider>(name)
-            ?? services.GetRequiredService<IPartitionKeyProvider>();
-        var loggerFactory = services.GetRequiredService<ILoggerFactory>();
         var clusterOptions = services.GetRequiredService<IOptions<ClusterOptions>>();
+        var documentIdProvider = services.GetKeyedService<IDocumentIdProvider>(name);
+        if (documentIdProvider is null)
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            var partitionKeyProvider = services.GetKeyedService<IPartitionKeyProvider>(name)
+                ?? services.GetRequiredService<IPartitionKeyProvider>();
+#pragma warning restore CS0618 // Type or member is obsolete
+            documentIdProvider = partitionKeyProvider is DefaultPartitionKeyProvider
+                ? services.GetRequiredService<IDocumentIdProvider>()
+                : new DefaultDocumentIdProvider(clusterOptions, partitionKeyProvider);
+        }
+
+        var loggerFactory = services.GetRequiredService<ILoggerFactory>();
         var activatorProvider = services.GetRequiredService<IActivatorProvider>();
         return new CosmosGrainStorage(
             name,
@@ -473,7 +472,7 @@ public static class CosmosStorageFactory
             loggerFactory,
             services,
             clusterOptions,
-            partitionKeyProvider,
+            documentIdProvider,
             activatorProvider);
     }
 }
