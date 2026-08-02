@@ -19,7 +19,6 @@ public static class DurableTaskHostingExtensions
 
     public static ISiloBuilder AddJournaledDurableTaskStorage(this ISiloBuilder siloBuilder)
     {
-        siloBuilder.Services.TryAddSingleton<DurableTaskGrainStorageShared>();
         siloBuilder.Services.TryAddScoped<DurableTaskGrainStorage>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, DurableTaskGrainStorage>();
         return siloBuilder;

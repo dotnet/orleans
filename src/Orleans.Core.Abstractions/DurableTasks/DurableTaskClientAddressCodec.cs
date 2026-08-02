@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Runtime.CompilerServices;
 using Orleans.Runtime;
@@ -22,7 +23,7 @@ public sealed class DurableTaskClientAddressCodec : IFieldCodec<DurableTaskObser
     public void WriteField<TBufferWriter>(
         ref Writer<TBufferWriter> writer,
         uint fieldIdDelta,
-        Type expectedType,
+        [AllowNull] Type expectedType,
         DurableTaskObserverAddress value)
         where TBufferWriter : IBufferWriter<byte>
     {

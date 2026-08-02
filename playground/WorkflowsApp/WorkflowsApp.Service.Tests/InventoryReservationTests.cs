@@ -23,8 +23,8 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
     {
         var result = InventoryReservation.AggregateOrderItems(
         [
-            new InventoryReservation.OrderItem { Sku = "Widget", Quantity = 3 },
-            new InventoryReservation.OrderItem { Sku = "Widget", Quantity = 4 }
+            new OrderItem { Sku = "Widget", Quantity = 3 },
+            new OrderItem { Sku = "Widget", Quantity = 4 }
         ]);
 
         Assert.Equal(7, result["Widget"]);
@@ -39,7 +39,7 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
             InventoryReservation.AggregateOrderItems(
             [
-                new InventoryReservation.OrderItem { Sku = "Widget", Quantity = quantity }
+                new OrderItem { Sku = "Widget", Quantity = quantity }
             ]));
 
         Assert.Contains("must be positive", exception.Message);
@@ -56,8 +56,8 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
             inventory.ReserveItemsAsync(
                 "overdraw",
                 [
-                    new InventoryReservation.OrderItem { Sku = "Widget", Quantity = 4 },
-                    new InventoryReservation.OrderItem { Sku = "Widget", Quantity = 4 }
+                    new OrderItem { Sku = "Widget", Quantity = 4 },
+                    new OrderItem { Sku = "Widget", Quantity = 4 }
                 ],
                 notifications));
 
@@ -73,7 +73,7 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         var (inventory, notifications) = CreateGrains();
         _ = await notifications.GetNotificationsAsync();
         await inventory.AddStockAsync("Widget", 10);
-        var items = new List<InventoryReservation.OrderItem>
+        var items = new List<OrderItem>
         {
             new() { Sku = "Widget", Quantity = 2 },
             new() { Sku = "Widget", Quantity = 3 }
@@ -93,16 +93,16 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         Assert.Single(await notifications.GetNotificationsAsync());
     }
 
-    private (InventoryReservation.IInventoryGrain Inventory, InventoryReservation.INotificationServiceGrain Notifications) CreateGrains()
+    private (IInventoryGrain Inventory, INotificationServiceGrain Notifications) CreateGrains()
     {
         var key = Guid.NewGuid().ToString("N");
         return (
-            _fixture.Cluster.Client.GetGrain<InventoryReservation.IInventoryGrain>($"inventory-{key}"),
-            _fixture.Cluster.Client.GetGrain<InventoryReservation.INotificationServiceGrain>($"notifications-{key}"));
+            _fixture.Cluster.Client.GetGrain<IInventoryGrain>($"inventory-{key}"),
+            _fixture.Cluster.Client.GetGrain<INotificationServiceGrain>($"notifications-{key}"));
     }
 
     private static async Task<List<string>> WaitForNotificationsAsync(
-        InventoryReservation.INotificationServiceGrain grain,
+        INotificationServiceGrain grain,
         int count)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -125,14 +125,15 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         public Fixture()
         {
             var builder = new InProcessTestClusterBuilder();
-            var storageProvider = new VolatileStateMachineStorageProvider();
             builder.ConfigureSilo((_, siloBuilder) =>
             {
                 siloBuilder.AddDurableTasks();
-                siloBuilder.AddStateMachineStorage();
+                siloBuilder.AddJournalStorage();
                 siloBuilder.AddDurableMessaging();
                 siloBuilder.AddJournaledDurableTaskStorage();
-                siloBuilder.Services.AddSingleton<IStateMachineStorageProvider>(storageProvider);
+                siloBuilder.Services.AddSingleton<VolatileJournalStorageProvider>();
+                siloBuilder.Services.AddSingleton<IJournalStorageProvider>(
+                    static serviceProvider => serviceProvider.GetRequiredService<VolatileJournalStorageProvider>());
             });
             Cluster = builder.Build();
         }

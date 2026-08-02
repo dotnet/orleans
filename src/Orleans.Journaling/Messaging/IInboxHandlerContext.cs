@@ -161,11 +161,11 @@ public interface IInboxHandlerContext
     /// <remarks>
     /// <para>
     /// The message is added to the grain's outbox and will be persisted atomically with grain state
-    /// when <c>IStateMachineManager.WriteStateAsync()</c> is called. The message will remain in the
+    /// when <c>IJournaledStateManager.WriteStateAsync()</c> is called. The message will remain in the
     /// outbox until it is successfully delivered to the target grain's inbox.
     /// </para>
     /// <para>
-    /// Delivery is handled by a background pump (typically integrated with Orleans.DurableJobs) that
+    /// Delivery is handled by the outbox's background pump, which
     /// iterates pending outbox messages and calls <c>IDurableInboxExtension.DeliverAsync()</c> on
     /// target grains.
     /// </para>

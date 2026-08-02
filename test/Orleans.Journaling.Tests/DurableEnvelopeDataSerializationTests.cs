@@ -533,6 +533,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
 
         // Deserialize
         var deserializedData = _serializer.Deserialize<DurableEnvelopeData>(serialized);
+        Assert.NotNull(deserializedData);
 
         // Verify body is preserved
         Assert.True(deserializedData.TryGetBody<SimpleRecord>(out var body));
@@ -553,6 +554,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
 
         // Deserialize
         var deserializedData = _serializer.Deserialize<DurableEnvelopeData>(serialized);
+        Assert.NotNull(deserializedData);
 
         // Verify body
         Assert.True(deserializedData.TryGetBody<string>(out var body));
@@ -576,6 +578,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
 
         var serialized = _serializer.SerializeToArray(originalData);
         var deserializedData = _serializer.Deserialize<DurableEnvelopeData>(serialized);
+        Assert.NotNull(deserializedData);
 
         var keys = new HashSet<string>(deserializedData.ContextKeys);
         Assert.Equal(3, keys.Count);
@@ -595,6 +598,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         var originalData = CreateEnvelopeData(original);
         var serialized = _serializer.SerializeToArray(originalData);
         var deserializedData = _serializer.Deserialize<DurableEnvelopeData>(serialized);
+        Assert.NotNull(deserializedData);
 
         Assert.True(deserializedData.TryGetBody<NestedRecord>(out var body));
         Assert.Equal(1, body.Id);
@@ -638,6 +642,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
 
         var serialized = _serializer.SerializeToArray(originalData);
         var deserializedData = _serializer.Deserialize<DurableEnvelopeData>(serialized);
+        Assert.NotNull(deserializedData);
 
         Assert.True(deserializedData.HasContextKey("existing-key"));
         Assert.False(deserializedData.HasContextKey("nonexistent-key"));
@@ -650,6 +655,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
 
         var serialized = _serializer.SerializeToArray(originalData);
         var deserializedData = _serializer.Deserialize<DurableEnvelopeData>(serialized);
+        Assert.NotNull(deserializedData);
 
         var bytes = deserializedData.GetBodyBytes();
         Assert.True(bytes.Length > 0);
@@ -670,6 +676,7 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
 
         var serialized = _serializer.SerializeToArray(originalData);
         var deserializedData = _serializer.Deserialize<DurableEnvelopeData>(serialized);
+        Assert.NotNull(deserializedData);
 
         Assert.True(deserializedData.TryGetContextBytes("ctx-key", out var bytes));
         Assert.True(bytes.Length > 0);

@@ -11,7 +11,7 @@ public class DurableTaskState : IDurableTaskState
 {
     /// <inheritdoc cref="IDurableTaskState.Result"/>
     [Id(0)]
-    public DurableTaskResponse Result { get; set; }
+    public DurableTaskResponse Result { get; set; } = DurableTaskResponse.Pending;
 
     /// <summary>
     /// Gets or sets the set of clients which are interested in the result of this task.
@@ -23,11 +23,11 @@ public class DurableTaskState : IDurableTaskState
     /// In that case, the result will not be 
     /// </remarks>
     [Id(1)]
-    public HashSet<IDurableTaskObserver> Observers { get; set; }
+    public HashSet<IDurableTaskObserver> Observers { get; set; } = [];
 
     /// <inheritdoc cref="IDurableTaskState.Request"/>
     [Id(2)]
-    public IDurableTaskRequest Request { get; set; }
+    public IDurableTaskRequest Request { get; set; } = null!;
 
     /// <inheritdoc cref="IDurableTaskState.CompletedAt"/>
     [Id(3)]
@@ -46,4 +46,3 @@ public class DurableTaskState : IDurableTaskState
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;
     DateTimeOffset IDurableTaskState.CreatedAt => CreatedAt;
 }
-

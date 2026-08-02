@@ -4,6 +4,33 @@ using Orleans.Serialization.Session;
 
 namespace WorkflowsApp.Service.Samples.InventoryReservation;
 
+[GenerateSerializer]
+public sealed class OrderItem
+{
+    [Id(0)] public required string Sku { get; init; }
+    [Id(1)] public int Quantity { get; init; }
+}
+
+[Alias("WorkflowsApp.Service.Samples.InventoryReservation.IInventoryGrain")]
+public interface IInventoryGrain : IGrainWithStringKey
+{
+    [Alias("AddStock")]
+    Task AddStockAsync(string sku, int quantity);
+
+    [Alias("GetAllStock")]
+    Task<Dictionary<string, int>> GetAllStockAsync();
+
+    [Alias("ReserveItems")]
+    Task<string> ReserveItemsAsync(string orderId, List<OrderItem> items, INotificationServiceGrain notificationService);
+}
+
+[Alias("WorkflowsApp.Service.Samples.InventoryReservation.INotificationServiceGrain")]
+public interface INotificationServiceGrain : IGrainWithStringKey
+{
+    [Alias("GetNotifications")]
+    Task<List<string>> GetNotificationsAsync();
+}
+
 /// <summary>
 /// Demonstrates atomic inventory updates and notifications using durable dictionaries and an outbox/inbox pair.
 /// </summary>
@@ -151,33 +178,6 @@ internal static class InventoryReservation
         [Id(0)] public required string OrderId { get; init; }
         [Id(1)] public required string Reason { get; init; }
         [Id(2)] public DateTimeOffset Timestamp { get; init; }
-    }
-
-    [GenerateSerializer]
-    public sealed class OrderItem
-    {
-        [Id(0)] public required string Sku { get; init; }
-        [Id(1)] public int Quantity { get; init; }
-    }
-
-    [Alias("WorkflowsApp.Service.Samples.InventoryReservation.IInventoryGrain")]
-    public interface IInventoryGrain : IGrainWithStringKey
-    {
-        [Alias("AddStock")]
-        Task AddStockAsync(string sku, int quantity);
-
-        [Alias("GetAllStock")]
-        Task<Dictionary<string, int>> GetAllStockAsync();
-
-        [Alias("ReserveItems")]
-        Task<string> ReserveItemsAsync(string orderId, List<OrderItem> items, INotificationServiceGrain notificationService);
-    }
-
-    [Alias("WorkflowsApp.Service.Samples.InventoryReservation.INotificationServiceGrain")]
-    public interface INotificationServiceGrain : IGrainWithStringKey
-    {
-        [Alias("GetNotifications")]
-        Task<List<string>> GetNotificationsAsync();
     }
 
     internal sealed class InventoryGrain(

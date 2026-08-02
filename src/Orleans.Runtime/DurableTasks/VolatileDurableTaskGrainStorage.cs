@@ -25,13 +25,13 @@ public class VolatileDurableTaskGrainStorage(
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
 
-    public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) => _workingCopy[taskId] = _stateCopier.Copy(state);
+    public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) => _workingCopy[taskId] = CopyState(state);
     public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
         if (_workingCopy.TryGetValue(taskId, out var internalState))
         {
-            state = _stateCopier.Copy(internalState);
+            state = CopyState(internalState);
             return true;
         }
 
@@ -41,13 +41,13 @@ public class VolatileDurableTaskGrainStorage(
 
     public ValueTask ReadAsync(CancellationToken cancellationToken)
     {
-        _workingCopy = _storageCopier.Copy(_persistedCopy);
+        _workingCopy = CopyStorage(_persistedCopy);
         return default;
     }
 
     public ValueTask WriteAsync(CancellationToken cancellationToken)
     {
-        _persistedCopy = _storageCopier.Copy(_workingCopy);
+        _persistedCopy = CopyStorage(_workingCopy);
         return default;
     }
 
@@ -102,6 +102,14 @@ public class VolatileDurableTaskGrainStorage(
 
         return result;
     }
+
+    private DurableTaskState CopyState(DurableTaskState state) =>
+        _stateCopier.Copy(state)
+        ?? throw new InvalidOperationException("The durable task state copier returned null.");
+
+    private Dictionary<TaskId, DurableTaskState> CopyStorage(Dictionary<TaskId, DurableTaskState> storage) =>
+        _storageCopier.Copy(storage)
+        ?? throw new InvalidOperationException("The durable task storage copier returned null.");
 
 
     public void Clear()

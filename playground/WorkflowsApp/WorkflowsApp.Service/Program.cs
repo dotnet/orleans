@@ -32,11 +32,11 @@ public class Program
                 siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDurableTasks();
                 siloBuilder.AddDurableMessaging();
-                siloBuilder.AddStateMachineStorage();
                 siloBuilder.AddJournaledDurableTaskStorage();
-                siloBuilder.AddAzureAppendBlobStateMachineStorage();
-                siloBuilder.Services.AddOptions<AzureAppendBlobStateMachineStorageOptions>().Configure((AzureAppendBlobStateMachineStorageOptions options, IServiceProvider serviceProvider)
-                    => options.ConfigureBlobServiceClient(ct => Task.FromResult(serviceProvider.GetRequiredKeyedService<BlobServiceClient>("state"))));
+                siloBuilder.AddAzureBlobJournalStorage();
+                siloBuilder.Services.AddOptions<AzureBlobJournalStorageOptions>().Configure(
+                    (AzureBlobJournalStorageOptions options, IServiceProvider serviceProvider)
+                        => options.BlobServiceClient = serviceProvider.GetRequiredKeyedService<BlobServiceClient>("state"));
             });
 
         builder.Logging.SetMinimumLevel(LogLevel.Information);

@@ -74,7 +74,7 @@ namespace Orleans.DurableTasks.Tests
         [Fact]
         public void OnlyValidValuesAreAllowed()
         {
-            Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(null));
+            Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(null!));
             Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(""));
             Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("/"));
             Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("//"));

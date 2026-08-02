@@ -123,7 +123,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
     /// </summary>
     protected virtual void OnWriteCompleted() { }
 
-    void IDurableStateMachine.OnWriteCompleted() => OnWriteCompleted();
+    void IJournaledState.OnWriteCompleted() => OnWriteCompleted();
 
     private void ApplySet(K key, V value)
     {

@@ -81,6 +81,10 @@ public static class HostingExtensions
     /// deduplication, and atomic persistence integrated with grain state machines.
     /// </para>
     /// <para>
+    /// Durable message envelopes use Orleans binary serialization so that deferred payload buffers
+    /// retain their serializer context after recovery.
+    /// </para>
+    /// <para>
     /// <b>Usage:</b>
     /// <code>
     /// builder.AddDurableMessaging(options =&gt;
@@ -137,15 +141,17 @@ public static class HostingExtensions
         }, "DurableInboxOptions validation failed. Check MaxCapacity, DeduplicationWindow, and DefaultPollTimeout.");
 
         services.ConfigureNamedOptionForLogging<DurableInboxOptions>(Options.DefaultName);
+        services.Configure<JournaledStateManagerOptions>(
+            options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
+        services.TryAddSingleton<JournalingInstruments>();
 
-        // Register grain extensions with keyed service pattern
-        // IDurableInboxExtension - main inbox delivery interface
-        services.AddKeyedTransient<IGrainExtension>(typeof(IDurableInboxExtension), (sp, _) =>
+        services.TryAddScoped<DurableInboxExtension>(sp =>
         {
             var grainContext = sp.GetRequiredService<IGrainContext>();
-            var stateMachineManager = sp.GetRequiredService<IStateMachineManager>();
+            var stateManager = sp.GetRequiredService<IJournaledStateManager>();
             var sessionPool = sp.GetRequiredService<SerializerSessionPool>();
             var logger = sp.GetRequiredService<ILogger<DurableInboxExtension>>();
+            var instruments = sp.GetRequiredService<JournalingInstruments>();
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
 
             // Get inbox and processed dictionaries via keyed services
@@ -162,9 +168,10 @@ public static class HostingExtensions
 
             return new DurableInboxExtension(
                 grainContext,
-                stateMachineManager,
+                stateManager,
                 sessionPool,
                 logger,
+                instruments,
                 durableInbox,  // Shared inbox for handler registration
                 inboxDict,     // IDurableDictionary<K,V> implements IDictionary<K,V>
                 processed,
@@ -173,13 +180,12 @@ public static class HostingExtensions
                 options.DeduplicationWindow);
         });
 
-        // IDurableInboxObserver - observer for durable RPC replies
-        // The observer interface is implemented by the same extension instance
-        services.AddKeyedTransient<IGrainExtension>(typeof(IDurableInboxObserver), (sp, _) =>
-        {
-            // Delegate to the main extension - they share the same implementation
-            return sp.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
-        });
+        services.TryAddKeyedScoped<IGrainExtension>(
+            typeof(IDurableInboxExtension),
+            (sp, _) => sp.GetRequiredService<DurableInboxExtension>());
+        services.TryAddKeyedScoped<IGrainExtension>(
+            typeof(IDurableInboxObserver),
+            (sp, _) => sp.GetRequiredService<DurableInboxExtension>());
 
         // Register storage implementations (scoped to grain activation)
         services.TryAddScoped<IDurableInbox>(sp =>
@@ -187,7 +193,13 @@ public static class HostingExtensions
             var inbox = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox");
             var processed = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("inbox-processed");
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
-            return new DurableInbox(inbox, processed, options.MaxCapacity);
+            return new DurableInbox(
+                inbox,
+                processed,
+                sp,
+                sp.GetRequiredService<IGrainContext>(),
+                sp.GetRequiredService<JournalingInstruments>(),
+                options.MaxCapacity);
         });
 
         // Register DurableOutbox directly - it inherits from DurableDictionary and registers itself

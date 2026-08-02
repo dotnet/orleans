@@ -169,15 +169,4 @@ internal static class InstrumentNames
     public const string RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB = "orleans-runtime-total-physical-memory";
     public const string RUNTIME_MEMORY_AVAILABLE_MEMORY_MB = "orleans-runtime-available-memory";
 
-    // Journaling - Inbox
-    public const string JOURNALING_INBOX_MESSAGES_RECEIVED = "orleans-journaling-inbox-messages-received";
-    public const string JOURNALING_INBOX_MESSAGES_PROCESSED = "orleans-journaling-inbox-messages-processed";
-    public const string JOURNALING_INBOX_MESSAGES_DEPTH = "orleans-journaling-inbox-depth";
-    public const string JOURNALING_INBOX_PROCESSING_DURATION = "orleans-journaling-inbox-processing-duration";
-
-    // Journaling - Outbox
-    public const string JOURNALING_OUTBOX_MESSAGES_SENT = "orleans-journaling-outbox-messages-sent";
-    public const string JOURNALING_OUTBOX_MESSAGES_DELIVERED = "orleans-journaling-outbox-messages-delivered";
-    public const string JOURNALING_OUTBOX_MESSAGES_DEPTH = "orleans-journaling-outbox-depth";
-    public const string JOURNALING_OUTBOX_DELIVERY_DURATION = "orleans-journaling-outbox-delivery-duration";
 }

@@ -110,7 +110,6 @@ internal static class Bank
     }
 
     [GrainType("client")]
-    [Alias("ClientGrain")]
     public class ClientGrain : DurableGrain, IClientGrain
     {
         public async Task Run()

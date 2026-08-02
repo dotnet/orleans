@@ -8,7 +8,7 @@ namespace Orleans.Journaling;
 /// </summary>
 public abstract class DurableGrain : Grain, IGrainBase
 {
-    private readonly IDurableOutbox _outbox;
+    private readonly IDurableOutbox? _outbox;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DurableGrain"/> class and associates its state manager with the grain lifecycle.
@@ -20,7 +20,8 @@ public abstract class DurableGrain : Grain, IGrainBase
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
-        _outbox = ServiceProvider.GetRequiredService<IDurableOutbox>();
+        _outbox = ServiceProvider.GetService<IDurableOutbox>();
+        _ = ServiceProvider.GetService<IDurableInbox>();
     }
 
     /// <summary>

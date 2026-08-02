@@ -10,8 +10,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling.Configuration;
 using Orleans.Runtime;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Journaling.Messaging;
@@ -43,6 +41,7 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
     private readonly IGrainFactory _grainFactory;
     private readonly IGrainContext _grainContext;
     private readonly ILogger<DurableOutbox> _logger;
+    private readonly JournalingInstruments _instruments;
     private readonly TimeSpan _backpressureRetryDelay;
     private readonly CancellationTokenSource _shutdownCts = new();
 
@@ -60,43 +59,43 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
     /// to determine if new work arrived while it was processing.
     /// </summary>
     private int _pumpVersion;
+    private int _metricsActive;
 
     /// <summary>
     /// Creates a new DurableOutbox instance.
     /// </summary>
     /// <param name="key">The keyed service key for state machine registration.</param>
     /// <param name="manager">State machine manager for durable storage.</param>
-    /// <param name="keyCodec">Codec for serializing message IDs (Guid keys).</param>
-    /// <param name="valueCodec">Codec for serializing envelope values.</param>
-    /// <param name="serializerSessionPool">Serializer session pool.</param>
+    /// <param name="shared">Shared journaled state manager services.</param>
+    /// <param name="serviceProvider">The service provider.</param>
     /// <param name="grainFactory">Grain factory for accessing target grains.</param>
     /// <param name="grainContext">The grain context for lifecycle subscription.</param>
     /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="instruments">Journaling metrics.</param>
     /// <param name="options">Durable inbox options containing backpressure retry delay.</param>
     public DurableOutbox(
         [ServiceKey] string key,
-        IStateMachineManager manager,
-        IFieldCodec<Guid> keyCodec,
-        IFieldCodec<DurableEnvelope> valueCodec,
-        SerializerSessionPool serializerSessionPool,
+        IJournaledStateManager manager,
+        JournaledStateManagerShared shared,
+        IServiceProvider serviceProvider,
         IGrainFactory grainFactory,
         IGrainContext grainContext,
         ILogger<DurableOutbox> logger,
+        JournalingInstruments instruments,
         IOptions<DurableInboxOptions> options)
-        : base(key, manager, keyCodec, valueCodec, serializerSessionPool)
+        : base(key, manager, shared, serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(grainFactory);
         ArgumentNullException.ThrowIfNull(grainContext);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(instruments);
         ArgumentNullException.ThrowIfNull(options);
 
         _grainFactory = grainFactory;
         _grainContext = grainContext;
         _logger = logger;
+        _instruments = instruments;
         _backpressureRetryDelay = options.Value.BackpressureRetryDelay;
-
-        // Register observable gauge for outbox depth
-        JournalingInstruments.RegisterOutboxDepthObserve(() => Count);
 
         // Subscribe to the grain lifecycle to start pumping on activation
         var lifecycle = grainContext.ObservableLifecycle;
@@ -119,15 +118,22 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
     /// </remarks>
     public void Send(DurableEnvelope envelope)
     {
+        EnsureMetricsActive();
+        var isNewMessage = !ContainsKey(envelope.MessageId);
+
         // Track this message as pending (not yet durable)
         _pendingMessageIds.Add(envelope.MessageId);
 
         // Store envelope keyed by MessageId for O(1) lookup during removal
         this[envelope.MessageId] = envelope;
+        if (isNewMessage)
+        {
+            _instruments.OnOutboxDepthChanged(1);
+        }
 
         // Record metric for message sent
         var grainType = _grainContext.GrainId.Type.ToString();
-        JournalingInstruments.OnOutboxMessageSent(grainType, envelope.RouteKey);
+        _instruments.OnOutboxMessageSent(grainType, envelope.RouteKey);
 
         // NOTE: We do NOT call EnsurePumpScheduled() here. The pump will be scheduled
         // when OnWriteCompleted is called, which happens after WriteStateAsync() completes.
@@ -164,7 +170,13 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
     public bool RemoveMessage(Guid messageId)
     {
         _pendingMessageIds.Remove(messageId);
-        return Remove(messageId);
+        var removed = Remove(messageId);
+        if (removed && Volatile.Read(ref _metricsActive) != 0)
+        {
+            _instruments.OnOutboxDepthChanged(-1);
+        }
+
+        return removed;
     }
 
     /// <summary>
@@ -248,8 +260,8 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
 
                         // Record successful delivery metrics
                         var statusLabel = result.Status.ToString().ToLowerInvariant();
-                        JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, statusLabel);
-                        JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                        _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, statusLabel);
+                        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                         break;
 
                     case DeliveryStatus.RouteNotFound:
@@ -266,8 +278,8 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                         failedCount++;
 
                         // Record metric
-                        JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "route_not_found");
-                        JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                        _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "route_not_found");
+                        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                         break;
 
                     case DeliveryStatus.Backpressured:
@@ -281,8 +293,8 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                             envelope.CorrelationKey?.ToString());
 
                         // Record metric
-                        JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
-                        JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                        _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
+                        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                         break;
 
                     default:
@@ -310,8 +322,8 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                     envelope.CorrelationKey?.ToString());
 
                 // Record error metric
-                JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
-                JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
+                _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
             }
         }
 
@@ -327,6 +339,8 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
         {
             return Task.CompletedTask;
         }
+
+        EnsureMetricsActive();
 
         // On reactivation, all messages in the outbox are durable (they were persisted before deactivation)
         // The _pendingMessageIds set is empty since it's not persisted
@@ -345,7 +359,20 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
     public Task OnStop(CancellationToken cancellationToken = default)
     {
         _shutdownCts.Cancel();
+        if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
+        {
+            _instruments.OnOutboxDepthChanged(-Count);
+        }
+
         return Task.CompletedTask;
+    }
+
+    private void EnsureMetricsActive()
+    {
+        if (Interlocked.Exchange(ref _metricsActive, 1) == 0)
+        {
+            _instruments.OnOutboxDepthChanged(Count);
+        }
     }
 
     /// <summary>

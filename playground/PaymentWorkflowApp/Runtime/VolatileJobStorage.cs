@@ -12,13 +12,13 @@ internal class VolatileJobStorage(DeepCopier<Dictionary<TaskId, JobTaskState>> s
 
     public IEnumerable<(TaskId Id, JobTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, pair.Value));
 
-    public void AddOrUpdateTask(TaskId taskId, JobTaskState state) => _workingCopy[taskId] = _stateCopier.Copy(state);
+    public void AddOrUpdateTask(TaskId taskId, JobTaskState state) => _workingCopy[taskId] = CopyState(state);
     public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out JobTaskState? state)
     {
         if (_workingCopy.TryGetValue(taskId, out var internalState))
         {
-            state = _stateCopier.Copy(internalState);
+            state = CopyState(internalState);
             return true;
         }
 
@@ -28,13 +28,21 @@ internal class VolatileJobStorage(DeepCopier<Dictionary<TaskId, JobTaskState>> s
 
     public ValueTask ReadAsync(CancellationToken cancellationToken)
     {
-        _workingCopy = _storageCopier.Copy(_persistedCopy);
+        _workingCopy = CopyStorage(_persistedCopy);
         return default;
     }
 
     public ValueTask WriteAsync(CancellationToken cancellationToken)
     {
-        _persistedCopy = _storageCopier.Copy(_workingCopy);
+        _persistedCopy = CopyStorage(_workingCopy);
         return default;
     }
+
+    private JobTaskState CopyState(JobTaskState state) =>
+        _stateCopier.Copy(state)
+        ?? throw new InvalidOperationException("The job state copier returned null.");
+
+    private Dictionary<TaskId, JobTaskState> CopyStorage(Dictionary<TaskId, JobTaskState> storage) =>
+        _storageCopier.Copy(storage)
+        ?? throw new InvalidOperationException("The job storage copier returned null.");
 }

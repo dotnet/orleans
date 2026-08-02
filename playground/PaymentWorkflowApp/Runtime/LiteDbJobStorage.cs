@@ -30,7 +30,7 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
     {
         lock (_lock)
         {
-            _workingCopy[taskId] = _copier.Copy(state);
+            _workingCopy[taskId] = CopyState(state);
         }
     }
     public bool RemoveTask(TaskId taskId)
@@ -51,7 +51,7 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
         {
             if (_workingCopy.TryGetValue(taskId, out var internalState))
             {
-                state = _copier.Copy(internalState);
+                state = CopyState(internalState);
                 return true;
             }
         }
@@ -69,14 +69,20 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
             _workingCopy = [];
             foreach (var entry in collection.FindAll())
             {
-                var taskId = TaskId.Parse(entry.Id!);
-
-                _workingCopy.Add(taskId, _serializer.Deserialize(entry.Payload));
+                var taskId = TaskId.Parse(entry.Id ?? throw new InvalidDataException("The stored job id is missing."));
+                var payload = entry.Payload ?? throw new InvalidDataException($"The payload for job '{taskId}' is missing.");
+                var state = _serializer.Deserialize(payload)
+                    ?? throw new InvalidDataException($"The payload for job '{taskId}' deserialized to null.");
+                _workingCopy.Add(taskId, state);
             }
         }
 
         return default;
     }
+
+    private JobTaskState CopyState(JobTaskState state) =>
+        _copier.Copy(state)
+        ?? throw new InvalidOperationException("The job state copier returned null.");
 
     public ValueTask WriteAsync(CancellationToken cancellationToken)
     {

@@ -16,12 +16,13 @@ namespace Orleans.Journaling.Messaging;
 /// Implementation of durable inbox extension for grain message delivery.
 /// Handles message persistence, deduplication, long-polling, and processing.
 /// </summary>
-internal sealed partial class DurableInboxExtension : IDurableInboxExtension
+internal sealed partial class DurableInboxExtension : IDurableInboxExtension, IDisposable
 {
     private readonly IGrainContext _grainContext;
-    private readonly IStateMachineManager _stateMachineManager;
+    private readonly IJournaledStateManager _stateManager;
     private readonly SerializerSessionPool _sessionPool;
     private readonly ILogger<DurableInboxExtension> _logger;
+    private readonly JournalingInstruments _instruments;
     private readonly IDurableInbox _durableInbox;
     private readonly IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inboxDict;
     private readonly IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
@@ -30,7 +31,9 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
     private readonly int _maxCapacity;
     private readonly TimeSpan _deduplicationWindow;
     private readonly object _processingLock = new();
+    private readonly CancellationTokenSource _shutdownCts = new();
     private Task? _processingTask;
+    private int _metricsActive;
     
     /// <summary>
     /// Counter incremented when new messages are added. The processing task checks this
@@ -42,9 +45,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
     /// Creates a new inbox extension instance.
     /// </summary>
     /// <param name="grainContext">The grain context for this extension.</param>
-    /// <param name="stateMachineManager">State machine manager for atomic persistence.</param>
+    /// <param name="stateManager">State manager for atomic persistence.</param>
     /// <param name="sessionPool">Serializer session pool for envelope creation.</param>
     /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="instruments">Journaling metrics.</param>
     /// <param name="durableInbox">The grain's durable inbox (shared with grain DI).</param>
     /// <param name="inboxDict">Durable dictionary for inbox messages.</param>
     /// <param name="processed">Durable dictionary for processed message tracking.</param>
@@ -53,9 +57,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
     /// <param name="deduplicationWindow">How long to track processed messages (default: 7 days).</param>
     public DurableInboxExtension(
         IGrainContext grainContext,
-        IStateMachineManager stateMachineManager,
+        IJournaledStateManager stateManager,
         SerializerSessionPool sessionPool,
         ILogger<DurableInboxExtension> logger,
+        JournalingInstruments instruments,
         IDurableInbox durableInbox,
         IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inboxDict,
         IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
@@ -64,9 +69,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
         TimeSpan? deduplicationWindow = null)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
-        ArgumentNullException.ThrowIfNull(stateMachineManager);
+        ArgumentNullException.ThrowIfNull(stateManager);
         ArgumentNullException.ThrowIfNull(sessionPool);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(instruments);
         ArgumentNullException.ThrowIfNull(durableInbox);
         ArgumentNullException.ThrowIfNull(inboxDict);
         ArgumentNullException.ThrowIfNull(processed);
@@ -74,9 +80,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCapacity);
 
         _grainContext = grainContext;
-        _stateMachineManager = stateMachineManager;
+        _stateManager = stateManager;
         _sessionPool = sessionPool;
         _logger = logger;
+        _instruments = instruments;
         _durableInbox = durableInbox;
         _inboxDict = inboxDict;
         _processed = processed;
@@ -84,9 +91,6 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
         _pendingDeliveries = new Dictionary<Guid, TaskCompletionSource<DeliveryResult>>();
         _maxCapacity = maxCapacity;
         _deduplicationWindow = deduplicationWindow ?? TimeSpan.FromDays(7);
-
-        // Register observable gauge for inbox depth
-        JournalingInstruments.RegisterInboxDepthObserve(() => _inboxDict.Count);
     }
 
     /// <summary>
@@ -142,6 +146,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
         DeliveryOptions options,
         CancellationToken cancellationToken = default)
     {
+        EnsureMetricsActive();
         var key = (envelope.SenderId, envelope.MessageId);
 
         // Check for duplicate (already processed)
@@ -157,7 +162,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
             // Record duplicate message metric
             var grainType = _grainContext.GrainId.Type.ToString();
-            JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "duplicate");
+            _instruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "duplicate");
 
             return DeliveryResult.Duplicate();
         }
@@ -175,7 +180,8 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
             // Record duplicate message metric
             var grainType = _grainContext.GrainId.Type.ToString();
-            JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "duplicate");
+            _instruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "duplicate");
+            ScheduleProcessing();
 
             // If long-polling, wait for existing processing to complete
             if (options.PollTimeout > TimeSpan.Zero)
@@ -201,7 +207,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
             // Record backpressure metric
             var grainType = _grainContext.GrainId.Type.ToString();
-            JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "backpressured");
+            _instruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "backpressured");
 
             return DeliveryResult.Backpressured();
         }
@@ -230,7 +236,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
                 // Record route not found metric
                 var grainType = _grainContext.GrainId.Type.ToString();
-                JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "route_not_found");
+                _instruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "route_not_found");
 
                 return DeliveryResult.RouteNotFound(envelope.RouteKey);
             }
@@ -238,9 +244,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
         // Accept message into inbox
         _inboxDict[key] = envelope;
+        _instruments.OnInboxDepthChanged(1);
 
         // Persist atomically
-        await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+        await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
         LogMessageAccepted(
             _logger,
@@ -252,7 +259,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
         // Record accepted message metric
         var grainTypeName = _grainContext.GrainId.Type.ToString();
-        JournalingInstruments.OnInboxMessageReceived(grainTypeName, envelope.RouteKey, "accepted");
+        _instruments.OnInboxMessageReceived(grainTypeName, envelope.RouteKey, "accepted");
 
         // If long-polling, wait for processing to complete
         if (options.PollTimeout > TimeSpan.Zero)
@@ -335,7 +342,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
     /// </summary>
     private async Task ProcessingLoopAsync()
     {
-        while (true)
+        while (!_shutdownCts.IsCancellationRequested)
         {
             // Capture current version INSIDE the lock to avoid races with ScheduleProcessing
             int versionBeforeProcessing;
@@ -392,6 +399,11 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
         foreach (var envelope in pending)
         {
+            if (_shutdownCts.IsCancellationRequested)
+            {
+                return;
+            }
+
             try
             {
                 await ProcessMessageAsync(envelope).ConfigureAwait(true);
@@ -439,9 +451,9 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
                     var result = await observer.OnResponseAsync(envelope.CorrelationKey, envelope, options, CancellationToken.None).ConfigureAwait(true);
 
                     // Mark as processed
-                    _inboxDict.Remove(key);
+                    RemoveMessage(key);
                     _processed[key] = DateTimeOffset.UtcNow;
-                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                    await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
                     // Dispose envelope data to release ArcBuffer resources (after persistence)
                     envelope.Data.Dispose();
@@ -460,8 +472,8 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
                 // Record processing metrics
                     stopwatch.Stop();
-                    JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
-                    JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                    _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
+                    _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
 
                     // Notify waiters
                     CompleteDelivery(envelope.MessageId, result);
@@ -477,17 +489,17 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
                     envelope.CorrelationKey?.ToString());
 
                 // Mark as processed to avoid infinite retry
-                    _inboxDict.Remove(key);
+                    RemoveMessage(key);
                     _processed[key] = DateTimeOffset.UtcNow;
-                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                    await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
                     // Dispose envelope data
                     envelope.Data.Dispose();
 
                     // Record processing metrics (error case)
                     stopwatch.Stop();
-                    JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "error");
-                    JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                    _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "error");
+                    _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
 
                     // Notify waiters with error
                     CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
@@ -502,17 +514,17 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
             envelope.CorrelationKey?.ToString());
 
         // Remove from inbox and mark as processed
-            _inboxDict.Remove(key);
+            RemoveMessage(key);
             _processed[key] = DateTimeOffset.UtcNow;
-            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
             // Dispose envelope data to release ArcBuffer resources
             envelope.Data.Dispose();
 
             // Record metrics (route not found during processing)
             stopwatch.Stop();
-            JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "route_not_found");
-            JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+            _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "route_not_found");
+            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
 
             // Notify waiters
             CompleteDelivery(envelope.MessageId, DeliveryResult.RouteNotFound(envelope.RouteKey));
@@ -525,11 +537,11 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
             await handler.HandleAsync(context, CancellationToken.None).ConfigureAwait(true);
 
             // Mark as processed
-            _inboxDict.Remove(key);
+            RemoveMessage(key);
             _processed[key] = DateTimeOffset.UtcNow;
 
             // Persist atomically
-            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
             // Dispose envelope data to release ArcBuffer resources (after persistence)
             envelope.Data.Dispose();
@@ -549,8 +561,8 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
         // Record processing metrics
             stopwatch.Stop();
-            JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
-            JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+            _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
+            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
 
             // Notify waiters
             CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
@@ -567,17 +579,17 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
             // For now, mark as processed to avoid infinite retry
             // In production, this should use a retry policy or dead-letter queue
-            _inboxDict.Remove(key);
+            RemoveMessage(key);
             _processed[key] = DateTimeOffset.UtcNow;
-            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
             // Dispose envelope data to release ArcBuffer resources (after persistence)
             envelope.Data.Dispose();
 
             // Record processing metrics (error case)
             stopwatch.Stop();
-            JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "error");
-            JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+            _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "error");
+            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
 
             // Notify waiters with error
             CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
@@ -593,6 +605,53 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
         {
             tcs.TrySetResult(result);
         }
+    }
+
+    internal void ResumeProcessing()
+    {
+        EnsureMetricsActive();
+        if (_inboxDict.Count > 0)
+        {
+            ScheduleProcessing();
+        }
+    }
+
+    internal void StopProcessing()
+    {
+        _shutdownCts.Cancel();
+        if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
+        {
+            _instruments.OnInboxDepthChanged(-_inboxDict.Count);
+        }
+    }
+
+    public void Dispose()
+    {
+        StopProcessing();
+        _shutdownCts.Dispose();
+    }
+
+    private void EnsureMetricsActive()
+    {
+        if (Interlocked.Exchange(ref _metricsActive, 1) == 0)
+        {
+            _instruments.OnInboxDepthChanged(_inboxDict.Count);
+        }
+    }
+
+    private bool RemoveMessage((GrainId SenderId, Guid MessageId) key)
+    {
+        if (!_inboxDict.Remove(key))
+        {
+            return false;
+        }
+
+        if (Volatile.Read(ref _metricsActive) != 0)
+        {
+            _instruments.OnInboxDepthChanged(-1);
+        }
+
+        return true;
     }
 
     // Structured logging using LoggerMessage source generator
