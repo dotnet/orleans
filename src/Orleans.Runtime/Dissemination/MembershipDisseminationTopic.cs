@@ -94,6 +94,11 @@ internal sealed class MembershipDisseminationTopic(
         }
 
         var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        if (update is null)
+        {
+            return DisseminationApplyResult.Rejected;
+        }
+
         if (update.Diff is { } diff)
         {
             return update.Snapshot is null
