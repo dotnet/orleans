@@ -1,5 +1,5 @@
-using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Orleans.Metadata;
 using Orleans.Runtime.Dissemination;
@@ -40,7 +40,7 @@ namespace Orleans.Runtime
                 hashes[siloManifest.Key] = ManifestHashCalculator.ComputeHash(siloManifest.Value);
             }
 
-            return new(new ClusterManifestHashSummary(manifest.Version, hashes.ToFrozenDictionary()));
+            return new(new ClusterManifestHashSummary(manifest.Version, hashes.ToImmutableDictionary()));
         }
 
         public ValueTask<ManifestHash> GetSiloManifestHash() => new(_siloManifestHash);

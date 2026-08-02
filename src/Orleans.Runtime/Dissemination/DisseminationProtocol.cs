@@ -184,7 +184,7 @@ internal sealed partial class DisseminationProtocol(
             var request = new DisseminationAntiEntropyRequest
             {
                 Sender = _transport.LocalSilo,
-                DigestsByTopic = pendingRequest.ToFrozenDictionary(StringComparer.Ordinal),
+                DigestsByTopic = pendingRequest.ToImmutableDictionary(StringComparer.Ordinal),
             };
 
             var response = await SafeRequest(
@@ -250,7 +250,7 @@ internal sealed partial class DisseminationProtocol(
     {
         if (!_options.CurrentValue.Enabled)
         {
-            return CreateAntiEntropyResponse(FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty, truncated: false);
+            return CreateAntiEntropyResponse(ImmutableDictionary<string, ImmutableArray<DisseminationValue>>.Empty, truncated: false);
         }
 
         var requestDigestCount = GetDigestCount(request.DigestsByTopic);
@@ -591,7 +591,7 @@ internal sealed partial class DisseminationProtocol(
 
     private async Task SendGossipBatchCore(
         SiloAddress peer,
-        FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic,
+        ImmutableDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic,
         CancellationToken cancellationToken)
     {
         var batch = new DisseminationGossipBatch
@@ -1181,7 +1181,7 @@ internal sealed partial class DisseminationProtocol(
     }
 
     private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(
-        FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic,
+        ImmutableDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic,
         bool truncated) => new()
     {
         Sender = _transport.LocalSilo,
@@ -1189,7 +1189,7 @@ internal sealed partial class DisseminationProtocol(
         Truncated = truncated,
     };
 
-    private static int GetDigestCount(FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>> digestsByTopic)
+    private static int GetDigestCount(ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>> digestsByTopic)
     {
         var result = 0;
         foreach (var digests in digestsByTopic.Values)
@@ -1200,7 +1200,7 @@ internal sealed partial class DisseminationProtocol(
         return result;
     }
 
-    private static int GetValueCount(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic)
+    private static int GetValueCount(ImmutableDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic)
     {
         var result = 0;
         foreach (var values in valuesByTopic.Values)
@@ -1211,7 +1211,7 @@ internal sealed partial class DisseminationProtocol(
         return result;
     }
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> GroupValuesByTopic(IReadOnlyList<TopicValue> values)
+    private static ImmutableDictionary<string, ImmutableArray<DisseminationValue>> GroupValuesByTopic(IReadOnlyList<TopicValue> values)
     {
         var result = new Dictionary<string, ImmutableArray<DisseminationValue>.Builder>(StringComparer.Ordinal);
         foreach (var (topic, value) in values)
@@ -1236,9 +1236,9 @@ internal sealed partial class DisseminationProtocol(
         topicValues.Add(value);
     }
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(
+    private static ImmutableDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(
         Dictionary<string, ImmutableArray<DisseminationValue>.Builder> result) =>
-        result.ToFrozenDictionary(
+        result.ToImmutableDictionary(
             static pair => pair.Key,
             static pair => pair.Value.ToImmutable(),
             StringComparer.Ordinal);

@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Threading;
 using Orleans.Concurrency;
@@ -68,8 +67,8 @@ internal sealed class DisseminationGossipBatch
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public FrozenDictionary<string, ImmutableArray<DisseminationValue>> ValuesByTopic { get; init; } =
-        FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty;
+    public ImmutableDictionary<string, ImmutableArray<DisseminationValue>> ValuesByTopic { get; init; } =
+        ImmutableDictionary<string, ImmutableArray<DisseminationValue>>.Empty;
 }
 
 [GenerateSerializer, Immutable]
@@ -79,8 +78,8 @@ internal sealed class DisseminationAntiEntropyRequest
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>> DigestsByTopic { get; init; } =
-        FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>>.Empty;
+    public ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>> DigestsByTopic { get; init; } =
+        ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>>.Empty;
 }
 
 [GenerateSerializer, Immutable]
@@ -90,8 +89,8 @@ internal sealed class DisseminationAntiEntropyResponse
     public required SiloAddress Sender { get; init; }
 
     [Id(1)]
-    public FrozenDictionary<string, ImmutableArray<DisseminationValue>> ValuesByTopic { get; init; } =
-        FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty;
+    public ImmutableDictionary<string, ImmutableArray<DisseminationValue>> ValuesByTopic { get; init; } =
+        ImmutableDictionary<string, ImmutableArray<DisseminationValue>>.Empty;
 
     [Id(2)]
     public bool Truncated { get; init; }

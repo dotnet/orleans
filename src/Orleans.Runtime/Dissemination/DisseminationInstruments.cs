@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
 
@@ -47,7 +46,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnGossipSent(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
+    public static void OnGossipSent(ImmutableDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
     {
         if (!GossipSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
         {
@@ -81,7 +80,7 @@ internal static class DisseminationInstruments
         }
     }
 
-    public static void OnGossipReceived(FrozenDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
+    public static void OnGossipReceived(ImmutableDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic, string kind)
     {
         if (!GossipReceived.Enabled && !ValuesApplied.Enabled)
         {
