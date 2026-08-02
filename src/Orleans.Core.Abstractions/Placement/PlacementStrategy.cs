@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a value indicating whether or not this placement strategy is used to place grains versus stateless workers, system targets, clients, or observers.
         /// </summary>
-        public abstract bool IsGrain { get; }
+        public virtual bool IsGrain => true;
 
         /// <summary>
         /// Initializes an instance of this type using the provided grain properties.

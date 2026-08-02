@@ -2,7 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;

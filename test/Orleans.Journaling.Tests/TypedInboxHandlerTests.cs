@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;

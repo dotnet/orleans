@@ -1,5 +1,5 @@
 using System;
-using Orleans.Journaling.Configuration;
+using Orleans.DurableMessaging.Configuration;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -204,12 +204,26 @@ public class DurableInboxOptionsTests
         var options = new DurableInboxOptions
         {
             MaxCapacity = 1,
-            DeduplicationWindow = TimeSpan.FromTicks(1),
+            DeduplicationWindow = TimeSpan.FromTicks(2),
+            MaxOutboxRetryAge = TimeSpan.FromTicks(1),
             DefaultPollTimeout = TimeSpan.FromTicks(1)
         };
 
         // Act & Assert - should not throw
         options.Validate();
+    }
+
+    [Fact]
+    public void Validate_WithRetryAgeOutsideDeduplicationWindow_ThrowsArgumentOutOfRangeException()
+    {
+        var options = new DurableInboxOptions
+        {
+            DeduplicationWindow = TimeSpan.FromHours(1),
+            MaxOutboxRetryAge = TimeSpan.FromHours(1)
+        };
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
+        Assert.Equal(nameof(DurableInboxOptions.MaxOutboxRetryAge), exception.ParamName);
     }
 
     [Fact]
@@ -237,7 +251,8 @@ public class DurableInboxOptionsTests
         var options = new DurableInboxOptions
         {
             MaxCapacity = capacity,
-            DeduplicationWindow = TimeSpan.FromDays(deduplicationDays)
+            DeduplicationWindow = TimeSpan.FromDays(deduplicationDays),
+            MaxOutboxRetryAge = TimeSpan.FromHours(12)
         };
 
         // Act

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core.Internal;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Session;
@@ -276,7 +276,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
                     new JournaledStateManagerOptions { JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey }));
             builder.ConfigureSilo((options, siloBuilder) =>
             {
-                siloBuilder.AddJournalStorage();
+                siloBuilder.UseInMemoryDurableJobs();
                 siloBuilder.Services.AddSingleton(storageProvider);
                 siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
                 
