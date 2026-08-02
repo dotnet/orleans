@@ -1,29 +1,37 @@
 ---
-title: Run an Orleans application
-description: Learn how to run an Orleans app in .NET.
-ms.date: 05/23/2025
+title: Deploy and operate Orleans
+description: Plan, deploy, and operate an Orleans 10 application in production.
+ms.date: 08/02/2026
 ms.topic: overview
 ---
 
-# Run an Orleans application
+# Deploy and operate Orleans
 
-A typical Orleans application consists of a cluster of server processes (silos) where grains live, and a set of client processes (usually web servers) receiving external requests, turning them into grain method calls, and returning results. Therefore, the first step to run an Orleans application is starting a cluster of silos. For testing purposes, a cluster can consist of a single silo. For a reliable production deployment, more than one silo in a cluster is desirable for fault tolerance and scale.
+An Orleans production deployment is a cluster of silo processes, optionally with separate Orleans clients. Silos communicate directly with each other over TCP. Clients discover gateways through the configured clustering provider and connect to those gateways.
 
-Once the cluster runs, start one or more client processes that connect to the cluster and can send requests to the grains. Clients connect to a special TCP endpoint on silos called a gateway. By default, every silo in a cluster has a client gateway enabled. Clients connect to all silos in parallel for better performance and resilience.
+Orleans manages grain activation and cluster membership, but the hosting platform remains responsible for process supervision, networking, health probes, secrets, resource allocation, and controlled rollout. A production design also needs durable grain state where the application requires it.
 
-## Configure and start a silo
+## Operations track
 
-Configure the silo in conjunction with an <xref:Microsoft.Extensions.Hosting.IHost>. For more information, see [Orleans: Server configuration](../host/configuration-guide/server-configuration.md). After configuring the silo within the host, start the host to initiate the Orleans silo.
+Use these articles together:
 
-## Configure and connect a client
+1. [Production-readiness checklist](production-readiness.md) - Review the decisions required before launch.
+1. [Topology and networking](networking.md) - Configure listening and advertised endpoints, firewalls, and clustering.
+1. [Health and observability](health-and-observability.md) - Design startup, readiness, liveness, dependency health, telemetry, and alerts.
+1. [Graceful shutdown and upgrades](upgrades.md) - Drain instances, scale in, and perform rolling or blue-green releases.
+1. [Capacity planning and scaling](capacity-planning.md) - Size silos, set resource policies, and validate scaling behavior.
+1. [Backup, restore, and disaster recovery](disaster-recovery.md) - Protect application state and recover clusters safely.
+1. [Failure handling](handling-failures.md) - Design grain calls for unknown outcomes, idempotency, and bounded retries.
+1. [Troubleshoot deployments](troubleshooting-deployments.md) - Triage incidents using membership, networking, dependencies, and telemetry.
 
-Configure clients similarly to silos, using an `IHost`. For more information, see [Orleans: Client configuration](../host/configuration-guide/client-configuration.md). When the client is configured, start the host instance to have the client connect to the silos.
+## Choose a platform
 
-## Production configurations
+- [Kubernetes](kubernetes.md)
+- [Azure App Service](deploy-to-azure-app-service.md)
+- [Azure Container Apps](deploy-to-azure-container-apps.md)
+- Other orchestrators, virtual machines, or bare-metal hosts that satisfy the [platform requirements](platform-guides.md)
 
-The configuration examples used here are for testing silos and clients running on the same machine (`localhost`). In production, silos and clients usually run on different servers and are configured with one of the reliable cluster configuration options. Find more information about this in the [Configuration guide](../host/configuration-guide/index.md) and the description of [Cluster management](../implementation/cluster-management.md).
+For application configuration, see [Server configuration](../host/configuration-guide/server-configuration.md), [Client configuration](../host/configuration-guide/client-configuration.md), and [Typical configurations](../host/configuration-guide/typical-configurations.md).
 
-## Next steps
-
-> [!div class="nextstepaction"]
-> [Deploy Orleans to Azure App Service](deploy-to-azure-app-service.md)
+> [!IMPORTANT]
+> Localhost clustering and in-memory grain storage are development defaults. They don't provide a multi-host production cluster or durable application state.
