@@ -14,12 +14,16 @@ using Microsoft.Accordant;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Metadata;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.MembershipService;
 using Orleans.Serialization;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 using Xunit;
 
 namespace UnitTests.Dissemination;
@@ -554,6 +558,19 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void CreateAntiEntropyStateReturnsEmptyWhenDisseminationIsDisabled()
+    {
+        var local = CreateSilo(11111);
+        var transport = new FakeTransport(local, CreateSilo(11112));
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic, options => options.Enabled = false);
+
+        var state = protocol.CreateAntiEntropyState();
+
+        Assert.Empty(state.Topics);
+    }
+
+    [Fact]
     public async Task AntiEntropyResponseIncludesNewerLocalValues()
     {
         var local = CreateSilo(11111);
@@ -821,6 +838,288 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task MembershipTopicApplyValueRejectsWrongTopicKey()
+    {
+        var local = CreateSilo(11121);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var topic = CreateMembershipTopic(local, new FakeMembershipManager(snapshot), serializer);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("not-cluster", 1),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+    }
+
+    [Fact]
+    public async Task MembershipTopicApplyValueRejectsNullDeserializedPayload()
+    {
+        var local = CreateSilo(11122);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var topic = CreateMembershipTopic(local, new FakeMembershipManager(snapshot), serializer);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", 1),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray<MembershipTableSnapshotUpdate>(null!),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+    }
+
+    [Fact]
+    public async Task MembershipTopicApplyValueReturnsObsoleteThenDuplicateForStaleVersions()
+    {
+        var local = CreateSilo(11123);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(5, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var olderSnapshot = CreateMembershipSnapshot(4, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var olderValue = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", olderSnapshot.Version.Value),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = olderSnapshot }),
+        };
+        var sameVersionValue = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", currentSnapshot.Version.Value),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = currentSnapshot }),
+        };
+
+        var obsoleteResult = await topic.ApplyValue(olderValue, CancellationToken.None);
+        var duplicateResult = await topic.ApplyValue(sameVersionValue, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Obsolete, obsoleteResult);
+        Assert.Equal(DisseminationApplyResult.Duplicate, duplicateResult);
+        Assert.Equal(currentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Fact]
+    public async Task MembershipTopicApplyValueRejectsDiffWithMismatchedBaseVersion()
+    {
+        var local = CreateSilo(11124);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(5, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var diff = new MembershipTableSnapshotDiff(
+            baseVersion: new MembershipVersion(1),
+            version: new MembershipVersion(6),
+            updatedEntries: ImmutableArray<MembershipEntry>.Empty,
+            removedSilos: ImmutableArray<SiloAddress>.Empty);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", diff.Version.Value),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+        Assert.Equal(currentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Fact]
+    public async Task MembershipTopicApplyValueRejectsUpdateContainingSnapshotAndDiff()
+    {
+        var local = CreateSilo(11129);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var diff = new MembershipTableSnapshotDiff(
+            currentSnapshot.Version,
+            new MembershipVersion(2),
+            ImmutableArray<MembershipEntry>.Empty,
+            ImmutableArray<SiloAddress>.Empty);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", 2),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate
+            {
+                Snapshot = currentSnapshot,
+                Diff = diff,
+            }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+        Assert.Equal(currentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Theory]
+    [InlineData(4, 5, (int)DisseminationApplyResult.Obsolete)]
+    [InlineData(5, 5, (int)DisseminationApplyResult.Duplicate)]
+    public async Task MembershipTopicApplyDiffRejectsNonNewerVersion(
+        long diffVersion,
+        long currentVersion,
+        int expected)
+    {
+        var local = CreateSilo(11130);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(currentVersion, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var diff = new MembershipTableSnapshotDiff(
+            new MembershipVersion(currentVersion - 1),
+            new MembershipVersion(diffVersion),
+            ImmutableArray<MembershipEntry>.Empty,
+            ImmutableArray<SiloAddress>.Empty);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", diffVersion),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal((DisseminationApplyResult)expected, result);
+        Assert.Equal(currentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Fact]
+    public async Task MembershipTopicDiffPreservesNewerIAmAliveTimeAndAppliesSuspectTimeChange()
+    {
+        var local = CreateSilo(11131);
+        var peer = CreateSilo(11132);
+        var startTime = DateTime.UnixEpoch;
+        var baseEntry = CreateMembershipEntry(peer, SiloStatus.Active, startTime);
+        baseEntry.IAmAliveTime = startTime.AddMinutes(2);
+        baseEntry.SuspectTimes = [Tuple.Create(local, startTime.AddSeconds(1))];
+        var updatedEntry = CreateMembershipEntry(peer, SiloStatus.Active, startTime);
+        updatedEntry.IAmAliveTime = startTime.AddMinutes(1);
+        updatedEntry.SuspectTimes = [Tuple.Create(local, startTime.AddSeconds(2))];
+        var baseSnapshot = CreateMembershipSnapshot(1, baseEntry);
+        var updatedSnapshot = CreateMembershipSnapshot(2, updatedEntry);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var sourceManager = new FakeMembershipManager(baseSnapshot);
+        var sourceTopic = CreateMembershipTopic(local, sourceManager, serializer);
+        var peerDigest = Assert.Single(sourceTopic.GetDigests());
+        sourceManager.CurrentSnapshot = updatedSnapshot;
+        var localDigest = Assert.Single(sourceTopic.GetDigests());
+
+        var value = await sourceTopic.GetValue(localDigest, peerDigest, CancellationToken.None);
+        Assert.NotNull(value);
+        var receiverManager = new FakeMembershipManager(baseSnapshot);
+        var receiverTopic = CreateMembershipTopic(peer, receiverManager, serializer);
+
+        var result = await receiverTopic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Applied, result);
+        var appliedEntry = receiverManager.CurrentSnapshot.Entries[peer];
+        Assert.Equal(baseEntry.IAmAliveTime, appliedEntry.IAmAliveTime);
+        var suspectTime = Assert.Single(appliedEntry.SuspectTimes!);
+        Assert.Equal(updatedEntry.SuspectTimes![0], suspectTime);
+    }
+
+    [Fact]
+    public async Task MembershipTopicGetValueReturnsNullForWrongKeyOrStaleDigest()
+    {
+        var local = CreateSilo(11125);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(3, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var topic = CreateMembershipTopic(local, new FakeMembershipManager(snapshot), serializer);
+
+        var wrongKeyResult = await topic.GetValue(new DisseminationTopicDigest("not-cluster", 3), peerDigest: null, CancellationToken.None);
+        var staleDigestResult = await topic.GetValue(new DisseminationTopicDigest("cluster", 99), peerDigest: null, CancellationToken.None);
+
+        Assert.Null(wrongKeyResult);
+        Assert.Null(staleDigestResult);
+    }
+
+    [Fact]
+    public async Task MembershipTopicOnFallbackRequiredRefreshesMembershipWhenEnabled()
+    {
+        var local = CreateSilo(11126);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(snapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer, options => options.Dissemination.FallbackEnabled = true);
+
+        await topic.OnFallbackRequired(peer: null, new DisseminationTopicDigest("cluster", 7), CancellationToken.None);
+
+        var refreshCall = Assert.Single(manager.RefreshCalls);
+        Assert.Equal(new MembershipVersion(7), refreshCall);
+    }
+
+    [Fact]
+    public async Task MembershipTopicOnFallbackRequiredSkipsRefreshWhenDisabled()
+    {
+        var local = CreateSilo(11127);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(snapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer, options => options.Dissemination.FallbackEnabled = false);
+
+        await topic.OnFallbackRequired(peer: null, new DisseminationTopicDigest("cluster", 7), CancellationToken.None);
+
+        Assert.Empty(manager.RefreshCalls);
+    }
+
+    [Fact]
+    public async Task MembershipTopicSnapshotHistoryEvictionFallsBackToFullSnapshotForOldPeerVersion()
+    {
+        var local = CreateSilo(11128);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var initialSnapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(initialSnapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        Assert.Single(topic.GetDigests());
+
+        // Exceed the 32-entry snapshot history so that version 1 is evicted.
+        for (var version = 2; version <= 40; version++)
+        {
+            manager.CurrentSnapshot = CreateMembershipSnapshot(version, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+            Assert.Single(topic.GetDigests());
+        }
+
+        var latestDigest = Assert.Single(topic.GetDigests());
+        var evictedPeerDigest = new DisseminationTopicDigest("cluster", 1);
+
+        var value = await topic.GetValue(latestDigest, evictedPeerDigest, CancellationToken.None);
+
+        Assert.NotNull(value);
+        var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        Assert.NotNull(update);
+        Assert.Null(update.Diff);
+        Assert.NotNull(update.Snapshot);
+        Assert.Equal(40, update.Snapshot.Version.Value);
+    }
+
+    [Fact]
     public void ManifestHashIsIndependentOfDictionaryOrdering()
     {
         var manifest1 = CreateManifest(
@@ -831,6 +1130,63 @@ public class DisseminationProtocolTests
             ("grain-b", "placement", "random"));
 
         Assert.Equal(ManifestHashCalculator.ComputeHash(manifest1), ManifestHashCalculator.ComputeHash(manifest2));
+    }
+
+    [Fact]
+    public void ManifestHashCalculator_ChangesWhenGrainPropertyValueChanges()
+    {
+        var original = CreateManifest(("grain-a", "placement", "local"));
+        var changed = CreateManifest(("grain-a", "placement", "random"));
+
+        Assert.NotEqual(ManifestHashCalculator.ComputeHash(original), ManifestHashCalculator.ComputeHash(changed));
+    }
+
+    [Fact]
+    public void ManifestHashCalculator_ChangesWhenGrainIsAdded()
+    {
+        var original = CreateManifest(("grain-a", "placement", "local"));
+        var withExtraGrain = CreateManifest(("grain-a", "placement", "local"), ("grain-b", "placement", "local"));
+
+        Assert.NotEqual(ManifestHashCalculator.ComputeHash(original), ManifestHashCalculator.ComputeHash(withExtraGrain));
+    }
+
+    [Fact]
+    public void ManifestHashCalculator_IsDeterministicForEmptyManifest()
+    {
+        var empty = new GrainManifest(
+            System.Collections.Immutable.ImmutableDictionary<GrainType, GrainProperties>.Empty,
+            System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+
+        var first = ManifestHashCalculator.ComputeHash(empty);
+        var second = ManifestHashCalculator.ComputeHash(empty);
+
+        Assert.Equal(first, second);
+        Assert.NotEqual(default(ManifestHash), first);
+    }
+
+    [Fact]
+    public void ManifestHashCalculator_ChangesWhenInterfacePropertiesChange()
+    {
+        static GrainManifest CreateManifestWithInterface(string propertyValue)
+        {
+            var interfaces = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainInterfaceType, GrainInterfaceProperties>();
+            var properties = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+            properties["version"] = propertyValue;
+            interfaces[GrainInterfaceType.Create("test.interface")] = new GrainInterfaceProperties(properties.ToImmutable());
+            return new GrainManifest(
+                System.Collections.Immutable.ImmutableDictionary<GrainType, GrainProperties>.Empty,
+                interfaces.ToImmutable());
+        }
+
+        var original = CreateManifestWithInterface("1");
+        var changed = CreateManifestWithInterface("2");
+        var identical = CreateManifestWithInterface("1");
+
+        Assert.NotEqual(ManifestHashCalculator.ComputeHash(original), ManifestHashCalculator.ComputeHash(changed));
+        Assert.Equal(ManifestHashCalculator.ComputeHash(original), ManifestHashCalculator.ComputeHash(identical));
+        Assert.NotEqual(ManifestHashCalculator.ComputeHash(original), ManifestHashCalculator.ComputeHash(new GrainManifest(
+            System.Collections.Immutable.ImmutableDictionary<GrainType, GrainProperties>.Empty,
+            System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty)));
     }
 
     [Fact]
@@ -910,6 +1266,773 @@ public class DisseminationProtocolTests
         Assert.Equal(options.MaxBatchBytes, new DisseminationTopicOptions().MaxPayloadBytes);
     }
 
+    [Fact]
+    public void OptionsValidatorAcceptsDefaultOptions()
+    {
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, new DisseminationOptions());
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveMaxConcurrentSends()
+    {
+        var options = new DisseminationOptions { MaxConcurrentSends = 0 };
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveFailureBackoff()
+    {
+        var options = new DisseminationOptions { FailureBackoff = TimeSpan.Zero };
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveMaxBatchBytes()
+    {
+        var options = new DisseminationOptions { MaxBatchBytes = 0 };
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveMaxBatchItems()
+    {
+        var options = new DisseminationOptions { MaxBatchItems = 0 };
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveTargetHopCount()
+    {
+        var options = new DisseminationOptions();
+        options.Overlay.TargetHopCount = 0;
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveMinFanOutFactor()
+    {
+        var options = new DisseminationOptions();
+        options.Overlay.MinFanOutFactor = 0;
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveAntiEntropyInterval()
+    {
+        var options = new DisseminationOptions();
+        options.Overlay.AntiEntropyInterval = TimeSpan.Zero;
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void OptionsValidatorRejectsNonPositiveAntiEntropyPeerCount()
+    {
+        var options = new DisseminationOptions();
+        options.Overlay.AntiEntropyPeerCount = 0;
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void TopicOptionsValidatorAcceptsDefaultOptions()
+    {
+        var result = DisseminationTopicOptionsValidator.Validate("Test", new DisseminationTopicOptions());
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void TopicOptionsValidatorRejectsNonPositiveMaxPendingItemCount()
+    {
+        var options = new DisseminationTopicOptions { MaxPendingItemCount = 0 };
+
+        var result = DisseminationTopicOptionsValidator.Validate("Test", options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void TopicOptionsValidatorRejectsNonPositiveMaxCoalescingDelay()
+    {
+        var options = new DisseminationTopicOptions { MaxCoalescingDelay = TimeSpan.Zero };
+
+        var result = DisseminationTopicOptionsValidator.Validate("Test", options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void TopicOptionsValidatorRejectsStaleItemTtlNotGreaterThanCoalescingDelay()
+    {
+        var options = new DisseminationTopicOptions
+        {
+            MaxCoalescingDelay = TimeSpan.FromSeconds(5),
+            StaleItemTtl = TimeSpan.FromSeconds(5),
+        };
+
+        var result = DisseminationTopicOptionsValidator.Validate("Test", options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void TopicOptionsValidatorRejectsNonPositiveMaxPayloadBytes()
+    {
+        var options = new DisseminationTopicOptions { MaxPayloadBytes = 0 };
+
+        var result = DisseminationTopicOptionsValidator.Validate("Test", options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void ClusterMembershipOptionsDisseminationValidatorRejectsNonPositiveMaxPendingItemCount()
+    {
+        var options = new ClusterMembershipOptions();
+        options.Dissemination.MaxPendingItemCount = 0;
+
+        var result = new ClusterMembershipOptionsDisseminationValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void ApplyDisseminatedRuntimeStatistics_AppliesNewerRejectsInactiveObsoleteAndDuplicate()
+    {
+        var local = CreateSilo(21001);
+        var peer = CreateSilo(21002);
+        var statusOracle = new FakeSiloStatusOracle();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var baseline = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var rejectedForInactive = publisher.ApplyDisseminatedRuntimeStatistics(peer, baseline);
+
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var applied = publisher.ApplyDisseminatedRuntimeStatistics(peer, baseline);
+        var duplicate = publisher.ApplyDisseminatedRuntimeStatistics(peer, baseline);
+        var obsolete = publisher.ApplyDisseminatedRuntimeStatistics(peer, CreateStatistics(baseline.DateTime.AddSeconds(-1)));
+
+        Assert.Equal(DisseminationApplyResult.Rejected, rejectedForInactive);
+        Assert.Equal(DisseminationApplyResult.Applied, applied);
+        Assert.Equal(DisseminationApplyResult.Duplicate, duplicate);
+        Assert.Equal(DisseminationApplyResult.Obsolete, obsolete);
+        Assert.Equal(baseline.DateTime, publisher.PeriodicStatistics[peer].DateTime);
+    }
+
+    [Fact]
+    public void IsRuntimeStatisticsObsolete_ReflectsSiloActivityAndStatisticsRecency()
+    {
+        var local = CreateSilo(21003);
+        var peer = CreateSilo(21004);
+        var statusOracle = new FakeSiloStatusOracle();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+
+        Assert.True(publisher.IsRuntimeStatisticsObsolete(peer, DateTime.UtcNow.Ticks));
+
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        Assert.False(publisher.IsRuntimeStatisticsObsolete(peer, DateTime.UtcNow.Ticks));
+
+        var current = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        publisher.ApplyDisseminatedRuntimeStatistics(peer, current);
+
+        Assert.False(publisher.IsRuntimeStatisticsObsolete(peer, current.DateTime.Ticks + 1));
+        Assert.True(publisher.IsRuntimeStatisticsObsolete(peer, current.DateTime.Ticks - 1));
+        // Boundary: a request for the exact same timestamp as the stored statistics is not obsolete (strictly-greater comparison).
+        Assert.False(publisher.IsRuntimeStatisticsObsolete(peer, current.DateTime.Ticks));
+    }
+
+    [Fact]
+    public void GetActiveSilosForDissemination_ReturnsOnlyActiveSilos()
+    {
+        var local = CreateSilo(21005);
+        var activePeer = CreateSilo(21006);
+        var joiningPeer = CreateSilo(21007);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(activePeer, SiloStatus.Active);
+        statusOracle.SetStatus(joiningPeer, SiloStatus.Joining);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+
+        var activeSilos = publisher.GetActiveSilosForDissemination();
+
+        Assert.Equal(new[] { activePeer }, activeSilos);
+    }
+
+    [Fact]
+    public void DeploymentLoadTopic_CreateItemProducesDigestKeyedByOriginWithSerializedPayload()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21101);
+        var publisher = CreateDeploymentLoadPublisher(local, new FakeSiloStatusOracle());
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+        var statistics = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var item = topic.CreateItem(local, statistics);
+
+        Assert.Equal(local.ToParsableString(), item.Digest.Key);
+        Assert.Equal(statistics.DateTime.Ticks, item.Digest.Version);
+        Assert.Equal(local, item.Root);
+        var deserialized = serializer.Deserialize<SiloRuntimeStatistics>(item.Payload) ?? throw new InvalidOperationException("Expected non-null statistics.");
+        Assert.Equal(statistics.DateTime, deserialized.DateTime);
+        Assert.Equal(statistics.ActivationCount, deserialized.ActivationCount);
+    }
+
+    [Fact]
+    public void DeploymentLoadTopic_GetDigestsSortsAndMarksStaleOrMissingActiveSilosAsMinVersion()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21102);
+        var siloWithoutStats = CreateSilo(21103);
+        var siloWithFreshStats = CreateSilo(21104);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(siloWithFreshStats, SiloStatus.Active);
+        statusOracle.SetStatus(siloWithoutStats, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+        var freshStats = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        publisher.ApplyDisseminatedRuntimeStatistics(siloWithFreshStats, freshStats);
+
+        var digests = topic.GetDigests();
+
+        Assert.Equal(2, digests.Count);
+        Assert.Equal(digests.OrderBy(d => d.Key, StringComparer.Ordinal).Select(d => d.Key), digests.Select(d => d.Key));
+        var freshDigest = digests.Single(d => d.Key == siloWithFreshStats.ToParsableString());
+        var missingDigest = digests.Single(d => d.Key == siloWithoutStats.ToParsableString());
+        Assert.Equal(freshStats.DateTime.Ticks, freshDigest.Version);
+        Assert.Equal(long.MinValue, missingDigest.Version);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_GetValueReturnsNullForMalformedKey()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21105);
+        var publisher = CreateDeploymentLoadPublisher(local, new FakeSiloStatusOracle());
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+
+        var value = await topic.GetValue(new DisseminationTopicDigest("not-a-silo-address", 1), peerDigest: null, CancellationToken.None);
+
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_GetValueReturnsNullWhenStatisticsMissingOrDigestIsNewerThanLocal()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21106);
+        var peer = CreateSilo(21107);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+
+        var missingResult = await topic.GetValue(new DisseminationTopicDigest(peer.ToParsableString(), 1), peerDigest: null, CancellationToken.None);
+
+        var statistics = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        publisher.ApplyDisseminatedRuntimeStatistics(peer, statistics);
+        var staleResult = await topic.GetValue(
+            new DisseminationTopicDigest(peer.ToParsableString(), statistics.DateTime.Ticks + 1),
+            peerDigest: null,
+            CancellationToken.None);
+
+        Assert.Null(missingResult);
+        Assert.Null(staleResult);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_GetValueReturnsSerializedStatisticsWhenDigestIsCurrent()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21108);
+        var peer = CreateSilo(21109);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+        var statistics = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        publisher.ApplyDisseminatedRuntimeStatistics(peer, statistics);
+
+        var value = await topic.GetValue(new DisseminationTopicDigest(peer.ToParsableString(), statistics.DateTime.Ticks), peerDigest: null, CancellationToken.None);
+
+        Assert.NotNull(value);
+        Assert.Equal(peer, value.Root);
+        var roundTripped = serializer.Deserialize<SiloRuntimeStatistics>(value.Payload) ?? throw new InvalidOperationException("Expected non-null statistics.");
+        Assert.Equal(statistics.DateTime, roundTripped.DateTime);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_ApplyValueRejectsMalformedKey()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21110);
+        var publisher = CreateDeploymentLoadPublisher(local, new FakeSiloStatusOracle());
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("not-a-silo-address", 1),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(CreateStatistics(DateTime.UtcNow)),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_ApplyValueRejectsNullDeserializedPayload()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21111);
+        var peer = CreateSilo(21112);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest(peer.ToParsableString(), 1),
+            Root = peer,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray<SiloRuntimeStatistics>(null!),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_ApplyValueDelegatesResultToPublisher()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21113);
+        var peer = CreateSilo(21114);
+        var statusOracle = new FakeSiloStatusOracle();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+
+        DisseminationValue CreateValue(DateTime dateTime) => new()
+        {
+            Digest = new DisseminationTopicDigest(peer.ToParsableString(), dateTime.Ticks),
+            Root = peer,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(CreateStatistics(dateTime)),
+        };
+
+        var rejectedResult = await topic.ApplyValue(CreateValue(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var appliedResult = await topic.ApplyValue(CreateValue(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+        var duplicateResult = await topic.ApplyValue(CreateValue(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+        var obsoleteResult = await topic.ApplyValue(CreateValue(new DateTime(2025, 12, 31, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, rejectedResult);
+        Assert.Equal(DisseminationApplyResult.Applied, appliedResult);
+        Assert.Equal(DisseminationApplyResult.Duplicate, duplicateResult);
+        Assert.Equal(DisseminationApplyResult.Obsolete, obsoleteResult);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_OnFallbackRequiredRefreshesStatisticsWhenEnabledForValidSilo()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21115);
+        var peer = CreateSilo(21116);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var remoteStatistics = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var grainFactory = new RecordingGrainFactory
+        {
+            Resolver = (_, _) => new FakeSiloControl(() => Task.FromResult(remoteStatistics)),
+        };
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, grainFactory);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer, configure: options => options.Dissemination.FallbackEnabled = true);
+
+        await topic.OnFallbackRequired(peer: null, new DisseminationTopicDigest(peer.ToParsableString(), 1), CancellationToken.None);
+
+        Assert.Single(grainFactory.SystemTargetRequests);
+        Assert.Equal(remoteStatistics.DateTime, publisher.PeriodicStatistics[peer].DateTime);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task DeploymentLoadTopic_OnFallbackRequiredSkipsRefreshWhenDisabledOrKeyInvalid(bool fallbackEnabled, bool validKey)
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21117);
+        var peer = CreateSilo(21118);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var grainFactory = new RecordingGrainFactory();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, grainFactory);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer, configure: options => options.Dissemination.FallbackEnabled = fallbackEnabled);
+        var key = validKey ? peer.ToParsableString() : "not-a-silo-address";
+
+        await topic.OnFallbackRequired(peer: null, new DisseminationTopicDigest(key, 1), CancellationToken.None);
+
+        Assert.Empty(grainFactory.SystemTargetRequests);
+    }
+
+    [Fact]
+    public void OrleansTransport_GetMembershipOrdersAndFiltersByStatus()
+    {
+        var local = CreateSilo(21201);
+        var active1 = CreateSilo(21202);
+        var active2 = CreateSilo(21203);
+        var joining = CreateSilo(21204);
+        var shuttingDown = CreateSilo(21205);
+        var stopping = CreateSilo(21206);
+        var dead = CreateSilo(21207);
+        var created = CreateSilo(21208);
+        var snapshot = CreateMembershipSnapshot(
+            1,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch),
+            CreateMembershipEntry(active2, SiloStatus.Active, DateTime.UnixEpoch.AddSeconds(2)),
+            CreateMembershipEntry(active1, SiloStatus.Active, DateTime.UnixEpoch.AddSeconds(1)),
+            CreateMembershipEntry(joining, SiloStatus.Joining, DateTime.UnixEpoch),
+            CreateMembershipEntry(shuttingDown, SiloStatus.ShuttingDown, DateTime.UnixEpoch),
+            CreateMembershipEntry(stopping, SiloStatus.Stopping, DateTime.UnixEpoch),
+            CreateMembershipEntry(dead, SiloStatus.Dead, DateTime.UnixEpoch),
+            CreateMembershipEntry(created, SiloStatus.Created, DateTime.UnixEpoch));
+        var membershipManager = new FakeMembershipManager(snapshot);
+        var transport = new OrleansDisseminationTransport(new FakeLocalSiloDetails(local), membershipManager, new RecordingGrainFactory());
+
+        var membership = transport.GetMembership();
+
+        Assert.Equal(new[] { local, active1, active2, joining, shuttingDown, stopping }, membership.AllMembers);
+        Assert.DoesNotContain(dead, membership.AllMembers);
+        Assert.DoesNotContain(created, membership.AllMembers);
+        Assert.Equal(new[] { local, active1, active2 }, membership.ActiveMembers);
+    }
+
+    [Fact]
+    public void OrleansTransport_GetMembershipCachesResultUntilMembershipVersionChanges()
+    {
+        var local = CreateSilo(21209);
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipManager = new FakeMembershipManager(snapshot);
+        var transport = new OrleansDisseminationTransport(new FakeLocalSiloDetails(local), membershipManager, new RecordingGrainFactory());
+
+        var first = transport.GetMembership();
+        var second = transport.GetMembership();
+
+        Assert.True(first.AllMembers == second.AllMembers);
+        Assert.True(first.ActiveMembers == second.ActiveMembers);
+
+        var peer = CreateSilo(21210);
+        membershipManager.CurrentSnapshot = CreateMembershipSnapshot(
+            2,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch),
+            CreateMembershipEntry(peer, SiloStatus.Active, DateTime.UnixEpoch));
+        var third = transport.GetMembership();
+
+        Assert.False(first.AllMembers == third.AllMembers);
+        Assert.Equal(2, third.AllMembers.Length);
+    }
+
+    [Fact]
+    public async Task OrleansTransport_RefreshMembershipDelegatesToMembershipManager()
+    {
+        var local = CreateSilo(21211);
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipManager = new FakeMembershipManager(snapshot);
+        var transport = new OrleansDisseminationTransport(new FakeLocalSiloDetails(local), membershipManager, new RecordingGrainFactory());
+
+        await transport.RefreshMembership(CancellationToken.None);
+
+        var refreshCall = Assert.Single(membershipManager.RefreshCalls);
+        Assert.Null(refreshCall);
+    }
+
+    [Fact]
+    public async Task OrleansTransport_SendGossipDelegatesToDisseminationSystemTarget()
+    {
+        var local = CreateSilo(21212);
+        var peer = CreateSilo(21213);
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipManager = new FakeMembershipManager(snapshot);
+        DisseminationGossipBatch? receivedBatch = null;
+        var grainFactory = new RecordingGrainFactory
+        {
+            Resolver = (_, _) => new FakeDisseminationSystemTarget(pushGossip: (batch, _) =>
+            {
+                receivedBatch = batch;
+                return Task.CompletedTask;
+            }),
+        };
+        var transport = new OrleansDisseminationTransport(new FakeLocalSiloDetails(local), membershipManager, grainFactory);
+        var batchToSend = new DisseminationGossipBatch { Sender = local };
+
+        await transport.SendGossip(peer, batchToSend, CancellationToken.None);
+
+        var request = Assert.Single(grainFactory.SystemTargetRequests);
+        Assert.Equal(typeof(IDisseminationSystemTarget), request.Interface);
+        Assert.Equal(peer, request.Destination);
+        Assert.Same(batchToSend, receivedBatch);
+    }
+
+    [Fact]
+    public async Task OrleansTransport_ExchangeAntiEntropyDelegatesToDisseminationSystemTarget()
+    {
+        var local = CreateSilo(21214);
+        var peer = CreateSilo(21215);
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipManager = new FakeMembershipManager(snapshot);
+        var expectedResponse = new DisseminationAntiEntropyResponse { Sender = peer };
+        var grainFactory = new RecordingGrainFactory
+        {
+            Resolver = (_, _) => new FakeDisseminationSystemTarget(exchangeAntiEntropy: (_, _) => Task.FromResult(expectedResponse)),
+        };
+        var transport = new OrleansDisseminationTransport(new FakeLocalSiloDetails(local), membershipManager, grainFactory);
+        var request = new DisseminationAntiEntropyRequest { Sender = local };
+
+        var response = await transport.ExchangeAntiEntropy(peer, request, CancellationToken.None);
+
+        Assert.Same(expectedResponse, response);
+    }
+
+    [Fact]
+    public async Task DisseminationService_PublishQueuesGossipAndStopAsyncFlushesIt()
+    {
+        var local = CreateSilo(21301);
+        var peers = Enumerable.Range(21302, 4).Select(CreateSilo).ToArray();
+        var transport = new FakeTransport(local, peers);
+        var topic = new FakeTopic(local);
+        var service = CreateService(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+
+        var result = await service.Publish(topic.Name, item, peers, CancellationToken.None);
+        Assert.True(result);
+        Assert.Empty(transport.GossipBatches);
+
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(GetOriginatorTreeTargets(local, peers, fanout: 2), transport.GossipBatches.Select(batch => batch.Peer));
+    }
+
+    [Fact]
+    public async Task DisseminationService_ReceiveGossipAppliesValuesToTopic()
+    {
+        var local = CreateSilo(21303);
+        var sender = CreateSilo(21304);
+        var transport = new FakeTransport(local, sender);
+        var topic = new FakeTopic(local);
+        var service = CreateService(transport, topic);
+        var value = topic.CreateItem(sender, FakeTopic.DefaultKey, sequence: 5);
+        var batch = CreateGossipBatch(sender, value);
+
+        await service.ReceiveGossip(batch, CancellationToken.None);
+
+        Assert.Equal(1, topic.ApplyCounts[FakeTopic.DefaultKey]);
+        Assert.Equal(5, topic.GetVersion(FakeTopic.DefaultKey));
+    }
+
+    [Fact]
+    public async Task DisseminationService_ReceiveAntiEntropyReturnsLocalValuesNewerThanRequestDigest()
+    {
+        var local = CreateSilo(21305);
+        var peer = CreateSilo(21306);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.SetValue(FakeTopic.DefaultKey, 3);
+        var service = CreateService(transport, topic);
+        var request = new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(topic.Name, new DisseminationTopicDigest(FakeTopic.DefaultKey, 1)),
+        };
+
+        var response = await service.ReceiveAntiEntropy(request, CancellationToken.None);
+
+        var value = Assert.Single(GetAntiEntropyResponseValues(response));
+        Assert.Equal(3, BitConverter.ToInt64(value.Payload.Span));
+    }
+
+    [Fact]
+    public async Task DisseminationService_StopAsyncWithoutStartAsyncCompletesWithoutThrowing()
+    {
+        var local = CreateSilo(21309);
+        var transport = new FakeTransport(local);
+        var topic = new FakeTopic(local);
+        var service = CreateService(transport, topic);
+
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DisseminationService_StopAsyncPropagatesItsCancellationTokenToPendingGossipSends()
+    {
+        var local = CreateSilo(21501);
+        var peers = Enumerable.Range(21502, 3).Select(CreateSilo).ToArray();
+        var transport = new FakeTransport(local, peers);
+        var topic = new FakeTopic(local);
+        var service = CreateService(transport, topic, options => options.Overlay.FanOutFactor = static _ => 3);
+        var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
+        var observedTokens = new List<CancellationToken>();
+        transport.SendGossipHandler = (target, batch, cancellationToken) =>
+        {
+            observedTokens.Add(cancellationToken);
+            return Task.CompletedTask;
+        };
+        using var cts = new CancellationTokenSource();
+
+        await service.Publish(topic.Name, item, peers, CancellationToken.None);
+        await service.StopAsync(cts.Token);
+
+        Assert.NotEmpty(observedTokens);
+        Assert.All(observedTokens, token => Assert.Equal(cts.Token, token));
+    }
+
+    [Fact]
+    public async Task DisseminationService_RunAntiEntropyPropagatesItsCancellationTokenToTransport()
+    {
+        var local = CreateSilo(21503);
+        var peers = Enumerable.Range(21504, 3).Select(CreateSilo).ToArray();
+        var transport = new FakeTransport(local, peers);
+        var topic = new FakeTopic(local);
+        topic.SetValue(FakeTopic.DefaultKey, 1);
+        var service = CreateService(transport, topic, options => options.Overlay.AntiEntropyPeerCount = 3);
+        using var cts = new CancellationTokenSource();
+
+        await service.RunAntiEntropy(cts.Token);
+
+        Assert.NotEmpty(transport.ExchangeAntiEntropyCancellationTokens);
+        Assert.All(transport.ExchangeAntiEntropyCancellationTokens, token => Assert.Equal(cts.Token, token));
+    }
+
+    [Fact]
+    public async Task MembershipGossiper_NoOpWhenNoPartners()
+    {
+        var services = new ServiceCollection().BuildServiceProvider();
+        var gossiper = new MembershipGossiper(services, NullLogger<MembershipGossiper>.Instance);
+        var local = CreateSilo(21401);
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+
+        await gossiper.GossipToRemoteSilos(new List<SiloAddress>(), snapshot, local, SiloStatus.Active);
+    }
+
+    [Fact]
+    public async Task MembershipGossiper_UsesDisseminationWhenTopicIsEnabledAndPublishSucceeds()
+    {
+        var local = CreateSilo(21402);
+        var peer = CreateSilo(21403);
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipManager = new FakeMembershipManager(snapshot);
+        var membershipTopic = CreateMembershipTopic(local, membershipManager, serializer, options => options.Dissemination.Enabled = true);
+        var transport = new FakeTransport(local, peer);
+        var disseminationService = CreateService(transport, new IDisseminationTopic[] { membershipTopic });
+        var services = new ServiceCollection()
+            .AddSingleton(disseminationService)
+            .AddSingleton(membershipTopic)
+            .AddSingleton<ILocalSiloDetails>(new FakeLocalSiloDetails(local))
+            .BuildServiceProvider();
+        var gossiper = new MembershipGossiper(services, NullLogger<MembershipGossiper>.Instance);
+
+        // Must not throw: MembershipSystemTarget is deliberately not registered, so any fallback attempt would fail.
+        await gossiper.GossipToRemoteSilos(new List<SiloAddress> { peer }, snapshot, local, SiloStatus.Active);
+
+        await disseminationService.StopAsync(CancellationToken.None);
+        Assert.NotEmpty(transport.GossipBatches);
+    }
+
+    [Fact]
+    public async Task MembershipGossiper_FallsBackWhenDisseminationServiceNotRegistered()
+    {
+        var local = CreateSilo(21404);
+        var peer = CreateSilo(21405);
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipTopic = CreateMembershipTopic(local, new FakeMembershipManager(snapshot), serializer, options => options.Dissemination.Enabled = true);
+        var services = new ServiceCollection()
+            .AddSingleton(membershipTopic)
+            .AddSingleton<ILocalSiloDetails>(new FakeLocalSiloDetails(local))
+            .BuildServiceProvider();
+        var gossiper = new MembershipGossiper(services, NullLogger<MembershipGossiper>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gossiper.GossipToRemoteSilos(new List<SiloAddress> { peer }, snapshot, local, SiloStatus.Active));
+    }
+
+    [Fact]
+    public async Task MembershipGossiper_FallsBackWhenMembershipTopicNotRegistered()
+    {
+        var local = CreateSilo(21406);
+        var peer = CreateSilo(21407);
+        var transport = new FakeTransport(local, peer);
+        var disseminationService = CreateService(transport, Array.Empty<IDisseminationTopic>());
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var services = new ServiceCollection()
+            .AddSingleton(disseminationService)
+            .AddSingleton<ILocalSiloDetails>(new FakeLocalSiloDetails(local))
+            .BuildServiceProvider();
+        var gossiper = new MembershipGossiper(services, NullLogger<MembershipGossiper>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gossiper.GossipToRemoteSilos(new List<SiloAddress> { peer }, snapshot, local, SiloStatus.Active));
+    }
+
+    [Fact]
+    public async Task MembershipGossiper_FallsBackWhenMembershipTopicDisabled()
+    {
+        var local = CreateSilo(21408);
+        var peer = CreateSilo(21409);
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipTopic = CreateMembershipTopic(local, new FakeMembershipManager(snapshot), serializer, options => options.Dissemination.Enabled = false);
+        var transport = new FakeTransport(local, peer);
+        var disseminationService = CreateService(transport, new IDisseminationTopic[] { membershipTopic });
+        var services = new ServiceCollection()
+            .AddSingleton(disseminationService)
+            .AddSingleton(membershipTopic)
+            .AddSingleton<ILocalSiloDetails>(new FakeLocalSiloDetails(local))
+            .BuildServiceProvider();
+        var gossiper = new MembershipGossiper(services, NullLogger<MembershipGossiper>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gossiper.GossipToRemoteSilos(new List<SiloAddress> { peer }, snapshot, local, SiloStatus.Active));
+    }
+
     private static DisseminationProtocol CreateProtocol(
         FakeTransport transport,
         FakeTopic topic,
@@ -936,17 +2059,97 @@ public class DisseminationProtocolTests
     private static DisseminationService CreateService(
         FakeTransport transport,
         FakeTopic topic,
-        Action<DisseminationOptions>? configure = null)
+        Action<DisseminationOptions>? configure = null) =>
+        CreateService(transport, new IDisseminationTopic[] { topic }, configure);
+
+    private static DisseminationService CreateService(
+        IDisseminationTransport transport,
+        IReadOnlyList<IDisseminationTopic> topics,
+        Action<DisseminationOptions>? configure = null,
+        TimeProvider? timeProvider = null)
     {
         var options = new DisseminationOptions { Enabled = true };
         configure?.Invoke(options);
         return new DisseminationService(
             transport,
             new TestOptionsMonitor<DisseminationOptions>(options),
-            new[] { topic },
-            TimeProvider.System,
+            topics,
+            timeProvider ?? TimeProvider.System,
             NullLogger<DisseminationProtocol>.Instance);
     }
+
+    private static SystemTargetShared CreateSystemTargetShared(SiloAddress localSilo) => new(
+        runtimeClient: null!,
+        new FakeLocalSiloDetails(localSilo),
+        NullLoggerFactory.Instance,
+        Options.Create(new SchedulingOptions()),
+        grainReferenceActivator: null!,
+        timerRegistry: null!,
+        activations: new ActivationDirectory(CreateCatalogInstruments()),
+        schedulerInstruments: CreateSchedulerInstruments(),
+        grainInstruments: CreateGrainInstruments(),
+        messagingInstruments: CreateMessagingInstruments(),
+        messagingProcessingInstruments: CreateMessagingProcessingInstruments());
+
+    private static CatalogInstruments CreateCatalogInstruments() => CreateInstruments<CatalogInstruments>();
+
+    private static SchedulerInstruments CreateSchedulerInstruments() => CreateInstruments<SchedulerInstruments>();
+
+    private static GrainInstruments CreateGrainInstruments() => CreateInstruments<GrainInstruments>();
+
+    private static MessagingInstruments CreateMessagingInstruments() => CreateInstruments<MessagingInstruments>();
+
+    private static MessagingProcessingInstruments CreateMessagingProcessingInstruments() => CreateInstruments<MessagingProcessingInstruments>();
+
+    private static T CreateInstruments<T>() where T : class
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
+        services.AddSingleton<T>();
+        return services.BuildServiceProvider().GetRequiredService<T>();
+    }
+
+    private static DeploymentLoadPublisher CreateDeploymentLoadPublisher(
+        SiloAddress local,
+        FakeSiloStatusOracle statusOracle,
+        IInternalGrainFactory? grainFactory = null,
+        IServiceProvider? serviceProvider = null) =>
+        new(
+            new FakeLocalSiloDetails(local),
+            statusOracle,
+            Options.Create(new DeploymentLoadPublisherOptions()),
+            grainFactory ?? new RecordingGrainFactory(),
+            NullLoggerFactory.Instance,
+            new ActivationDirectory(CreateCatalogInstruments()),
+            activationWorkingSet: null!,
+            environmentStatisticsProvider: null!,
+            Options.Create(new LoadSheddingOptions()),
+            serviceProvider ?? new ServiceCollection().BuildServiceProvider(),
+            CreateSystemTargetShared(local));
+
+    private static DeploymentLoadStatisticsDisseminationTopic CreateDeploymentLoadTopic(
+        DeploymentLoadPublisher publisher,
+        Serializer serializer,
+        Action<DeploymentLoadPublisherOptions>? configure = null,
+        TimeProvider? timeProvider = null)
+    {
+        var options = new DeploymentLoadPublisherOptions();
+        configure?.Invoke(options);
+        return new DeploymentLoadStatisticsDisseminationTopic(
+            publisher,
+            new TestOptionsMonitor<DeploymentLoadPublisherOptions>(options),
+            serializer,
+            timeProvider ?? TimeProvider.System);
+    }
+
+    private static SiloRuntimeStatistics CreateStatistics(DateTime dateTime, int activationCount = 0) =>
+        new(
+            activationCount,
+            recentlyUsedActivationCount: 0,
+            new FakeEnvironmentStatisticsProvider(),
+            Options.Create(new LoadSheddingOptions()),
+            dateTime);
 
     private static SiloAddress CreateSilo(int port) => SiloAddress.New(new IPEndPoint(IPAddress.Loopback, port), port);
 
@@ -1006,13 +2209,18 @@ public class DisseminationProtocolTests
     private static MembershipDisseminationTopic CreateMembershipTopic(
         SiloAddress local,
         FakeMembershipManager membershipManager,
-        Serializer serializer) =>
-        new(
+        Serializer serializer,
+        Action<ClusterMembershipOptions>? configure = null)
+    {
+        var options = new ClusterMembershipOptions();
+        configure?.Invoke(options);
+        return new(
             membershipManager,
-            new TestOptionsMonitor<ClusterMembershipOptions>(new ClusterMembershipOptions()),
+            new TestOptionsMonitor<ClusterMembershipOptions>(options),
             serializer,
             TimeProvider.System,
             new FakeLocalSiloDetails(local));
+    }
 
     private static MembershipTableSnapshot CreateMembershipSnapshot(long version, params MembershipEntry[] entries) =>
         new(new MembershipVersion(version), entries.ToImmutableDictionary(static entry => entry.SiloAddress));
@@ -1458,12 +2666,15 @@ public class DisseminationProtocolTests
             return Task.CompletedTask;
         }
 
+        public List<CancellationToken> ExchangeAntiEntropyCancellationTokens { get; } = new();
+
         public ValueTask<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
             SiloAddress peer,
             DisseminationAntiEntropyRequest request,
             CancellationToken cancellationToken)
         {
             AntiEntropyRequests.Add((peer, request));
+            ExchangeAntiEntropyCancellationTokens.Add(cancellationToken);
             return ExchangeAntiEntropyHandler(peer, request);
         }
 
@@ -1538,7 +2749,13 @@ public class DisseminationProtocolTests
 
         public Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => Task.FromResult(false);
 
-        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+        public List<MembershipVersion?> RefreshCalls { get; } = new();
+
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken)
+        {
+            RefreshCalls.Add(targetVersion);
+            return Task.CompletedTask;
+        }
 
         public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken)
         {
@@ -1585,6 +2802,173 @@ public class DisseminationProtocolTests
         public T Get(string? name) => currentValue;
 
         public IDisposable? OnChange(Action<T, string?> listener) => null;
+    }
+
+    private sealed class FakeSiloStatusOracle : ISiloStatusOracle
+    {
+        private readonly Dictionary<SiloAddress, SiloStatus> _statuses = new();
+
+        public SiloStatus CurrentStatus => SiloStatus.Active;
+
+        public string SiloName => "local";
+
+        public SiloAddress SiloAddress { get; set; } = default!;
+
+        public void SetStatus(SiloAddress silo, SiloStatus status) => _statuses[silo] = status;
+
+        public SiloAddress[] GetActiveSilos() =>
+            _statuses.Where(static kvp => kvp.Value == SiloStatus.Active).Select(static kvp => kvp.Key).ToArray();
+
+        public SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress) =>
+            _statuses.TryGetValue(siloAddress, out var status) ? status : SiloStatus.None;
+
+        public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false) =>
+            _statuses
+                .Where(kvp => !onlyActive || kvp.Value == SiloStatus.Active)
+                .ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value);
+
+        public bool TryGetSiloName(SiloAddress siloAddress, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? siloName)
+        {
+            siloName = siloAddress.ToParsableString();
+            return true;
+        }
+
+        public bool IsFunctionalDirectory(SiloAddress siloAddress) => true;
+
+        public bool IsDeadSilo(SiloAddress silo) => _statuses.TryGetValue(silo, out var status) && status == SiloStatus.Dead;
+
+        public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer) => true;
+
+        public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => true;
+    }
+
+    private sealed class FakeEnvironmentStatisticsProvider : Orleans.Statistics.IEnvironmentStatisticsProvider
+    {
+        public Orleans.Statistics.EnvironmentStatistics GetEnvironmentStatistics() => default;
+    }
+
+    private sealed class FakeSiloControl(Func<Task<SiloRuntimeStatistics>>? getRuntimeStatistics = null) : ISiloControl
+    {
+        public Task<SiloRuntimeStatistics> GetRuntimeStatistics() =>
+            getRuntimeStatistics?.Invoke() ?? throw new NotSupportedException();
+
+        public Task Ping(string message) => throw new NotSupportedException();
+
+        public Task ForceGarbageCollection() => throw new NotSupportedException();
+
+        public Task ForceActivationCollection(TimeSpan ageLimit) => throw new NotSupportedException();
+
+        public Task ForceRuntimeStatisticsCollection() => throw new NotSupportedException();
+
+        public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics() => throw new NotSupportedException();
+
+        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null) => throw new NotSupportedException();
+
+        public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics() => throw new NotSupportedException();
+
+        public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId) => throw new NotSupportedException();
+
+        public Task<int> GetActivationCount() => throw new NotSupportedException();
+
+        public Task MigrateRandomActivations(SiloAddress target, int count) => throw new NotSupportedException();
+
+        public Task<object?> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable =>
+            throw new NotSupportedException();
+
+        public Task<List<GrainId>> GetActiveGrains(GrainType grainType) => throw new NotSupportedException();
+
+        public Task SetCompatibilityStrategy(CompatibilityStrategy strategy) => throw new NotSupportedException();
+
+        public Task SetSelectorStrategy(VersionSelectorStrategy strategy) => throw new NotSupportedException();
+
+        public Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy) => throw new NotSupportedException();
+
+        public Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeDisseminationSystemTarget(
+        Func<DisseminationGossipBatch, CancellationToken, Task>? pushGossip = null,
+        Func<DisseminationAntiEntropyRequest, CancellationToken, Task<DisseminationAntiEntropyResponse>>? exchangeAntiEntropy = null) : IDisseminationSystemTarget
+    {
+        public Task PushGossip(DisseminationGossipBatch batch, CancellationToken cancellationToken) =>
+            pushGossip?.Invoke(batch, cancellationToken) ?? Task.CompletedTask;
+
+        public Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request, CancellationToken cancellationToken) =>
+            exchangeAntiEntropy?.Invoke(request, cancellationToken) ?? Task.FromResult(new DisseminationAntiEntropyResponse { Sender = request.Sender });
+    }
+
+    /// <summary>
+    /// Minimal <see cref="IInternalGrainFactory"/> fake that records <see cref="GetSystemTarget{TGrainInterface}(GrainType, SiloAddress)"/>
+    /// requests and resolves them via a configurable delegate. All other members are unused by the dissemination
+    /// subsystem and therefore throw if invoked.
+    /// </summary>
+    private sealed class RecordingGrainFactory : IInternalGrainFactory
+    {
+        public List<(Type Interface, SiloAddress Destination)> SystemTargetRequests { get; } = new();
+
+        public Func<Type, SiloAddress, object>? Resolver { get; set; }
+
+        public TGrainInterface GetSystemTarget<TGrainInterface>(GrainType grainType, SiloAddress destination) where TGrainInterface : ISystemTarget
+        {
+            SystemTargetRequests.Add((typeof(TGrainInterface), destination));
+            if (Resolver is { } resolver)
+            {
+                return (TGrainInterface)resolver(typeof(TGrainInterface), destination);
+            }
+
+            throw new NotSupportedException($"No resolver configured for {typeof(TGrainInterface)}.");
+        }
+
+        public TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId) where TGrainInterface : ISystemTarget =>
+            throw new NotSupportedException();
+
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj) where TGrainObserverInterface : IAddressable =>
+            throw new NotSupportedException();
+
+        public TGrainInterface Cast<TGrainInterface>(IAddressable grain) => throw new NotSupportedException();
+
+        public object Cast(IAddressable grain, Type interfaceType) => throw new NotSupportedException();
+
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey =>
+            throw new NotSupportedException();
+
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey =>
+            throw new NotSupportedException();
+
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithStringKey =>
+            throw new NotSupportedException();
+
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidCompoundKey =>
+            throw new NotSupportedException();
+
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerCompoundKey =>
+            throw new NotSupportedException();
+
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver =>
+            throw new NotSupportedException();
+
+        public void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver =>
+            throw new NotSupportedException();
+
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey) => throw new NotSupportedException();
+
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey) => throw new NotSupportedException();
+
+        public IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey) => throw new NotSupportedException();
+
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension) => throw new NotSupportedException();
+
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension) => throw new NotSupportedException();
+
+        public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable => throw new NotSupportedException();
+
+        public IAddressable GetGrain(GrainId grainId) => throw new NotSupportedException();
+
+        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType) => throw new NotSupportedException();
+
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix) => throw new NotSupportedException();
+
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey) => throw new NotSupportedException();
     }
 
     private sealed class TestTimeProvider : TimeProvider
