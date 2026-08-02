@@ -1,8 +1,10 @@
+using System.Distributed.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Runtime.DurableTasks;
 using Orleans.TestingHost;
+using WorkflowsApp.Service.Samples.HelloWorld;
 using WorkflowsApp.Service.Samples.InventoryReservation;
 using Xunit;
 
@@ -93,6 +95,18 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         Assert.Single(await notifications.GetNotificationsAsync());
     }
 
+    [Fact]
+    public async Task DurableTask_RemoteCallsUseDurableMessaging()
+    {
+        var grain = _fixture.Cluster.Client.GetGrain<IHelloWorkflowGrain>(Guid.NewGuid().ToString("N"));
+        var handle = await grain.RunSample().ScheduleAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var result = await handle.WaitAsync(timeout.Token);
+
+        Assert.Equal(["Hello, Melbourne!", "Hello, Seattle!", "Hello, Shanghai!"], result);
+    }
+
     private (IInventoryGrain Inventory, INotificationServiceGrain Notifications) CreateGrains()
     {
         var key = Guid.NewGuid().ToString("N");
@@ -125,11 +139,11 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         public Fixture()
         {
             var builder = new InProcessTestClusterBuilder();
+            builder.ConfigureClient(clientBuilder => clientBuilder.AddDurableTasks());
             builder.ConfigureSilo((_, siloBuilder) =>
             {
                 siloBuilder.AddDurableTasks();
-                siloBuilder.AddJournalStorage();
-                siloBuilder.AddDurableMessaging();
+                siloBuilder.UseInMemoryDurableJobs();
                 siloBuilder.AddJournaledDurableTaskStorage();
                 siloBuilder.Services.AddSingleton<VolatileJournalStorageProvider>();
                 siloBuilder.Services.AddSingleton<IJournalStorageProvider>(

@@ -21,11 +21,18 @@ public sealed class DurableJobRunResult
     [MemberNotNullWhen(true, nameof(PollAfterDelay))]
     public bool IsPending => Status == DurableJobRunStatus.PollAfter;
 
-    private DurableJobRunResult(DurableJobRunStatus status, TimeSpan? pollAfter, Exception? exception)
+    /// <summary>
+    /// Gets a value indicating whether the job requested durable rescheduling.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(RetryAtTime))]
+    public bool IsRetryRequested => Status == DurableJobRunStatus.RetryAt;
+
+    private DurableJobRunResult(DurableJobRunStatus status, TimeSpan? pollAfter, Exception? exception, DateTimeOffset? retryAt)
     {
         Status = status;
         PollAfterDelay = pollAfter;
         Exception = exception;
+        RetryAtTime = retryAt;
     }
 
     /// <summary>
@@ -46,7 +53,13 @@ public sealed class DurableJobRunResult
     [Id(2)]
     public Exception? Exception { get; }
 
-    private static readonly DurableJobRunResult CompletedInstance = new(DurableJobRunStatus.Completed, null, null);
+    /// <summary>
+    /// Gets the time at which a job requesting durable rescheduling should run again.
+    /// </summary>
+    [Id(3)]
+    public DateTimeOffset? RetryAtTime { get; }
+
+    private static readonly DurableJobRunResult CompletedInstance = new(DurableJobRunStatus.Completed, null, null, null);
 
     /// <summary>
     /// Gets a result indicating the job completed successfully.
@@ -67,7 +80,15 @@ public sealed class DurableJobRunResult
     public static DurableJobRunResult PollAfter(TimeSpan delay)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(delay, TimeSpan.Zero, nameof(delay));
-        return new(DurableJobRunStatus.PollAfter, delay, null);
+        return new(DurableJobRunStatus.PollAfter, delay, null, null);
+    }
+
+    /// <summary>
+    /// Creates a result indicating that the job should be durably re-queued for the specified time.
+    /// </summary>
+    public static DurableJobRunResult RetryAt(DateTimeOffset dueTime)
+    {
+        return new(DurableJobRunStatus.RetryAt, null, null, dueTime);
     }
 
     /// <summary>
@@ -81,7 +102,7 @@ public sealed class DurableJobRunResult
     public static DurableJobRunResult Failed(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        return new(DurableJobRunStatus.Failed, null, exception);
+        return new(DurableJobRunStatus.Failed, null, exception, null);
     }
 }
 
@@ -103,5 +124,10 @@ public enum DurableJobRunStatus
     /// <summary>
     /// The job failed and should be processed through the retry policy.
     /// </summary>
-    Failed
+    Failed,
+
+    /// <summary>
+    /// The handler completed its current attempt and requested durable rescheduling.
+    /// </summary>
+    RetryAt
 }

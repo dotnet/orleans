@@ -6,7 +6,9 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.TestKit;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -34,6 +36,22 @@ public class ArcBufferCodecTests
         _serviceProvider = services.BuildServiceProvider();
         _serializer = _serviceProvider.GetRequiredService<Serializer<ArcBuffer>>();
         _copier = _serviceProvider.GetRequiredService<DeepCopier<ArcBuffer>>();
+    }
+
+    public sealed class ArcBufferFieldCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture)
+        : FieldCodecTester<ArcBuffer, ArcBufferCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override ArcBuffer CreateValue() => default;
+
+        protected override ArcBuffer[] TestValues => [default];
+    }
+
+    public sealed class ArcBufferCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture)
+        : CopierTester<ArcBuffer, ArcBufferCopier>(output, fixture), IClassFixture<SerializationTesterFixture>
+    {
+        protected override ArcBuffer CreateValue() => default;
+
+        protected override ArcBuffer[] TestValues => [default];
     }
 
     /// <summary>

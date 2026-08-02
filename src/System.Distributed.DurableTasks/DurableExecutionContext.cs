@@ -20,6 +20,7 @@ public abstract partial class DurableExecutionContext(TaskId id)
     public TaskId TaskId { get; } = id;
 
     protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    protected internal abstract ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
     protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
     protected internal abstract TaskId CreateChildTaskId(string? name);
 

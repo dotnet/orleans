@@ -2,8 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Journaling.Configuration;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
+using Orleans.DurableMessaging.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
@@ -76,22 +76,6 @@ public class DurableMessagingHostingTests : IClassFixture<DurableMessagingHostin
 
         // We can't easily test DeliverAsync without a full message, but accessing the reference
         // confirms the extension is registered
-    }
-
-    [Fact, TestCategory("BVT"), TestCategory("Functional")]
-    public async Task AddDurableMessaging_RegistersIDurableInboxObserver()
-    {
-        // Arrange
-        var grain = _fixture.Client.GetGrain<ITestDurableGrainInterface>(Guid.NewGuid());
-
-        // Act - Activate grain
-        await grain.SetValues("test", 42);
-
-        // Get the grain reference as IDurableInboxObserver
-        var observer = grain.AsReference<IDurableInboxObserver>();
-
-        // Assert - Observer extension should be accessible
-        Assert.NotNull(observer);
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Functional")]

@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Xunit;
 

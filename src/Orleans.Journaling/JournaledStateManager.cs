@@ -458,6 +458,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     break;
                                 }
 
+                            case RevertPendingChangesWorkItem:
+                                {
+                                    await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    break;
+                                }
+
                             case InitializeWorkItem:
                                 {
                                     lock (_lock)
@@ -838,6 +844,24 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
+    public async ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Task pendingRecovery;
+        bool didEnqueue;
+        lock (_lock)
+        {
+            pendingRecovery = EnqueueOrGetPendingWorkItem<RevertPendingChangesWorkItem>(out didEnqueue);
+        }
+
+        if (didEnqueue)
+        {
+            _workSignal.Signal();
+        }
+
+        await pendingRecovery.WaitAsync(cancellationToken);
+    }
+
     private async ValueTask ReadStorageAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
@@ -1073,6 +1097,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private sealed class WriteSnapshotWorkItem : WorkItem;
 
     private sealed class DeleteStateWorkItem : WorkItem;
+
+    private sealed class RevertPendingChangesWorkItem : WorkItem;
 
     private sealed class RegisterStateWorkItem(string name) : WorkItem(name)
     {

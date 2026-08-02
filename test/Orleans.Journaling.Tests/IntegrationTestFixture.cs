@@ -23,7 +23,7 @@ public class IntegrationTestFixture : IAsyncLifetime
                 new JournaledStateManagerOptions { JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey }));
         builder.ConfigureSilo((options, siloBuilder) =>
         {
-            siloBuilder.AddJournalStorage();
+            siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableMessaging();
             siloBuilder.UseJsonJournalFormat(JournalingTestsJsonContext.Default);
             siloBuilder.Services.AddSingleton(storageProvider);

@@ -255,6 +255,13 @@ internal sealed partial class ShardExecutor
                     activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
                     activity?.SetStatus(ActivityStatusCode.Ok);
                 }
+                else if (result.IsRetryRequested)
+                {
+                    LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.RetryAtTime.Value, jobContext.DequeueCount);
+                    await shard.RescheduleJobAsync(jobContext, result.RetryAtTime.Value, cancellationToken);
+                    _durableJobsInstruments.OnJobRetried(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, "retried");
+                }
                 else if (result.IsFailed)
                 {
                     // Handle failed result through retry policy

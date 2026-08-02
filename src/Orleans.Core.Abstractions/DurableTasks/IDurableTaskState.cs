@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Distributed.DurableTasks;
+using Orleans.Runtime;
 
 namespace Orleans.DurableTasks;
 
@@ -16,10 +17,10 @@ public interface IDurableTaskState
     /// <summary>
     /// The result of the task, which will be <see langword="null"/> if the task has not yet completed.
     /// </summary>
-    public DurableTaskResponse Result { get; }
+    public DurableTaskResponse? Result { get; }
 
     /// <summary>
-    /// The set of clients which are interested in the result of this task.
+    /// The set of grains which must receive the result of this task.
     /// </summary>
     /// <remarks>
     /// This task cannot be retired until all clients have acknowledged the task's result.
@@ -27,12 +28,12 @@ public interface IDurableTaskState
     /// In the case of nested tasks (eg, defined by local methods), there will typically be no clients.
     /// In that case, the result will not be 
     /// </remarks>
-    public IReadOnlySet<IDurableTaskObserver> Observers { get; }
+    public IReadOnlySet<GrainId> CompletionDestinations { get; }
 
     /// <summary>
     /// The invokable request.
     /// </summary>
-    public IDurableTaskRequest Request { get; }
+    public IDurableTaskRequest? Request { get; }
 
     /// <summary>
     /// The time at which the task completed.
@@ -49,4 +50,3 @@ public interface IDurableTaskState
     /// </summary>
     public DateTimeOffset CreatedAt { get; }
 }
-

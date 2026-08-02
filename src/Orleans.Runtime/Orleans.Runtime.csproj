@@ -26,6 +26,7 @@
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs" />
+    <InternalsVisibleTo Include="Orleans.DurableTasks" />
     <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling" />
     <InternalsVisibleTo Include="Orleans.Placement.Tests" />
@@ -38,4 +39,3 @@
     <InternalsVisibleTo Include="TestInternalGrains" />
   </ItemGroup>
 </Project>
-

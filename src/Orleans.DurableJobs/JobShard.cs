@@ -84,6 +84,12 @@ public interface IJobShard : IAsyncDisposable
     Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Reschedules a successfully handled job without carrying forward its failure-attempt count.
+    /// </summary>
+    Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) =>
+        RetryJobLaterAsync(jobContext, newDueTime, cancellationToken);
+
+    /// <summary>
     /// Attempts to schedule a new job on this shard.
     /// </summary>
     /// <param name="request">The request containing the job scheduling parameters.</param>
@@ -189,6 +195,13 @@ public abstract class JobShard : IJobShard
     {
         await PersistRetryJobAsync(jobContext.Job.Id, newDueTime, cancellationToken);
         _jobQueue.RetryJobLater(jobContext, newDueTime);
+    }
+
+    /// <inheritdoc/>
+    public async Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
+    {
+        await PersistRetryJobAsync(jobContext.Job.Id, newDueTime, cancellationToken);
+        _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, dequeueCount: 0);
     }
 
     /// <summary>
