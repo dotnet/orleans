@@ -9,8 +9,37 @@ namespace Orleans.Docs.Snippets.Streaming;
 
 public static class StreamConfiguration
 {
+    // <memory_silo>
+    public static IHostApplicationBuilder AddStreamingSilo(
+        this IHostApplicationBuilder builder)
+    {
+        builder.UseOrleans(siloBuilder =>
+        {
+            siloBuilder
+                .AddMemoryStreams(TemperatureStreams.ProviderName)
+                .AddMemoryGrainStorage("PubSubStore");
+        });
+
+        return builder;
+    }
+    // </memory_silo>
+
+    // <memory_client>
+    public static IHostApplicationBuilder AddStreamingClient(
+        this IHostApplicationBuilder builder)
+    {
+        builder.UseOrleansClient(clientBuilder =>
+        {
+            clientBuilder.AddMemoryStreams(TemperatureStreams.ProviderName);
+        });
+
+        return builder;
+    }
+    // </memory_client>
+
     public static void ConfigurePubSubManagedIdentity(
-        IHostApplicationBuilder hostBuilder, IConfiguration configuration)
+        IHostApplicationBuilder hostBuilder,
+        IConfiguration configuration)
     {
         // <pubsub_managed_identity>
         var endpoint = new Uri(configuration["AZURE_TABLE_STORAGE_ENDPOINT"]!);
@@ -18,59 +47,88 @@ public static class StreamConfiguration
 
         hostBuilder.UseOrleans(siloBuilder =>
         {
-            siloBuilder.AddAzureTableGrainStorage("PubSubStore",
-                options => options.TableServiceClient = new TableServiceClient(endpoint, credential));
+            siloBuilder.AddAzureTableGrainStorage(
+                "PubSubStore",
+                options => options.TableServiceClient =
+                    new TableServiceClient(endpoint, credential));
         });
         // </pubsub_managed_identity>
     }
 
     public static void ConfigurePubSubConnectionString(
-        IHostApplicationBuilder hostBuilder, string connectionString)
+        IHostApplicationBuilder hostBuilder,
+        string connectionString)
     {
         // <pubsub_connection_string>
         hostBuilder.UseOrleans(siloBuilder =>
         {
-            siloBuilder.AddAzureTableGrainStorage("PubSubStore",
-                options => options.TableServiceClient = new TableServiceClient(connectionString));
+            siloBuilder.AddAzureTableGrainStorage(
+                "PubSubStore",
+                options => options.TableServiceClient =
+                    new TableServiceClient(connectionString));
         });
         // </pubsub_connection_string>
     }
 
-    public static void ConfigureStreamProviderManagedIdentity(
-        IHostApplicationBuilder hostBuilder, IConfiguration configuration)
+    public static void ConfigureAzureQueueManagedIdentity(
+        IHostApplicationBuilder hostBuilder,
+        IConfiguration configuration)
     {
-        // <stream_provider_managed_identity>
-        var tableEndpoint = new Uri(configuration["AZURE_TABLE_STORAGE_ENDPOINT"]!);
-        var queueEndpoint = new Uri(configuration["AZURE_QUEUE_STORAGE_ENDPOINT"]!);
+        // <azure_queue_managed_identity>
+        var queueEndpoint =
+            new Uri(configuration["AZURE_QUEUE_STORAGE_ENDPOINT"]!);
         var credential = new DefaultAzureCredential();
 
         hostBuilder.UseOrleans(siloBuilder =>
         {
-            siloBuilder.AddMemoryStreams("StreamProvider")
-                .AddAzureQueueStreams("AzureQueueProvider",
-                    optionsBuilder => optionsBuilder.ConfigureAzureQueue(
-                        options => options.Configure(
-                            opt => opt.QueueServiceClient = new QueueServiceClient(queueEndpoint, credential))))
-                .AddAzureTableGrainStorage("PubSubStore",
-                    options => options.TableServiceClient = new TableServiceClient(tableEndpoint, credential));
+            siloBuilder
+                .AddAzureQueueStreams(
+                    "AzureQueue",
+                    streams => streams.ConfigureAzureQueue(
+                        optionsBuilder => optionsBuilder.Configure(options =>
+                        {
+                            options.QueueServiceClient =
+                                new QueueServiceClient(queueEndpoint, credential);
+                            options.QueueNames =
+                                Enumerable.Range(0, 8)
+                                    .Select(index => $"orleans-stream-{index}")
+                                    .ToList();
+                        })))
+                .AddAzureTableGrainStorage(
+                    "PubSubStore",
+                    options => options.TableServiceClient =
+                        new TableServiceClient(
+                            new Uri(configuration["AZURE_TABLE_STORAGE_ENDPOINT"]!),
+                            credential));
         });
-        // </stream_provider_managed_identity>
+        // </azure_queue_managed_identity>
     }
 
-    public static void ConfigureStreamProviderConnectionString(
-        IHostApplicationBuilder hostBuilder, string connectionString)
+    public static void ConfigureAzureQueueConnectionString(
+        IHostApplicationBuilder hostBuilder,
+        string connectionString)
     {
-        // <stream_provider_connection_string>
+        // <azure_queue_connection_string>
         hostBuilder.UseOrleans(siloBuilder =>
         {
-            siloBuilder.AddMemoryStreams("StreamProvider")
-                .AddAzureQueueStreams("AzureQueueProvider",
-                    optionsBuilder => optionsBuilder.ConfigureAzureQueue(
-                        options => options.Configure(
-                            opt => opt.QueueServiceClient = new QueueServiceClient(connectionString))))
-                .AddAzureTableGrainStorage("PubSubStore",
-                    options => options.TableServiceClient = new TableServiceClient(connectionString));
+            siloBuilder
+                .AddAzureQueueStreams(
+                    "AzureQueue",
+                    streams => streams.ConfigureAzureQueue(
+                        optionsBuilder => optionsBuilder.Configure(options =>
+                        {
+                            options.QueueServiceClient =
+                                new QueueServiceClient(connectionString);
+                            options.QueueNames =
+                                Enumerable.Range(0, 8)
+                                    .Select(index => $"orleans-stream-{index}")
+                                    .ToList();
+                        })))
+                .AddAzureTableGrainStorage(
+                    "PubSubStore",
+                    options => options.TableServiceClient =
+                        new TableServiceClient(connectionString));
         });
-        // </stream_provider_connection_string>
+        // </azure_queue_connection_string>
     }
 }

@@ -1,60 +1,70 @@
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Docs.Snippets.Streaming;
 
-// Sample grain for demonstrating stream access
-public class MyGrain : Grain
+// <stream_contract>
+[GenerateSerializer]
+public sealed class TemperatureReading
 {
-    // <get_stream_provider>
-    public async Task SetupStream()
-    {
-        IStreamProvider streamProvider = this.GetStreamProvider("SimpleStreamProvider");
-        StreamId streamId = StreamId.Create("MyStreamNamespace", this.GetPrimaryKey());
-        IAsyncStream<string> stream = streamProvider.GetStream<string>(streamId);
-    }
-    // </get_stream_provider>
+    [Id(0)]
+    public required double Celsius { get; init; }
 
-    // <produce_event>
-    public async Task ProduceEvent(IAsyncStream<string> stream, string eventData)
-    {
-        await stream.OnNextAsync(eventData);
-    }
-    // </produce_event>
-
-    // <subscribe_to_stream>
-    public async Task<StreamSubscriptionHandle<string>> SubscribeToStream(
-        IAsyncStream<string> stream, IAsyncObserver<string> observer)
-    {
-        StreamSubscriptionHandle<string> subscriptionHandle = await stream.SubscribeAsync(observer);
-        return subscriptionHandle;
-    }
-    // </subscribe_to_stream>
-
-    // <unsubscribe_from_stream>
-    public async Task UnsubscribeFromStream(StreamSubscriptionHandle<string> subscriptionHandle)
-    {
-        await subscriptionHandle.UnsubscribeAsync();
-    }
-    // </unsubscribe_from_stream>
-
-    // <get_all_subscription_handles>
-    public async Task<IList<StreamSubscriptionHandle<string>>> GetSubscriptions(
-        IAsyncStream<string> stream)
-    {
-        IList<StreamSubscriptionHandle<string>> allMyHandles =
-            await stream.GetAllSubscriptionHandles();
-        return allMyHandles;
-    }
-    // </get_all_subscription_handles>
-
-    // <resume_subscription>
-    public async Task<StreamSubscriptionHandle<int>> ResumeSubscription(
-        StreamSubscriptionHandle<int> subscriptionHandle, IAsyncObserver<int> observer)
-    {
-        StreamSubscriptionHandle<int> newHandle =
-            await subscriptionHandle.ResumeAsync(observer);
-        return newHandle;
-    }
-    // </resume_subscription>
+    [Id(1)]
+    public required DateTimeOffset ObservedAt { get; init; }
 }
+
+public interface ITemperatureProducerGrain : IGrainWithStringKey
+{
+    Task StartAsync();
+}
+// </stream_contract>
+
+// <stream_identity>
+public static class TemperatureStreams
+{
+    public const string ProviderName = "Telemetry";
+    public const string Namespace = "device-telemetry";
+
+    public static IAsyncStream<TemperatureReading> Get(
+        Grain grain,
+        string deviceId)
+    {
+        var provider = grain.GetStreamProvider(ProviderName);
+        var streamId = StreamId.Create(Namespace, deviceId);
+        return provider.GetStream<TemperatureReading>(streamId);
+    }
+}
+// </stream_identity>
+
+// <stream_producer>
+public sealed class TemperatureProducerGrain : Grain, ITemperatureProducerGrain
+{
+    private IAsyncStream<TemperatureReading> _stream = null!;
+    private IGrainTimer? _timer;
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        _stream = TemperatureStreams.Get(this, this.GetPrimaryKeyString());
+        return Task.CompletedTask;
+    }
+
+    public Task StartAsync()
+    {
+        _timer ??= this.RegisterGrainTimer(
+            PublishAsync,
+            dueTime: TimeSpan.Zero,
+            period: TimeSpan.FromSeconds(5));
+
+        return Task.CompletedTask;
+    }
+
+    private Task PublishAsync(CancellationToken cancellationToken) =>
+        _stream.OnNextAsync(new TemperatureReading
+        {
+            Celsius = Random.Shared.Next(-20, 45),
+            ObservedAt = DateTimeOffset.UtcNow,
+        });
+}
+// </stream_producer>

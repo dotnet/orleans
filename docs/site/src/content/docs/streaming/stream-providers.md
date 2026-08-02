@@ -1,157 +1,70 @@
 ---
 title: Orleans stream providers
-description: Learn about the available stream providers for .NET Orleans.
-ms.date: 05/23/2025
+description: Compare built-in Orleans 10 stream providers by durability, rewindability, status, and prerequisites.
+ms.date: 08/02/2026
 ms.topic: concept-article
-zone_pivot_groups: orleans-version
 ---
 
 # Orleans stream providers
 
-Streams can come in different shapes and forms. Some streams might deliver events over direct TCP links, while others deliver events via durable queues. Different stream types might use different batching strategies, caching algorithms, or backpressure procedures. Stream providers are extensibility points in the Orleans Streaming Runtime that allow you to implement any type of stream, avoiding constraints on streaming applications to only a subset of those behavioral choices. This extensibility point is similar in spirit to Orleans storage providers.
+A stream provider connects the Orleans streaming API to a transport and defines its runtime semantics. Select a provider from required durability, replay, throughput, hosting environment, and operational ownership. Provider behavior still depends on backing-service configuration such as retention, replication, and visibility timeouts.
 
-:::zone target="docs" pivot="orleans-10-0,orleans-9-0,orleans-8-0,orleans-7-0"
+## Provider matrix
 
-## Azure Event Hub stream provider
+| Provider | Package | Status | External event durability | Rewindable | External prerequisites |
+|---|---|---|---|---|---|
+| Memory | `Microsoft.Orleans.Streaming` | Stable | No; silo memory only | Yes, within the transient in-memory cache | None |
+| Azure Queue Storage | `Microsoft.Orleans.Streaming.AzureStorage` | Stable | Yes, in Azure Storage queues | No | Azure Storage account or Azurite; queue names and credentials |
+| Azure Event Hubs | `Microsoft.Orleans.Streaming.EventHubs` | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
+| Amazon SQS | `Microsoft.Orleans.Streaming.SQS` | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
+| ADO.NET | `Microsoft.Orleans.Streaming.AdoNet` | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
+| NATS JetStream | `Microsoft.Orleans.Streaming.NATS` | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
+| Redis Streams | `Microsoft.Orleans.Streaming.Redis` | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
 
-[Azure Event Hubs](/azure/event-hubs) is a fully managed, real-time data ingestion service capable of receiving and processing millions of events per second. It's designed to handle high-throughput, low-latency data ingestion from multiple sources and subsequent processing of that data by multiple consumers.
+Alpha packages have an `alpha.1` version suffix in Orleans 10. Treat their APIs and operational behavior as prerelease, validate failure modes under load, and pin versions deliberately.
 
-Event Hubs is often used as the foundation of a larger event-processing architecture, serving as the "front door" for an event pipeline. You can use it to ingest data from various sources, including social media feeds, IoT devices, and log files. One of the key benefits of Event Hubs is the ability to scale out horizontally to meet the needs of even the largest event-processing workloads. It's also highly available and fault-tolerant, with multiple data replicas distributed across multiple Azure regions to ensure high availability.
+Kafka and Azure Service Bus aren't built-in Orleans 10 stream providers. Integrate them through application code or a custom persistent-stream queue adapter rather than configuring a nonexistent built-in provider.
 
-The [Microsoft.Orleans.Streaming.EventHubs](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) NuGet package contains the Event Hubs stream provider.
+## Memory streams
 
-## Azure Queue (AQ) stream provider
+Register memory streams with `AddMemoryStreams`. They use silo memory for queues and cache, so events don't survive cluster loss. Rewind works only while the relevant event remains in the live in-memory cache. Use this provider for local development, tests, and workloads where loss is explicitly acceptable.
 
-The Azure Queue (AQ) stream provider delivers events over Azure Queues. On the producer side, the AQ stream provider enqueues events directly into Azure Queue. On the consumer side, the AQ stream provider manages a set of **pulling agents** that pull events from a set of Azure Queues and deliver them to the application code that consumes them. You can think of the pulling agents as a distributed "microservice"—a partitioned, highly available, and elastic distributed component. The pulling agents run inside the same silos hosting application grains. Thus, there's no need to run separate Azure worker roles to pull from the queues. The Orleans Streaming Runtime fully manages the existence of pulling agents, their management, backpressure, balancing the queues between them, and handing off queues from a failed agent to another agent. This is all transparent to application code using streams.
+## Azure Queue Storage
 
-The [Microsoft.Orleans.Streaming.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage) NuGet package contains the [Azure Queue storage](https://azure.microsoft.com/products/storage/queues) stream provider.
+Register Azure Queue streams with `AddAzureQueueStreams`. The provider uses multiple Azure Storage queues and persistent-stream pulling agents. It isn't rewindable, and Azure Queue retries can produce duplicates or reorder delivery after failures.
 
-## Queue adapters
+Configure the current <xref:Azure.Storage.Queues.QueueServiceClient> directly on `AzureQueueOptions` and supply queue names:
 
-Different stream providers delivering events over durable queues exhibit similar behavior and are subject to similar implementations. Therefore, we provide a generic extensible <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> that allows you to plug in different types of queues without writing a completely new stream provider from scratch. `PersistentStreamProvider` uses an <xref:Orleans.Streams.IQueueAdapter> component, which abstracts specific queue implementation details and provides means to enqueue and dequeue events. The logic inside `PersistentStreamProvider` handles everything else. The Azure Queue Provider mentioned above is also implemented this way: it's an instance of `PersistentStreamProvider` that uses an `AzureQueueAdapter`.
+### Managed identity
 
-:::zone-end
+:::code language="csharp" source="snippets/streaming/Configuration.cs" id="azure_queue_managed_identity":::
 
-:::zone target="docs" pivot="orleans-8-0,orleans-9-0,orleans-10-0"
+### Connection string
 
-## Aspire integration for streaming
+:::code language="csharp" source="snippets/streaming/Configuration.cs" id="azure_queue_connection_string":::
 
-[Aspire](../host/aspire-integration.md) simplifies Orleans streaming configuration by managing resource provisioning and connection automatically.
+The examples use durable Azure Table Storage for `PubSubStore`; queue durability alone doesn't preserve explicit subscription records.
 
-### Azure Queue Storage streaming with Aspire
+## Azure Event Hubs
 
-**AppHost project (Program.cs):**
+Register Event Hubs with `AddEventHubStreams`. Event Hubs retention and partition positions make this provider rewindable. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and retention bounds how far recovery can rewind.
 
-```csharp
-var builder = DistributedApplication.CreateBuilder(args);
+## Amazon SQS
 
-var storage = builder.AddAzureStorage("storage");
-var queues = storage.AddQueues("streaming");
+Register SQS with `AddSqsStreams`. SQS retains accepted messages and redelivers after visibility timeout when processing isn't acknowledged. The Orleans provider isn't rewindable. Configure credentials using the deployment environment's AWS credential chain or protected connection configuration, and monitor queue age, redelivery, and dead-letter policy.
 
-var orleans = builder.AddOrleans("cluster")
-    .WithClustering(builder.AddRedis("redis"))
-    .WithStreaming("AzureQueueProvider", queues);
+## ADO.NET streaming (alpha)
 
-builder.AddProject<Projects.MySilo>("silo")
-    .WithReference(orleans)
-    .WithReference(queues);
+Register ADO.NET streaming with `AddAdoNetStreams`. Install the matching database driver and apply the SQL Server, PostgreSQL, or MySQL streaming schema shipped in the package source. Messages are durable in relational tables but expire and can move to dead letters according to `AdoNetStreamOptions`. The provider isn't rewindable.
 
-builder.Build().Run();
-```
+## NATS JetStream streaming (alpha)
 
-**Silo project (Program.cs):**
+Register NATS with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. `PartitionCount` changes require corresponding server-side stream updates. The Orleans 10 provider isn't rewindable.
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
+## Redis Streams streaming (alpha)
 
-builder.AddServiceDefaults();
-builder.AddKeyedAzureQueueServiceClient("streaming");
-builder.UseOrleans();
+Register Redis Streams with `AddRedisStreams`. The provider stores events and checkpoints in Redis and is rewindable while entries remain. Redis durability depends on its persistence and replication configuration. `MaxStreamLength` can bound retention; without it, stream length is unbounded, so capacity planning is required.
 
-builder.Build().Run();
-```
+## Custom adapters
 
-> [!TIP]
-> During local development, Aspire automatically uses the Azurite emulator for Azure Queue Storage. In production deployments, Aspire connects to your real Azure Storage account based on your Azure deployment configuration.
-
-> [!IMPORTANT]
-> You must call `AddKeyedAzureQueueServiceClient` to register the queue client in the dependency injection container. Orleans streaming providers look up resources by their keyed service name—if you skip this step, Orleans won't be able to resolve the queue client and will throw a dependency resolution error at runtime.
-
-### In-memory streaming for development
-
-For local development and testing scenarios, you can use in-memory streaming which doesn't require any external dependencies:
-
-**AppHost project (Program.cs):**
-
-```csharp
-var builder = DistributedApplication.CreateBuilder(args);
-
-var orleans = builder.AddOrleans("cluster")
-    .WithDevelopmentClustering()
-    .WithMemoryStreaming("MemoryStreamProvider");
-
-builder.AddProject<Projects.MySilo>("silo")
-    .WithReference(orleans);
-
-builder.Build().Run();
-```
-
-**Silo project (Program.cs):**
-
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.AddServiceDefaults();
-builder.UseOrleans();
-
-builder.Build().Run();
-```
-
-> [!WARNING]
-> In-memory streams are not durable and are lost when the silo restarts. Use in-memory streaming only for development and testing—never for production workloads that require message durability.
-
-### Broadcast channels with Aspire
-
-Broadcast channels provide a simple pub/sub mechanism for broadcasting messages to all subscribers:
-
-**AppHost project (Program.cs):**
-
-```csharp
-var builder = DistributedApplication.CreateBuilder(args);
-
-var orleans = builder.AddOrleans("cluster")
-    .WithDevelopmentClustering()
-    .WithBroadcastChannel("BroadcastChannel");
-
-builder.AddProject<Projects.MySilo>("silo")
-    .WithReference(orleans);
-
-builder.Build().Run();
-```
-
-**Silo project (Program.cs):**
-
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.AddServiceDefaults();
-builder.UseOrleans();
-
-builder.Build().Run();
-```
-
-For comprehensive documentation on Orleans and Aspire integration, see [Orleans and Aspire integration](../host/aspire-integration.md).
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-3-x"
-
-## Simple message stream provider
-
-The simple message stream provider, also known as the SMS provider, delivers events over TCP using regular Orleans grain messaging. Since SMS events are delivered over unreliable TCP links, SMS does _not_ guarantee reliable event delivery and doesn't automatically resend failed messages for SMS streams. By default, the producer's call to <xref:Orleans.Streams.IAsyncObserver`1.OnNextAsync*> returns a <xref:System.Threading.Tasks.Task> representing the stream consumer's processing status. This tells the producer whether the consumer successfully received and processed the event. If this task fails, the producer can decide to send the same event again, achieving reliability at the application level. Although stream message delivery is best-effort, SMS streams themselves are reliable. That is, the subscriber-to-producer binding performed by Pub-Sub is fully reliable.
-
-:::zone-end
-
-## See also
-
-- [Orleans streams implementation details](../implementation/streams-implementation/index.md)
+<xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> hosts providers built on <xref:Orleans.Streams.IQueueAdapter>. A custom adapter supplies enqueue/dequeue behavior, queue mapping, rewindability, and failure handling while Orleans supplies pulling agents, subscription routing, and caches. See [stream implementation architecture](../implementation/streams-implementation/index.md) before building one.

@@ -1,40 +1,71 @@
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Streams;
 
 namespace Orleans.Docs.Snippets.Streaming;
 
-// <explicit_subscription_grain>
-public class ExplicitSubscriptionGrain : Grain, IAsyncObserver<string>
+public interface IExplicitTelemetryGrain : IGrainWithStringKey
 {
-    private const string PROVIDER_NAME = "SimpleStreamProvider";
+    Task SubscribeAsync();
 
-    // <explicit_subscription_activate>
+    Task UnsubscribeAsync();
+}
+
+// <explicit_subscription_grain>
+public sealed class ExplicitTelemetryGrain :
+    Grain,
+    IExplicitTelemetryGrain,
+    IAsyncObserver<TemperatureReading>
+{
+    private readonly ILogger<ExplicitTelemetryGrain> _logger;
+    private IAsyncStream<TemperatureReading> _stream = null!;
+
+    public ExplicitTelemetryGrain(ILogger<ExplicitTelemetryGrain> logger) =>
+        _logger = logger;
+
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        var streamProvider = this.GetStreamProvider(PROVIDER_NAME);
-        var streamId = StreamId.Create("MyStreamNamespace", this.GetPrimaryKey());
-        var stream = streamProvider.GetStream<string>(streamId);
+        _stream = TemperatureStreams.Get(this, this.GetPrimaryKeyString());
 
-        var subscriptionHandles = await stream.GetAllSubscriptionHandles();
-        foreach (var handle in subscriptionHandles)
+        var handles = await _stream.GetAllSubscriptionHandles();
+        foreach (var handle in handles)
         {
             await handle.ResumeAsync(this);
         }
     }
-    // </explicit_subscription_activate>
 
-    public Task OnNextAsync(string item, StreamSequenceToken? token = null)
+    public async Task SubscribeAsync()
     {
-        return Task.CompletedTask;
+        var handles = await _stream.GetAllSubscriptionHandles();
+        if (handles.Count == 0)
+        {
+            await _stream.SubscribeAsync(this);
+        }
     }
 
-    public Task OnCompletedAsync()
+    public async Task UnsubscribeAsync()
     {
+        var handles = await _stream.GetAllSubscriptionHandles();
+        foreach (var handle in handles)
+        {
+            await handle.UnsubscribeAsync();
+        }
+    }
+
+    public Task OnNextAsync(
+        TemperatureReading item,
+        StreamSequenceToken? token = null)
+    {
+        _logger.LogInformation(
+            "Received {Temperature} C at {ObservedAt}",
+            item.Celsius,
+            item.ObservedAt);
         return Task.CompletedTask;
     }
 
     public Task OnErrorAsync(Exception ex)
     {
+        _logger.LogError(ex, "The telemetry subscription failed");
         return Task.CompletedTask;
     }
 }
