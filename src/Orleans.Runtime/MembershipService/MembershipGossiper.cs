@@ -20,12 +20,12 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
     {
         if (gossipPartners.Count == 0) return;
 
-        LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
-
         if (await TryGossipViaDissemination(gossipPartners, snapshot))
         {
             return;
         }
+
+        LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
 
         var systemTarget = _membershipSystemTarget ??= serviceProvider.GetRequiredService<MembershipSystemTarget>();
         await systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
