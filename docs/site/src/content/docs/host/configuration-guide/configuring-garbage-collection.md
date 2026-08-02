@@ -1,39 +1,37 @@
 ---
 title: Configure .NET garbage collection
-description: Learn how to configure .NET garbage collection in .NET Orleans.
-ms.date: 05/23/2025
+description: Configure .NET garbage collection for Orleans 10 silos.
+ms.date: 08/02/2026
 ms.topic: how-to
 ---
 
 # Configure .NET garbage collection
 
-For good performance, it's important to configure .NET garbage collection correctly for the silo process. Based on the team's findings, the best combination of settings is `gcServer=true` and `gcConcurrent=true`. You can configure these values in your C# project (_.csproj_) or an _app.config_ file. For more information, see [Flavors of garbage collection](../../../core/runtime-config/garbage-collector.md#flavors-of-garbage-collection).
-
-## .NET Core and .NET 5+
-
-This method isn't supported for SDK-style projects compiling against the full .NET Framework.
+Orleans silos are long-running, highly concurrent server processes. Enable server garbage collection in the silo project:
 
 ```xml
 <PropertyGroup>
-    <ServerGarbageCollection>true</ServerGarbageCollection>
-    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+  <ServerGarbageCollection>true</ServerGarbageCollection>
+  <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
 </PropertyGroup>
 ```
 
-## .NET Framework
+Server GC creates heaps and collection threads based on the processors available to the process. It is effective only when more than one processor is available.
 
-SDK-style projects compiling against the full .NET Framework should still use this configuration style. Consider an example _app.config_ XML file:
+## Containers and CPU limits
 
-``` xml
-<configuration>
-    <runtime>
-        <gcServer enabled="true"/>
-        <gcConcurrent enabled="true"/>
-    </runtime>
-</configuration>
-```
+.NET considers container CPU and memory limits when configuring the GC. Give the silo more than one CPU when you expect server GC to provide parallel collection, and load-test using the same limits as production.
 
-However, this isn't as easy if a silo runs as part of an Azure Worker Role, which defaults to using workstation GC. A relevant blog post discusses how to set the same configuration for an Azure Worker Role; see [Server garbage collection mode in Azure](/archive/blogs/cclayton/server-garbage-collection-mode-in-microsoft-azure).
+Don't size a silo solely from average managed-heap usage. Include native memory, socket buffers, serialization buffers, provider SDKs, telemetry, and temporary allocation bursts. Leave headroom below the container or operating-system memory limit so the runtime can collect before the process is terminated.
 
-> [!IMPORTANT]
-> Server garbage collection is available only on multiprocessor computers. Therefore, even if you configure garbage collection via the application _.csproj_ file or the scripts in the referred blog post, you won't get the benefits of `gcServer=true` if the silo runs on a (virtual) machine with a single core. For more information, see [GCSettings.IsServerGC remarks](/dotnet/api/system.runtime.gcsettings.isservergc#remarks).
+## Coordinate with Orleans activation management
+
+.NET GC reclaims unreachable managed objects. Orleans [activation collection](activation-collection.md) decides when idle grain activations become unreachable. Configure both layers:
+
+- Use server GC for process-level managed memory throughput.
+- Keep activation collection defaults unless workload measurements indicate a different idle age.
+- Consider memory-pressure activation shedding to reduce active grain count before the process reaches its memory limit.
+
+Monitor allocation rate, heap size, pause duration, time in GC, process working set, and activation count together. A GC setting can't compensate for unbounded activation growth or retained application objects.
+
+For runtime configuration details, see [.NET garbage collection configuration](../../../core/runtime-config/garbage-collector.md) and <xref:System.Runtime.GCSettings.IsServerGC>.

@@ -1,170 +1,47 @@
 ---
 title: Client configuration
-description: Learn about client configurations in .NET Orleans.
-ms.date: 01/21/2026
+description: Configure an Orleans 10 external client.
+ms.date: 08/02/2026
 ms.topic: how-to
-zone_pivot_groups: orleans-version
-ms.custom: sfi-ropc-nochange
 ---
 
 # Client configuration
 
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
+An external client runs outside a silo process and reaches the cluster through silo gateways. Install [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client), call `UseOrleansClient`, and configure the same cluster identity and clustering provider as the silos:
 
-Configure a client for connecting to a cluster of silos and sending requests to grains programmatically via an <xref:Microsoft.Extensions.Hosting.IHostBuilder> and several supplemental option classes. Like silo options, client option classes follow the [Options pattern in .NET](../../../core/extensions/options.md).
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="external_client":::
 
-:::zone-end
+The host starts Orleans before later registered hosted services and stops it with the rest of the application. Resolve `IClusterClient` or `IGrainFactory` from dependency injection; don't build a second client singleton manually.
 
-:::zone target="docs" pivot="orleans-3-x"
+## Required settings
 
-Configure a client for connecting to a cluster of silos and sending requests to grains programmatically via an <xref:Orleans.ClientBuilder> and several supplemental option classes. Like silo options, client option classes follow the [Options pattern in .NET](../../../core/extensions/options.md).
+- `ServiceId` identifies the logical Orleans application and should remain stable.
+- `ClusterId` identifies one deployment of that service. Use a different value to isolate environments or parallel deployments.
+- The client clustering provider discovers gateway-enabled silos. Its settings must point to the same membership data as the silos.
 
-:::zone-end
+Common production clustering packages include Azure Table Storage, ADO.NET, Redis, Azure Cosmos DB, DynamoDB, Consul, and ZooKeeper. Static and localhost clustering are intended for development. Kubernetes hosting is a silo integration, not a client clustering provider.
 
-> [!TIP]
-> If you just want to start a local silo and a local client for development purposes, see [Local development configuration](local-development-configuration.md).
-
-:::zone target="docs" pivot="orleans-8-0,orleans-9-0,orleans-10-0"
-
-> [!TIP]
-> If you're using [Aspire](../aspire-integration.md), client configuration is handled automatically. Aspire injects <xref:Orleans.Configuration.ClusterOptions.ClusterId>, <xref:Orleans.Configuration.ClusterOptions.ServiceId>, and clustering provider settings via environment variables, so you can use the simpler parameterless <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> method. See [Orleans and Aspire integration](../aspire-integration.md) for the recommended approach.
-
-:::zone-end
-
-Add the [Microsoft.Orleans.Clustering.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.AzureStorage) NuGet package to your client project.
-
-There are several key aspects of client configuration:
-
-- Orleans clustering information
-- Clustering provider
-- Application parts
-
-Example of a client configuration:
-
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
-
-### [Microsoft Entra ID (recommended)](#tab/entra-id)
-
-Using a `TokenCredential` with a service URI is the recommended approach. This pattern avoids storing secrets in configuration and leverages Microsoft Entra ID for secure authentication.
-
-<xref:Azure.Identity.DefaultAzureCredential> provides a credential chain that works seamlessly across local development and production environments. During development, it uses your Azure CLI or Visual Studio credentials. In production on Azure, it automatically uses the managed identity assigned to your resource.
-
-[!INCLUDE [credential-chain-guidance](../../includes/credential-chain-guidance.md)]
+When Aspire supplies the Orleans resource, register the corresponding keyed service client and use the parameterless form:
 
 ```csharp
-using Azure.Identity;
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "my-first-cluster";
-        options.ServiceId = "MyOrleansService";
-    })
-    .UseAzureStorageClustering(options =>
-    {
-        options.ConfigureTableServiceClient(
-            new Uri("https://<your-storage-account>.table.core.windows.net"),
-            new DefaultAzureCredential());
-    });
-});
-
-using var host = builder.Build();
-await host.StartAsync();
+builder.AddKeyedRedisClient("orleans-redis");
+builder.UseOrleansClient();
 ```
 
-### [Connection string](#tab/connection-string)
+## Connection resiliency
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "my-first-cluster";
-        options.ServiceId = "MyOrleansService";
-    })
-    .UseAzureStorageClustering(
-        options => options.ConfigureTableServiceClient(
-            builder.Configuration["ORLEANS_AZURE_STORAGE_CONNECTION_STRING"]));
-});
+Orleans registers a default `IClientConnectionRetryFilter`. It retries eligible initial connection failures with linear backoff, up to 15 retries. Host startup fails if the client still can't connect, the host is stopping, or the failure isn't considered retryable.
 
-using var host = builder.Build();
-await host.StartAsync();
-```
+Override the policy only when the application has different startup requirements:
 
----
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="client_retry":::
 
-:::zone-end
+Bound every custom retry policy and honor the cancellation token so deployments can fail fast and shutdown isn't delayed indefinitely.
 
-:::zone target="docs" pivot="orleans-3-x"
+Initial connection retries don't make grain calls idempotent. A call can fail after the target started processing it, so retry application operations only when their semantics tolerate duplicates. Grain references remain usable after transient connectivity failures.
 
-:::code language="csharp" source="snippets-v3/client-config/Configuration.cs" id="full_client_config":::
+## Gateway behavior
 
-:::zone-end
+Configure gateway refresh and connection behavior through <xref:Orleans.Configuration.GatewayOptions> or `Orleans:Gateway`. Orleans refreshes the gateway list from the clustering provider and reconnects as gateways become unavailable. Expose gateway endpoints only to client networks that require them; silo-to-silo traffic uses a separate endpoint.
 
-Let's break down the steps used in this sample:
-
-## Orleans clustering information
-
-```csharp
-    .Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "orleans-docker";
-        options.ServiceId = "AspNetSampleApp";
-    })
-```
-
-Here, we set two things:
-
-- The <xref:Orleans.Configuration.ClusterOptions.ClusterId?displayProperty=nameWithType> to `"my-first-cluster"`: This is a unique ID for the Orleans cluster. All clients and silos using this ID can directly talk to each other. Some might choose to use a different <xref:Orleans.Configuration.ClusterOptions.ClusterId> for each deployment, for example.
-- The <xref:Orleans.Configuration.ClusterOptions.ServiceId?displayProperty=nameWithType> to `"AspNetSampleApp"`: This is a unique ID for your application, used by some providers (e.g., persistence providers). This ID should remain stable across deployments.
-
-## Clustering provider
-
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
-
-### [Microsoft Entra ID (recommended)](#tab/entra-id)
-
-[!INCLUDE [credential-chain-guidance](../../includes/credential-chain-guidance.md)]
-
-```csharp
-clientBuilder.UseAzureStorageClustering(options =>
-{
-    options.ConfigureTableServiceClient(
-        new Uri("https://<your-storage-account>.table.core.windows.net"),
-        new DefaultAzureCredential());
-});
-```
-
-### [Connection string](#tab/connection-string)
-
-```csharp
-.UseAzureStorageClustering(
-    options => options.ConfigureTableServiceClient(connectionString));
-```
-
----
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-3-x"
-
-:::code language="csharp" source="snippets-v3/client-config/Configuration.cs" id="azure_clustering":::
-
-:::zone-end
-
-The client discovers all available gateways in the cluster using this provider. Several providers are available; here, we use the Azure Table provider.
-
-For more information, see [Server configuration](server-configuration.md).
-
-:::zone target="docs" pivot="orleans-3-x"
-
-## Application parts
-
-:::code language="csharp" source="snippets-v3/client-config/Configuration.cs" id="application_parts":::
-
-For more information, see [Server configuration](server-configuration.md).
-
-:::zone-end
+For a co-hosted client, use `UseOrleans` instead. The silo's client communicates directly with the cluster and doesn't require a gateway hop.

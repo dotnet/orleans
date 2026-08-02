@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.GrainDirectory.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AdoNet" Version="10.2.1" />
+  </ItemGroup>
+
+</Project>

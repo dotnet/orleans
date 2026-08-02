@@ -1,553 +1,66 @@
 ---
-title: Typical configurations
-description: Learn about typical configurations in .NET Orleans.
-ms.date: 01/21/2026
-ms.topic: reference
-zone_pivot_groups: orleans-version
-ms.custom: sfi-ropc-nochange
+title: Typical Orleans configurations
+description: Choose a local, Aspire, or production Orleans 10 configuration.
+ms.date: 08/02/2026
+ms.topic: concept-article
 ---
 
-# Typical configurations
+# Typical Orleans configurations
 
-Below are examples of typical configurations you can use for development and production deployments.
+Choose the smallest hosting model that matches the deployment.
 
-:::zone target="docs" pivot="orleans-8-0,orleans-9-0,orleans-10-0"
+| Scenario | Hosting model | Clustering | State and reminders |
+|---|---|---|---|
+| One-process development | Co-hosted silo and client | `UseLocalhostClustering` | Memory providers |
+| Local distributed development | Aspire with multiple silo replicas | Local container or emulator | Local container or emulator |
+| Production service with HTTP/API entry points | Co-host ASP.NET Core and Orleans in each silo when resource isolation isn't required | Platform-appropriate durable provider | Durable providers |
+| Isolated frontend and worker tier | External Orleans client in frontend; silo-only worker tier | Same durable provider and cluster identity in both tiers | Durable providers on silos |
 
-## Recommended: Aspire configuration
+## Single-process development
 
-[Aspire](../aspire-integration.md) is the recommended approach for configuring Orleans applications. Aspire provides declarative resource management, automatic service discovery, built-in observability, and simplified deployment—eliminating most manual configuration.
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="local_silo_and_client":::
 
-### Production configuration with Redis
+This is intentionally disposable. See [Local development configuration](local-development-configuration.md) before adding more local silos.
 
-This configuration uses Redis for clustering, grain storage, and reminders with multiple silo replicas:
+## Aspire development and deployment modeling
 
-**AppHost project (Program.cs):**
+The compiled AppHost examples define Orleans resources and their dependencies:
 
-```csharp
-var builder = DistributedApplication.CreateBuilder(args);
+:::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="orleans_with_storage_reminders":::
 
-var redis = builder.AddRedis("redis");
+The silo registers the Aspire service clients and lets Orleans consume injected configuration:
 
-var orleans = builder.AddOrleans("cluster")
-    .WithClustering(redis)
-    .WithGrainStorage("Default", redis)
-    .WithReminders(redis);
+:::code language="csharp" source="../snippets/aspire/Silo/SiloProgram.cs" id="silo_basic_config":::
 
-// Add Orleans silo with 3 replicas for production
-builder.AddProject<Projects.MySilo>("silo")
-    .WithReference(orleans)
-    .WithReference(redis)
-    .WithReplicas(3);
+Use `.WithReplicas(...)` to model multiple silos. Local Redis containers and Azurite are useful development dependencies, but production deployments must bind those resources to managed or otherwise durable services. Don't call `.RunAsEmulator()` in a production AppHost configuration.
 
-// Add a separate client project (e.g., an API)
-builder.AddProject<Projects.MyApi>("api")
-    .WithReference(orleans.AsClient())
-    .WithReference(redis);
+## Production configuration
 
-builder.Build().Run();
-```
+A production configuration should make these choices explicit:
 
-**Silo project (Program.cs):**
+1. Pick a durable clustering provider supported by the platform.
+2. Set stable `ServiceId` and environment/deployment-specific `ClusterId` values.
+3. Configure advertised addresses that every silo and client can route to.
+4. Add durable storage, reminders, streams, and grain directories only for features the application uses.
+5. Supply credentials through the deployment environment, preferably using workload identity.
+6. Configure health/readiness, telemetry, graceful termination, CPU, memory, and server GC.
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
+For example, an Azure deployment can use Azure Table Storage for clustering and reminders and Azure Blob or Table Storage for grain state. An AWS deployment can use DynamoDB. A database-centered deployment can use ADO.NET. Redis, Cosmos DB, Consul, and ZooKeeper providers are also available for the capabilities their packages implement. Kubernetes deployments can use the separate Kubernetes hosting integration with one of these clustering providers.
 
-builder.AddServiceDefaults();
-builder.AddKeyedRedisClient("redis");
-builder.UseOrleans();
+The provider used for clustering doesn't need to match the grain storage or reminder provider. Select each based on durability, latency, operational ownership, and cost.
 
-builder.Build().Run();
-```
+## Separate external client
 
-**Client project (Program.cs):**
+Use an external client when the frontend and silo tier need separate scaling, security boundaries, deployments, or resource isolation. Configure `UseOrleansClient` with exactly the same service identity, cluster identity, and clustering backend as the silo tier. The client reaches gateway endpoints, so expose and secure those routes separately from silo-to-silo endpoints.
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
+## Avoid development configuration in production
 
-builder.AddServiceDefaults();
-builder.AddKeyedRedisClient("redis");
-builder.UseOrleansClient();
+Don't use any of the following in production:
 
-var app = builder.Build();
-// ... configure API endpoints
-app.Run();
-```
+- `UseLocalhostClustering`, development clustering, or static gateway lists.
+- Memory grain storage or memory reminders when data must survive.
+- Azurite or other emulator endpoints.
+- Loopback or wildcard addresses as advertised endpoints.
+- Unbounded custom client connection retries.
 
-> [!TIP]
-> Use `WithReplicas(n)` to run multiple silo instances for high availability. Use `orleans.AsClient()` when a project only needs to call grains, not host them.
-
-### Production configuration with Azure Storage
-
-This configuration uses Azure Table Storage for clustering and Azure Blob Storage for grain storage:
-
-**AppHost project (Program.cs):**
-
-```csharp
-var builder = DistributedApplication.CreateBuilder(args);
-
-var storage = builder.AddAzureStorage("storage")
-    .RunAsEmulator();  // Use Azurite for local development
-var tables = storage.AddTables("clustering");
-var blobs = storage.AddBlobs("grainstate");
-
-var orleans = builder.AddOrleans("cluster")
-    .WithClustering(tables)
-    .WithGrainStorage("Default", blobs);
-
-builder.AddProject<Projects.MySilo>("silo")
-    .WithReference(orleans)
-    .WaitFor(storage)
-    .WithReplicas(3);
-
-builder.Build().Run();
-```
-
-**Silo project (Program.cs):**
-
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.AddServiceDefaults();
-builder.AddKeyedAzureTableServiceClient("clustering");
-builder.AddKeyedAzureBlobServiceClient("grainstate");
-builder.UseOrleans();
-
-builder.Build().Run();
-```
-
-> [!TIP]
-> To use the Azurite emulator for local development, call `.RunAsEmulator()` on the Azure Storage resource as shown above. Without this call, Aspire expects a real Azure Storage connection. In production deployments, remove `.RunAsEmulator()` and configure your Azure Storage account connection.
-
-> [!IMPORTANT]
-> You must call the appropriate `AddKeyed*` method (such as `AddKeyedRedisClient`, `AddKeyedAzureTableServiceClient`, or `AddKeyedAzureBlobServiceClient`) to register the backing resource in the dependency injection container. Orleans providers look up resources by their keyed service name—if you skip this step, Orleans won't be able to resolve the resource and will throw a dependency resolution error at runtime.
-
-For comprehensive documentation on Orleans and Aspire integration, see [Orleans and Aspire integration](../aspire-integration.md).
-
-:::zone-end
-
-## Local development
-
-For more information, see [Local development configuration](local-development-configuration.md).
-
-:::zone target="docs" pivot="orleans-8-0,orleans-9-0,orleans-10-0"
-
-## Traditional configurations (without Aspire)
-
-The following sections describe traditional Orleans configurations that don't use Aspire. These are useful when Aspire isn't available or when you need fine-grained control over Orleans configuration.
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
-
-## Reliable production deployment using Azure
-
-For a reliable production deployment using Azure, use the Azure Table option for cluster membership. This configuration is typical for deployments to on-premises servers, containers, or Azure virtual machine instances.
-
-### [Microsoft Entra ID (recommended)](#tab/entra-id)
-
-Using a `TokenCredential` with a service URI is the recommended approach. This pattern avoids storing secrets in configuration and leverages Microsoft Entra ID for secure authentication.
-
-<xref:Azure.Identity.DefaultAzureCredential> provides a credential chain that works seamlessly across local development and production environments. During development, it uses your Azure CLI or Visual Studio credentials. In production on Azure, it automatically uses the managed identity assigned to your resource.
-
-[!INCLUDE [credential-chain-guidance](../../includes/credential-chain-guidance.md)]
-
-Silo configuration:
-
-```csharp
-using Azure.Identity;
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAzureStorageClustering(options =>
-    {
-        options.ConfigureTableServiceClient(
-            new Uri("https://<your-storage-account>.table.core.windows.net"),
-            new DefaultAzureCredential());
-    })
-    .ConfigureEndpoints(siloPort: 11_111, gatewayPort: 30_000);
-});
-
-builder.Logging.SetMinimumLevel(LogLevel.Information).AddConsole();
-
-using var host = builder.Build();
-```
-
-Client configuration:
-
-```csharp
-using Azure.Identity;
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAzureStorageClustering(options =>
-    {
-        options.ConfigureTableServiceClient(
-            new Uri("https://<your-storage-account>.table.core.windows.net"),
-            new DefaultAzureCredential());
-    });
-});
-
-using var host = builder.Build();
-```
-
-### [Connection string](#tab/connection-string)
-
-> [!WARNING]
-> Connection strings contain secrets and should be avoided in production. Use Microsoft Entra ID authentication whenever possible.
-
-The format of the `DataConnection` string is a semicolon-separated list of `Key=Value` pairs. The following options are supported:
-
-| Key                        | Value                               |
-|----------------------------|-------------------------------------|
-| `DefaultEndpointsProtocol` | `https`                             |
-| `AccountName`              | `<Azure storage account>`           |
-| `AccountKey`               | `<Azure table storage account key>` |
-
-The following is an example of a `DataConnection` string for Azure Table storage:
-
-```
-"DefaultEndpointsProtocol=https;AccountName=<Azure storage account>;AccountKey=<Azure table storage account key>"
-```
-
-Silo configuration:
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAzureStorageClustering(
-        options => options.ConfigureTableServiceClient(connectionString))
-    .ConfigureEndpoints(siloPort: 11_111, gatewayPort: 30_000);
-});
-
-builder.Logging.SetMinimumLevel(LogLevel.Information).AddConsole();
-
-using var host = builder.Build();
-```
-
-Client configuration:
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAzureStorageClustering(
-        options => options.ConfigureTableServiceClient(connectionString));
-});
-
-using var host = builder.Build();
-```
-
----
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-3-x"
-
-## Reliable production deployment using Azure
-
-For a reliable production deployment using Azure, use the Azure Table option for cluster membership. This configuration is typical for deployments to on-premises servers, containers, or Azure virtual machine instances.
-
-The format of the `DataConnection` string is a semicolon-separated list of `Key=Value` pairs. The following options are supported:
-
-| Key                        | Value                               |
-|----------------------------|-------------------------------------|
-| `DefaultEndpointsProtocol` | `https`                             |
-| `AccountName`              | `<Azure storage account>`           |
-| `AccountKey`               | `<Azure table storage account key>` |
-
-The following is an example of a `DataConnection` string for Azure Table storage:
-
-```
-"DefaultEndpointsProtocol=https;AccountName=<Azure storage account>;AccountKey=<Azure table storage account key>"
-```
-
-Silo configuration:
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-var silo = new SiloHostBuilder()
-    .Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAzureStorageClustering(
-        options => options.ConnectionString = connectionString)
-    .ConfigureEndpoints(siloPort: 11_111, gatewayPort: 30_000)
-    .ConfigureLogging(builder => builder.SetMinimumLevel(LogLevel.Information).AddConsole())
-    .Build();
-```
-
-Client configuration:
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-
-var client = new ClientBuilder()
-    .Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAzureStorageClustering(
-        options => options.ConnectionString = connectionString)
-    .Build();
-```
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
-
-## Reliable production deployment using SQL Server
-
-For a reliable production deployment using SQL Server, supply a SQL Server connection string.
-
-> [!NOTE]
-> Starting with Orleans 10.0, ADO.NET providers require the `Microsoft.Data.SqlClient` package instead of `System.Data.SqlClient`. Use the invariant `Microsoft.Data.SqlClient` in Orleans 10.0 and later.
-
-### Orleans 10.0+
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAdoNetClustering(options =>
-    {
-        options.ConnectionString = connectionString;
-        options.Invariant = "Microsoft.Data.SqlClient"; // Orleans 10.0+
-    })
-    .ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000);
-});
-
-builder.Logging.SetMinimumLevel(LogLevel.Information).AddConsole();
-
-using var host = builder.Build();
-```
-
-### Orleans 7.0-9.x
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAdoNetClustering(options =>
-    {
-        options.ConnectionString = connectionString;
-        options.Invariant = "System.Data.SqlClient";
-    })
-    .ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000);
-});
-
-builder.Logging.SetMinimumLevel(LogLevel.Information).AddConsole();
-
-using var host = builder.Build();
-```
-
-Client configuration:
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAdoNetClustering(options =>
-    {
-        options.ConnectionString = connectionString;
-        // Use "Microsoft.Data.SqlClient" for Orleans 10.0+
-        // Use "System.Data.SqlClient" for Orleans 7.0-9.x
-        options.Invariant = "Microsoft.Data.SqlClient";
-    });
-});
-
-using var host = builder.Build();
-```
-
-## Unreliable deployment on a cluster of dedicated servers
-
-For testing on a cluster of dedicated servers where reliability isn't a concern, you can leverage `MembershipTableGrain` and avoid dependency on Azure Table. You just need to designate one of the nodes as primary.
-
-On the silos:
-
-```csharp
-var primarySiloEndpoint = new IPEndPoint(PRIMARY_SILO_IP_ADDRESS, 11_111);
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder
-        .UseDevelopmentClustering(primarySiloEndpoint)
-        .Configure<ClusterOptions>(options =>
-        {
-            options.ClusterId = "Cluster42";
-            options.ServiceId = "MyAwesomeService";
-        })
-        .ConfigureEndpoints(siloPort: 11_111, gatewayPort: 30_000);
-});
-builder.Logging.AddConsole();
-
-using var host = builder.Build();
-await host.RunAsync();
-```
-
-On the clients:
-
-```csharp
-var gateways = new IPEndPoint[]
-{
-    new IPEndPoint(PRIMARY_SILO_IP_ADDRESS, 30_000),
-    new IPEndPoint(OTHER_SILO__IP_ADDRESS_1, 30_000),
-    // ...
-    new IPEndPoint(OTHER_SILO__IP_ADDRESS_N, 30_000),
-};
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.UseStaticClustering(gateways)
-        .Configure<ClusterOptions>(options =>
-        {
-            options.ClusterId = "Cluster42";
-            options.ServiceId = "MyAwesomeService";
-        });
-});
-
-using var host = builder.Build();
-await host.StartAsync();
-```
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-3-x"
-
-## Reliable production deployment using SQL Server
-
-For a reliable production deployment using SQL Server, supply a SQL Server connection string.
-
-Silo configuration:
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-var silo = new SiloHostBuilder()
-    .Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAdoNetClustering(options =>
-    {
-      options.ConnectionString = connectionString;
-      options.Invariant = "System.Data.SqlClient";
-    })
-    .ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)
-    .ConfigureLogging(builder => builder.SetMinimumLevel(LogLevel.Information).AddConsole())
-    .Build();
-```
-
-Client configuration:
-
-```csharp
-const string connectionString = "YOUR_CONNECTION_STRING_HERE";
-
-var client = new ClientBuilder()
-    .Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .UseAdoNetClustering(options =>
-    {
-      options.ConnectionString = connectionString;
-      options.Invariant = "System.Data.SqlClient";
-    })
-    .Build();
-```
-
-## Unreliable deployment on a cluster of dedicated servers
-
-For testing on a cluster of dedicated servers where reliability isn't a concern, you can leverage `MembershipTableGrain` and avoid dependency on Azure Table. You just need to designate one of the nodes as primary.
-
-On the silos:
-
-```csharp
-var primarySiloEndpoint = new IPEndPoint(PRIMARY_SILO_IP_ADDRESS, 11_111);
-var silo = new SiloHostBuilder()
-    .UseDevelopmentClustering(primarySiloEndpoint)
-    .Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .ConfigureEndpoints(siloPort: 11_111, gatewayPort: 30_000)
-    .ConfigureLogging(logging => logging.AddConsole())
-    .Build();
-```
-
-On the clients:
-
-```csharp
-var gateways = new IPEndPoint[]
-{
-    new IPEndPoint(PRIMARY_SILO_IP_ADDRESS, 30_000),
-    new IPEndPoint(OTHER_SILO__IP_ADDRESS_1, 30_000),
-    // ...
-    new IPEndPoint(OTHER_SILO__IP_ADDRESS_N, 30_000),
-};
-
-var client = new ClientBuilder()
-    .UseStaticClustering(gateways)
-    .Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "Cluster42";
-        options.ServiceId = "MyAwesomeService";
-    })
-    .Build();
-```
-
-:::zone-end
+See [Server configuration](server-configuration.md), [Client configuration](client-configuration.md), and [Orleans and Aspire integration](../aspire-integration.md) for implementation details.

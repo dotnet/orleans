@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <Sdk Name="Aspire.AppHost.Sdk" Version="9.0.0" />
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.4.6" />
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -9,14 +9,14 @@
 
   <!-- <apphost_packages> -->
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.1.3" />
-    <PackageReference Include="Aspire.Hosting.Orleans" Version="13.1.3" />
-    <PackageReference Include="Aspire.Hosting.Redis" Version="13.1.3" />
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Orleans" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </apphost_packages> -->
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.1.3" />
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
   </ItemGroup>
 
   <!-- Project references removed - Silo and Client are library projects

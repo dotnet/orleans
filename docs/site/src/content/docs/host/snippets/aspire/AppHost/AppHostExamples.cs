@@ -90,11 +90,10 @@ public static class AppHostExamples
             .RunAsEmulator();  // Use Azurite emulator for local development
 
         var tables = storage.AddTables("orleans-tables");
-        var blobs = storage.AddBlobs("orleans-blobs");
 
         var orleans = builder.AddOrleans("cluster")
             .WithClustering(tables)
-            .WithGrainStorage("Default", blobs)
+            .WithGrainStorage("Default", tables)
             .WithReminders(tables);
 
         builder.AddProject<Projects.Silo>("silo")

@@ -8,6 +8,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.1" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </silo_packages> -->

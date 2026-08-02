@@ -1,91 +1,60 @@
 ---
-title: List of options classes
-description: Explore a listing of options classes in .NET Orleans.
-ms.date: 01/21/2026
+title: Core Orleans configuration options
+description: Find the Orleans 10 option types used for common hosting tasks.
+ms.date: 08/02/2026
 ms.topic: reference
-zone_pivot_groups: orleans-version
 ---
 
-# List of options classes
+# Core Orleans configuration options
 
-All options classes used to configure Orleans are found in the `Orleans.Configuration` namespace. Many also have helper methods in the `Orleans.Hosting` namespace.
+Orleans options use the [.NET options pattern](../../../core/extensions/options.md). Configure them with `ISiloBuilder.Configure<TOptions>` or `IClientBuilder.Configure<TOptions>`. Orleans also automatically binds the specific sections listed in [Declarative configuration](index.md#declarative-configuration); other option types require explicit binding.
 
-:::zone pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
+This page is a curated starting point, not an exhaustive property catalog. The [`Orleans.Configuration` API reference](https://learn.microsoft.com/dotnet/api/orleans.configuration) and provider package APIs are the source of truth for the installed Orleans version.
 
-## Common core options for client and silo builders
+## Shared identity and messaging
 
-| Option type | Used for |
-|--|--|
-| <xref:Orleans.Configuration.ClusterOptions> | Setting the <xref:Orleans.Configuration.ClusterOptions.ClusterId> and the <xref:Orleans.Configuration.ClusterOptions.ServiceId> |
-| <xref:Orleans.Configuration.NetworkingOptions> | Setting timeout values for sockets and opened connections |
-| <xref:Orleans.Configuration.SerializationProviderOptions> | Setting the serialization providers |
-| <xref:Orleans.Configuration.TypeManagementOptions> | Setting the refresh period of the Type Map (see Heterogeneous silos and Versioning) |
+| Option type | Use it for |
+|---|---|
+| <xref:Orleans.Configuration.ClusterOptions> | `ServiceId` and `ClusterId` shared by silos and clients |
+| <xref:Orleans.Configuration.ClientMessagingOptions> | External client messaging and connections |
+| <xref:Orleans.Configuration.SiloMessagingOptions> | Silo messaging, response timeouts, and connection behavior |
+| <xref:Orleans.Configuration.GatewayOptions> | Client gateway refresh and preferred gateway behavior |
+| <xref:Orleans.Configuration.NetworkingOptions> | Shared socket and connection settings |
 
-## <xref:Orleans.IClientBuilder>-specific options
+## Silo hosting
 
-| Option type                                    | Used for                              |
-|------------------------------------------------|---------------------------------------|
-| <xref:Orleans.Configuration.ClientMessagingOptions> | Setting the number of connections to keep open, and specify what network interface to use |
-| <xref:Orleans.Configuration.StatisticsOptions> | Settings related to statistics output |
-| <xref:Orleans.Configuration.GatewayOptions> | Setting the refresh period of the list of available gateways |
-| <xref:Orleans.Configuration.StaticGatewayListProviderOptions> | Setting URIs a client will use to connect to cluster |
+| Option type | Use it for |
+|---|---|
+| <xref:Orleans.Configuration.EndpointOptions> | Advertised silo/gateway ports and listening endpoints |
+| <xref:Orleans.Configuration.SiloOptions> | Silo name |
+| <xref:Orleans.Configuration.ClusterMembershipOptions> | Membership probing, failure detection, and initial connectivity validation |
+| <xref:Orleans.Configuration.GrainCollectionOptions> | Idle activation collection and memory-pressure shedding |
+| <xref:Orleans.Configuration.GrainDirectoryOptions> | Built-in grain directory cache and partition behavior |
+| <xref:Orleans.Configuration.LoadSheddingOptions> | Request rejection under host load |
+| <xref:Orleans.Configuration.SchedulingOptions> | Grain scheduling limits and diagnostics |
+| <xref:Orleans.Configuration.ProcessExitHandlingOptions> | Process-exit behavior |
+| <xref:Orleans.Configuration.GrainTypeOptions> | Grain classes and interfaces supported by the process |
 
-## <xref:Orleans.Hosting.ISiloBuilder>-specific options
+## Feature-specific options
 
-| Option type                                           | Used for                        |
-|-------------------------------------------------------|---------------------------------|
-| <xref:Orleans.Configuration.ClusterMembershipOptions> | Settings for cluster membership |
-| <xref:Orleans.Configuration.ConsistentRingOptions> | Configuration options for consistent hashing algorithm, used to balance resource allocations across the cluster. |
-| <xref:Orleans.Configuration.EndpointOptions> | Setting the Silo endpoint options |
-| <xref:Orleans.Configuration.GrainCollectionOptions> | Options for grain garbage collection |
-| <xref:Orleans.Configuration.GrainVersioningOptions> | Governs grain implementation selection in heterogeneous deployments |
-| <xref:Orleans.Configuration.LoadSheddingOptions> | Settings for load shedding configuration. |
-| <xref:Orleans.Configuration.PerformanceTuningOptions> | Performance tuning options (networking, number of threads) |
-| <xref:Orleans.Configuration.ProcessExitHandlingOptions> | Configure silo behavior on process exit |
-| <xref:Orleans.Configuration.SchedulingOptions> | Configuring scheduler behavior |
-| <xref:Orleans.Configuration.SiloMessagingOptions> | Configuring global messaging options that are silo related. |
-| <xref:Orleans.Configuration.SiloOptions> | Setting the name of the Silo |
-| <xref:Orleans.Configuration.StatisticsOptions> | Setting related to statistics output |
-| <xref:Orleans.Configuration.TelemetryOptions> | Setting telemetry consumer settings |
+Storage, clustering, reminders, streaming, serialization, dashboards, and third-party integrations define options in their own packages. Start with the provider's builder method, such as `UseRedisClustering`, `AddAzureBlobGrainStorage`, or `UseAdoNetReminderService`, then follow the linked options type in IntelliSense or API reference.
 
-:::zone-end
+Named providers are normally configured using their builder methods:
 
-:::zone pivot="orleans-3-x"
+```csharp
+siloBuilder.AddRedisGrainStorage("hot-state", options =>
+{
+    options.ConfigurationOptions = redisConfiguration;
+});
+```
 
-## Common core options for <xref:Orleans.IClientBuilder> and <xref:Orleans.Hosting.ISiloHostBuilder>
+Declarative named providers use `Orleans:{capability}:{name}` and a `ProviderType`; see [Declarative configuration](index.md#declarative-configuration).
 
-| Option type | Used for |
-|--|--|
-| <xref:Orleans.Configuration.ClusterOptions> | Setting the <xref:Orleans.Configuration.ClusterOptions.ClusterId> and the <xref:Orleans.Configuration.ClusterOptions.ServiceId> |
-| <xref:Orleans.Configuration.NetworkingOptions> | Setting timeout values for sockets and opened connections |
-| <xref:Orleans.Configuration.SerializationProviderOptions> | Setting the serialization providers |
-| <xref:Orleans.Configuration.TypeManagementOptions> | Setting the refresh period of the Type Map (see Heterogeneous silos and Versioning) |
+## Find an option
 
-## <xref:Orleans.IClientBuilder>-specific options
+1. Start from the hosting extension method for the feature.
+2. Follow its options delegate type in IntelliSense.
+3. Check the installed package's API reference for defaults and validation.
+4. Inspect startup validation errors; Orleans validates required provider settings before the silo or client becomes ready.
 
-| Option type                                    | Used for                              |
-|------------------------------------------------|---------------------------------------|
-| <xref:Orleans.Configuration.ClientMessagingOptions> | Setting the number of connections to keep open, and specify what network interface to use |
-| <xref:Orleans.Configuration.StatisticsOptions> | Settings related to statistics output |
-| <xref:Orleans.Configuration.GatewayOptions> | Setting the refresh period of the list of available gateways |
-| <xref:Orleans.Configuration.StaticGatewayListProviderOptions> | Setting URIs a client will use to connect to cluster |
-
-## <xref:Orleans.Hosting.ISiloHostBuilder>-specific options
-
-| Option type                                           | Used for                        |
-|-------------------------------------------------------|---------------------------------|
-| <xref:Orleans.Configuration.ClusterMembershipOptions> | Settings for cluster membership |
-| <xref:Orleans.Configuration.ConsistentRingOptions> | Configuration options for consistent hashing algorithm, used to balance resource allocations across the cluster. |
-| <xref:Orleans.Configuration.EndpointOptions> | Setting the Silo endpoint options |
-| <xref:Orleans.Configuration.GrainCollectionOptions> | Options for grain garbage collection |
-| <xref:Orleans.Configuration.GrainVersioningOptions> | Governs grain implementation selection in heterogeneous deployments |
-| <xref:Orleans.Configuration.LoadSheddingOptions> | Settings for load shedding configuration. Must have a registered implementation of <xref:Orleans.Statistics.IHostEnvironmentStatistics> such as through <xref:Orleans.Statistics.ClientBuilderExtensions.UsePerfCounterEnvironmentStatistics*?displayProperty=nameWithType> or <xref:Orleans.Statistics.SiloHostBuilderExtensions.UsePerfCounterEnvironmentStatistics*?displayProperty=nameWithType> (Windows only) for `LoadShedding` to function. |
-| <xref:Orleans.Configuration.PerformanceTuningOptions> | Performance tuning options (networking, number of threads) |
-| <xref:Orleans.Configuration.ProcessExitHandlingOptions> | Configure silo behavior on process exit |
-| <xref:Orleans.Configuration.SchedulingOptions> | Configuring scheduler behavior |
-| <xref:Orleans.Configuration.SiloMessagingOptions> | Configuring global messaging options that are silo related. |
-| <xref:Orleans.Configuration.SiloOptions> | Setting the name of the Silo |
-| <xref:Orleans.Configuration.StatisticsOptions> | Setting related to statistics output |
-| <xref:Orleans.Configuration.TelemetryOptions> | Setting telemetry consumer settings |
-
-:::zone-end
+Avoid copying all available properties into configuration. Leave defaults in place unless a deployment requirement or measurement justifies an override. This reduces version drift and makes intentional tuning visible.
