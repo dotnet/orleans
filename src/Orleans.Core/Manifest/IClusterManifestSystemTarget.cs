@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Orleans.Metadata;
@@ -77,7 +76,7 @@ namespace Orleans.Runtime
     {
         public ClusterManifestHashSummary(
             MajorMinorVersion version,
-            FrozenDictionary<SiloAddress, ManifestHash> siloManifestHashes)
+            ImmutableDictionary<SiloAddress, ManifestHash> siloManifestHashes)
         {
             Version = version;
             SiloManifestHashes = siloManifestHashes;
@@ -93,7 +92,7 @@ namespace Orleans.Runtime
         /// Gets the manifest hash for each silo.
         /// </summary>
         [Id(1)]
-        public FrozenDictionary<SiloAddress, ManifestHash> SiloManifestHashes { get; }
+        public ImmutableDictionary<SiloAddress, ManifestHash> SiloManifestHashes { get; }
     }
 
     /// <summary>

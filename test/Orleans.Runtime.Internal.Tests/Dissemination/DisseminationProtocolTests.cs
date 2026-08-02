@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -664,7 +663,7 @@ public class DisseminationProtocolTests
                 {
                     1 => CreateValueGroups(badRepairItem),
                     2 => CreateValueGroups(goodRepairItem),
-                    _ => FrozenDictionary<string, ImmutableArray<DisseminationValue>>.Empty,
+                    _ => ImmutableDictionary<string, ImmutableArray<DisseminationValue>>.Empty,
                 },
             });
         };
@@ -778,6 +777,45 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void WirePayloadsRoundTripThroughSerializer()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var sender = CreateSilo(11111);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest(FakeTopic.DefaultKey, version: 1),
+            Root = sender,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = new byte[] { 1, 2, 3 },
+        };
+
+        var gossip = RoundTrip(serializer, new DisseminationGossipBatch
+        {
+            Sender = sender,
+            ValuesByTopic = CreateValueGroups(value),
+        });
+        var request = RoundTrip(serializer, new DisseminationAntiEntropyRequest
+        {
+            Sender = sender,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(FakeTopic.DefaultName, value.Digest),
+        });
+        var response = RoundTrip(serializer, new DisseminationAntiEntropyResponse
+        {
+            Sender = sender,
+            ValuesByTopic = CreateValueGroups(value),
+        });
+        var manifestSummary = RoundTrip(serializer, new ClusterManifestHashSummary(
+            new MajorMinorVersion(1, 2),
+            ImmutableDictionary<SiloAddress, ManifestHash>.Empty.Add(sender, new ManifestHash("hash"))));
+
+        Assert.Equal(value.Digest, Assert.Single(GetGossipValues(gossip)).Digest);
+        Assert.Equal(value.Digest, Assert.Single(request.DigestsByTopic.Values).Single());
+        Assert.Equal(value.Digest, Assert.Single(GetAntiEntropyResponseValues(response)).Digest);
+        Assert.Equal(new ManifestHash("hash"), manifestSummary.SiloManifestHashes[sender]);
+    }
+
+    [Fact]
     public void OptionsValidatorRejectsInvalidFanoutBounds()
     {
         var options = new DisseminationOptions();
@@ -858,13 +896,13 @@ public class DisseminationProtocolTests
     private static SiloAddress[] CreateSilos(int count) =>
         Enumerable.Range(11111, count).Select(CreateSilo).OrderBy(static silo => silo).ToArray();
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationTopicDigest>> CreateAntiEntropyRequestDigests(
+    private static ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>> CreateAntiEntropyRequestDigests(
         string topicName,
         params DisseminationTopicDigest[] digests) =>
         new Dictionary<string, ImmutableArray<DisseminationTopicDigest>>(StringComparer.Ordinal)
         {
             [topicName] = [.. digests],
-        }.ToFrozenDictionary(StringComparer.Ordinal);
+        }.ToImmutableDictionary(StringComparer.Ordinal);
 
     private static DisseminationGossipBatch CreateGossipBatch(SiloAddress sender, params DisseminationValue[] values) => new()
     {
@@ -878,14 +916,17 @@ public class DisseminationProtocolTests
     private static IEnumerable<DisseminationValue> GetAntiEntropyResponseValues(DisseminationAntiEntropyResponse response) =>
         response.ValuesByTopic.Values.SelectMany(static values => values);
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(params DisseminationValue[] values) =>
+    private static ImmutableDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(params DisseminationValue[] values) =>
         CreateValueGroups(FakeTopic.DefaultName, values);
 
-    private static FrozenDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(string topicName, params DisseminationValue[] values) =>
+    private static ImmutableDictionary<string, ImmutableArray<DisseminationValue>> CreateValueGroups(string topicName, params DisseminationValue[] values) =>
         new Dictionary<string, ImmutableArray<DisseminationValue>>(StringComparer.Ordinal)
         {
             [topicName] = [.. values],
-        }.ToFrozenDictionary(StringComparer.Ordinal);
+        }.ToImmutableDictionary(StringComparer.Ordinal);
+
+    private static T RoundTrip<T>(Serializer serializer, T value) =>
+        serializer.Deserialize<T>(serializer.SerializeToArray(value));
 
     private static MembershipDisseminationTopic CreateMembershipTopic(
         SiloAddress local,
