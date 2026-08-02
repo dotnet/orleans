@@ -883,6 +883,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     staleCacheEvidence);
             }
 
+            AssertSplitPartitionHandoffsAreDurable(logs);
             var finalWorkerProgress = traffic.GetWorkerProgress();
             phase.Set("all-distributed-final");
             Assert.Equal(SiloCount, cluster.Silos.Count);
@@ -1303,6 +1304,46 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
 
         Assert.Empty(errors);
+    }
+
+    private static void AssertSplitPartitionHandoffsAreDurable(PhaseAwareLogCapture logs)
+    {
+        var completedHandoffs = new Dictionary<(string Silo, int Count), int>();
+        var removedHandoffs = 0;
+        foreach (var entry in logs.ToArray())
+        {
+            var isCompleted = string.Equals(
+                entry.EventId.Name,
+                "LogInformationAcceptSplitPartitionCompleted",
+                StringComparison.Ordinal);
+            var isRemoved = string.Equals(
+                entry.EventId.Name,
+                "LogInformationRemovedTransferredEntries",
+                StringComparison.Ordinal);
+            if (!isCompleted && !isRemoved)
+            {
+                continue;
+            }
+
+            Assert.False(string.IsNullOrEmpty(entry.HandoffSilo));
+            Assert.True(entry.HandoffCount.HasValue);
+            var handoff = (entry.HandoffSilo!, entry.HandoffCount.Value);
+            completedHandoffs.TryGetValue(handoff, out var count);
+            if (isCompleted)
+            {
+                completedHandoffs[handoff] = count + 1;
+            }
+            else
+            {
+                removedHandoffs++;
+                Assert.True(
+                    count > 0,
+                    $"Sender-side registrations were removed before the recipient completed the handoff: {entry}");
+                completedHandoffs[handoff] = count - 1;
+            }
+        }
+
+        Assert.True(removedHandoffs > 0, "The rolling upgrade did not exercise a non-empty split-partition handoff.");
     }
 
     private static bool IsExpectedIntentionalRestartLog(PhaseAwareLogEntry entry)
@@ -1842,8 +1883,41 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 if (IsEnabled(logLevel))
                 {
-                    capture.Add(siloName, category, logLevel, eventId, formatter(state, exception), exception);
+                    var (handoffSilo, handoffCount) = GetHandoffIdentity(state);
+                    capture.Add(
+                        siloName,
+                        category,
+                        logLevel,
+                        eventId,
+                        formatter(state, exception),
+                        exception,
+                        handoffSilo,
+                        handoffCount);
                 }
+            }
+
+            private static (string? Silo, int? Count) GetHandoffIdentity<TState>(TState state)
+            {
+                if (state is not IEnumerable<KeyValuePair<string, object?>> properties)
+                {
+                    return default;
+                }
+
+                string? silo = null;
+                int? count = null;
+                foreach (var property in properties)
+                {
+                    if (property.Key is "Silo" or "AddedSilo")
+                    {
+                        silo = property.Value?.ToString();
+                    }
+                    else if (property.Key == "Count" && property.Value is int value)
+                    {
+                        count = value;
+                    }
+                }
+
+                return (silo, count);
             }
         }
     }
@@ -1858,7 +1932,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             LogLevel level,
             EventId eventId,
             string message,
-            Exception? exception)
+            Exception? exception,
+            string? handoffSilo,
+            int? handoffCount)
         {
             var baseException = exception?.GetBaseException();
             _entries.Enqueue(
@@ -1871,7 +1947,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     eventId,
                     message,
                     baseException?.GetType().FullName,
-                    baseException?.Message));
+                    baseException?.Message,
+                    handoffSilo,
+                    handoffCount));
         }
 
         public PhaseAwareLogEntry[] ToArray() => _entries.ToArray();
@@ -1886,7 +1964,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         EventId EventId,
         string Message,
         string? ExceptionType,
-        string? ExceptionMessage)
+        string? ExceptionMessage,
+        string? HandoffSilo,
+        int? HandoffCount)
     {
         public override string ToString() =>
             $"{Timestamp:O} phase='{Phase}' silo='{SiloName}' [{Level}] [{Category}] ({EventId.Id}:{EventId.Name}) "
