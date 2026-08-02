@@ -1,24 +1,37 @@
 ---
-title: One-way requests
-description: Learn about one-way requests in .NET Orleans.
-ms.date: 05/23/2025
+title: One-way grain calls
+description: Use one-way requests for best-effort Orleans notifications.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# One-way requests
+# One-way grain calls
 
-Grains perform asynchronous request execution, requiring all grain interface methods to return an asynchronous type, like <xref:System.Threading.Tasks.Task>. Awaiting the completion of a task returned from a grain call notifies the caller that the request has finished, allowing the caller to handle any exceptions or receive return values. Orleans also supports *one-way requests*, enabling callers to notify a grain about an event without expecting exceptions or completion signals.
+A regular grain call returns a task that completes when Orleans receives the method's response. The task carries a return value or exception and tells the caller that the request finished.
 
-One-way requests return to the caller immediately and don't signal failure or completion. A one-way request doesn't even guarantee the callee received the request. The primary benefit of one-way requests is that they save messaging costs associated with sending a response back to the caller and can therefore improve performance in some specialized cases. One-way requests are an advanced performance feature. Use them with care and only when you determine that a one-way request is beneficial. We recommend preferring regular bidirectional requests, which signal completion and propagate errors back to callers.
-
-You can make a request one-way by marking the grain interface method with the <xref:Orleans.Concurrency.OneWayAttribute>, like this:
+A method marked with <xref:Orleans.Concurrency.OneWayAttribute> returns to the caller after Orleans accepts the request for sending. The caller receives no completion signal, result, or exception:
 
 ```csharp
-public interface IOneWayGrain : IGrainWithGuidKey
+public interface IAuditGrain : IGrainWithStringKey
 {
     [OneWay]
-    Task Notify(MyData data);
+    ValueTask Record(AuditEntry entry);
 }
 ```
 
-One-way requests must return either <xref:System.Threading.Tasks.Task> or <xref:System.Threading.Tasks.ValueTask>. They must not return generic variants of those types (<xref:System.Threading.Tasks.Task`1> and <xref:System.Threading.Tasks.ValueTask`1>).
+One-way methods must return <xref:System.Threading.Tasks.Task> or <xref:System.Threading.Tasks.ValueTask>, not their generic forms.
+
+## Delivery semantics
+
+One-way calls are best effort:
+
+- Completion of the returned task doesn't mean the target received or processed the request.
+- Exceptions thrown by the target aren't returned to the caller.
+- The caller can't distinguish successful processing from message loss or target failure.
+- Cancellation and response timeout semantics don't provide useful completion guarantees because there is no response.
+
+Use one-way calls only for notifications that are safe to lose and where the result isn't needed. Telemetry hints, cache invalidation hints, or redundant status signals can fit this model.
+
+Don't use one-way calls for state changes that require confirmation, financial operations, workflow transitions, or any operation the caller might need to retry. Prefer a regular request-response call, a durable queue, or an Orleans streaming provider when delivery and recovery matter.
+
+One-way calls can reduce response-message overhead, but treat them as an advanced optimization. Measure before replacing regular calls.

@@ -1,371 +1,154 @@
 ---
-title: Develop a grain
-description: Learn how to develop a grain in .NET Orleans.
-ms.date: 05/23/2025
+title: Develop Orleans grains
+description: Define grain contracts, implement grains, and call them in Orleans 10.
+ms.date: 08/02/2026
 ms.topic: article
 ---
 
-# Develop a grain
+# Develop Orleans grains
 
-Before writing code to implement a grain class, create a new Class Library project targeting .NET Standard or .NET Core (preferred), or .NET Framework 4.6.1 or higher (if you cannot use .NET Standard or .NET Core due to dependencies). You can define grain interfaces and grain classes in the same Class Library project or in two different projects for better separation of interfaces from implementation. In either case, the projects need to reference the [Microsoft.Orleans.Sdk](https://www.nuget.org/packages/Microsoft.Orleans.Sdk) NuGet package.
+A grain is an application object with a stable logical identity. Orleans activates it on demand, routes calls to its current activation, and removes idle activations from memory. Application code works with grain references instead of constructing grain classes or locating activations.
 
-For more thorough instructions, see the [Project Setup](../tutorials-and-samples/tutorial-1.md#project-setup) section of [Tutorial One – Orleans Basics](../tutorials-and-samples/tutorial-1.md).
+## Define a grain contract
 
-## Grain interfaces and classes
-
-Grains interact with each other and are called from outside by invoking methods declared as part of their respective grain interfaces. A grain class implements one or more previously declared grain interfaces. All methods of a grain interface must return a <xref:System.Threading.Tasks.Task> (for `void` methods), a <xref:System.Threading.Tasks.Task`1>, or a <xref:System.Threading.Tasks.ValueTask`1> (for methods returning values of type `T`).
-
-The following is an excerpt from the Orleans Presence Service sample:
+A grain interface derives from one of the grain key interfaces and declares asynchronous methods:
 
 ```csharp
-public interface IPlayerGrain : IGrainWithGuidKey
+public interface IShoppingCartGrain : IGrainWithStringKey
 {
-    Task<IGameGrain> GetCurrentGame(CancellationToken cancellationToken = default);
+    ValueTask AddItem(CartItem item);
 
-    Task JoinGame(IGameGrain game, CancellationToken cancellationToken = default);
+    ValueTask<IReadOnlyList<CartItem>> GetItems();
 
-    Task LeaveGame(IGameGrain game, CancellationToken cancellationToken = default);
-}
+    Task Checkout();
 
-public class PlayerGrain : Grain, IPlayerGrain
-{
-    private IGameGrain _currentGame;
-
-    // Game the player is currently in. May be null.
-    public Task<IGameGrain> GetCurrentGame(CancellationToken cancellationToken = default)
-    {
-       return Task.FromResult(_currentGame);
-    }
-
-    // Game grain calls this method to notify that the player has joined the game.
-    public Task JoinGame(IGameGrain game, CancellationToken cancellationToken = default)
-    {
-       _currentGame = game;
-
-       Console.WriteLine(
-           $"Player {GetPrimaryKey()} joined game {game.GetPrimaryKey()}");
-
-       return Task.CompletedTask;
-    }
-
-   // Game grain calls this method to notify that the player has left the game.
-   public Task LeaveGame(IGameGrain game, CancellationToken cancellationToken = default)
-   {
-       _currentGame = null;
-
-       Console.WriteLine(
-           $"Player {GetPrimaryKey()} left game {game.GetPrimaryKey()}");
-
-       return Task.CompletedTask;
-   }
-}
-```
-
-## Response timeout for grain methods
-
-The Orleans runtime allows you to enforce a response timeout per grain method. If a grain method doesn't complete within the timeout, the runtime throws a <xref:System.TimeoutException>. To impose a response timeout, add the <xref:Orleans.ResponseTimeoutAttribute> to the interface's grain method definition. It's crucial to add the attribute to the interface method definition, not the method implementation in the grain class, as both the client and the silo need to be aware of the timeout.
-
-Extending the previous `PlayerGrain` implementation, the following example shows how to impose a response timeout on the `LeaveGame` method:
-
-```csharp
-public interface IPlayerGrain : IGrainWithGuidKey
-{
-    Task<IGameGrain> GetCurrentGame(CancellationToken cancellationToken = default);
-
-    Task JoinGame(IGameGrain game, CancellationToken cancellationToken = default);
-
-    [ResponseTimeout("00:00:05")] // 5s timeout
-    Task LeaveGame(IGameGrain game, CancellationToken cancellationToken = default);
-}
-```
-
-The preceding code sets a response timeout of five seconds on the `LeaveGame` method. When leaving a game, if it takes longer than five seconds a <xref:System.TimeoutException> is thrown.
-
-You can also specify the timeout using <xref:System.TimeSpan> constructor parameters:
-
-```csharp
-public interface IDataProcessingGrain : IGrainWithGuidKey
-{
-    // 2 minute timeout using hours, minutes, seconds
-    [ResponseTimeout(0, 2, 0)]
-    Task<ProcessingResult> ProcessLargeDatasetAsync(Dataset data, CancellationToken cancellationToken = default);
-
-    // 500ms timeout using TimeSpan.FromMilliseconds equivalent
-    [ResponseTimeout("00:00:00.500")]
-    Task<HealthStatus> GetHealthAsync(CancellationToken cancellationToken = default);
-}
-```
-
-### Configure response timeout
-
-Similar to individual grain method response timeouts, you can configure a default response timeout for all grain methods. Calls to grain methods time out if a response isn't received within the specified period. By default, this period is **30 seconds**. You can configure the default response timeout:
-
-- By configuring <xref:Orleans.Configuration.MessagingOptions.ResponseTimeout> on <xref:Orleans.Configuration.ClientMessagingOptions>, on an external client.
-- By configuring <xref:Orleans.Configuration.MessagingOptions.ResponseTimeout> on <xref:Orleans.Configuration.SiloMessagingOptions>, on a server.
-
-For more information on configuring Orleans, see [Client configuration](../host/configuration-guide/client-configuration.md) or [Server configuration](../host/configuration-guide/server-configuration.md).
-
-### Timeout best practices
-
-Consider the following when configuring timeouts:
-
-- **Per-method timeouts override global settings**: A <xref:Orleans.ResponseTimeoutAttribute> on a grain method takes precedence over the global <xref:Orleans.ResponseTimeoutAttribute> configuration.
-- **Set realistic timeouts**: Base timeouts on expected execution time plus reasonable network latency. Timeouts that are too short cause unnecessary failures; timeouts that are too long delay error detection.
-- **Long-running operations**: For operations that may take significant time, consider using Orleans [Reminders](timers-and-reminders.md) instead of extending timeouts indefinitely.
-- **Testing**: Test timeout behavior in your integration tests to ensure your application handles <xref:System.TimeoutException> gracefully.
-
-## Return values from grain methods
-
-Define a grain method that returns a value of type `T` in a grain interface as returning a <xref:System.Threading.Tasks.Task`1>.
-For grain methods not marked with the `async` keyword, when the return value is available, you usually return it using the following statement:
-
-```csharp
-public Task<SomeType> GrainMethod1()
-{
-    return Task.FromResult(GetSomeType());
-}
-```
-
-Define a grain method that returns no value (effectively a void method) in a grain interface as returning a <xref:System.Threading.Tasks.Task>. The returned <xref:System.Threading.Tasks.Task> indicates the asynchronous execution and completion of the method. For grain methods not marked with the `async` keyword, when a "void" method completes its execution, it needs to return the special value <xref:System.Threading.Tasks.Task.CompletedTask?displayProperty=nameWithType>:
-
-```csharp
-public Task GrainMethod2()
-{
-    return Task.CompletedTask;
-}
-```
-
-A grain method marked as `async` returns the value directly:
-
-```csharp
-public async Task<SomeType> GrainMethod3()
-{
-    return await GetSomeTypeAsync();
-}
-```
-
-A `void` grain method marked as `async` that returns no value simply returns at the end of its execution:
-
-```csharp
-public async Task GrainMethod4()
-{
-    return;
-}
-```
-
-If a grain method receives the return value from another asynchronous method call (to a grain or not) and doesn't need to perform error handling for that call, it can simply return the <xref:System.Threading.Tasks.Task> it receives from that asynchronous call:
-
-```csharp
-public Task<SomeType> GrainMethod5()
-{
-    Task<SomeType> task = CallToAnotherGrain();
-
-    return task;
-}
-```
-
-Similarly, a `void` grain method can return a <xref:System.Threading.Tasks.Task> returned to it by another call instead of awaiting it.
-
-```csharp
-public Task GrainMethod6()
-{
-    Task task = CallToAsyncAPI();
-    return task;
-}
-```
-
-<xref:System.Threading.Tasks.ValueTask`1> can be used instead of <xref:System.Threading.Tasks.Task`1>.
-
-## IAsyncEnumerable return values
-
-Orleans supports returning <xref:System.Collections.Generic.IAsyncEnumerable`1> from grain methods, enabling efficient streaming of data from a grain to a caller without loading the entire result set into memory. This is useful for scenarios like:
-
-- Returning large collections of data progressively
-- Streaming real-time updates
-- Processing results as they become available
-
-### Define a streaming grain interface
-
-```csharp
-public interface IDataGrain : IGrainWithStringKey
-{
-    // Returns a streaming sequence of items
-    IAsyncEnumerable<DataItem> GetAllItemsAsync();
-
-    // Can also include CancellationToken for cancellation support
-    IAsyncEnumerable<DataItem> GetItemsAsync(CancellationToken cancellationToken = default);
-}
-```
-
-### Implement the streaming method
-
-Use the `yield return` statement or return an <xref:System.Collections.Generic.IAsyncEnumerable`1> directly:
-
-```csharp
-public class DataGrain : Grain, IDataGrain
-{
-    public async IAsyncEnumerable<DataItem> GetAllItemsAsync()
-    {
-        for (int i = 0; i < 1000; i++)
-        {
-            // Simulate async data retrieval
-            var item = await FetchItemAsync(i);
-            yield return item;
-        }
-    }
-
-    public async IAsyncEnumerable<DataItem> GetItemsAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        int id = 0;
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            var item = await FetchItemAsync(id++);
-            yield return item;
-        }
-    }
-
-    private Task<DataItem> FetchItemAsync(int id) =>
-        Task.FromResult(new DataItem { Id = id });
+    Task<Receipt> GetReceipt();
 }
 
 [GenerateSerializer]
-public class DataItem
+public sealed record CartItem(
+    [property: Id(0)] string ProductId,
+    [property: Id(1)] int Quantity);
+
+[GenerateSerializer]
+public sealed record Receipt(
+    [property: Id(0)] string OrderId);
+```
+
+Orleans 10 supports these grain method return types:
+
+- <xref:System.Threading.Tasks.Task>
+- <xref:System.Threading.Tasks.Task`1>
+- <xref:System.Threading.Tasks.ValueTask>
+- <xref:System.Threading.Tasks.ValueTask`1>
+
+Use `Task` or `ValueTask` for methods without a result, and their generic forms for methods returning a result. Don't use `void`, `async void`, or synchronous return types in grain contracts. A <xref:System.Threading.CancellationToken> can be included as a method parameter for cooperative cancellation.
+
+Arguments, return values, and exceptions cross process boundaries. Make application data serializable by Orleans, normally using <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> values. Grain references are already serializable and can be passed in calls or stored as part of grain state.
+
+## Implement the contract
+
+A grain class usually derives from <xref:Orleans.Grain> and implements one or more grain interfaces:
+
+```csharp
+public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
 {
-    [Id(0)]
-    public int Id { get; set; }
+    private readonly List<CartItem> _items = [];
+
+    public ValueTask AddItem(CartItem item)
+    {
+        _items.Add(item);
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<IReadOnlyList<CartItem>> GetItems() =>
+        ValueTask.FromResult<IReadOnlyList<CartItem>>(_items.ToArray());
+
+    public Task Checkout() => Task.CompletedTask;
+
+    public Task<Receipt> GetReceipt() =>
+        Task.FromResult(new Receipt($"order-{this.GetPrimaryKeyString()}"));
 }
 ```
 
-### Consume the streaming method
+Orleans creates grain classes through dependency injection. Constructor injection is available for application services, and <xref:Orleans.IGrainFactory> is available through the `GrainFactory` property on <xref:Orleans.Grain>.
+
+> [!IMPORTANT]
+> A grain activation processes one turn at a time. Don't block on tasks using `.Result`, `.Wait()`, or `GetAwaiter().GetResult()`. Use `await` so Orleans can resume the request on the activation scheduler.
+
+## Get and call a grain reference
+
+Use <xref:Orleans.IGrainFactory.GetGrain*> with the interface and key:
 
 ```csharp
-var grain = client.GetGrain<IDataGrain>("mydata");
+IShoppingCartGrain cart =
+    grainFactory.GetGrain<IShoppingCartGrain>("customer-42");
 
-await foreach (var item in grain.GetAllItemsAsync())
+await cart.AddItem(new CartItem("SKU-123", 2));
+IReadOnlyList<CartItem> items = await cart.GetItems();
+```
+
+Getting a reference doesn't create or activate a grain. The first call that needs an activation causes Orleans to place and activate it. The reference remains valid if the activation moves, deactivates, or is recreated on another silo.
+
+## Understand call completion
+
+A regular grain call completes in one of these ways:
+
+- The method returns successfully, optionally with a result.
+- The method throws, and the exception is propagated to the caller.
+- The caller cancels the call and observes <xref:System.OperationCanceledException>.
+- The caller doesn't receive a response before its response timeout and observes <xref:System.TimeoutException>.
+- Messaging or cluster failures prevent the call from completing.
+
+A timeout tells the caller that no response arrived in time. It doesn't prove that the grain method didn't run or won't finish. `CancelRequestOnTimeout` defaults to `false`; when enabled, Orleans sends a best-effort cancellation signal after a timeout, and the grain must still cooperate by observing a cancellation token.
+
+Distributed calls can be retried by application code or infrastructure after an uncertain outcome. Design operations to be idempotent when duplicate execution would be harmful. A common pattern is to include an operation ID and persist completed IDs with the state change.
+
+Configure a per-method timeout on the interface:
+
+```csharp
+public interface IReportGrain : IGrainWithGuidKey
 {
-    Console.WriteLine($"Received item: {item.Id}");
-
-    // Process each item as it arrives
-    await ProcessItemAsync(item);
+    [ResponseTimeout("00:00:10")]
+    Task<Report> Generate(CancellationToken cancellationToken = default);
 }
 ```
 
-### Configure batch size
+Global defaults are configured through <xref:Orleans.Configuration.ClientMessagingOptions> and <xref:Orleans.Configuration.SiloMessagingOptions>. See [Cancellation tokens](cancellation-tokens.md) for cancellation semantics and configuration.
 
-Orleans batches multiple elements together to reduce network round trips. You can configure the batch size using the `WithBatchSize` extension method:
+## Activation and deactivation
+
+Override the current lifecycle methods when a grain needs activation-scoped setup or cleanup:
 
 ```csharp
-// Request up to 50 elements per batch instead of the default 100
-await foreach (var item in grain.GetAllItemsAsync().WithBatchSize(50))
+public override Task OnActivateAsync(CancellationToken cancellationToken)
 {
-    await ProcessItemAsync(item);
+    return base.OnActivateAsync(cancellationToken);
+}
+
+public override Task OnDeactivateAsync(
+    DeactivationReason reason,
+    CancellationToken cancellationToken)
+{
+    return base.OnDeactivateAsync(reason, cancellationToken);
 }
 ```
 
-### IAsyncEnumerable vs Orleans Streams
+The parameterless `OnActivateAsync()` overload is obsolete. Deactivation callbacks are best effort and don't run after process termination or some failures, so don't rely on them to persist critical state.
 
-| Feature | IAsyncEnumerable | Orleans Streams |
-|---------|------------------|-----------------|
-| **Use case** | Request-response streaming | Pub-sub messaging |
-| **Lifetime** | Scoped to single call | Persistent subscriptions |
-| **Direction** | Grain to caller only | Any producer to any subscriber |
-| **Backpressure** | Built-in | Provider-dependent |
-| **Persistence** | No | Optional (provider-dependent) |
+See [Grain lifecycle](grain-lifecycle.md) for collection, lifecycle participation, and migration.
 
-Use <xref:System.Collections.Generic.IAsyncEnumerable`1> when:
+## Choose basic or advanced features
 
-- You need a simple request-response pattern with streaming results
-- The caller initiates the data flow and consumes all results
-- You want automatic backpressure and cancellation support
+Most grains only need a contract, an implementation, a stable key, and regular request-response calls. Add specialized behavior only when the workload requires it:
 
-Use [Orleans Streams](../streaming/index.md) when:
-
-- You need pub-sub messaging with multiple subscribers
-- Subscriptions should survive grain deactivation
-- You need persistent or durable streams
-
-## Grain references
-
-A grain reference is a proxy object implementing the same grain interface as the corresponding grain class. It encapsulates the logical identity (type and unique key) of the target grain. You use grain references to make calls to the target grain. Each grain reference points to a single grain (a single instance of the grain class), but you can create multiple independent references to the same grain.
-
-Since a grain reference represents the logical identity of the target grain, it's independent of the grain's physical location and remains valid even after a complete system restart. You can use grain references like any other .NET object. You can pass it to a method, use it as a method return value, etc., and even save it to persistent storage.
-
-You can obtain a grain reference by passing the identity of a grain to the <xref:Orleans.IGrainFactory.GetGrain``1(System.Type,System.Guid)?displayProperty=nameWithType> method, where `T` is the grain interface and `key` is the unique key of the grain within its type.
-
-The following examples show how to obtain a grain reference for the `IPlayerGrain` interface defined previously.
-
-From inside a grain class:
-
-```csharp
-IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
-```
-
-From Orleans client code.
-
-```csharp
-IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
-```
-
-For more information about grain references, see the [grain reference article](grain-references.md).
-
-### Grain method invocation
-
-The Orleans programming model is based on [asynchronous programming](../../csharp/asynchronous-programming/index.md). Using the grain reference from the previous example, here's how you perform a grain method invocation:
-
-```csharp
-// Invoking a grain method asynchronously
-Task joinGameTask = player.JoinGame(this, GrainCancellationToken);
-
-// The await keyword effectively makes the remainder of the
-// method execute asynchronously at a later point
-// (upon completion of the Task being awaited) without blocking the thread.
-await joinGameTask;
-
-// The next line will execute later, after joinGameTask has completed.
-players.Add(playerId);
-```
-
-You can join two or more `Tasks`. The join operation creates a new <xref:System.Threading.Tasks.Task> that resolves when all its constituent `Tasks` complete. This pattern is useful when a grain needs to start multiple computations and wait for all of them to complete before proceeding. For example, a front-end grain generating a web page made of many parts might make multiple back-end calls (one for each part) and receive a <xref:System.Threading.Tasks.Task> for each result. The grain would then await the join of all these `Tasks`. When the joined <xref:System.Threading.Tasks.Task> resolves, the individual `Tasks` have completed, and all the data required to format the web page has been received.
-
-Example:
-
-```csharp
-List<Task> tasks = new List<Task>();
-Message notification = CreateNewMessage(text);
-
-foreach (ISubscriber subscriber in subscribers)
-{
-    tasks.Add(subscriber.Notify(notification));
-}
-
-// WhenAll joins a collection of tasks, and returns a joined
-// Task that will be resolved when all of the individual notification Tasks are resolved.
-Task joinedTask = Task.WhenAll(tasks);
-
-await joinedTask;
-
-// Execution of the rest of the method will continue
-// asynchronously after joinedTask is resolve.
-```
-
-### Error propagation
-
-When a grain method throws an exception, Orleans propagates that exception up the calling stack, across hosts as necessary. For this to work as intended, exceptions must be serializable by Orleans, and hosts handling the exception must have the exception type available. If an exception type isn't available, Orleans throws the exception as an instance of <xref:Orleans.Serialization.UnavailableExceptionFallbackException?displayProperty=nameWithType>, preserving the message, type, and stack trace of the original exception.
-
-Exceptions thrown from grain methods don't cause the grain to be deactivated unless the exception inherits from <xref:Orleans.Storage.InconsistentStateException?displayProperty=nameWithType>. Storage operations throw <xref:Orleans.Storage.InconsistentStateException> when they discover that the grain's in-memory state is inconsistent with the state in the database. Aside from the special handling of <xref:Orleans.Storage.InconsistentStateException>, this behavior is similar to throwing an exception from any .NET object: exceptions don't cause an object to be destroyed.
-
-### Virtual methods
-
-A grain class can optionally override the <xref:Orleans.Grain.OnActivateAsync*> and <xref:Orleans.Grain.OnDeactivateAsync*> virtual methods. The Orleans runtime invokes these methods upon activation and deactivation of each grain of the class. This gives your grain code a chance to perform additional initialization and cleanup operations. An exception thrown by <xref:Orleans.Grain.OnActivateAsync*> fails the activation process.
-
-While <xref:Orleans.Grain.OnActivateAsync*> (if overridden) is always called as part of the grain activation process, <xref:Orleans.Grain.OnDeactivateAsync*> isn't guaranteed to be called in all situations (for example, in case of a server failure or other abnormal events). Because of this, your applications shouldn't rely on <xref:Orleans.Grain.OnDeactivateAsync*> for performing critical operations, such as persisting state changes. Use it only for best-effort operations.
-
-## See also
-
-- [Grain extensions](grain-extensions.md)
-- [Grain identity](grain-identity.md)
-- [Grain references](grain-references.md)
-- [Grain persistence](grain-persistence/index.md)
-- [Grain lifecycle overview](grain-lifecycle.md)
+- [Request scheduling and reentrancy](request-scheduling.md)
+- [Timers and reminders](timers-and-reminders.md)
+- [Observers](observers.md)
 - [Grain placement](grain-placement.md)
+- [Stateless worker grains](stateless-worker-grains.md)
+- [Grain call filters](interceptors.md)
+- [Grain extensions](grain-extensions.md)
+- [Grain services](grainservices.md)
+
+The [Orleans runtime implementation](../implementation/index.md) documentation describes internal scheduling, messaging, and lifecycle components. Those details aren't required for basic grain development.
