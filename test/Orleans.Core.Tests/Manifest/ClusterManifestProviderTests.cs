@@ -13,6 +13,7 @@ using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Metadata;
 using Orleans.Runtime.Utilities;
 using Orleans.Runtime.Versions;
@@ -267,6 +268,242 @@ public class ClusterManifestProviderTests
         Assert.Equal(new[] { localSilo, remoteSilo }, supportedSilos.OrderBy(static silo => silo));
     }
 
+    /// <summary>
+    /// When two or more manifests are missing simultaneously, the provider should attempt to fill them from a single
+    /// peer's cluster manifest hash summary before falling back to individual per-silo manifest fetches. When the
+    /// advertised hash is already present in the local manifest cache (e.g. because it matches a manifest already
+    /// known to this silo), the value is reused directly and no additional peer needs to be contacted at all.
+    /// </summary>
+    [Fact]
+    public async Task Current_FillsMultipleMissingManifestsFromSinglePeerHashSummaryCache()
+    {
+        var localSilo = CreateSiloAddress(11131, 1);
+        var peer1 = CreateSiloAddress(11132, 1);
+        var peer2 = CreateSiloAddress(11133, 1);
+        var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active)));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var siloManifestProvider = CreateSiloManifestProvider();
+        var localManifest = siloManifestProvider.SiloManifest;
+        var localHash = ManifestHashCalculator.ComputeHash(localManifest);
+
+        // Both peers advertise the same manifest hash as the local silo (a common case in a homogeneous cluster),
+        // so both should be satisfied entirely from the local manifest cache after a single hash-summary request to peer1.
+        var hashSummary = new ClusterManifestHashSummary(
+            new MajorMinorVersion(1, 0),
+            ImmutableDictionary<SiloAddress, ManifestHash>.Empty.Add(peer1, localHash).Add(peer2, localHash));
+        var peer1Target = new FakeClusterManifestSystemTarget(hashSummary);
+        grainFactory
+            .GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer1)
+            .Returns(peer1Target);
+
+        var services = new ServiceCollection().AddSingleton(grainFactory).BuildServiceProvider();
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+
+        var provider = new ClusterManifestProvider(
+            localSiloDetails,
+            siloManifestProvider,
+            membership,
+            Substitute.For<IFatalErrorHandler>(),
+            NullLogger<ClusterManifestProvider>.Instance,
+            services);
+
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            membership.Update(CreateMembershipSnapshot(
+                2,
+                (localSilo, SiloStatus.Active),
+                (peer1, SiloStatus.Active),
+                (peer2, SiloStatus.Active)));
+
+            await Until(() => provider.Current.Silos.ContainsKey(peer1) && provider.Current.Silos.ContainsKey(peer2));
+
+            Assert.Same(localManifest, provider.Current.Silos[peer1]);
+            Assert.Same(localManifest, provider.Current.Silos[peer2]);
+            Assert.Equal(1, peer1Target.HashSummaryRequests);
+            Assert.Equal(0, peer1Target.UpdateRequests);
+            grainFactory.DidNotReceive().GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer2);
+        }
+        finally
+        {
+            await lifecycle.OnStop();
+            membership.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A single missing manifest (below the batch-fill threshold) is fetched via the new hash-based path
+    /// (<see cref="IClusterManifestSystemTarget.GetSiloManifestHash"/> + <see cref="IClusterManifestSystemTarget.GetSiloManifestByHash"/>)
+    /// and must not fall back to the legacy <see cref="ISiloManifestSystemTarget"/> when the hash-based fetch succeeds.
+    /// </summary>
+    [Fact]
+    public async Task Current_FetchesSingleMissingManifestViaHashPathWithoutLegacyFallback()
+    {
+        var localSilo = CreateSiloAddress(11134, 1);
+        var remoteSilo = CreateSiloAddress(11135, 1);
+        var remoteManifest = CreateGrainManifest();
+        var remoteHash = ManifestHashCalculator.ComputeHash(remoteManifest);
+        var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active)));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var siloManifestProvider = CreateSiloManifestProvider();
+        var remoteTarget = new FakeHashOnlyClusterManifestSystemTarget(remoteHash, remoteManifest);
+        grainFactory
+            .GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
+            .Returns(remoteTarget);
+        var legacyTarget = new RecordingSiloManifestSystemTarget();
+        grainFactory
+            .GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
+            .Returns(legacyTarget);
+
+        var services = new ServiceCollection().AddSingleton(grainFactory).BuildServiceProvider();
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+
+        var provider = new ClusterManifestProvider(
+            localSiloDetails,
+            siloManifestProvider,
+            membership,
+            Substitute.For<IFatalErrorHandler>(),
+            NullLogger<ClusterManifestProvider>.Instance,
+            services);
+
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            membership.Update(CreateMembershipSnapshot(
+                2,
+                (localSilo, SiloStatus.Active),
+                (remoteSilo, SiloStatus.Active)));
+
+            await Until(() => provider.Current.Silos.ContainsKey(remoteSilo));
+
+            Assert.Same(remoteManifest, provider.Current.Silos[remoteSilo]);
+            Assert.False(legacyTarget.WasInvoked);
+        }
+        finally
+        {
+            await lifecycle.OnStop();
+            membership.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Current_FillsMultipleMissingManifestsFromPeerUpdateWhenHashesMatch()
+    {
+        var localSilo = CreateSiloAddress(11136, 1);
+        var peer1 = CreateSiloAddress(11137, 1);
+        var peer2 = CreateSiloAddress(11138, 1);
+        var manifest1 = CreateGrainManifest("2");
+        var manifest2 = CreateGrainManifest("3");
+        var hash1 = ManifestHashCalculator.ComputeHash(manifest1);
+        var hash2 = ManifestHashCalculator.ComputeHash(manifest2);
+        var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active)));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var summary = new ClusterManifestHashSummary(
+            new MajorMinorVersion(2, 0),
+            ImmutableDictionary<SiloAddress, ManifestHash>.Empty.Add(peer1, hash1).Add(peer2, hash2));
+        var update = new ClusterManifestUpdate(
+            new MajorMinorVersion(2, 0),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty.Add(peer1, manifest1).Add(peer2, manifest2),
+            includesAllActiveServers: true);
+        var peer1Target = new FakeClusterManifestSystemTarget(summary, update);
+        grainFactory
+            .GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer1)
+            .Returns(peer1Target);
+        var services = new ServiceCollection().AddSingleton(grainFactory).BuildServiceProvider();
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+        var provider = new ClusterManifestProvider(
+            localSiloDetails,
+            CreateSiloManifestProvider(),
+            membership,
+            Substitute.For<IFatalErrorHandler>(),
+            NullLogger<ClusterManifestProvider>.Instance,
+            services);
+
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            membership.Update(CreateMembershipSnapshot(
+                2,
+                (localSilo, SiloStatus.Active),
+                (peer1, SiloStatus.Active),
+                (peer2, SiloStatus.Active)));
+
+            await Until(() => provider.Current.Silos.ContainsKey(peer1) && provider.Current.Silos.ContainsKey(peer2));
+
+            Assert.Equal(hash1, ManifestHashCalculator.ComputeHash(provider.Current.Silos[peer1]));
+            Assert.Equal(hash2, ManifestHashCalculator.ComputeHash(provider.Current.Silos[peer2]));
+            Assert.Equal(1, peer1Target.HashSummaryRequests);
+            Assert.Equal(1, peer1Target.UpdateRequests);
+            grainFactory.DidNotReceive().GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer2);
+        }
+        finally
+        {
+            await lifecycle.OnStop();
+            membership.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Current_FallsBackToLegacyManifestWhenHashResponseDoesNotMatch()
+    {
+        var localSilo = CreateSiloAddress(11139, 1);
+        var remoteSilo = CreateSiloAddress(11140, 1);
+        var advertisedManifest = CreateGrainManifest("2");
+        var mismatchedManifest = CreateGrainManifest("3");
+        var legacyManifest = CreateGrainManifest("4");
+        var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active)));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory
+            .GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
+            .Returns(new FakeHashOnlyClusterManifestSystemTarget(
+                ManifestHashCalculator.ComputeHash(advertisedManifest),
+                mismatchedManifest));
+        var legacyTarget = new RecordingSiloManifestSystemTarget(legacyManifest);
+        grainFactory
+            .GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
+            .Returns(legacyTarget);
+        var services = new ServiceCollection().AddSingleton(grainFactory).BuildServiceProvider();
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+        var provider = new ClusterManifestProvider(
+            localSiloDetails,
+            CreateSiloManifestProvider(),
+            membership,
+            Substitute.For<IFatalErrorHandler>(),
+            NullLogger<ClusterManifestProvider>.Instance,
+            services);
+
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            membership.Update(CreateMembershipSnapshot(
+                2,
+                (localSilo, SiloStatus.Active),
+                (remoteSilo, SiloStatus.Active)));
+
+            await Until(() => provider.Current.Silos.ContainsKey(remoteSilo));
+
+            Assert.Same(legacyManifest, provider.Current.Silos[remoteSilo]);
+            Assert.True(legacyTarget.WasInvoked);
+        }
+        finally
+        {
+            await lifecycle.OnStop();
+            membership.Dispose();
+        }
+    }
+
     private static ClusterManifestProvider CreateClusterManifestProvider(
         SiloAddress localSilo,
         TestClusterMembershipService membership,
@@ -330,7 +567,7 @@ public class ClusterManifestProviderTests
             silos.ToImmutableDictionary(silo => silo, _ => manifest));
     }
 
-    private static GrainManifest CreateGrainManifest()
+    private static GrainManifest CreateGrainManifest(string interfaceVersion = "1")
     {
         var grains = ImmutableDictionary.CreateRange(
         [
@@ -350,7 +587,7 @@ public class ClusterManifestProviderTests
                 new GrainInterfaceProperties(CreatePropertyDictionary(
                 [
                     new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.TypeName, "ITest"),
-                    new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.Version, "1")
+                    new KeyValuePair<string, string>(WellKnownGrainInterfaceProperties.Version, interfaceVersion)
                 ])))
         ]);
 
@@ -519,6 +756,73 @@ public class ClusterManifestProviderTests
     private sealed class TestSiloManifestSystemTarget(GrainManifest manifest) : ISiloManifestSystemTarget
     {
         public ValueTask<GrainManifest> GetSiloManifest() => new(manifest);
+    }
+
+    /// <summary>
+    /// Fake <see cref="IClusterManifestSystemTarget"/> that only supports <see cref="GetClusterManifestHashSummary"/>,
+    /// used to verify the batch-fill path in <see cref="ClusterManifestProvider"/> that resolves multiple missing
+    /// manifests from a single peer's hash summary.
+    /// </summary>
+    private sealed class FakeClusterManifestSystemTarget(
+        ClusterManifestHashSummary hashSummary,
+        ClusterManifestUpdate? update = null) : IClusterManifestSystemTarget
+    {
+        public int HashSummaryRequests { get; private set; }
+
+        public int UpdateRequests { get; private set; }
+
+        public ValueTask<ClusterManifest> GetClusterManifest() => throw new NotSupportedException();
+
+        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion)
+        {
+            UpdateRequests++;
+            return new(update);
+        }
+
+        public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary()
+        {
+            HashSummaryRequests++;
+            return new(hashSummary);
+        }
+
+        public ValueTask<ManifestHash> GetSiloManifestHash() => throw new NotSupportedException();
+
+        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash) => throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Fake <see cref="IClusterManifestSystemTarget"/> that only supports the single-silo hash-based fetch path
+    /// (<see cref="GetSiloManifestHash"/> + <see cref="GetSiloManifestByHash"/>).
+    /// </summary>
+    private sealed class FakeHashOnlyClusterManifestSystemTarget(ManifestHash hash, GrainManifest manifest) : IClusterManifestSystemTarget
+    {
+        public ValueTask<ClusterManifest> GetClusterManifest() => throw new NotSupportedException();
+
+        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion) => throw new NotSupportedException();
+
+        public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary() => throw new NotSupportedException();
+
+        public ValueTask<ManifestHash> GetSiloManifestHash() => new(hash);
+
+        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash requestedHash) =>
+            new(requestedHash == hash ? manifest : null);
+    }
+
+    /// <summary>
+    /// Fake legacy <see cref="ISiloManifestSystemTarget"/> that records whether it was ever invoked, so tests can
+    /// assert that the legacy fallback path was not used when the hash-based fetch succeeds.
+    /// </summary>
+    private sealed class RecordingSiloManifestSystemTarget(GrainManifest? manifest = null) : ISiloManifestSystemTarget
+    {
+        public bool WasInvoked { get; private set; }
+
+        public ValueTask<GrainManifest> GetSiloManifest()
+        {
+            WasInvoked = true;
+            return manifest is null
+                ? throw new InvalidOperationException("The legacy manifest fetch path should not be used when the hash-based fetch succeeds.")
+                : new(manifest);
+        }
     }
 
     private sealed class TestClusterManifestProvider(ClusterManifest initialManifest) : IClusterManifestProvider
