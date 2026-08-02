@@ -1,28 +1,44 @@
 ---
 title: Event sourcing overview
-description: Learn an overview of event sourcing in .NET Orleans.
-ms.date: 05/23/2025
+description: Build event-sourced Orleans grains with JournaledGrain and log-consistency providers.
+ms.date: 08/02/2026
 ms.topic: overview
 ---
 
 # Event sourcing overview
 
-Event sourcing provides a flexible way to manage and persist grain state. An event-sourced grain has many potential advantages over a standard grain. For one, you can use it with many different storage provider configurations, and it supports geo-replication across multiple clusters. Moreover, it cleanly separates the grain class from definitions of the grain state (represented by a grain state object) and grain updates (represented by event objects).
+The supported Orleans Event Sourcing model uses <xref:Orleans.EventSourcing.JournaledGrain`2> from the `Microsoft.Orleans.EventSourcing` package. A journaled grain represents changes as events and derives its current state by applying those events in order.
 
-The documentation is structured as follows:
+`JournaledGrain` separates:
 
-- [JournaledGrain basics](journaledgrain-basics.md) explains how to define event-sourced grains by deriving from <xref:Orleans.EventSourcing.JournaledGrain`2>, how to access the current state, and how to raise events that update the state.
+- **State**, the aggregate view used to answer requests.
+- **Events**, the immutable changes submitted by the grain.
+- **Log consistency**, the protocol that orders, confirms, persists, and refreshes events.
+- **Storage**, selected by the configured log-consistency provider.
 
-- [Replicated instances](replicated-instances.md) explains how the event-sourcing mechanism handles replicated grain instances and ensures consistency. It discusses the possibility of racing events and conflicts, and how to address them.
+The built-in providers support snapshot storage, a complete event sequence stored as one record, and application-defined storage. Their scalability and retrieval capabilities differ, so select a provider based on the [provider comparison](log-consistency-providers.md).
 
-- [Immediate/Delayed confirmation](immediate-vs-delayed-confirmation.md) explains how delayed confirmation of events and reentrancy can improve availability and throughput.
+## Consistency model
 
-- [Notifications](notifications.md) explains how to subscribe to notifications, allowing grains to react to new events.
+The confirmed `Version` is the number of confirmed events. A confirmed state at a given version is derived from one ordered event sequence. Locally raised events can also contribute to `TentativeState` before confirmation.
 
-- [Event sourcing configuration](event-sourcing-configuration.md) explains how to configure projects, clusters, and log-consistency providers.
+Log-consistency providers use optimistic concurrency and protocol notifications to coordinate instances that can exist in advanced deployment topologies. This isn't automatic geographic replication: Orleans doesn't provision replicated storage, deploy multiple clusters, route users between regions, or define disaster-recovery policy. Any multi-cluster design must separately provide shared/reachable storage and Orleans multi-cluster connectivity, and must be validated for the selected provider.
 
-- [Built-in log-consistency providers](log-consistency-providers.md) explains how the three currently included log-consistency providers work.
+## Articles
 
-- [JournaledGrain diagnostics](journaledgrain-diagnostics.md) explains how to monitor for connection errors and get simple statistics.
+- [JournaledGrain basics](journaledgrain-basics.md)
+- [Replicated instances and conflicts](replicated-instances.md)
+- [Immediate and delayed confirmation](immediate-vs-delayed-confirmation.md)
+- [Notifications](notifications.md)
+- [Event sourcing configuration](event-sourcing-configuration.md)
+- [Log-consistency providers](log-consistency-providers.md)
+- [JournaledGrain diagnostics](journaledgrain-diagnostics.md)
 
-The behavior documented above is reasonably stable regarding the `JournaledGrain` API. However, we expect to extend or change the list of log consistency providers soon to more easily allow you to plug in standard event storage systems.
+## Event Sourcing and experimental Journaling
+
+`Microsoft.Orleans.EventSourcing` and `Microsoft.Orleans.Journaling` are separate packages and programming models.
+
+- Event Sourcing uses `JournaledGrain<TState, TEvent>` and log-consistency providers.
+- Journaling uses `DurableGrain`, journaled state, and durable collections.
+
+`Microsoft.Orleans.Journaling` is an alpha package whose APIs are marked experimental with diagnostic `ORLEANSEXP005`. It isn't a replacement for Event Sourcing. Evaluate it as an experimental feature and expect API or storage-format changes.

@@ -1,48 +1,45 @@
 ---
-title: Replicated grains
-description: Learn the concepts of replicated grains in .NET Orleans.
-ms.date: 05/23/2025
+title: JournaledGrain instances and conflicts
+description: Understand optimistic concurrency and synchronization for JournaledGrain instances.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# Replicated grains
+# `JournaledGrain` instances and conflicts
 
-Multiple instances of the same grain can be active in certain scenarios. `JournaledGrain` is designed to support replicated instances with minimal friction. It relies on *log-consistency providers* to run the necessary protocols ensuring all instances agree on the same sequence of events. In particular, it handles the following aspects:
+Advanced Orleans deployments can encounter more than one instance representing the same logical journal. Log-consistency providers coordinate those instances around one confirmed event sequence.
 
-- **Consistent versions**: All versions of the grain state (except tentative versions) are based on the same global sequence of events. In particular, if two instances see the same version number, they see the same state.
+At a given confirmed version, instances derive the same state from the same event sequence. Local tentative views can differ while submissions are unconfirmed.
 
-- **Racing events**: Multiple instances can simultaneously raise an event. The consistency provider resolves this race and ensures all instances agree on the same sequence.
+## Racing updates
 
-- **Notifications/Reactivity**: After an event is raised at one grain instance, the consistency provider not only updates storage but also notifies all other grain instances.
+Unconditional events are eventually ordered by the provider. An event can be confirmed later in the sequence than the tentative view expected, so transition logic must remain valid for any accepted ordering.
 
-For a general discussion of the consistency model, see our [TechReport](https://www.microsoft.com/research/publication/geo-distribution-actor-based-services/) and the [GSP paper](https://www.microsoft.com/research/publication/global-sequence-protocol-a-robust-abstraction-for-replicated-shared-state-extended-version/) (Global Sequence Protocol).
-
-## Conditional events
-
-Racing events can be problematic if they conflict, i.e., both shouldn't commit for some reason. For example, when withdrawing money from a bank account, two instances might independently determine sufficient funds exist for a withdrawal and issue a withdrawal event. However, the combination of both events could overdraw the account. To avoid this, the `JournaledGrain` API supports the <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*> method.
+When validity depends on the currently observed version, use a conditional event:
 
 ```csharp
-bool success = await RaiseConditionalEvent(
-    new WithdrawalEvent() { /* ... */ });
+var accepted = await RaiseConditionalEvent(new Withdrawn(amount));
 ```
 
-Conditional events double-check if the local version matches the version in storage. If not, it means the event sequence has grown in the meantime, indicating this event lost a race against another event. In that case, the conditional event is *not* appended to the log, and <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*> returns `false`.
-
-This is analogous to using e-tags with conditional storage updates and provides a simple mechanism to avoid committing conflicting events.
-
-It's possible and sensible to use both conditional and unconditional events for the same grain, such as `DepositEvent` and `WithdrawalEvent`. Deposits don't need to be conditional: even if a `DepositEvent` loses a race, it doesn't have to be canceled but can still be appended to the global event sequence.
-
-Awaiting the task returned by <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*> is sufficient to confirm the event; you don't need to call <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> as well.
+The provider compares the expected confirmed version with storage. If another update advanced the log, it doesn't append the event and returns `false`. The grain can then re-evaluate the command against the refreshed state.
 
 ## Explicit synchronization
 
-Sometimes, you might want to ensure a grain is fully caught up with the latest version. You can enforce this by calling:
+Call `RefreshNow` to confirm local submissions and refresh from the global log:
 
 ```csharp
 await RefreshNow();
 ```
 
-This call does two things:
+This is useful before a decision that requires the latest confirmed view. It incurs storage/protocol work and can wait while the backing service is unavailable.
 
-1. Confirms all unconfirmed events.
-1. Loads the latest version from storage.
+## Deployment boundary
+
+The protocol contains cluster-aware notification and concurrency mechanisms, but doesn't itself deliver a geographically replicated application. A multi-cluster deployment must provide:
+
+- Compatible Orleans multi-cluster configuration and connectivity.
+- Storage that every participating instance can reach with the required consistency.
+- A provider whose behavior fits the topology.
+- Application decisions for write regions, failover, latency, and conflict handling.
+
+The custom provider's `primaryCluster` registration argument currently doesn't restrict submissions. Don't rely on it as a write-region, replication, access-control, or failover mechanism.

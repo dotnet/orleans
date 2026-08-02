@@ -1,51 +1,50 @@
 ---
 title: Azure Cosmos DB grain persistence
-description: Use the Azure Cosmos DB grain persistence provider to persist Azure Cosmos DB for NoSQL data in a .NET Orleans application.
+description: Configure Azure Cosmos DB for NoSQL as an Orleans grain storage provider.
+ms.date: 08/02/2026
 ms.topic: how-to
-ms.devlang: csharp
-ms.date: 05/23/2025
 ---
 
 # Azure Cosmos DB for NoSQL grain persistence
 
-The Azure Cosmos DB grain persistence provider supports the [API for NoSQL](/azure/cosmos-db/nosql).
+The `Microsoft.Orleans.Persistence.Cosmos` package stores grain state as items in Azure Cosmos DB for NoSQL. Clustering is configured separately using `Microsoft.Orleans.Clustering.Cosmos`; installing or configuring clustering isn't required merely to use Cosmos DB for grain state.
 
-## Install NuGet package
+## Configure storage
 
-Install the [Microsoft.Orleans.Persistence.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) and [Microsoft.Orleans.Clustering.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Cosmos) NuGet packages. The Azure Cosmos DB provider stores state in a container item.
-
-> [!IMPORTANT]
-> The default database name used by the provider is **Orleans**. The default clustering container name is **OrleansCluster** and the default storage container name is **OrleansStorage**. The cluster container expects a partition key value of `/ClusterId` and the storage container expects `/PartitionKey`.
-
-## Configure clustering provider
-
-To configure the clustering provider, use the `HostingExtensions.UseCosmosClustering` extension method. In this method, you can customize the name and throughput of the database or container, enable resource creation, or configure the client's credentials.
+Configure a named provider with `AddCosmosGrainStorage`. Microsoft Entra authentication avoids storing account keys:
 
 ```csharp
-siloBuilder.UseCosmosClustering(
-    configureOptions: static options =>
-    {
-        options.IsResourceCreationEnabled = true;
-        options.DatabaseName = "OrleansAlternativeDatabase";
-        options.ContainerName = "OrleansClusterAlternativeContainer";
-        options.ContainerThroughputProperties = ThroughputProperties.CreateAutoscaleThroughput(1000);
-        options.ConfigureCosmosClient("<azure-cosmos-db-nosql-connection-string>");
-    });
-```
+using Azure.Identity;
 
-## Configure storage provider
-
-Configure the Azure Cosmos DB grain persistence provider using the `HostingExtensions.AddCosmosGrainStorage` extension method.
-
-```csharp
 siloBuilder.AddCosmosGrainStorage(
-    name: "profileStore",
-    configureOptions: static options =>
+    "profileStore",
+    options =>
     {
-        options.IsResourceCreationEnabled = true;
-        options.DatabaseName = "OrleansAlternativeDatabase";
-        options.ContainerName = "OrleansStorageAlternativeContainer";
-        options.ContainerThroughputProperties = ThroughputProperties.CreateAutoscaleThroughput(1000);
-        options.ConfigureCosmosClient("<azure-cosmos-db-nosql-connection-string>");
+        options.ConfigureCosmosClient(
+            "https://account.documents.azure.com:443/",
+            new DefaultAzureCredential());
+        options.DatabaseName = "Orleans";
+        options.ContainerName = "OrleansStorage";
+        options.IsResourceCreationEnabled = false;
     });
 ```
+
+The defaults are database `Orleans`, container `OrleansStorage`, and partition-key path `/PartitionKey`. Provision the database and container before startup when `IsResourceCreationEnabled` is `false`. Enabling resource creation is convenient for development but production provisioning is usually managed separately.
+
+## Partitioning and indexing
+
+The default partition-key provider derives a key for the grain record. If an application needs another partitioning strategy, implement the Cosmos partition-key provider contract and use the generic `AddCosmosGrainStorage<TPartitionKeyProvider>` overload.
+
+Changing the partition-key path or partition-key algorithm after data exists is a data migration. All silos using the same provider name must agree on the database, container, partition-key path, and provider implementation.
+
+Use `StateFieldsToIndex` to opt selected serialized state fields into indexing. Index only fields used by operational queries: additional indexing increases write cost. Grain storage itself retrieves records by identity and doesn't provide a general query API.
+
+## Concurrency and deployment
+
+The provider maps Cosmos DB ETags to Orleans ETags. Concurrent writes from stale activations fail with <xref:Orleans.Storage.InconsistentStateException>.
+
+When evolving state:
+
+- Keep the configured serializer able to read existing items.
+- Deploy compatible readers before writing a new representation.
+- Treat container changes, partition-key changes, and serializer changes as explicit migrations.

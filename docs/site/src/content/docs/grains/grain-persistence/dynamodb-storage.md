@@ -1,96 +1,36 @@
 ---
 title: Amazon DynamoDB grain persistence
-description: Learn about Amazon DynamoDB grain persistence in .NET Orleans.
-ms.date: 02/06/2026
+description: Configure Amazon DynamoDB as an Orleans grain storage provider.
+ms.date: 08/02/2026
 ms.topic: how-to
-ai-usage: ai-assisted
-zone_pivot_groups: orleans-version
 ---
 
 # Amazon DynamoDB grain persistence
 
-In this article, you learn how to install and configure Amazon DynamoDB grain persistence.
-
-## Installation
-
-Install the [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) package from NuGet.
-
-## Configuration
-
-Configure the DynamoDB grain persistence provider using the <xref:Orleans.Hosting.DynamoDBSiloBuilderExtensions.AddDynamoDBGrainStorage*?displayProperty=nameWithType> extension method.
+Install the `Microsoft.Orleans.Persistence.DynamoDB` package and configure a named provider with <xref:Orleans.Hosting.DynamoDBSiloBuilderExtensions.AddDynamoDBGrainStorage*>:
 
 ```csharp
 siloBuilder.AddDynamoDBGrainStorage(
-    name: "profileStore",
-    configureOptions: options =>
+    "profileStore",
+    options =>
     {
-        options.AccessKey = "<DynamoDB access key>";
-        options.SecretKey = "<DynamoDB secret key>";
-        options.Service = "<DynamoDB region name>"; // Such as "us-west-2"
+        options.Service = "us-west-2";
+        options.ServiceId = "my-application";
+        options.TableName = "OrleansGrainState";
+        options.CreateIfNotExists = false;
     });
-);
 ```
 
-If your authentication method requires a token or a non-default profile name, you can define those properties. First, view your credentials file using the following command:
+The AWS SDK credential chain supplies credentials when `AccessKey` and `SecretKey` aren't set. In production, prefer workload credentials such as an IAM role over long-lived keys. `ProfileName`, `AccessKey`, `SecretKey`, and `Token` are available when the deployment environment requires explicit SDK configuration.
 
-```bash
-cat ~/.aws/credentials
-```
+## Capacity and lifecycle
 
-As an example, the following configuration shows how to configure the DynamoDB grain persistence provider to use the `default` profile from the `~/.aws/credentials` file:
+`UseProvisionedThroughput` selects provisioned-capacity behavior. When enabled, configure `ReadCapacityUnits` and `WriteCapacityUnits`. `CreateIfNotExists` and `UpdateIfExists` allow provider-managed table changes, but infrastructure-managed provisioning is usually preferable in production.
 
-```bash
-[YOUR_PROFILE_NAME]
-aws_access_key_id = ***
-aws_secret_access_key = ***
-aws_security_token = ***
-aws_session_expiration = ***
-aws_session_token = ***
-```
+`DeleteStateOnClear` controls whether clearing state deletes the item or resets it. `TimeToLive` advances the item's expiration on every write; enable it only when disappearing state is valid application behavior.
 
-This configuration allows for both types of authentication credentials:
+The `ServiceId` must remain stable across deployments that share the same logical application state. The provider uses optimistic concurrency and rejects stale writes.
 
-- access key & secret key
-- access key & secret key & token
+## Serialization
 
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
-
-``` csharp
-siloBuilder.AddDynamoDBGrainStorage(
-  name: "profileStore",
-  configureOptions: options =>
-  {
-      options.AccessKey = "***";
-      options.SecretKey = "***";
-      options.Service = "***";
-      options.ProfileName = "***";
-      options.Token = "***";
-  });
-```
-
-For more information on AWS credentials and named profiles, see [AWS Credentials](https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/net-dg-config-creds.html#creds-locate) and [Named profiles](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html#cli-configure-files-using-profiles) in the AWS documentation.
-
-## Configure serialization
-
-Grain storage serialization is configured using the <xref:Orleans.Storage.IGrainStorageSerializer> interface. By default, grain state serializes using `Newtonsoft.Json`. You can customize the serializer by setting the <xref:Orleans.Configuration.DynamoDBStorageOptions.GrainStorageSerializer> property. For more information on configuring grain storage serializers, see [Grain storage serializers](../../host/configuration-guide/serialization.md#grain-storage-serializers).
-
-:::zone-end
-:::zone target="docs" pivot="orleans-3-x"
-
-``` csharp
-siloBuilder.AddDynamoDBGrainStorage(
-  name: "profileStore",
-  configureOptions: options =>
-  {
-      options.UseJson = true;
-      options.AccessKey = "***";
-      options.SecretKey = "***";
-      options.Service = "***";
-      options.ProfileName = "***";
-      options.Token = "***";
-  });
-```
-
-For more information on AWS credentials and named profiles, see [AWS Credentials](https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/net-dg-config-creds.html#creds-locate) and [Named profiles](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html#cli-configure-files-using-profiles) in the AWS documentation.
-
-:::zone-end
+Set `DynamoDBStorageOptions.GrainStorageSerializer` to customize the stored representation. Changing serializers doesn't rewrite existing items, so the replacement must read the previous representation or be accompanied by a migration.
