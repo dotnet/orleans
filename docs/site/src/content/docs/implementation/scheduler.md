@@ -1,79 +1,87 @@
 ---
-title: Scheduling overview
-description: Explore the scheduling overview in .NET Orleans.
-ms.date: 03/30/2025
+title: Scheduling and turn execution
+description: Understand Orleans 10 activation scheduling, request admission, continuations, and interleaving.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# Scheduling overview
+# Scheduling and turn execution
 
-Two forms of scheduling in Orleans are relevant to grains:
+Orleans separates **request scheduling** from **task scheduling**:
 
-1. **Request scheduling**: Scheduling incoming grain calls for execution according to rules discussed in [Request scheduling](../grains/request-scheduling.md).
-1. **Task scheduling**: Scheduling synchronous blocks of code to execute in a *single-threaded* manner.
+- request scheduling decides which incoming calls may make progress for an activation;
+- task scheduling executes each synchronous work item one at a time in that activation's context.
 
-All grain code executes on the grain's task scheduler, meaning requests also execute on the grain's task scheduler. Even if request scheduling rules allow multiple requests to execute *concurrently*, they won't execute *in parallel* because the grain's task scheduler always executes tasks one by one and never executes multiple tasks in parallel.
+This distinction explains how reentrant calls can interleave without two pieces of grain code running in parallel on the same activation.
 
-## Task scheduling
+## `WorkItemGroup` and `ActivationTaskScheduler`
 
-To better understand scheduling, consider the following grain, `MyGrain`. It has a method called `DelayExecution()` that logs a message, waits some time, then logs another message before returning.
+Each activation owns a `WorkItemGroup` and an `ActivationTaskScheduler`. The task scheduler enqueues work into the group. The group implements a small state machine (`Waiting`, `Runnable`, and `Running`) and schedules itself onto the .NET thread pool.
+
+```mermaid
+flowchart LR
+    Request[Admitted request]
+    Continuation[Async continuation]
+    Scheduler[ActivationTaskScheduler]
+    Queue[WorkItemGroup queue]
+    Pool[.NET thread pool]
+    Turn[One synchronous turn]
+
+    Request --> Scheduler
+    Continuation --> Scheduler
+    Scheduler --> Queue
+    Queue --> Pool
+    Pool --> Turn
+    Turn -->|more queued work| Pool
+```
+
+Only one thread can execute a `WorkItemGroup` at a time. That thread is not permanently assigned: different turns can run on different pool threads. The invariant is exclusive execution of the activation context, not thread affinity.
+
+Source: [`WorkItemGroup`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Scheduler/WorkItemGroup.cs) and [`ActivationTaskScheduler`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Scheduler/ActivationTaskScheduler.cs).
+
+## Async methods become multiple turns
+
+An async grain method runs synchronously until it awaits incomplete work. Its continuation is later queued back to the same activation scheduler.
 
 ```csharp
-public interface IMyGrain : IGrain
+public async Task UpdateAsync()
 {
-    Task DelayExecution();
-}
-
-public class MyGrain : Grain, IMyGrain
-{
-    private readonly ILogger<MyGrain> _logger;
-
-    public MyGrain(ILogger<MyGrain> logger) => _logger = logger;
-
-    public async Task DelayExecution()
-    {
-        _logger.LogInformation("Executing first task");
-
-        await Task.Delay(1_000);
-
-        _logger.LogInformation("Executing second task");
-    }
+    ApplyFirstChange();       // turn 1
+    await ReadDependency();   // yields
+    ApplySecondChange();      // a later turn
 }
 ```
 
-When this method executes, the method body executes in two parts:
+For a non-reentrant activation, other application requests normally wait while this request is incomplete. For reentrant or selectively interleavable calls, another request can run during the await. It still runs as a separate synchronous turn; it does not execute in parallel with `ApplyFirstChange` or `ApplySecondChange`.
 
-1. The first `_logger.LogInformation(...)` call and the call to `Task.Delay(1_000)`.
-1. The second `_logger.LogInformation(...)` call.
+Therefore, grain state is protected from parallel access by the scheduler but can still change across an `await` when interleaving is allowed. Code must recheck assumptions after awaits in reentrant grains.
 
-The second task isn't scheduled on the grain's task scheduler until the `Task.Delay(1_000)` call completes. At that point, it schedules the *continuation* of the grain method.
+## Request admission
 
-Here's a graphical representation of how a request is scheduled and executed as two tasks:
+`ActivationData` owns pending and running requests. It applies the grain's concurrency policy, dispatches eligible messages, and signals completion so that another request can progress. Policies include:
 
-:::image type="content" source="media/scheduler/scheduling-1.png" alt-text="Two-Task-based request execution example.":::
+- the default non-reentrant model;
+- grain-wide reentrancy;
+- call-chain reentrancy;
+- `[AlwaysInterleave]`; and
+- predicate-based `[MayInterleave]`.
 
-The description above isn't specific to Orleans; it describes how task scheduling works in .NET. The C# compiler converts asynchronous methods into an asynchronous state machine, and execution progresses through this state machine in discrete steps. Each step schedules on the current <xref:System.Threading.Tasks.TaskScheduler> (accessed via <xref:System.Threading.Tasks.TaskScheduler.Current?displayProperty=nameWithType>, defaulting to <xref:System.Threading.Tasks.TaskScheduler.Default?displayProperty=nameWithType>) or the current <xref:System.Threading.SynchronizationContext>. If a <xref:System.Threading.Tasks.TaskScheduler> is used, each step in the method represents a <xref:System.Threading.Tasks.Task> instance passed to that <xref:System.Threading.Tasks.TaskScheduler>. Therefore, a <xref:System.Threading.Tasks.Task> in .NET can represent two conceptual things:
+The user-facing rules are documented in [request scheduling](../grains/request-scheduling.md). Internally, request admission and task serialization remain separate layers.
 
-1. An asynchronous operation that can be awaited. The execution of the `DelayExecution()` method above is represented by a <xref:System.Threading.Tasks.Task> that can be awaited.
-1. A synchronous block of work. Each stage within the `DelayExecution()` method above is represented by a <xref:System.Threading.Tasks.Task>.
+## Runtime context and inline execution
 
-When `TaskScheduler.Default` is used, continuations schedule directly onto the .NET <xref:System.Threading.ThreadPool> and aren't wrapped in a <xref:System.Threading.Tasks.Task> object. The wrapping of continuations in <xref:System.Threading.Tasks.Task> instances occurs transparently, so developers rarely need to be aware of these implementation details.
+`ActivationTaskScheduler.TryExecuteTaskInline` permits inline execution only when the current `RuntimeContext` belongs to the same `WorkItemGroup` and the task was not already queued. Runtime helpers follow the same rule: execute inline in the matching grain context, otherwise enqueue.
 
-### Task scheduling in Orleans
+This prevents a continuation or runtime callback from bypassing activation isolation simply because it originated on a thread which is already processing Orleans work.
 
-Each grain activation has its own <xref:System.Threading.Tasks.TaskScheduler> instance responsible for enforcing the *single-threaded* execution model of grains. Internally, this <xref:System.Threading.Tasks.TaskScheduler> is implemented via `ActivationTaskScheduler` and `WorkItemGroup`. `WorkItemGroup` keeps enqueued tasks in a <xref:System.Collections.Generic.Queue`1> (where `T` is internally a <xref:System.Threading.Tasks.Task>) and implements <xref:System.Threading.IThreadPoolWorkItem>. To execute each currently enqueued <xref:System.Threading.Tasks.Task>, `WorkItemGroup` schedules *itself* on the .NET <xref:System.Threading.ThreadPool>. When the .NET <xref:System.Threading.ThreadPool> invokes the `WorkItemGroup`'s `IThreadPoolWorkItem.Execute()` method, the `WorkItemGroup` executes the enqueued <xref:System.Threading.Tasks.Task> instances one by one.
+## Blocking and escaping the scheduler
 
-Each grain has a scheduler that executes by scheduling itself on the .NET <xref:System.Threading.ThreadPool>:
+Blocking a turn prevents every queued continuation and admitted request for that activation from progressing. Sync-over-async can deadlock when the awaited completion needs the same activation scheduler.
 
-:::image type="content" source="media/scheduler/scheduling-2.png" alt-text="Orleans grains scheduling themselves on the .NET ThreadPool.":::
+`Task.Run` executes outside the activation scheduler. It can be useful for isolated CPU work, but code running there must not directly access mutable grain state or assume `RuntimeContext.Current` is the activation. Return immutable results and apply them in a scheduled continuation.
 
-Each scheduler contains a queue of tasks:
+## Fairness and diagnostics
 
-:::image type="content" source="media/scheduler/scheduling-3.png" alt-text="Scheduler queue of scheduled tasks.":::
+`WorkItemGroup` drains work subject to runtime scheduling limits so one busy activation does not permanently own a thread-pool worker. Long synchronous turns still delay other work and are reported by runtime scheduling diagnostics.
 
-The .NET <xref:System.Threading.ThreadPool> executes each work item enqueued to it. This includes *grain schedulers* as well as other work items, such as those scheduled via `Task.Run(...)`:
-
-:::image type="content" source="media/scheduler/scheduling-4.png" alt-text="Visualization of the all schedulers running in the .NET ThreadPool.":::
-
-> [!NOTE]
-> A grain's scheduler can only execute on one thread at a time, but it doesn't always execute on the same thread. The .NET <xref:System.Threading.ThreadPool> is free to use a different thread each time the grain's scheduler executes. The grain's scheduler ensures it only executes on one thread at a time, implementing the *single-threaded* execution model of grains.
+Scheduling guarantees are local to an activation. They do not order calls across grains, create a distributed lock, or provide message exactly-once behavior.
