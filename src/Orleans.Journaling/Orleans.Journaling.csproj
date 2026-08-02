@@ -27,7 +27,6 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,6 +5,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Journaling.Messaging;
 
@@ -12,7 +15,7 @@ namespace Orleans.Journaling.Messaging;
 /// Durable inbox implementation for receiving and processing messages.
 /// Uses IDurableDictionary for persistent storage with deduplication support.
 /// </summary>
-internal sealed class DurableInbox : IDurableInbox
+internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
 {
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inbox;
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
@@ -20,6 +23,9 @@ internal sealed class DurableInbox : IDurableInbox
     private readonly Dictionary<string, IInboxHandler> _legacyRouteHandlers;
     private readonly ConcurrentDictionary<string, IInboxHandler?> _routeCache;
     private readonly int _capacity;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly JournalingInstruments? _instruments;
+    private DurableInboxExtension? _extension;
 
     /// <summary>
     /// Creates a new DurableInbox instance.
@@ -42,6 +48,27 @@ internal sealed class DurableInbox : IDurableInbox
         _legacyRouteHandlers = new Dictionary<string, IInboxHandler>();
         _routeCache = new ConcurrentDictionary<string, IInboxHandler?>();
         _capacity = capacity;
+    }
+
+    internal DurableInbox(
+        IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
+        IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
+        IServiceProvider serviceProvider,
+        IGrainContext grainContext,
+        JournalingInstruments instruments,
+        int capacity)
+        : this(inbox, processed, capacity)
+    {
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+        ArgumentNullException.ThrowIfNull(grainContext);
+        ArgumentNullException.ThrowIfNull(instruments);
+
+        _serviceProvider = serviceProvider;
+        _instruments = instruments;
+        grainContext.ObservableLifecycle.Subscribe(
+            RuntimeTypeNameFormatter.Format(GetType()),
+            GrainLifecycleStage.Last,
+            this);
     }
 
     /// <summary>
@@ -90,6 +117,7 @@ internal sealed class DurableInbox : IDurableInbox
             {
                 // Dispose ArcBuffer resources
                 envelope.Data.Dispose();
+                _instruments?.OnInboxDepthChanged(-1);
             }
             return removed;
         }
@@ -213,6 +241,23 @@ internal sealed class DurableInbox : IDurableInbox
     public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler)
     {
         return _legacyRouteHandlers.TryGetValue(routeKey, out handler);
+    }
+
+    public Task OnStart(CancellationToken cancellationToken = default)
+    {
+        if (!cancellationToken.IsCancellationRequested && _serviceProvider is not null)
+        {
+            _extension = _serviceProvider.GetRequiredService<DurableInboxExtension>();
+            _extension.ResumeProcessing();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task OnStop(CancellationToken cancellationToken = default)
+    {
+        _extension?.StopProcessing();
+        return Task.CompletedTask;
     }
 }
 
