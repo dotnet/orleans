@@ -547,9 +547,28 @@ internal sealed partial class DisseminationProtocol(
 
     private async Task SendGossipBatches(List<(SiloAddress Peer, ImmutableArray<PendingTopicValues> ValuesByTopic)> batches, CancellationToken cancellationToken)
     {
-        foreach (var queued in batches)
+        var nextBatch = -1;
+        var workers = new Task[Math.Min(batches.Count, _options.CurrentValue.MaxConcurrentSends)];
+        for (var i = 0; i < workers.Length; i++)
         {
-            await SendGossipBatch(queued.Peer, queued.ValuesByTopic, cancellationToken);
+            workers[i] = SendNextBatches();
+        }
+
+        await Task.WhenAll(workers);
+
+        async Task SendNextBatches()
+        {
+            while (true)
+            {
+                var index = Interlocked.Increment(ref nextBatch);
+                if (index >= batches.Count)
+                {
+                    return;
+                }
+
+                var queued = batches[index];
+                await SendGossipBatch(queued.Peer, queued.ValuesByTopic, cancellationToken);
+            }
         }
     }
 

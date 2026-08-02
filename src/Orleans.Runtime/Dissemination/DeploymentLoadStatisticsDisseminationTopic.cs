@@ -81,6 +81,11 @@ internal sealed class DeploymentLoadStatisticsDisseminationTopic(
         }
 
         var statistics = serializer.Deserialize<SiloRuntimeStatistics>(value.Payload);
+        if (statistics is null)
+        {
+            return ValueTask.FromResult(DisseminationApplyResult.Rejected);
+        }
+
         return ValueTask.FromResult(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatistics(siloAddress, statistics));
     }
 

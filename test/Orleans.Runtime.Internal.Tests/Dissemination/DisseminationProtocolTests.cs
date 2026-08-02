@@ -403,6 +403,62 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task GossipSendsHonorConfiguredConcurrency()
+    {
+        var local = CreateSilo(11111);
+        var peers = Enumerable.Range(11112, 4).Select(CreateSilo).ToArray();
+        var transport = new FakeTransport(local, peers);
+        var releaseSends = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var concurrencyReached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = 0;
+        var inFlight = 0;
+        var maxInFlight = 0;
+        transport.SendGossipHandler = async (_, _, cancellationToken) =>
+        {
+            Interlocked.Increment(ref started);
+            var current = Interlocked.Increment(ref inFlight);
+            UpdateMaximum(ref maxInFlight, current);
+            if (current == 2)
+            {
+                concurrencyReached.TrySetResult(true);
+            }
+
+            try
+            {
+                await releaseSends.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref inFlight);
+            }
+        };
+
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 2;
+            options.Overlay.FanOutFactor = _ => peers.Length;
+        });
+
+        Assert.True(await protocol.Publish(
+            topic.Name,
+            topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1),
+            peers,
+            CancellationToken.None));
+        var flushTask = protocol.FlushPendingGossip(CancellationToken.None);
+
+        await concurrencyReached.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(2, Volatile.Read(ref started));
+        Assert.Equal(2, Volatile.Read(ref maxInFlight));
+
+        releaseSends.SetResult(true);
+        await flushTask;
+
+        Assert.Equal(peers.Length, started);
+        Assert.Equal(2, maxInFlight);
+    }
+
+    [Fact]
     public void FixedTreeRoutingSatisfiesReachabilityAndFanoutInvariants()
     {
         Gen.Select(Gen.Int[1, 64], Gen.Int[1, 8], Gen.Int[0, 63], static (count, fanout, rootSeed) =>
@@ -752,6 +808,7 @@ public class DisseminationProtocolTests
 
         Assert.NotNull(value);
         var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        Assert.NotNull(update);
         Assert.NotNull(update.Diff);
         Assert.Null(update.Snapshot);
         var receiverManager = new FakeMembershipManager(baseSnapshot);
@@ -925,8 +982,26 @@ public class DisseminationProtocolTests
             [topicName] = [.. values],
         }.ToImmutableDictionary(StringComparer.Ordinal);
 
-    private static T RoundTrip<T>(Serializer serializer, T value) =>
-        serializer.Deserialize<T>(serializer.SerializeToArray(value));
+    private static T RoundTrip<T>(Serializer serializer, T value)
+    {
+        var result = serializer.Deserialize<T>(serializer.SerializeToArray(value));
+        return result is null ? throw new InvalidOperationException("The serialized value unexpectedly round-tripped as null.") : result;
+    }
+
+    private static void UpdateMaximum(ref int maximum, int value)
+    {
+        var current = Volatile.Read(ref maximum);
+        while (value > current)
+        {
+            var observed = Interlocked.CompareExchange(ref maximum, value, current);
+            if (observed == current)
+            {
+                return;
+            }
+
+            current = observed;
+        }
+    }
 
     private static MembershipDisseminationTopic CreateMembershipTopic(
         SiloAddress local,
