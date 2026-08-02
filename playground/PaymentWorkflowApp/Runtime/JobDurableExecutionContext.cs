@@ -38,6 +38,20 @@ internal sealed class JobDurableExecutionContext(TaskId taskId, JobScheduler job
         return await jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
     }
 
+    protected override async ValueTask<DurableTaskResponse> ScheduleDelayAsync(
+        TaskId taskId,
+        DateTimeOffset dueTime,
+        CancellationToken cancellationToken)
+    {
+        var delay = dueTime - DateTimeOffset.UtcNow;
+        if (delay > TimeSpan.Zero)
+        {
+            await Task.Delay(delay, cancellationToken);
+        }
+
+        return DurableTaskResponse.Completed;
+    }
+
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
     {
         return jobScheduler.GetScheduledTaskHandle(taskId);

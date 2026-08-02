@@ -9,7 +9,7 @@ using Benchmarks.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Journaling;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 

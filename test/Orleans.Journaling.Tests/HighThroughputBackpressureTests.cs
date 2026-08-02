@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core.Internal;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost;
@@ -331,6 +331,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
                     // Still low enough to occasionally trigger backpressure in some tests
                     opts.MaxCapacity = 100;
                     opts.DeduplicationWindow = TimeSpan.FromMinutes(5);
+                    opts.MaxOutboxRetryAge = TimeSpan.FromMinutes(1);
                     opts.EnableLongPolling = false;
                     // Fast retry for testing - 50ms base delay
                     opts.BackpressureRetryDelay = TimeSpan.FromMilliseconds(50);

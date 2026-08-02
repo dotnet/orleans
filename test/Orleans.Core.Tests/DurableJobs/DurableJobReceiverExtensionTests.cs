@@ -72,7 +72,7 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenSameJobAttemptHasDifferentRunIds_DeduplicatesExecution()
+    public async Task HandleDurableJobAsync_DeduplicatesRunAndAllowsNewRunWithResetDequeueCount()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
@@ -81,7 +81,7 @@ public class DurableJobReceiverExtensionTests
 
         var extension = CreateExtension(handler, TimeSpan.FromMinutes(1));
         var firstNotification = CreateJobContext("run-1", jobId: "job-1", dequeueCount: 1);
-        var secondNotification = CreateJobContext("run-2", jobId: "job-1", dequeueCount: 1);
+        var secondNotification = CreateJobContext("run-1", jobId: "job-1", dequeueCount: 1);
 
         var first = extension.HandleDurableJobAsync(firstNotification, CancellationToken.None);
         var second = await extension.HandleDurableJobAsync(secondNotification, CancellationToken.None);
@@ -100,7 +100,7 @@ public class DurableJobReceiverExtensionTests
         Assert.Equal(DurableJobRunStatus.Completed, duplicateAfterCompletion.Status);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
-        var nextAttempt = CreateJobContext("run-3", jobId: "job-1", dequeueCount: 2);
+        var nextAttempt = CreateJobContext("run-2", jobId: "job-1", dequeueCount: 1);
         var retryResult = await extension.HandleDurableJobAsync(nextAttempt, CancellationToken.None);
         Assert.Equal(DurableJobRunStatus.Completed, retryResult.Status);
         await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());

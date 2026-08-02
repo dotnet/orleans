@@ -1,5 +1,5 @@
 using Orleans.Journaling;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Serialization.Session;
 
 namespace WorkflowsApp.Service.Samples.InventoryReservation;

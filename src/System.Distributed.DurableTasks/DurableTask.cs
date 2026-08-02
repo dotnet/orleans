@@ -8,6 +8,12 @@ public abstract class DurableTask
 {
     public static DurableTask<TResult> FromResult<TResult>(TResult value) => new CompletedDurableTask<TResult>(value);
 
+    public static DurableTask Delay(TimeSpan duration)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
+        return new DelayDurableTask(duration);
+    }
+
     public static DurableTask Run(Action<CancellationToken> func) => new DelegateDurableTask(func);
     public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, TResult> func) => new DelegateDurableTask<TResult>(func);
     public static DurableTask Run(Func<CancellationToken, Task> func) => new AsyncTaskDelegateDurableTask(func);
@@ -267,6 +273,30 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         }
 
         return handle;
+    }
+}
+
+internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask, ISchedulableTask
+{
+    public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
+    {
+        var context = DurableExecutionContext.CurrentContext
+            ?? throw new InvalidOperationException("DurableTask.Delay can only be scheduled from a durable execution context.");
+        return await context.ScheduleDelayAsync(taskId, DateTimeOffset.UtcNow + duration, cancellationToken);
+    }
+
+    public IScheduledTaskHandle GetHandle(TaskId taskId)
+    {
+        var context = DurableExecutionContext.CurrentContext
+            ?? throw new InvalidOperationException("DurableTask.Delay can only be scheduled from a durable execution context.");
+        return context.GetChildTaskHandle(taskId);
+    }
+
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    {
+        var taskId = context.CreateChildTaskId("delay");
+        var handle = await context.ScheduleChildTaskAsync(taskId, this, CancellationToken.None);
+        return await handle.WaitAsync(CancellationToken.None);
     }
 }
 

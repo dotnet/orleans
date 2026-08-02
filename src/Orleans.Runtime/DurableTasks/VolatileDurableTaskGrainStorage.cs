@@ -55,7 +55,7 @@ public class VolatileDurableTaskGrainStorage(
     {
         if (!TryGetTask(taskId, out var result))
         {
-            if (request?.Context is null)
+            if (request is not null && request.Context is null)
             {
                 throw new InvalidOperationException("The request context must not be null");
             }
@@ -70,6 +70,13 @@ public class VolatileDurableTaskGrainStorage(
         return result;
     }
 
+    public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request)
+    {
+        var typedState = GetState(state);
+        typedState.Request = request;
+        AddOrUpdateTask(taskId, typedState);
+    }
+
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         var typedState = GetState(state);
@@ -78,18 +85,17 @@ public class VolatileDurableTaskGrainStorage(
         AddOrUpdateTask(taskId, typedState);
     }
 
-    public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer)
+    public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
     {
         var typedState = GetState(state);
-        var clients = typedState.Observers ??= [];
-        clients.Add(observer);
+        typedState.CompletionDestinations.Add(destination);
         AddOrUpdateTask(taskId, typedState);
     }
 
-    public void ClearObservers(TaskId taskId, IDurableTaskState state)
+    public void ClearCompletionDestinations(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(state);
-        typedState.Observers?.Clear();
+        typedState.CompletionDestinations.Clear();
         AddOrUpdateTask(taskId, typedState);
     }
 
