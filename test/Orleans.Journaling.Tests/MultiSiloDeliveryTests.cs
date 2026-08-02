@@ -271,11 +271,14 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
             builder.Options.InitialSilosCount = 2;
 
             // Add storage and messaging to all silos
-            var storageProvider = new VolatileStateMachineStorageProvider();
+            var storageProvider = new VolatileJournalStorageProvider(
+                Microsoft.Extensions.Options.Options.Create(
+                    new JournaledStateManagerOptions { JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey }));
             builder.ConfigureSilo((options, siloBuilder) =>
             {
-                siloBuilder.AddStateMachineStorage();
-                siloBuilder.Services.AddSingleton<IStateMachineStorageProvider>(storageProvider);
+                siloBuilder.AddJournalStorage();
+                siloBuilder.Services.AddSingleton(storageProvider);
+                siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
                 
                 siloBuilder.AddDurableMessaging(opts =>
                 {

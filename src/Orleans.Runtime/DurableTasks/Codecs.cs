@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Activators;
@@ -47,8 +48,14 @@ internal sealed class SuccessDurableTaskResponseActivator : IActivator<SuccessDu
 internal sealed class PendingDurableTaskResponseCodec : IFieldCodec<PendingDurableTaskResponse>, IDeepCopier<PendingDurableTaskResponse>, IOptionalDeepCopier
 {
     /// <inheritdoc />
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, PendingDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] PendingDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
     {
+        if (value is null)
+        {
+            ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+            return;
+        }
+
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.VarInt);
         writer.WriteByte(1);
@@ -75,8 +82,14 @@ internal sealed class PendingDurableTaskResponseCodec : IFieldCodec<PendingDurab
 internal sealed class SubscribedDurableTaskResponseCodec : IFieldCodec<SubscribedDurableTaskResponse>, IDeepCopier<SubscribedDurableTaskResponse>, IOptionalDeepCopier
 {
     /// <inheritdoc />
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SubscribedDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] SubscribedDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
     {
+        if (value is null)
+        {
+            ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+            return;
+        }
+
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.VarInt);
         writer.WriteByte(1);
@@ -103,8 +116,14 @@ internal sealed class SubscribedDurableTaskResponseCodec : IFieldCodec<Subscribe
 internal sealed class SuccessDurableTaskResponseCodec : IFieldCodec<SuccessDurableTaskResponse>, IDeepCopier<SuccessDurableTaskResponse>, IOptionalDeepCopier
 {
     /// <inheritdoc />
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SuccessDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] SuccessDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
     {
+        if (value is null)
+        {
+            ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+            return;
+        }
+
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.VarInt);
         writer.WriteByte(1);
@@ -137,7 +156,7 @@ internal sealed class DurableTaskResponseCodec<TResult> : IFieldCodec<DurableTas
     public DurableTaskResponseCodec(ICodecProvider codecProvider)
         => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<TResult>>(this, codecProvider);
 
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DurableTaskResponse<TResult> value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] DurableTaskResponse<TResult> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (value is null)
         {
@@ -155,6 +174,7 @@ internal sealed class DurableTaskResponseCodec<TResult> : IFieldCodec<DurableTas
         writer.WriteEndObject();
     }
 
+    [return: MaybeNull]
     public DurableTaskResponse<TResult> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.IsReference)
@@ -207,7 +227,7 @@ internal sealed class ExceptionDurableTaskResponseCodec : IFieldCodec<ExceptionD
     public ExceptionDurableTaskResponseCodec(ICodecProvider codecProvider)
         => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<Exception>>(this, codecProvider);
 
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ExceptionDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] ExceptionDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
     {
         if (value is null)
         {
@@ -225,6 +245,7 @@ internal sealed class ExceptionDurableTaskResponseCodec : IFieldCodec<ExceptionD
         writer.WriteEndObject();
     }
 
+    [return: MaybeNull]
     public ExceptionDurableTaskResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.IsReference)
@@ -267,4 +288,3 @@ internal sealed class ExceptionDurableTaskResponseCopier : IDeepCopier<Exception
         return new ExceptionDurableTaskResponse(_copier.DeepCopy(input.Exception, context));
     }
 }
-

@@ -12,10 +12,10 @@ namespace Orleans.Journaling.Messaging;
 /// <remarks>
 /// <para>
 /// The outbox stores pending outbound messages in a durable dictionary until they are successfully delivered
-/// to the target grain's inbox. Messages persist atomically with grain state via <c>IStateMachineManager.WriteStateAsync()</c>.
+/// to the target grain's inbox. Messages persist atomically with grain state via <c>IJournaledStateManager.WriteStateAsync()</c>.
 /// </para>
 /// <para>
-/// Delivery is driven by a background pump (typically integrated with Orleans.DurableJobs) that iterates
+/// Delivery is driven by the outbox's background pump, which iterates
 /// pending messages and calls <c>IDurableInboxExtension.DeliverAsync()</c> on target grains. On successful
 /// delivery (<c>DeliveryResult.Accepted</c> or <c>DeliveryResult.Duplicate</c>), messages are removed from
 /// the outbox.
@@ -67,7 +67,7 @@ public interface IDurableOutbox
     /// <param name="envelope">The envelope to send.</param>
     /// <remarks>
     /// <para>
-    /// The message is persisted atomically with grain state when <c>IStateMachineManager.WriteStateAsync()</c>
+    /// The message is persisted atomically with grain state when <c>IJournaledStateManager.WriteStateAsync()</c>
     /// is called. The message will remain in the outbox until it is successfully delivered and removed via
     /// <see cref="RemoveMessage"/>.
     /// </para>
@@ -119,9 +119,9 @@ public interface IDurableOutbox
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing the delivery operation.</returns>
     /// <remarks>
-    /// This method should be called after <c>IStateMachineManager.WriteStateAsync()</c> to deliver
+    /// This method should be called after <c>IJournaledStateManager.WriteStateAsync()</c> to deliver
     /// messages that were added via <see cref="Send"/>. If the outbox is empty, this method returns immediately.
-    /// Delivery is done synchronously - for asynchronous delivery, use the <see cref="OutboxDeliveryPump"/> with DurableJobs.
+    /// Delivery is also triggered automatically after writes and when the grain activates.
     /// </remarks>
     Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default);
 }

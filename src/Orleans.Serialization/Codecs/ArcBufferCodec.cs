@@ -2,6 +2,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
@@ -15,7 +16,7 @@ namespace Orleans.Serialization.Codecs;
 public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
 {
     /// <inheritdoc/>
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ArcBuffer value)
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, ArcBuffer value)
         where TBufferWriter : IBufferWriter<byte>
     {
         ReferenceCodec.MarkValueField(writer.Session);

@@ -47,7 +47,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         int maxCapacity = 1000)
     {
         var grainContext = new MockGrainContext();
-        var stateMachineManager = new TestStateMachineManager();
+        var stateManager = new TestStateManager();
         var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var logger = NullLogger<DurableInboxExtension>.Instance;
 
@@ -62,9 +62,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         return new DurableInboxExtension(
             grainContext,
-            stateMachineManager,
+            stateManager,
             sessionPool,
             logger,
+            JournalingInstruments.CreateForDirectConstruction(),
             durableInbox,
             inbox,
             processed,
@@ -416,7 +417,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         // Arrange - create extension with concurrency level 4
         var grainContext = new MockGrainContext();
-        var stateMachineManager = new TestStateMachineManager();
+        var stateManager = new TestStateManager();
         var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var logger = NullLogger<DurableInboxExtension>.Instance;
         var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
@@ -426,9 +427,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         var extension = new DurableInboxExtension(
             grainContext,
-            stateMachineManager,
+            stateManager,
             sessionPool,
             logger,
+            JournalingInstruments.CreateForDirectConstruction(),
             durableInbox,
             inbox,
             processed,
@@ -468,7 +470,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         // Arrange - create extension with concurrency level 4
         var grainContext = new MockGrainContext();
-        var stateMachineManager = new TestStateMachineManager();
+        var stateManager = new TestStateManager();
         var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var logger = NullLogger<DurableInboxExtension>.Instance;
         var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
@@ -478,9 +480,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         var extension = new DurableInboxExtension(
             grainContext,
-            stateMachineManager,
+            stateManager,
             sessionPool,
             logger,
+            JournalingInstruments.CreateForDirectConstruction(),
             durableInbox,
             inbox,
             processed,
@@ -615,17 +618,17 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     }
 
     // Test state machine manager
-    private class TestStateMachineManager : IStateMachineManager
+    private class TestStateManager : IJournaledStateManager
     {
         public int WriteCount { get; private set; }
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
-        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) { }
+        public void RegisterState(string name, IJournaledState state) { }
 
-        public bool TryGetStateMachine(string name, [MaybeNullWhen(false)] out IDurableStateMachine stateMachine)
+        public bool TryGetState(string name, [MaybeNullWhen(false)] out IJournaledState state)
         {
-            stateMachine = null;
+            state = null;
             return false;
         }
 
@@ -637,15 +640,6 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
-        public ValueTask<TResult> RunAsync<TResult>(Func<TResult> operation)
-        {
-            return new ValueTask<TResult>(operation());
-        }
-
-        public ValueTask<TResult> RunAsync<TResult>(Func<ValueTask<TResult>> operation, CancellationToken cancellationToken = default)
-        {
-            return operation();
-        }
     }
 
     // Test IDurableInbox implementation for handler registration
