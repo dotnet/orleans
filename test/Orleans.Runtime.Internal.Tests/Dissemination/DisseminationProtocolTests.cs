@@ -617,6 +617,148 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task AntiEntropyResponseIsEmptyWhenDisseminationIsDisabled()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.SetValue(FakeTopic.DefaultKey, version: 5);
+        var protocol = CreateProtocol(transport, topic, options => options.Enabled = false);
+
+        var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest(FakeTopic.DefaultKey, version: 3)),
+        }, CancellationToken.None);
+
+        Assert.Equal(local, response.Sender);
+        Assert.Empty(response.ValuesByTopic);
+        Assert.False(response.Truncated);
+    }
+
+    [Fact]
+    public async Task AntiEntropyResponseSkipsUnknownTopicsEmptyRequestsAndCurrentRemoteValues()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        var emptyTopic = new FakeTopic(local, "empty");
+        topic.SetValue("equal", version: 5);
+        topic.SetValue("remote-newer", version: 5);
+        var protocol = CreateProtocol(transport, new IDisseminationTopic[] { topic, emptyTopic });
+        var digestsByTopic = ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>>.Empty
+            .Add("unknown", [new DisseminationTopicDigest("value", version: 1)])
+            .Add("empty", [])
+            .Add(topic.Name,
+            [
+                new DisseminationTopicDigest("equal", version: 5),
+                new DisseminationTopicDigest("remote-newer", version: 6),
+            ]);
+
+        var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = digestsByTopic,
+        }, CancellationToken.None);
+
+        Assert.Empty(response.ValuesByTopic);
+        Assert.False(response.Truncated);
+    }
+
+    [Fact]
+    public async Task AntiEntropyResponseSkipsNullAndOversizedValues()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.Options.MaxPayloadBytes = 8;
+        topic.SetValue("null", version: 2);
+        topic.SetValue("oversized", version: 2);
+        topic.SetValue("valid", version: 2);
+        topic.GetValueHandler = (digest, _) => digest.Key switch
+        {
+            "null" => null,
+            "oversized" => new DisseminationValue
+            {
+                Digest = digest,
+                Root = local,
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+                Payload = new byte[9],
+            },
+            _ => topic.CreateItem(local, digest.Key, digest.Version),
+        };
+        var protocol = CreateProtocol(transport, topic);
+
+        var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest("null", version: 1),
+                new DisseminationTopicDigest("oversized", version: 1),
+                new DisseminationTopicDigest("valid", version: 1)),
+        }, CancellationToken.None);
+
+        var value = Assert.Single(GetAntiEntropyResponseValues(response));
+        Assert.Equal("valid", value.Digest.Key);
+        Assert.False(response.Truncated);
+    }
+
+    [Fact]
+    public async Task AntiEntropyResponseTruncatesAtItemLimit()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.SetValue("a", version: 2);
+        topic.SetValue("b", version: 2);
+        var protocol = CreateProtocol(transport, topic, options => options.MaxBatchItems = 1);
+
+        var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest("a", version: 1),
+                new DisseminationTopicDigest("b", version: 1)),
+        }, CancellationToken.None);
+
+        Assert.Single(GetAntiEntropyResponseValues(response));
+        Assert.True(response.Truncated);
+    }
+
+    [Fact]
+    public async Task AntiEntropyResponseTruncatesBeforeExceedingByteLimit()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.SetValue("a", version: 2);
+        topic.SetValue("b", version: 2);
+        var protocol = CreateProtocol(transport, topic, options => options.MaxBatchBytes = sizeof(long) + 1);
+
+        var response = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest("a", version: 1),
+                new DisseminationTopicDigest("b", version: 1)),
+        }, CancellationToken.None);
+
+        var value = Assert.Single(GetAntiEntropyResponseValues(response));
+        Assert.Equal(sizeof(long), value.Payload.Length);
+        Assert.True(response.Truncated);
+    }
+
+    [Fact]
     public async Task AntiEntropyDigestRequestsAreSuppressedUntilExpectedCadenceExpires()
     {
         var local = CreateSilo(11111);
@@ -1483,6 +1625,166 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task TryPublishStatisticsViaDisseminationPublishesWhenEnabled()
+    {
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21008);
+        var peer = CreateSilo(21009);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(local, SiloStatus.Active);
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var services = new MutableServiceProvider();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, serviceProvider: services);
+        var topic = CreateDeploymentLoadTopic(
+            publisher,
+            serializer,
+            options => options.Dissemination.Enabled = true);
+        var transport = new FakeTransport(local, peer);
+        var dissemination = CreateService(transport, [topic]);
+        services.Add(dissemination);
+        services.Add(topic);
+
+        var result = await publisher.TryPublishStatisticsViaDissemination(
+            CreateStatistics(DateTime.UtcNow));
+        await dissemination.StopAsync(CancellationToken.None);
+
+        Assert.True(result);
+        var batch = Assert.Single(transport.GossipBatches);
+        Assert.Equal(peer, batch.Peer);
+        Assert.Single(GetGossipValues(batch.Batch));
+    }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    public async Task TryPublishStatisticsViaDisseminationReturnsFalseWhenDependencyIsMissingOrTopicDisabled(
+        bool registerDissemination,
+        bool registerTopic,
+        bool topicEnabled)
+    {
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21010);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(local, SiloStatus.Active);
+        var services = new MutableServiceProvider();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, serviceProvider: services);
+        var topic = CreateDeploymentLoadTopic(
+            publisher,
+            serializer,
+            options => options.Dissemination.Enabled = topicEnabled);
+        var dissemination = CreateService(new FakeTransport(local), [topic]);
+        if (registerDissemination)
+        {
+            services.Add(dissemination);
+        }
+
+        if (registerTopic)
+        {
+            services.Add(topic);
+        }
+
+        var result = await publisher.TryPublishStatisticsViaDissemination(
+            CreateStatistics(DateTime.UtcNow));
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task TryPublishStatisticsViaDisseminationReturnsFalseWhenProtocolDeclinesTopic()
+    {
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21011);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(local, SiloStatus.Active);
+        var services = new MutableServiceProvider();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, serviceProvider: services);
+        var topic = CreateDeploymentLoadTopic(
+            publisher,
+            serializer,
+            options => options.Dissemination.Enabled = true);
+        services.Add(CreateService(new FakeTransport(local), []));
+        services.Add(topic);
+
+        var result = await publisher.TryPublishStatisticsViaDissemination(
+            CreateStatistics(DateTime.UtcNow));
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task TryPublishStatisticsViaDisseminationReturnsFalseWhenPublishThrows()
+    {
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21012);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(local, SiloStatus.Active);
+        var services = new MutableServiceProvider();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, serviceProvider: services);
+        var topic = CreateDeploymentLoadTopic(
+            publisher,
+            serializer,
+            options => options.Dissemination.Enabled = true);
+        var transport = new FakeTransport(local)
+        {
+            GetMembershipHandler = static () => throw new InvalidOperationException("test failure"),
+        };
+        services.Add(CreateService(transport, [topic]));
+        services.Add(topic);
+
+        var result = await publisher.TryPublishStatisticsViaDissemination(
+            CreateStatistics(DateTime.UtcNow));
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task PublishStatisticsFallsBackToDirectSendWhenDisseminationThrows()
+    {
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21013);
+        var peer = CreateSilo(21014);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(local, SiloStatus.Active);
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var services = new MutableServiceProvider();
+        var directTarget = new FakeDeploymentLoadPublisherTarget();
+        var grainFactory = new RecordingGrainFactory
+        {
+            Resolver = (type, _) => type == typeof(IDeploymentLoadPublisher)
+                ? directTarget
+                : throw new NotSupportedException(),
+        };
+        var publisher = CreateDeploymentLoadPublisher(
+            local,
+            statusOracle,
+            grainFactory,
+            services);
+        var topic = CreateDeploymentLoadTopic(
+            publisher,
+            serializer,
+            options => options.Dissemination.Enabled = true);
+        var transport = new FakeTransport(local, peer)
+        {
+            GetMembershipHandler = static () => throw new InvalidOperationException("test failure"),
+        };
+        services.Add(CreateService(transport, [topic]));
+        services.Add(topic);
+
+        await publisher.PublishStatistics();
+
+        var update = Assert.Single(directTarget.Updates);
+        Assert.Equal(local, update.Source);
+        Assert.Equal(publisher.LocalRuntimeStatistics.DateTime, update.Statistics.DateTime);
+        Assert.Equal(peer, Assert.Single(grainFactory.SystemTargetRequests).Destination);
+    }
+
+    [Fact]
     public void DeploymentLoadTopic_CreateItemProducesDigestKeyedByOriginWithSerializedPayload()
     {
         using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -2122,8 +2424,8 @@ public class DisseminationProtocolTests
             grainFactory ?? new RecordingGrainFactory(),
             NullLoggerFactory.Instance,
             new ActivationDirectory(CreateCatalogInstruments()),
-            activationWorkingSet: null!,
-            environmentStatisticsProvider: null!,
+            new FakeActivationWorkingSet(),
+            new FakeEnvironmentStatisticsProvider(),
             Options.Create(new LoadSheddingOptions()),
             serviceProvider ?? new ServiceCollection().BuildServiceProvider(),
             CreateSystemTargetShared(local));
@@ -2515,6 +2817,8 @@ public class DisseminationProtocolTests
 
         public List<DisseminationTopicDigest> FallbackDigests { get; } = new();
 
+        public Func<DisseminationTopicDigest, DisseminationTopicDigest?, DisseminationValue?>? GetValueHandler { get; set; }
+
         public string Name => name;
 
         public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.ActiveMembers;
@@ -2563,6 +2867,11 @@ public class DisseminationProtocolTests
             DisseminationTopicDigest? peerDigest,
             CancellationToken cancellationToken)
         {
+            if (GetValueHandler is { } handler)
+            {
+                return ValueTask.FromResult(handler(digest, peerDigest));
+            }
+
             if (!_versions.TryGetValue(digest.Key, out var version) || version < digest.Version)
             {
                 return ValueTask.FromResult<DisseminationValue?>(null);
@@ -2620,12 +2929,19 @@ public class DisseminationProtocolTests
 
         public Func<CancellationToken, Task>? RefreshMembershipHandler { get; set; }
 
+        public Func<DisseminationMembership>? GetMembershipHandler { get; set; }
+
         public SiloAddress LocalSilo => localSilo;
 
         public int RefreshMembershipCallCount { get; private set; }
 
         public DisseminationMembership GetMembership()
         {
+            if (GetMembershipHandler is { } handler)
+            {
+                return handler();
+            }
+
             var members = _peers.Append(localSilo).Distinct().Select(peer =>
             {
                 var status = PeerStatuses.TryGetValue(peer, out var peerStatus) ? peerStatus : SiloStatus.Active;
@@ -2804,6 +3120,16 @@ public class DisseminationProtocolTests
         public IDisposable? OnChange(Action<T, string?> listener) => null;
     }
 
+    private sealed class MutableServiceProvider : IServiceProvider
+    {
+        private readonly Dictionary<Type, object> _services = [];
+
+        public void Add<T>(T service) where T : class => _services[typeof(T)] = service;
+
+        public object? GetService(Type serviceType) =>
+            _services.TryGetValue(serviceType, out var service) ? service : null;
+    }
+
     private sealed class FakeSiloStatusOracle : ISiloStatusOracle
     {
         private readonly Dictionary<SiloAddress, SiloStatus> _statuses = new();
@@ -2845,6 +3171,38 @@ public class DisseminationProtocolTests
     private sealed class FakeEnvironmentStatisticsProvider : Orleans.Statistics.IEnvironmentStatisticsProvider
     {
         public Orleans.Statistics.EnvironmentStatistics GetEnvironmentStatistics() => default;
+    }
+
+    private sealed class FakeActivationWorkingSet : IActivationWorkingSet
+    {
+        public int Count => 0;
+
+        public void OnActivated(IActivationWorkingSetMember member)
+        {
+        }
+
+        public void OnActive(IActivationWorkingSetMember member)
+        {
+        }
+
+        public void OnDeactivating(IActivationWorkingSetMember member)
+        {
+        }
+
+        public void OnDeactivated(IActivationWorkingSetMember member)
+        {
+        }
+    }
+
+    private sealed class FakeDeploymentLoadPublisherTarget : IDeploymentLoadPublisher
+    {
+        public List<(SiloAddress Source, SiloRuntimeStatistics Statistics)> Updates { get; } = [];
+
+        public Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
+        {
+            Updates.Add((siloAddress, siloStats));
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeSiloControl(Func<Task<SiloRuntimeStatistics>>? getRuntimeStatistics = null) : ISiloControl
