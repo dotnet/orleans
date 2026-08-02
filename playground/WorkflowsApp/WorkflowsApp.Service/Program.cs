@@ -31,12 +31,11 @@ public class Program
             {
                 siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDurableTasks();
-                siloBuilder.AddDurableMessaging();
                 siloBuilder.AddJournaledDurableTaskStorage();
-                siloBuilder.AddAzureBlobJournalStorage();
+                siloBuilder.UseAzureBlobDurableJobs(_ => { });
                 siloBuilder.Services.AddOptions<AzureBlobJournalStorageOptions>().Configure(
-                    (AzureBlobJournalStorageOptions options, IServiceProvider serviceProvider)
-                        => options.BlobServiceClient = serviceProvider.GetRequiredKeyedService<BlobServiceClient>("state"));
+                    (AzureBlobJournalStorageOptions options, IServiceProvider serviceProvider) =>
+                        options.BlobServiceClient = serviceProvider.GetRequiredKeyedService<BlobServiceClient>("state"));
             });
 
         builder.Logging.SetMinimumLevel(LogLevel.Information);

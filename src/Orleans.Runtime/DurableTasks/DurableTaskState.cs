@@ -11,7 +11,7 @@ public class DurableTaskState : IDurableTaskState
 {
     /// <inheritdoc cref="IDurableTaskState.Result"/>
     [Id(0)]
-    public DurableTaskResponse Result { get; set; } = DurableTaskResponse.Pending;
+    public DurableTaskResponse? Result { get; set; }
 
     /// <summary>
     /// Gets or sets the set of clients which are interested in the result of this task.
@@ -23,11 +23,14 @@ public class DurableTaskState : IDurableTaskState
     /// In that case, the result will not be 
     /// </remarks>
     [Id(1)]
-    public HashSet<IDurableTaskObserver> Observers { get; set; } = [];
+    public HashSet<IDurableTaskObserver> LegacyObservers { get; set; } = [];
+
+    [Id(6)]
+    public HashSet<GrainId> CompletionDestinations { get; set; } = [];
 
     /// <inheritdoc cref="IDurableTaskState.Request"/>
     [Id(2)]
-    public IDurableTaskRequest Request { get; set; } = null!;
+    public IDurableTaskRequest? Request { get; set; }
 
     /// <inheritdoc cref="IDurableTaskState.CompletedAt"/>
     [Id(3)]
@@ -41,8 +44,28 @@ public class DurableTaskState : IDurableTaskState
     [Id(5)] 
     public DateTimeOffset? CancellationRequestedAt { get; set; }
 
-    IReadOnlySet<IDurableTaskObserver> IDurableTaskState.Observers => Observers;
-    IDurableTaskRequest IDurableTaskState.Request => Request;
+    IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
+    IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;
     DateTimeOffset IDurableTaskState.CreatedAt => CreatedAt;
+
+    internal bool MigrateLegacyObservers()
+    {
+        var changed = false;
+        foreach (var observer in LegacyObservers)
+        {
+            if (observer is GrainReference reference)
+            {
+                changed |= CompletionDestinations.Add(reference.GrainId);
+            }
+        }
+
+        if (LegacyObservers.Count > 0)
+        {
+            LegacyObservers.Clear();
+            changed = true;
+        }
+
+        return changed;
+    }
 }

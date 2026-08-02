@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core.Internal;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost;
@@ -148,36 +148,6 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         Assert.NotNull(response);
         Assert.Equal("Processed: longpoll test", response.Result);
         Assert.Equal(correlationKey, response.CorrelationKey);
-    }
-
-    /// <summary>
-    /// Tests observer callback pattern using IDurableInboxObserver.
-    /// Verifies that response handlers can be invoked via OnResponseAsync when
-    /// a response arrives with matching correlation key.
-    /// </summary>
-    [Fact]
-    public async Task DurableRpc_Observer_ReceivesResponseCallback()
-    {
-        // Arrange
-        var observerGrain = _fixture.Client.GetGrain<IObserverGrain>(Guid.NewGuid());
-        var workerGrain = _fixture.Client.GetGrain<IWorkerGrain>(Guid.NewGuid());
-
-        // Act - Send request that will trigger observer callback
-        var correlationKey = HierarchicalKey.Create("observer-callback-101");
-        await observerGrain.SendRequestWithObserver(
-            workerGrain.GetGrainId(),
-            correlationKey,
-            new WorkRequest { Data = "observer test" });
-
-        // Wait for observer callback to be received
-        var observedResponse = await TestHelpers.WaitForNonNullAsync(
-            async () => await observerGrain.GetObservedResponse(),
-            message: "Observer did not receive callback");
-
-        // Assert - Observer should have received callback
-        Assert.NotNull(observedResponse);
-        Assert.Equal("Processed: observer test", observedResponse.Result);
-        Assert.Equal(correlationKey, observedResponse.CorrelationKey);
     }
 
     /// <summary>
@@ -445,12 +415,6 @@ public interface IOrchestratorGrain : IGrainWithGuidKey
     Task<List<WorkResponse>> GetCompletedTasks();
 }
 
-public interface IObserverGrain : IGrainWithGuidKey
-{
-    Task SendRequestWithObserver(GrainId workerId, HierarchicalKey correlationKey, WorkRequest request);
-    Task<WorkResponse?> GetObservedResponse();
-}
-
 public interface IRouteKeyHandlerGrain : IGrainWithGuidKey
 {
     Task<int> GetProcessedCount();
@@ -708,51 +672,6 @@ public class OrchestratorGrain(IDurableInbox inbox, IDurableOutbox outbox) : Dur
             _grain._completedTasks.Add(message);
             await _grain.WriteStateAsync();
         }
-    }
-}
-
-/// <summary>
-/// Observer grain that uses IDurableInboxObserver for response callbacks.
-/// </summary>
-[GrainType("DurableRpc.ObserverGrain")]
-public class ObserverGrain(IDurableOutbox outbox) : DurableGrain, IObserverGrain, IDurableInboxObserver
-{
-    private WorkResponse? _observedResponse;
-    private readonly IDurableOutbox _outbox = outbox;
-
-    public async Task SendRequestWithObserver(GrainId workerId, HierarchicalKey correlationKey, WorkRequest request)
-    {
-        var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
-        var builder = new DurableEnvelopeBuilder
-        {
-            SessionPool = sessionPool,
-            SenderId = this.GetGrainId()
-        };
-
-        var envelope = builder
-            .To(workerId, "ProcessData")
-            .WithBody(request)
-            .WithCorrelationKey(correlationKey)
-            .WithReplyTo(this.GetGrainId())
-            .Build();
-
-        _outbox.Send(envelope);
-        await WriteStateAsync();
-    }
-
-    public Task<WorkResponse?> GetObservedResponse() => Task.FromResult(_observedResponse);
-
-    // IDurableInboxObserver implementation
-    public async ValueTask<DeliveryResult> OnResponseAsync(HierarchicalKey correlationKey, DurableEnvelope envelope, DeliveryOptions options, CancellationToken cancellationToken)
-    {
-        if (envelope.Data.TryGetBody<WorkResponse>(out var response))
-        {
-            _observedResponse = response;
-            await WriteStateAsync();
-            return DeliveryResult.Processed();
-        }
-
-        return DeliveryResult.RouteNotFound(envelope.RouteKey);
     }
 }
 

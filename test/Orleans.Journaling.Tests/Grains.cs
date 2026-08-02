@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using System.Collections.Generic;
@@ -130,4 +130,3 @@ public class RequestContextTestGrain(
         }
     }
 }
-

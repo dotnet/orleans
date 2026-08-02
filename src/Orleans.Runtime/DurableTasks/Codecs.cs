@@ -58,12 +58,16 @@ internal sealed class PendingDurableTaskResponseCodec : IFieldCodec<PendingDurab
 
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.VarInt);
-        writer.WriteByte(1);
+        writer.WriteVarUInt32(0);
     }
 
     /// <inheritdoc />
+    [return: MaybeNull]
     public PendingDurableTaskResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
+        if (field.IsReference)
+            return ReferenceCodec.ReadReference<PendingDurableTaskResponse, TInput>(ref reader, field);
+
         field.EnsureWireType(WireType.VarInt);
 
         ReferenceCodec.MarkValueField(reader.Session);
@@ -92,12 +96,16 @@ internal sealed class SubscribedDurableTaskResponseCodec : IFieldCodec<Subscribe
 
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.VarInt);
-        writer.WriteByte(1);
+        writer.WriteVarUInt32(0);
     }
 
     /// <inheritdoc />
+    [return: MaybeNull]
     public SubscribedDurableTaskResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
+        if (field.IsReference)
+            return ReferenceCodec.ReadReference<SubscribedDurableTaskResponse, TInput>(ref reader, field);
+
         field.EnsureWireType(WireType.VarInt);
 
         ReferenceCodec.MarkValueField(reader.Session);
@@ -126,12 +134,16 @@ internal sealed class SuccessDurableTaskResponseCodec : IFieldCodec<SuccessDurab
 
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.VarInt);
-        writer.WriteByte(1);
+        writer.WriteVarUInt32(0);
     }
 
     /// <inheritdoc />
+    [return: MaybeNull]
     public SuccessDurableTaskResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
+        if (field.IsReference)
+            return ReferenceCodec.ReadReference<SuccessDurableTaskResponse, TInput>(ref reader, field);
+
         field.EnsureWireType(WireType.VarInt);
 
         ReferenceCodec.MarkValueField(reader.Session);
@@ -211,10 +223,13 @@ internal sealed class DurableTaskResponseCopier<TResult> : IDeepCopier<DurableTa
 
     public DurableTaskResponse<TResult> DeepCopy(DurableTaskResponse<TResult>? input, CopyContext context)
     {
-        if (input is null)
-            return null!;
+        if (context.TryGetCopy<DurableTaskResponse<TResult>>(input, out var existing))
+            return existing!;
 
-        return DurableTaskResponse.FromResult(_copier.DeepCopy(input.TypedResult!, context));
+        var original = input!;
+        var result = DurableTaskResponse.FromResult(_copier.DeepCopy(original.TypedResult!, context));
+        context.RecordCopy(original, result);
+        return result;
     }
 }
 
@@ -282,9 +297,12 @@ internal sealed class ExceptionDurableTaskResponseCopier : IDeepCopier<Exception
 
     public ExceptionDurableTaskResponse DeepCopy(ExceptionDurableTaskResponse? input, CopyContext context)
     {
-        if (input is null)
-            return null!;
+        if (context.TryGetCopy<ExceptionDurableTaskResponse>(input, out var existing))
+            return existing!;
 
-        return new ExceptionDurableTaskResponse(_copier.DeepCopy(input.Exception, context));
+        var original = input!;
+        var result = new ExceptionDurableTaskResponse(_copier.DeepCopy(original.Exception, context));
+        context.RecordCopy(original, result);
+        return result;
     }
 }

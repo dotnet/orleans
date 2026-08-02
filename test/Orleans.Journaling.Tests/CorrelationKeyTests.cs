@@ -1,4 +1,4 @@
-using Orleans.Journaling.Messaging;
+using Orleans.DurableMessaging;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;

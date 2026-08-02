@@ -8,7 +8,10 @@ namespace Orleans.Runtime.DurableTasks;
 
 internal sealed partial class DurableTaskGrainRuntime
 {
-    private class TaskHandle(TaskId taskId, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
+    private class TaskHandle(
+        TaskId taskId,
+        DurableTaskGrainRuntime runtime,
+        GrainId remoteTarget = default) : IScheduledTaskHandle
     {
         private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -22,7 +25,14 @@ internal sealed partial class DurableTaskGrainRuntime
 
         public async ValueTask CancelAsync(CancellationToken cancellationToken)
         {
-            await runtime.SignalCancellationAsync(TaskId, cancellationToken);
+            if (remoteTarget.IsDefault)
+            {
+                await runtime.CancelScheduledTaskAsync(TaskId, cancellationToken);
+            }
+            else
+            {
+                await runtime.CancelRemoteAsync(TaskId, remoteTarget, cancellationToken);
+            }
         }
 
         public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)

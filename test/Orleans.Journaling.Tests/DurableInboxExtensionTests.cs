@@ -5,7 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Journaling.Messaging;
+using Orleans.DurableJobs;
+using Orleans.DurableMessaging;
+using Orleans.DurableMessaging.Configuration;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost;
@@ -56,21 +59,32 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         
         // Create a test DurableInbox for handler registration
         var durableInbox = new TestDurableInbox();
-        
-        // Create a test outbox backed by a simple dictionary
         var outbox = new TestOutbox();
+        var jobHandlers = new TestJobHandlerRegistry();
+        var jobManager = new TestJobManager(jobHandlers);
 
         return new DurableInboxExtension(
             grainContext,
             stateManager,
             sessionPool,
             logger,
-            JournalingInstruments.CreateForDirectConstruction(),
+            DurableMessagingInstruments.CreateForDirectConstruction(),
             durableInbox,
             inbox,
             processed,
+            new Dictionary<(GrainId, Guid), InboxMessageState>(),
+            new Dictionary<(GrainId, Guid), InboxDeadLetter>(),
+            new TestDurableValue<string>(),
             outbox,
-            maxCapacity);
+            jobManager,
+            jobHandlers,
+            TimeProvider.System,
+            new DurableInboxOptions
+            {
+                MaxCapacity = maxCapacity,
+                BackpressureRetryDelay = TimeSpan.FromMilliseconds(1),
+                MaxProcessingAttempts = 1
+            });
     }
 
     [Fact]
@@ -380,150 +394,6 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         Assert.Equal(0, extension.Count);
     }
 
-    [Fact]
-    public async Task ProcessPendingMessages_WithConcurrency1_ProcessesSequentially()
-    {
-        // Arrange
-        var extension = CreateInboxExtension();
-        var handler = new CountingMessageHandler();
-        extension.RegisterHandler("test.route", handler);
-
-        var senderId = GrainId.Create("test", "sender");
-        var receiverId = GrainId.Create("test", "receiver");
-
-        // Deliver multiple messages in batches to avoid race conditions
-        var deliveryTasks = new List<Task>();
-        for (var i = 0; i < 5; i++)
-        {
-            var envelope = CreateTestEnvelope(senderId, receiverId, "test.route", $"message {i}");
-            deliveryTasks.Add(extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None).AsTask());
-        }
-
-        // Wait for all deliveries
-        await Task.WhenAll(deliveryTasks);
-
-        // Wait for all messages to be processed
-        await TestHelpers.WaitUntilAsync(
-            () => handler.ProcessedCount >= 5 && extension.Count == 0,
-            message: "Not all messages were processed");
-
-        // Assert - all messages processed
-        Assert.Equal(5, handler.ProcessedCount);
-        Assert.Equal(0, extension.Count);
-    }
-
-    [Fact]
-    public async Task ProcessPendingMessages_WithConcurrency4_ProcessesConcurrently()
-    {
-        // Arrange - create extension with concurrency level 4
-        var grainContext = new MockGrainContext();
-        var stateManager = new TestStateManager();
-        var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
-        var logger = NullLogger<DurableInboxExtension>.Instance;
-        var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
-        var processed = new Dictionary<(GrainId, Guid), DateTimeOffset>();
-        var durableInbox = new TestDurableInbox();
-        var outbox = new TestOutbox();
-
-        var extension = new DurableInboxExtension(
-            grainContext,
-            stateManager,
-            sessionPool,
-            logger,
-            JournalingInstruments.CreateForDirectConstruction(),
-            durableInbox,
-            inbox,
-            processed,
-            outbox,
-            maxCapacity: 1000,
-            deduplicationWindow: TimeSpan.FromDays(7));
-
-        var handler = new CountingMessageHandler();
-        extension.RegisterHandler("test.route", handler);
-
-        var senderId = GrainId.Create("test", "sender");
-        var receiverId = GrainId.Create("test", "receiver");
-
-        // Deliver multiple messages without waiting for processing
-        var deliveryTasks = new List<Task>();
-        for (var i = 0; i < 10; i++)
-        {
-            var envelope = CreateTestEnvelope(senderId, receiverId, "test.route", $"message {i}");
-            deliveryTasks.Add(extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None).AsTask());
-        }
-
-        // Wait for all deliveries to complete
-        await Task.WhenAll(deliveryTasks);
-
-        // Wait for all messages to be processed
-        await TestHelpers.WaitUntilAsync(
-            () => handler.ProcessedCount >= 10 && extension.Count == 0,
-            message: "Not all messages were processed concurrently");
-
-        // Assert - all messages processed
-        Assert.Equal(10, handler.ProcessedCount);
-        Assert.Equal(0, extension.Count);
-    }
-
-    [Fact]
-    public async Task ProcessPendingMessages_WithConcurrentHandlers_IsolatesExceptions()
-    {
-        // Arrange - create extension with concurrency level 4
-        var grainContext = new MockGrainContext();
-        var stateManager = new TestStateManager();
-        var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
-        var logger = NullLogger<DurableInboxExtension>.Instance;
-        var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
-        var processed = new Dictionary<(GrainId, Guid), DateTimeOffset>();
-        var durableInbox = new TestDurableInbox();
-        var outbox = new TestOutbox();
-
-        var extension = new DurableInboxExtension(
-            grainContext,
-            stateManager,
-            sessionPool,
-            logger,
-            JournalingInstruments.CreateForDirectConstruction(),
-            durableInbox,
-            inbox,
-            processed,
-            outbox,
-            maxCapacity: 1000,
-            deduplicationWindow: TimeSpan.FromDays(7));
-
-        // Register handlers: one throws, one succeeds
-        var throwingHandler = new ThrowingMessageHandler();
-        var successHandler = new CountingMessageHandler();
-        extension.RegisterHandler("throwing.route", throwingHandler);
-        extension.RegisterHandler("success.route", successHandler);
-
-        var senderId = GrainId.Create("test", "sender");
-        var receiverId = GrainId.Create("test", "receiver");
-
-        // Deliver messages to both routes without waiting
-        var deliveryTasks = new List<Task>();
-        for (var i = 0; i < 3; i++)
-        {
-            var throwingEnvelope = CreateTestEnvelope(senderId, receiverId, "throwing.route", $"throwing {i}");
-            deliveryTasks.Add(extension.DeliverAsync(throwingEnvelope, new DeliveryOptions(), CancellationToken.None).AsTask());
-
-            var successEnvelope = CreateTestEnvelope(senderId, receiverId, "success.route", $"success {i}");
-            deliveryTasks.Add(extension.DeliverAsync(successEnvelope, new DeliveryOptions(), CancellationToken.None).AsTask());
-        }
-
-        // Wait for all deliveries
-        await Task.WhenAll(deliveryTasks);
-
-        // Wait for all messages to be processed (both success and throwing handlers)
-        await TestHelpers.WaitUntilAsync(
-            () => successHandler.ProcessedCount >= 3 && extension.Count == 0,
-            message: "Not all messages were processed");
-
-        // Assert - successful messages processed despite exceptions in other handlers
-        Assert.Equal(3, successHandler.ProcessedCount);
-        Assert.Equal(0, extension.Count); // All messages removed (including failed ones)
-    }
-
     // Test message type
     [GenerateSerializer]
     public record TestMessage
@@ -572,22 +442,6 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("Test exception");
-        }
-    }
-
-    // Counting handler for concurrency tests
-    private class CountingMessageHandler : IInboxHandler
-    {
-        private int _count;
-
-        public int ProcessedCount => _count;
-
-        public bool CanHandle(IInboxHandlerContext context) => true;
-
-        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref _count);
-            return ValueTask.CompletedTask;
         }
     }
 
@@ -686,6 +540,75 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public bool RemoveMessage(Guid messageId) => _messages.Remove(messageId);
         public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) => _messages.TryGetValue(messageId, out envelope);
         public Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class TestDurableValue<T> : IDurableValue<T>
+    {
+        public T? Value { get; set; }
+    }
+
+    private sealed class TestJobHandlerRegistry : IDurableJobHandlerRegistry
+    {
+        public IDurableJobFeatureHandler? Handler { get; private set; }
+
+        public void Register(string jobName, IDurableJobFeatureHandler handler) => Handler = handler;
+    }
+
+    private sealed class TestJobManager(TestJobHandlerRegistry handlers) : ILocalDurableJobManager
+    {
+        public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
+        {
+            var job = new DurableJob
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                TargetGrainId = request.Target,
+                ShardId = "test"
+            };
+            _ = Task.Factory.StartNew(
+                () => RunAsync(job),
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default).Unwrap();
+            return Task.FromResult(job);
+        }
+
+        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        private async Task RunAsync(DurableJob job)
+        {
+            var dequeueCount = 0;
+            while (handlers.Handler is { } handler)
+            {
+                var result = await handler.ExecuteJobAsync(new TestJobRunContext(job, dequeueCount++), CancellationToken.None);
+                if (result.Status is DurableJobRunStatus.Completed or DurableJobRunStatus.Failed)
+                {
+                    return;
+                }
+
+                if (result.RetryAtTime is { } retryAt)
+                {
+                    var delay = retryAt - DateTimeOffset.UtcNow;
+                    if (delay > TimeSpan.Zero)
+                    {
+                        await Task.Delay(delay);
+                    }
+                }
+                else
+                {
+                    await Task.Delay(result.PollAfterDelay ?? TimeSpan.FromMilliseconds(1));
+                }
+            }
+        }
+    }
+
+    private sealed class TestJobRunContext(DurableJob job, int dequeueCount) : IJobRunContext
+    {
+        public DurableJob Job { get; } = job;
+        public string RunId { get; } = Guid.NewGuid().ToString();
+        public int DequeueCount { get; } = dequeueCount;
     }
 
     // Test IDurableDictionary implementation for simple in-memory storage

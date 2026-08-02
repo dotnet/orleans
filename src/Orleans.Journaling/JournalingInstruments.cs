@@ -13,8 +13,6 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
     private const string OperationTagName = "operation";
     private const string StatusTagName = "status";
     private const string ReasonTagName = "reason";
-    private const string GrainTypeTagName = "grain_type";
-    private const string RouteKeyTagName = "route_key";
     private const string StatusOk = "ok";
     private const string StatusError = "error";
 
@@ -37,10 +35,6 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
     private readonly Counter<long> StorageOperations = instruments.Meter.CreateCounter<long>("orleans-journaling-storage-operations");
     private readonly Counter<long> StorageBytes = instruments.Meter.CreateCounter<long>("orleans-journaling-storage-bytes", BytesUnit);
     private readonly Counter<long> CompactionTriggers = instruments.Meter.CreateCounter<long>("orleans-journaling-compaction-triggers");
-    private readonly Counter<long> InboxMessagesReceived = instruments.Meter.CreateCounter<long>("orleans-journaling-inbox-messages-received");
-    private readonly Counter<long> InboxMessagesProcessed = instruments.Meter.CreateCounter<long>("orleans-journaling-inbox-messages-processed");
-    private readonly Counter<long> OutboxMessagesSent = instruments.Meter.CreateCounter<long>("orleans-journaling-outbox-messages-sent");
-    private readonly Counter<long> OutboxMessagesDelivered = instruments.Meter.CreateCounter<long>("orleans-journaling-outbox-messages-delivered");
 
     private readonly Histogram<double> StateWriteDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-state-write-duration", MillisecondsUnit);
     private readonly Histogram<double> StateDeleteDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-state-delete-duration", MillisecondsUnit);
@@ -51,10 +45,6 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
     private readonly Histogram<long> WriteCoalescedCallers = instruments.Meter.CreateHistogram<long>("orleans-journaling-write-coalesced-callers");
     private readonly Histogram<double> GatherDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-gather-duration", MillisecondsUnit);
     private readonly Histogram<long> StateScanCount = instruments.Meter.CreateHistogram<long>("orleans-journaling-state-scan-count");
-    private readonly Histogram<double> InboxProcessingDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-inbox-processing-duration", MillisecondsUnit);
-    private readonly Histogram<double> OutboxDeliveryDuration = instruments.Meter.CreateHistogram<double>("orleans-journaling-outbox-delivery-duration", MillisecondsUnit);
-    private readonly DepthTracker InboxDepth = new(instruments.Meter, "orleans-journaling-inbox-depth");
-    private readonly DepthTracker OutboxDepth = new(instruments.Meter, "orleans-journaling-outbox-depth");
 
     internal void OnStateWriteRequest(string operation, TimeSpan latency, bool succeeded)
     {
@@ -119,33 +109,6 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
         }
     }
 
-    internal void OnInboxDepthChanged(int delta) => InboxDepth.Adjust(delta);
-
-    internal void OnOutboxDepthChanged(int delta) => OutboxDepth.Adjust(delta);
-
-    internal void OnInboxMessageReceived(string grainType, string routeKey, string status) =>
-        Add(InboxMessagesReceived, grainType, routeKey, status);
-
-    internal void OnInboxMessageProcessed(string grainType, string routeKey, string status) =>
-        Add(InboxMessagesProcessed, grainType, routeKey, status);
-
-    internal void OnInboxProcessingDuration(TimeSpan duration, string grainType, string routeKey) =>
-        Record(InboxProcessingDuration, duration, grainType, routeKey);
-
-    internal void OnOutboxMessageSent(string grainType, string routeKey)
-    {
-        if (OutboxMessagesSent.Enabled)
-        {
-            OutboxMessagesSent.Add(1, CreateMessagingTags(grainType, routeKey));
-        }
-    }
-
-    internal void OnOutboxMessageDelivered(string grainType, string routeKey, string status) =>
-        Add(OutboxMessagesDelivered, grainType, routeKey, status);
-
-    internal void OnOutboxDeliveryDuration(TimeSpan duration, string grainType, string routeKey) =>
-        Record(OutboxDeliveryDuration, duration, grainType, routeKey);
-
     private void Add(Counter<long> counter, string operation, bool succeeded)
     {
         if (counter.Enabled)
@@ -170,36 +133,6 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
         }
     }
 
-    private static void Add(Counter<long> counter, string grainType, string routeKey, string status)
-    {
-        if (counter.Enabled)
-        {
-            counter.Add(
-                1,
-                [
-                    new(GrainTypeTagName, grainType),
-                    new(RouteKeyTagName, routeKey),
-                    new(StatusTagName, status)
-                ]);
-        }
-    }
-
-    private static void Record(Histogram<double> histogram, TimeSpan duration, string grainType, string routeKey)
-    {
-        if (histogram.Enabled)
-        {
-            histogram.Record(
-                Math.Max(0, duration.TotalMilliseconds),
-                CreateMessagingTags(grainType, routeKey));
-        }
-    }
-
-    private static KeyValuePair<string, object?>[] CreateMessagingTags(string grainType, string routeKey) =>
-        [
-            new(GrainTypeTagName, grainType),
-            new(RouteKeyTagName, routeKey)
-        ];
-
     private static KeyValuePair<string, object?>[] CreateTags(string operation, bool succeeded) =>
         [
             new(OperationTagName, operation),
@@ -215,16 +148,4 @@ internal sealed class JournalingInstruments(OrleansInstruments instruments)
         }
     }
 
-    private sealed class DepthTracker
-    {
-        private readonly ObservableGauge<long> _gauge;
-        private long _value;
-
-        public DepthTracker(Meter meter, string name)
-        {
-            _gauge = meter.CreateObservableGauge(name, () => Volatile.Read(ref _value));
-        }
-
-        public void Adjust(int delta) => Interlocked.Add(ref _value, delta);
-    }
 }

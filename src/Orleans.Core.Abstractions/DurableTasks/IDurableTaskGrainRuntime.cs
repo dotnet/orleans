@@ -12,8 +12,6 @@ namespace Orleans.DurableTasks;
 [Alias("IDurableTaskObserverGrainExtension")]
 public interface IDurableTaskObserver : IGrainExtension
 {
-    // Called when a remotely scheduled request completes
-    // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
     [AlwaysInterleave]
     [Alias("OnResponse")]
     ValueTask OnResponseAsync(TaskId taskId, DurableTaskResponse response, CancellationToken cancellationToken = default);
@@ -42,12 +40,10 @@ public readonly struct SubscribeOrPollOptions
     [Id(0)]
     public TimeSpan PollTimeout { get; init; }
 
-    [Id(1)]
-    public IDurableTaskObserver? Observer { get; init; }
 }
 
 [Alias("IDurableTaskGrainExtension")]
-public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskObserver
+public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer
 {
     [Alias("GetTasksAsync")]
     IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync(CancellationToken cancellationToken = default);
@@ -90,6 +86,9 @@ public struct DurableTaskDiagnosticState
 internal interface IDurableTaskGrainRuntime
 {
     ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    ValueTask<DurableTaskResponse> ScheduleRemoteAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken);
+    ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
+    ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
     //IScheduledTaskHandle OnCreateScheduledTaskHandle(IScheduledTaskHandle handle);
 }

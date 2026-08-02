@@ -39,10 +39,15 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (_items.TryGetValue(taskId, out var result))
         {
+            if (result.MigrateLegacyObservers())
+            {
+                _items[taskId] = result;
+            }
+
             return result;
         }
 
-        if (request?.Context is null)
+        if (request is not null && request.Context is null)
         {
             throw new InvalidOperationException("The request context must not be null.");
         }
@@ -55,6 +60,14 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items.Add(taskId, result);
 
         return result;
+    }
+
+    public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var typedState = GetState(taskId, state);
+        typedState.Request = request;
+        _items[taskId] = typedState;
     }
 
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
@@ -78,22 +91,21 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
-    public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer)
+    public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
     {
-        ArgumentNullException.ThrowIfNull(observer);
         var typedState = GetState(taskId, state);
-        if (typedState.Observers.Add(observer))
+        if (typedState.CompletionDestinations.Add(destination))
         {
             _items[taskId] = typedState;
         }
     }
 
-    public void ClearObservers(TaskId taskId, IDurableTaskState state)
+    public void ClearCompletionDestinations(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
-        if (typedState.Observers.Count > 0)
+        if (typedState.CompletionDestinations.Count > 0)
         {
-            typedState.Observers.Clear();
+            typedState.CompletionDestinations.Clear();
             _items[taskId] = typedState;
         }
     }
@@ -103,6 +115,11 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (_items.TryGetValue(taskId, out var result))
         {
+            if (result.MigrateLegacyObservers())
+            {
+                _items[taskId] = result;
+            }
+
             state = result;
             return true;
         }
@@ -133,6 +150,11 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         if (state is not DurableTaskState result || !_items.ContainsKey(taskId))
         {
             throw new ArgumentException("The provided value does not belong to this storage provider.", nameof(state));
+        }
+
+        if (result.MigrateLegacyObservers())
+        {
+            _items[taskId] = result;
         }
 
         return result;

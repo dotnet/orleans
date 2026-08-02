@@ -156,6 +156,11 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
 
+        if (TryGetRuntime(out var runtime))
+        {
+            return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
+        }
+
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
@@ -172,6 +177,22 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
+        if (TryGetRuntime(out var runtime))
+        {
+            using var durableCts = new CancellationTokenSource();
+            using var durableRegistration = executionContext.RegisterCancellationCallback(
+                static async (state, cancellationToken) =>
+                {
+                    await state.cts.CancelAsync();
+                    await state.runtime.CancelRemoteAsync(state.taskId, state.target, cancellationToken);
+                },
+                state: (runtime, cts: durableCts, taskId: executionContext.TaskId, target: Context.TargetId));
+            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
+            return durableResponse.IsCompleted
+                ? durableResponse
+                : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
+        }
+
         var callerContext = RuntimeContext.Current;
         if (callerContext is not null)
         {
@@ -191,7 +212,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
         while (!response.IsCompleted && !cts.IsCancellationRequested)
         {
-            await remote.SubscribeOrPollAsync(executionContext.TaskId, options, cts.Token);
+            response = await remote.SubscribeOrPollAsync(executionContext.TaskId, options, cts.Token);
         }
 
         return response;
@@ -317,7 +338,11 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     {
         Debug.Assert(Context is not null);
 
-        // Schedule the request directly on the target grain.
+        if (DurableTaskRequest.TryGetRuntime(out var runtime))
+        {
+            return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
+        }
+
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
@@ -334,6 +359,22 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
+        if (DurableTaskRequest.TryGetRuntime(out var runtime))
+        {
+            using var durableCts = new CancellationTokenSource();
+            using var durableRegistration = executionContext.RegisterCancellationCallback(
+                static async (state, cancellationToken) =>
+                {
+                    await state.cts.CancelAsync();
+                    await state.runtime.CancelRemoteAsync(state.taskId, state.target, cancellationToken);
+                },
+                state: (runtime, cts: durableCts, taskId: executionContext.TaskId, target: Context.TargetId));
+            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
+            return durableResponse.IsCompleted
+                ? durableResponse
+                : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
+        }
+
         var callerContext = RuntimeContext.Current;
         if (callerContext is not null)
         {
@@ -353,7 +394,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
         while (!response.IsCompleted && !cts.IsCancellationRequested)
         {
-            await remote.SubscribeOrPollAsync(executionContext.TaskId, options, cts.Token);
+            response = await remote.SubscribeOrPollAsync(executionContext.TaskId, options, cts.Token);
         }
 
         return response;

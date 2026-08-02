@@ -26,6 +26,15 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
         return runtime.ScheduleChildAsync(taskId, task, cancellationToken);
     }
 
+    protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
+        TaskId taskId,
+        DateTimeOffset dueTime,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfNotChildTaskId(taskId);
+        return runtime.ScheduleDelayAsync(taskId, dueTime, cancellationToken);
+    }
+
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
     {
         ThrowIfNotChildTaskId(taskId);
