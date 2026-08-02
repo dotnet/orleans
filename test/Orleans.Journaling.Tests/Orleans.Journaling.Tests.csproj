@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -19,7 +19,6 @@
     <PackageReference Include="Verify.Xunit" />
     <Compile Remove="snapshots\**\*" />
     <None Include="snapshots\**\*" />
-    <PackageReference Include="NSubstitute" />
   </ItemGroup>
 
   <ItemGroup>

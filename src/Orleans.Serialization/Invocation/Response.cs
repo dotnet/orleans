@@ -43,18 +43,21 @@ namespace Orleans.Serialization.Invocation
         /// </summary>
         public static Response Completed => CompletedResponse.Instance;
 
+        /// <inheritdoc />
         public abstract object? Result { get; set; }
 
         public abstract bool IsFinal { get; }
 
         public virtual Type? GetSimpleResultType() => null;
 
+        /// <inheritdoc />
         public abstract Exception? Exception { get; set; }
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract T GetResult<T>();
 
+        /// <inheritdoc />
         public abstract void Dispose();
 
         /// <inheritdoc />
