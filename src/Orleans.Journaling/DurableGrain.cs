@@ -5,7 +5,7 @@ namespace Orleans.Journaling;
 
 public abstract class DurableGrain : Grain, IGrainBase
 {
-    private readonly IDurableOutbox _outbox;
+    private readonly IDurableOutbox? _outbox;
 
     protected DurableGrain()
     {
@@ -14,7 +14,8 @@ public abstract class DurableGrain : Grain, IGrainBase
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
-        _outbox = ServiceProvider.GetRequiredService<IDurableOutbox>();
+        _outbox = ServiceProvider.GetService<IDurableOutbox>();
+        _ = ServiceProvider.GetService<IDurableInbox>();
     }
 
     protected IJournaledStateManager StateManager { get; }
