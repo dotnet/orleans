@@ -107,10 +107,10 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Retrieve a map of implicit subscriptionsIds to implicit subscribers, given a stream ID. This method throws an exception if there's no namespace associated with the stream ID.
+        /// Retrieves a map of implicit subscription IDs to implicit subscriber grain IDs for the specified stream.
         /// </summary>
         /// <param name="streamId">A stream ID.</param>
-        /// <returns>A set of GrainId that are implicitly subscribed grains. They are expected to support the streaming consumer extension.</returns>
+        /// <returns>A dictionary mapping subscription IDs to implicitly subscribed grain IDs. The grains are expected to support the streaming consumer extension.</returns>
         /// <exception cref="System.ArgumentException">The stream ID doesn't have an associated namespace.</exception>
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
         internal Dictionary<Guid, GrainId> GetImplicitSubscribers(QualifiedStreamId streamId)

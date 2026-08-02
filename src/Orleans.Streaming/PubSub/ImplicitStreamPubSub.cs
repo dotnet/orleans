@@ -11,14 +11,14 @@ namespace Orleans.Streams
     {
         private readonly ImplicitStreamSubscriberTable implicitTable;
 
-        public ImplicitStreamPubSub(ImplicitStreamSubscriberTable implicitPubSubTable)
+        public ImplicitStreamPubSub(ImplicitStreamSubscriberTable implicitSubscriberTable)
         {
-            if (implicitPubSubTable == null)
+            if (implicitSubscriberTable == null)
             {
-                throw new ArgumentNullException(nameof(implicitPubSubTable));
+                throw new ArgumentNullException(nameof(implicitSubscriberTable));
             }
 
-            this.implicitTable = implicitPubSubTable;
+            this.implicitTable = implicitSubscriberTable;
         }
 
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
