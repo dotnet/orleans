@@ -63,7 +63,7 @@
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
-  <PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
     <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
     <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
   </PropertyGroup>

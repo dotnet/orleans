@@ -345,11 +345,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         private GrainMigrationPackage _migrationPackage;
 
         public void Initialize(GrainMigrationPackage package) => _migrationPackage = package;
-        public void Reset()
-        {
-            _core.Reset();
-            _migrationPackage = default;
-        }
+        public void Reset() => _core.Reset();
 
         public GrainMigrationPackage Value => _migrationPackage;
 

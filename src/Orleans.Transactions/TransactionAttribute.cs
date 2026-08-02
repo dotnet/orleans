@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
@@ -325,7 +325,7 @@ namespace Orleans
             {
                 // Suppress any exception here, allowing ResponseCompletionSource to complete with a Response instead of an exception.
                 // This gives TransactionRequestBase a chance to inspect this instance and retrieve the TransactionInfo property first.
-                // After, it will use GetException to get and throw the exception.
+                // After, it will use GetException to get and throw the exeption.
                 return null;
             }
 

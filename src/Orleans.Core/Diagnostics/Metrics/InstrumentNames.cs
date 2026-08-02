@@ -168,5 +168,4 @@ internal static class InstrumentNames
 
     public const string RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB = "orleans-runtime-total-physical-memory";
     public const string RUNTIME_MEMORY_AVAILABLE_MEMORY_MB = "orleans-runtime-available-memory";
-
 }
