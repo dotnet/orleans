@@ -61,7 +61,7 @@ Choose a provider already operated reliably in the target environment:
 - Apache ZooKeeper: `Microsoft.Orleans.Clustering.ZooKeeper`
 - Consul: `Microsoft.Orleans.Clustering.Consul`
 
-See [Typical configurations](../host/configuration-guide/typical-configurations.md) and the [Orleans packages list](../resources/nuget-packages.md) for configuration and package links. The Kubernetes hosting package supplements a clustering provider; it doesn't replace one.
+See [Typical configurations](../host/configuration-guide/typical-configurations.md) and the [Orleans packages list](../resources/nuget-packages.md) for configuration and package links. Orleans doesn't require the Kubernetes hosting package. If used for a simple one-`Deployment`-per-cluster topology, it supplements a clustering provider; it doesn't replace one.
 
 Evaluate:
 

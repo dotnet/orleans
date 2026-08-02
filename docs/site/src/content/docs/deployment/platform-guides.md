@@ -28,7 +28,7 @@ An HTTP-only platform isn't sufficient unless Orleans silos can also establish d
 
 ## Platform guidance
 
-- [Kubernetes](kubernetes.md) provides direct pod networking and an Orleans hosting integration.
+- [Kubernetes](kubernetes.md) provides direct pod networking. Explicit endpoint configuration is recommended; the Orleans hosting package is optional and limited to simple one-`Deployment`-per-cluster topologies.
 - [Azure App Service](deploy-to-azure-app-service.md) requires validation of private per-instance address and port mapping.
 - [Azure Container Apps](deploy-to-azure-container-apps.md) requires validation of replica-to-replica TCP reachability and stable advertised endpoints.
 

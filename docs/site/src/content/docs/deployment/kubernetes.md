@@ -1,6 +1,6 @@
 ---
 title: Host Orleans on Kubernetes
-description: Configure networking, RBAC, lifecycle, probes, and rollouts for an Orleans 10 cluster on Kubernetes.
+description: Configure networking, lifecycle, probes, and rollouts for an Orleans 10 cluster on Kubernetes.
 ms.date: 08/02/2026
 ms.topic: how-to
 ms.custom: devops
@@ -8,25 +8,40 @@ ms.custom: devops
 
 # Host Orleans on Kubernetes
 
-Kubernetes can host Orleans when pods have direct network connectivity and the application uses a production clustering provider. The `Microsoft.Orleans.Hosting.Kubernetes` package integrates pod identity and lifecycle information with Orleans; it doesn't use Kubernetes as the clustering provider.
+Kubernetes can host Orleans when pods have direct network connectivity and the application uses a production clustering provider. Orleans doesn't require a Kubernetes-specific hosting package. The recommended approach is to configure each silo explicitly from the pod name and pod IP supplied by the Kubernetes downward API.
 
 ## Configure the silo
 
-Reference `Microsoft.Orleans.Server`, a clustering provider package, and `Microsoft.Orleans.Hosting.Kubernetes`. Configure the clustering provider and call <xref:Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting*>:
+Reference `Microsoft.Orleans.Server` and a production clustering provider package. Configure the pod IP as the advertised address, listen on all pod interfaces, and use the pod name as the silo name:
 
 ```csharp
+using System.Net;
+
 var builder = WebApplication.CreateBuilder(args);
+
+var podName = builder.Configuration["POD_NAME"]
+    ?? throw new InvalidOperationException("POD_NAME isn't configured.");
+var podIp = IPAddress.Parse(
+    builder.Configuration["POD_IP"]
+        ?? throw new InvalidOperationException("POD_IP isn't configured."));
 
 builder.Host.UseOrleans(siloBuilder =>
 {
     siloBuilder
-        .UseKubernetesHosting()
         // Configure one production clustering provider here.
         .Configure<ClusterOptions>(options =>
         {
-            options.ServiceId = "dictionary-app";
-            options.ClusterId = "production";
-        });
+            options.ServiceId = builder.Configuration["ORLEANS_SERVICE_ID"]
+                ?? throw new InvalidOperationException("ORLEANS_SERVICE_ID isn't configured.");
+            options.ClusterId = builder.Configuration["ORLEANS_CLUSTER_ID"]
+                ?? throw new InvalidOperationException("ORLEANS_CLUSTER_ID isn't configured.");
+        })
+        .Configure<SiloOptions>(options => options.SiloName = podName)
+        .ConfigureEndpoints(
+            advertisedIP: podIp,
+            siloPort: 11_111,
+            gatewayPort: 30_000,
+            listenOnAnyHostAddress: true);
 });
 
 builder.Services.Configure<HostOptions>(options =>
@@ -41,49 +56,13 @@ var app = builder.Build();
 app.Run();
 ```
 
-Environment variables in the manifest can override the service and cluster IDs shown in code. All silos and clients must use the same values and clustering provider.
-
-`UseKubernetesHosting`:
-
-- Sets the silo name from `POD_NAME`.
-- Advertises `POD_IP`.
-- Listens on all local interfaces using the configured silo and gateway ports.
-- Reads the service and cluster IDs from `ORLEANS_SERVICE_ID` and `ORLEANS_CLUSTER_ID`.
-- Uses the Kubernetes API to reconcile Orleans members with pods carrying the same identity labels.
-
-The default silo and gateway ports are `11111` and `30000`. Set them explicitly if the application uses different values.
+All silos and clients must use the same service ID, cluster ID, and clustering provider. The example explicitly uses silo port `11111` and gateway port `30000`.
 
 ## Apply a production baseline
 
 The following baseline intentionally omits the clustering provider credentials and application ingress. Supply those resources using workload identity and provider-specific configuration.
 
 ```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: dictionary-app
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: dictionary-app-orleans
-rules:
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch", "patch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: dictionary-app-orleans
-subjects:
-  - kind: ServiceAccount
-    name: dictionary-app
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: dictionary-app-orleans
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -103,11 +82,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: dictionary-app
-        orleans/serviceId: dictionary-app
-        orleans/clusterId: production
     spec:
-      serviceAccountName: dictionary-app
-      automountServiceAccountToken: true
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 150
       containers:
         - name: app
@@ -128,22 +104,14 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
             - name: POD_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
             - name: ORLEANS_SERVICE_ID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.labels['orleans/serviceId']
+              value: dictionary-app
             - name: ORLEANS_CLUSTER_ID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.labels['orleans/clusterId']
+              value: production
           startupProbe:
             httpGet:
               path: /health/startup
@@ -189,7 +157,36 @@ Apply the manifest in a namespace dedicated or appropriately shared for the appl
 kubectl apply --namespace <namespace> --filename orleans.yaml
 ```
 
-The role is namespace-scoped. It permits the hosting integration to read pods and ensure the Orleans identity labels on its own pod are correct. If you explicitly enable `KubernetesHostingOptions.DeleteDefunctSiloPods`, also grant the `delete` verb. Keep that option disabled unless the operational consequences have been reviewed.
+The baseline disables service account token mounting because Orleans doesn't need to call the Kubernetes API. Add a service account and permissions only for application features that require them.
+
+## Optional Kubernetes hosting package
+
+The `Microsoft.Orleans.Hosting.Kubernetes` package is optional and isn't generally recommended. Consider it only for a simple topology where exactly one Kubernetes `Deployment` object owns exactly one Orleans cluster.
+
+> [!IMPORTANT]
+> Don't use the package for an Orleans cluster composed from multiple `Deployment` objects, StatefulSets, custom controllers, or blue-green or canary workloads sharing a cluster identity. Configure endpoints explicitly instead.
+
+For the supported simple topology, <xref:Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting*> configures the silo name, pod IP, listening endpoints, service ID, and cluster ID from pod metadata. It also calls the Kubernetes API to reconcile Orleans membership with matching pods. It supplements a production clustering provider; it doesn't replace one.
+
+To use it:
+
+1. Reference `Microsoft.Orleans.Hosting.Kubernetes` and call `UseKubernetesHosting()`.
+1. Add `orleans/serviceId` and `orleans/clusterId` labels to the `Deployment` pod template.
+1. Supply `POD_NAME`, `POD_NAMESPACE`, `POD_IP`, `ORLEANS_SERVICE_ID`, and `ORLEANS_CLUSTER_ID` through the downward API.
+1. Mount a dedicated service account token and grant this namespace-scoped role:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orleans-hosting
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "patch"]
+```
+
+Bind the role to the workload's dedicated service account. If you explicitly enable `KubernetesHostingOptions.DeleteDefunctSiloPods`, also grant `delete`. Keep that option disabled unless its operational consequences have been reviewed.
 
 ## Network requirements
 
@@ -198,7 +195,7 @@ Allow direct pod-IP TCP traffic:
 - Every silo pod to port `11111` on every silo pod.
 - Every Orleans client to port `30000` on every silo pod.
 - Every silo and client to the clustering provider.
-- Silo pods to the Kubernetes API when `UseKubernetesHosting` is enabled.
+- Silo pods to the Kubernetes API only when the optional hosting package is enabled.
 
 Don't place a Kubernetes `Service` virtual IP in `AdvertisedIPAddress`. Orleans advertises each pod IP so peers can contact that specific silo. A `Service` can expose application HTTP ingress, but it doesn't replace Orleans membership or direct silo connectivity.
 
@@ -222,8 +219,10 @@ Keep `maxUnavailable: 0` and some surge capacity when the cluster can't tolerate
 
 Scale in gradually. Verify that membership stabilizes and remaining silos have capacity before removing more pods. See [Graceful shutdown and upgrades](upgrades.md).
 
-## Troubleshoot the integration
+## Troubleshoot Kubernetes hosting
 
-If startup reports missing `KUBERNETES_SERVICE_HOST` or `KUBERNETES_SERVICE_PORT`, verify that the process is running in a pod and that service environment links haven't been disabled. If the API returns `403 Forbidden`, check the pod's service account, role binding namespace, and the required pod verbs.
+For explicit endpoint configuration, compare `POD_NAME`, `POD_IP`, service ID, cluster ID, and the advertised membership endpoint.
 
-Compare pod labels, `POD_NAME`, `POD_NAMESPACE`, `POD_IP`, service ID, cluster ID, and the advertised membership endpoint. For broader triage, see [Troubleshoot deployments](troubleshooting-deployments.md).
+If the optional hosting package reports missing `KUBERNETES_SERVICE_HOST` or `KUBERNETES_SERVICE_PORT`, verify that the process is running in a pod and that service environment links haven't been disabled. If the API returns `403 Forbidden`, check the pod's service account, role binding namespace, and required pod verbs.
+
+For broader triage, see [Troubleshoot deployments](troubleshooting-deployments.md).
