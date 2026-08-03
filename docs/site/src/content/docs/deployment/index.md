@@ -27,6 +27,7 @@ Use these articles together:
 ## Choose a platform
 
 - [Kubernetes](kubernetes.md)
+- [Service Fabric](service-fabric.md)
 - [Azure App Service](deploy-to-azure-app-service.md)
 - [Azure Container Apps](deploy-to-azure-container-apps.md)
 - Other orchestrators, virtual machines, or bare-metal hosts that satisfy the [platform requirements](platform-guides.md)

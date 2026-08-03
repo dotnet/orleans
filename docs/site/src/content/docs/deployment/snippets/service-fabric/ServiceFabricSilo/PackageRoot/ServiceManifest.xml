@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ServiceManifest Name="OrleansSiloPkg"
+                 Version="1.0.0"
+                 xmlns="http://schemas.microsoft.com/2011/01/fabric"
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ServiceTypes>
+    <StatelessServiceType ServiceTypeName="OrleansSiloType" />
+  </ServiceTypes>
+
+  <CodePackage Name="Code" Version="1.0.0">
+    <EntryPoint>
+      <ExeHost>
+        <Program>ServiceFabricSilo.exe</Program>
+        <WorkingFolder>CodePackage</WorkingFolder>
+      </ExeHost>
+    </EntryPoint>
+    <EnvironmentVariables>
+      <EnvironmentVariable Name="ORLEANS_SERVICE_ID"
+                           Value="OrleansService" />
+      <EnvironmentVariable Name="ORLEANS_CLUSTER_ID"
+                           Value="production" />
+      <EnvironmentVariable Name="ORLEANS_TABLE_SERVICE_URI"
+                           Value="https://orleansstorage.table.core.windows.net" />
+    </EnvironmentVariables>
+  </CodePackage>
+
+  <Resources>
+    <Endpoints>
+      <Endpoint Name="OrleansSiloEndpoint" Protocol="tcp" />
+      <Endpoint Name="OrleansGatewayEndpoint" Protocol="tcp" />
+    </Endpoints>
+    <ManagedIdentities DefaultIdentity="OrleansSiloServiceIdentity">
+      <ManagedIdentity Name="OrleansSiloServiceIdentity" />
+    </ManagedIdentities>
+  </Resources>
+</ServiceManifest>
