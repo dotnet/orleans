@@ -2199,6 +2199,50 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task DisseminationService_StartAsyncDoesNotStartAntiEntropyWhenDisabled()
+    {
+        var local = CreateSilo(21310);
+        var transport = new FakeTransport(local);
+        var topic = new FakeTopic(local);
+        var options = new DisseminationOptions { Enabled = false };
+        var optionsMonitor = new TestOptionsMonitor<DisseminationOptions>(options);
+        var service = new DisseminationService(
+            transport,
+            optionsMonitor,
+            [topic],
+            TimeProvider.System,
+            NullLogger<DisseminationProtocol>.Instance);
+
+        await service.StartAsync(CancellationToken.None);
+
+        Assert.False(service.IsAntiEntropyRunning);
+        options.Enabled = true;
+        optionsMonitor.Update(options);
+        await WaitUntil(() => service.IsAntiEntropyRunning);
+        Assert.True(service.IsAntiEntropyRunning);
+        options.Enabled = false;
+        optionsMonitor.Update(options);
+        await WaitUntil(() => !service.IsAntiEntropyRunning);
+        Assert.False(service.IsAntiEntropyRunning);
+        await service.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DisseminationService_StartAsyncStartsAntiEntropyWhenEnabled()
+    {
+        var local = CreateSilo(21311);
+        var transport = new FakeTransport(local);
+        var topic = new FakeTopic(local);
+        var service = CreateService(transport, topic);
+
+        await service.StartAsync(CancellationToken.None);
+
+        Assert.True(service.IsAntiEntropyRunning);
+        await service.StopAsync(CancellationToken.None);
+        Assert.False(service.IsAntiEntropyRunning);
+    }
+
+    [Fact]
     public async Task DisseminationService_StopAsyncPropagatesItsCancellationTokenToPendingGossipSends()
     {
         var local = CreateSilo(21501);
@@ -3113,11 +3157,33 @@ public class DisseminationProtocolTests
 
     private sealed class TestOptionsMonitor<T>(T currentValue) : IOptionsMonitor<T>
     {
-        public T CurrentValue => currentValue;
+        private readonly List<Action<T, string?>> _listeners = [];
 
-        public T Get(string? name) => currentValue;
+        public T CurrentValue { get; private set; } = currentValue;
 
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        public T Get(string? name) => CurrentValue;
+
+        public IDisposable OnChange(Action<T, string?> listener)
+        {
+            _listeners.Add(listener);
+            return new ListenerRegistration(_listeners, listener);
+        }
+
+        public void Update(T value)
+        {
+            CurrentValue = value;
+            foreach (var listener in _listeners.ToArray())
+            {
+                listener(value, Options.DefaultName);
+            }
+        }
+
+        private sealed class ListenerRegistration(
+            List<Action<T, string?>> listeners,
+            Action<T, string?> listener) : IDisposable
+        {
+            public void Dispose() => listeners.Remove(listener);
+        }
     }
 
     private sealed class MutableServiceProvider : IServiceProvider

@@ -30,6 +30,7 @@ namespace Orleans.Runtime.Metadata
 #else
         private readonly object _currentLock = new();
 #endif
+        private readonly object _publishLock = new();
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
@@ -64,6 +65,10 @@ namespace Orleans.Runtime.Metadata
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
         public GrainManifest LocalGrainManifest { get; }
+
+        internal int ManifestCacheCount => _manifestCache.Count;
+
+        internal bool IsManifestCached(ManifestHash hash) => _manifestCache.ContainsKey(hash);
 
         private ClusterManifest EnsureValidManifestForCurrentMembership(ClusterMembershipSnapshot clusterMembership)
         {
@@ -235,7 +240,6 @@ namespace Orleans.Runtime.Metadata
                     if (result.Value is not null)
                     {
                         modified = true;
-                        _manifestCache[ManifestHashCalculator.ComputeHash(result.Value)] = result.Value;
                         builder[result.Key] = result.Value;
                     }
                     else
@@ -304,7 +308,6 @@ namespace Orleans.Runtime.Metadata
                             continue;
                         }
 
-                        _manifestCache[expectedHash] = manifest;
                         builder[silo] = manifest;
                         missing.Remove(silo);
                         modified = true;
@@ -346,13 +349,44 @@ namespace Orleans.Runtime.Metadata
 
         private bool TryPublishManifest(ClusterManifest manifest)
         {
-            var publishSuccess = _updates.TryPublish(manifest);
+            bool publishSuccess;
+            lock (_publishLock)
+            {
+                publishSuccess = _updates.TryPublish(manifest);
+                if (publishSuccess)
+                {
+                    SynchronizeManifestCache(manifest);
+                }
+            }
+
             if (publishSuccess)
             {
                 ManifestEvents.EmitClusterManifestUpdated(this, manifest);
             }
 
             return publishSuccess;
+        }
+
+        private void SynchronizeManifestCache(ClusterManifest manifest)
+        {
+            var retainedHashes = new HashSet<ManifestHash>
+            {
+                ManifestHashCalculator.ComputeHash(LocalGrainManifest),
+            };
+            foreach (var siloManifest in manifest.Silos.Values)
+            {
+                var hash = ManifestHashCalculator.ComputeHash(siloManifest);
+                retainedHashes.Add(hash);
+                _manifestCache[hash] = siloManifest;
+            }
+
+            foreach (var hash in _manifestCache.Keys)
+            {
+                if (!retainedHashes.Contains(hash))
+                {
+                    _manifestCache.TryRemove(hash, out _);
+                }
+            }
         }
 
         private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
@@ -388,7 +422,6 @@ namespace Orleans.Runtime.Metadata
                 var manifest = await remoteManifestProvider.GetSiloManifestByHash(hash).AsTask().WaitAsync(_shutdownCts.Token);
                 if (manifest is not null && ManifestHashCalculator.ComputeHash(manifest) == hash)
                 {
-                    _manifestCache[hash] = manifest;
                     return manifest;
                 }
             }
