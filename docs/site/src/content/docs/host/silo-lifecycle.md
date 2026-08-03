@@ -1,6 +1,6 @@
 ---
 title: Orleans silo lifecycle
-description: Participate in Orleans 10 silo startup and shutdown.
+description: Participate in Orleans silo startup and shutdown.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -13,7 +13,7 @@ Most application code should use .NET `IHostedService` or `BackgroundService`. I
 
 ## Lifecycle stages
 
-The current <xref:Orleans.ServiceLifecycleStage> values are:
+<xref:Orleans.ServiceLifecycleStage> defines these stages:
 
 | Stage | Value | Purpose |
 |---|---:|---|
@@ -29,7 +29,7 @@ The current <xref:Orleans.ServiceLifecycleStage> values are:
 | `GrainDeactivation` | `19998` | Deactivate grains during shutdown |
 | `BecomeActive` | `19999` | Internal transition immediately before active |
 | `Active` | `20000` | Silo is active and accepts workload |
-| `Last` | `int.MaxValue` | Latest lifecycle stage |
+| `Last` | `int.MaxValue` | Final lifecycle stage |
 
 Some constants intentionally share or closely bracket values because their startup and shutdown semantics differ. Treat the named constants as ordering contracts; don't copy their numeric values into application code.
 

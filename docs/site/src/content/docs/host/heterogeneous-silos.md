@@ -1,6 +1,6 @@
 ---
 title: Heterogeneous Orleans silos
-description: Host different Orleans 10 grain types on different silos.
+description: Host different Orleans grain types on different silos.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

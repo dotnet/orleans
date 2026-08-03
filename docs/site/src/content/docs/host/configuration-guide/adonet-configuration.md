@@ -1,13 +1,13 @@
 ---
 title: ADO.NET database configuration
-description: Find Orleans 10 ADO.NET schema scripts and provider invariants.
+description: Find Orleans ADO.NET schema scripts and provider invariants.
 ms.date: 08/02/2026
 ms.topic: reference
 ---
 
 # ADO.NET database configuration
 
-Orleans keeps its current ADO.NET schema scripts beside each provider's source. Run the main script before the capability scripts. Use scripts from the same Orleans release as the packages deployed by the application.
+Orleans keeps its ADO.NET schema scripts beside each provider's source. Run the main script before the capability scripts. Use scripts from the same Orleans release as the packages deployed by the application.
 
 ## Driver invariants
 
@@ -19,7 +19,7 @@ Orleans keeps its current ADO.NET schema scripts beside each provider's source. 
 | Oracle | [Oracle.ManagedDataAccess.Core](https://www.nuget.org/packages/Oracle.ManagedDataAccess.Core/) | `Oracle.DataAccess.Client` |
 
 > [!IMPORTANT]
-> Orleans 10 uses `Microsoft.Data.SqlClient`, not `System.Data.SqlClient`, for SQL Server.
+> Use `Microsoft.Data.SqlClient`, not `System.Data.SqlClient`, for SQL Server.
 
 ## Main scripts
 

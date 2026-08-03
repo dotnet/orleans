@@ -1,6 +1,6 @@
 ---
 title: Local development configuration
-description: Configure an Orleans 10 application for local development.
+description: Configure an Orleans application for local development.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

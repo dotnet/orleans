@@ -1,6 +1,6 @@
 ---
 title: Silo metadata
-description: Annotate Orleans 10 silos for placement and application decisions.
+description: Annotate Orleans silos for placement and application decisions.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

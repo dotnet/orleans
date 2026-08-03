@@ -1,6 +1,6 @@
 ---
 title: Client configuration
-description: Configure an Orleans 10 external client.
+description: Configure an Orleans external client.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

@@ -1,6 +1,6 @@
 ---
 title: Background services and startup tasks
-description: Run application initialization and background work with Orleans 10.
+description: Run application initialization and background work with Orleans.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

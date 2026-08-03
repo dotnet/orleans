@@ -1,6 +1,6 @@
 ---
 title: Orleans clients
-description: Choose and host an Orleans 10 client.
+description: Choose and host an Orleans client.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

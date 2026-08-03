@@ -1,6 +1,6 @@
 ---
 title: Orleans grain directories
-description: Choose and configure grain directories in Orleans 10.
+description: Choose and configure Orleans grain directories.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -11,7 +11,7 @@ A grain directory maps a grain identity to the silo that currently hosts its act
 
 ## Start with the default directory
 
-Orleans 10 uses the built-in `LocalGrainDirectory` by default. Despite its name, the directory is distributed across the cluster using a consistent-hash ring. It requires no external service and is the right starting point for most applications.
+Orleans uses the built-in `LocalGrainDirectory` by default. Despite its name, the directory is distributed across the cluster using a consistent-hash ring. It requires no external service and is the right starting point for most applications.
 
 The default directory is eventually consistent during membership changes. A brief duplicate activation is possible during failures; Orleans resolves the conflict and deactivates the duplicate. Grain state and operations should therefore tolerate activation races and retries.
 
@@ -63,10 +63,10 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 
 ## Experimental distributed grain directory
 
-Orleans 10 includes `AddDistributedGrainDirectory`, a strongly consistent in-cluster directory based on partitioned ranges and membership views.
+`AddDistributedGrainDirectory` adds a strongly consistent in-cluster directory based on partitioned ranges and membership views.
 
 > [!CAUTION]
-> `AddDistributedGrainDirectory` is experimental and emits diagnostic `ORLEANSEXP003`. Its API and behavior can change or be removed. It is not the Orleans 10 default.
+> `AddDistributedGrainDirectory` is experimental and emits diagnostic `ORLEANSEXP003`. Its API and behavior can change or be removed. It is not the default grain directory.
 
 ```csharp
 #pragma warning disable ORLEANSEXP003

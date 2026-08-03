@@ -1,6 +1,6 @@
 ---
 title: Core Orleans configuration options
-description: Find the Orleans 10 option types used for common hosting tasks.
+description: Find the Orleans option types used for common hosting tasks.
 ms.date: 08/02/2026
 ms.topic: reference
 ---

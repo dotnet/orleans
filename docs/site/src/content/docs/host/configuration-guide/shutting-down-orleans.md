@@ -1,6 +1,6 @@
 ---
 title: Shut down Orleans silos
-description: Gracefully stop Orleans 10 silos with the .NET Generic Host.
+description: Gracefully stop Orleans silos with the .NET Generic Host.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

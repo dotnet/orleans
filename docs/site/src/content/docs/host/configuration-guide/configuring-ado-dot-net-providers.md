@@ -1,6 +1,6 @@
 ---
 title: Configure ADO.NET providers
-description: Configure Orleans 10 clustering, reminders, storage, and grain directories with ADO.NET.
+description: Configure Orleans clustering, reminders, storage, and grain directories with ADO.NET.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---
@@ -26,13 +26,13 @@ Run the main script for the database first, followed by each capability script. 
 2. `src/AdoNet/Orleans.Clustering.AdoNet/SQLServer-Clustering.sql`
 3. `src/AdoNet/Orleans.Persistence.AdoNet/SQLServer-Persistence.sql`
 
-See [ADO.NET database configuration](adonet-configuration.md) for links to every current script and invariant.
+See [ADO.NET database configuration](adonet-configuration.md) for schema script and invariant links.
 
 Apply schema changes as a controlled deployment step. Don't grant silos schema-owner permissions solely so they can create tables at runtime.
 
 ## Configure SQL Server
 
-Orleans 10 uses `Microsoft.Data.SqlClient` for SQL Server:
+Use `Microsoft.Data.SqlClient` for SQL Server:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="adonet_silo":::
 
@@ -50,7 +50,7 @@ builder.UseOrleansClient(clientBuilder =>
 ```
 
 > [!IMPORTANT]
-> `System.Data.SqlClient` isn't the SQL Server invariant for Orleans 10. Reference the `Microsoft.Data.SqlClient` package and use the `Microsoft.Data.SqlClient` invariant.
+> `System.Data.SqlClient` isn't the SQL Server invariant. Reference the `Microsoft.Data.SqlClient` package and use the `Microsoft.Data.SqlClient` invariant.
 
 ## Configure another database
 

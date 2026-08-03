@@ -1,6 +1,6 @@
 ---
 title: Orleans and Aspire integration
-description: Model and run Orleans 10 applications with Aspire.
+description: Model and run Orleans applications with Aspire.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---
@@ -35,7 +35,7 @@ Register the keyed Aspire client for every backing resource consumed by Orleans,
 
 :::code language="csharp" source="snippets/aspire/Silo/SiloProgram.cs" id="silo_basic_config":::
 
-The AppHost injects the `Orleans` configuration hierarchy. Orleans 10 binds cluster identity, endpoints, clustering, reminders, streaming, grain storage, and grain directory configuration from it.
+The AppHost injects the `Orleans` configuration hierarchy. Orleans binds cluster identity, endpoints, clustering, reminders, streaming, grain storage, and grain directory configuration from it.
 
 > [!IMPORTANT]
 > Resource references inject configuration, but the application project must register the matching keyed service client. For example, use `AddKeyedRedisClient`, `AddKeyedAzureTableServiceClient`, or the matching Aspire integration method for the resource type and name.
@@ -85,7 +85,7 @@ Common AppHost operations include:
 | `AsClient()` | Reference the cluster from a client-only project. |
 | `WithReference(orleans)` | Inject Orleans configuration into a project. |
 
-Consult the current [Aspire Orleans integration reference](https://aspire.dev/integrations/frameworks/orleans/) for resource types and overloads supported by your Aspire version.
+Consult the [Aspire Orleans integration reference](https://aspire.dev/integrations/frameworks/orleans/) for resource types and overloads supported by your Aspire version.
 
 ## Production considerations
 

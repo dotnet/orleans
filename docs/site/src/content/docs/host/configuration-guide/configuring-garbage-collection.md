@@ -1,6 +1,6 @@
 ---
 title: Configure .NET garbage collection
-description: Configure .NET garbage collection for Orleans 10 silos.
+description: Configure .NET garbage collection for Orleans silos.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

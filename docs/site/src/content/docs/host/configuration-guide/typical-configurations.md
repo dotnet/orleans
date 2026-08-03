@@ -1,6 +1,6 @@
 ---
 title: Typical Orleans configurations
-description: Choose a local, Aspire, or production Orleans 10 configuration.
+description: Choose a local, Aspire, or production Orleans configuration.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

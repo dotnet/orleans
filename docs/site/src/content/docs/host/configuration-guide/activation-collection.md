@@ -1,6 +1,6 @@
 ---
 title: Activation collection and resource management
-description: Manage idle Orleans 10 activations and memory pressure.
+description: Manage idle Orleans activations and memory pressure.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

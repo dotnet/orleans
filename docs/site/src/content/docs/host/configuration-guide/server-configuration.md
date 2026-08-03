@@ -1,6 +1,6 @@
 ---
 title: Server configuration
-description: Configure Orleans 10 silos, providers, and network endpoints.
+description: Configure Orleans silos, providers, and network endpoints.
 ms.date: 08/02/2026
 ms.topic: how-to
 ---

@@ -1,6 +1,6 @@
 ---
 title: Orleans configuration guide
-description: Configure Orleans 10 silos, clients, providers, and endpoints.
+description: Configure Orleans silos, clients, providers, and endpoints.
 ms.date: 08/02/2026
 ms.topic: overview
 ---
@@ -47,7 +47,7 @@ Provider extension methods validate configuration when the host starts. Prefer p
 
 ## Declarative configuration
 
-Orleans 10 automatically binds the `Orleans` configuration section when `UseOrleans()` or `UseOrleansClient()` is called. The following sections are recognized:
+Orleans automatically binds the `Orleans` configuration section when `UseOrleans()` or `UseOrleansClient()` is called. The following sections are recognized:
 
 | Path | Applies to | Purpose |
 |---|---|---|
