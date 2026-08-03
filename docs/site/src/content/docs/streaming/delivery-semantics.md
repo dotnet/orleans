@@ -1,6 +1,6 @@
 ---
 title: Stream delivery, ordering, replay, and recovery
-description: Design Orleans 10 streaming consumers for provider-specific delivery, ordering, replay, and failure behavior.
+description: Design Orleans streaming consumers for provider-specific delivery, ordering, replay, and failure behavior.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -40,9 +40,9 @@ A rewindable provider can start or resume a subscription from a provider sequenc
 
 - Memory streams are rewindable only over their transient in-memory cache.
 - Event Hubs and Redis Streams are rewindable over retained external data.
-- Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers in Orleans 10 aren't rewindable.
+- Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers aren't rewindable.
 
-See the [provider matrix](stream-providers.md#provider-matrix) for current capabilities.
+See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
 
 ## Recovery checklist
 

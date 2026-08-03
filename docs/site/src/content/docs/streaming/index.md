@@ -1,6 +1,6 @@
 ---
 title: Streaming with Orleans
-description: Understand Orleans streams and choose the right messaging abstraction for an Orleans 10 application.
+description: Understand Orleans streams and choose the right messaging abstraction for an Orleans application.
 ms.date: 08/02/2026
 ms.topic: overview
 ---

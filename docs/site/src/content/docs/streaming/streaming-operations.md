@@ -1,6 +1,6 @@
 ---
 title: Operate and tune Orleans streams
-description: Apply backpressure, tune persistent providers, and observe Orleans 10 streaming health.
+description: Apply backpressure, tune persistent providers, and observe Orleans streaming health.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

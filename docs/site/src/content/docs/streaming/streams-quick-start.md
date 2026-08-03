@@ -1,6 +1,6 @@
 ---
 title: Orleans streaming quickstart
-description: Configure an Orleans 10 in-memory stream, publish events, and consume them with an implicit subscription.
+description: Configure an Orleans in-memory stream, publish events, and consume them with an implicit subscription.
 ms.date: 08/02/2026
 ms.topic: quickstart
 ---

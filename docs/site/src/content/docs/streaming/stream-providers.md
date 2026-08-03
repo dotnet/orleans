@@ -1,6 +1,6 @@
 ---
 title: Orleans stream providers
-description: Compare built-in Orleans 10 stream providers by durability, rewindability, status, and prerequisites.
+description: Compare built-in Orleans stream providers by durability, rewindability, status, and prerequisites.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -21,9 +21,9 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 | NATS JetStream | `Microsoft.Orleans.Streaming.NATS` | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
 | Redis Streams | `Microsoft.Orleans.Streaming.Redis` | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
 
-Alpha packages have an `alpha.1` version suffix in Orleans 10. Treat their APIs and operational behavior as prerelease, validate failure modes under load, and pin versions deliberately.
+Alpha packages have an `alpha.1` version suffix. Treat their APIs and operational behavior as prerelease, validate failure modes under load, and pin versions deliberately.
 
-Kafka and Azure Service Bus aren't built-in Orleans 10 stream providers. Integrate them through application code or a custom persistent-stream queue adapter rather than configuring a nonexistent built-in provider.
+Kafka and Azure Service Bus aren't built-in Orleans stream providers. Integrate them through application code or a custom persistent-stream queue adapter rather than configuring a nonexistent built-in provider.
 
 ## Memory streams
 
@@ -59,7 +59,7 @@ Register ADO.NET streaming with `AddAdoNetStreams`. Install the matching databas
 
 ## NATS JetStream streaming (alpha)
 
-Register NATS with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. `PartitionCount` changes require corresponding server-side stream updates. The Orleans 10 provider isn't rewindable.
+Register NATS with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. `PartitionCount` changes require corresponding server-side stream updates. The provider isn't rewindable.
 
 ## Redis Streams streaming (alpha)
 

@@ -1,6 +1,6 @@
 ---
 title: Broadcast channels
-description: Configure and use Orleans 10 broadcast channels with correct identity and delivery semantics.
+description: Configure and use Orleans broadcast channels with correct identity and delivery semantics.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

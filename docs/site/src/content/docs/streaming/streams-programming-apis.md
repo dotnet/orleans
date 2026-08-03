@@ -1,6 +1,6 @@
 ---
 title: Orleans streaming APIs
-description: Work with stream identities, producers, consumers, and explicit or implicit subscriptions in Orleans 10.
+description: Work with stream identities, producers, consumers, and explicit or implicit subscriptions in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
