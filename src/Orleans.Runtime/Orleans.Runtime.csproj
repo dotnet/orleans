@@ -32,6 +32,7 @@
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs" />
     <InternalsVisibleTo Include="Orleans.DurableTasks" />
+    <InternalsVisibleTo Include="Orleans.DurableTasks.Tests" />
     <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling" />
     <InternalsVisibleTo Include="Orleans.Placement.Tests" />

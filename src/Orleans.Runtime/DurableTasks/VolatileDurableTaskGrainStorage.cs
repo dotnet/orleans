@@ -65,6 +65,14 @@ public class VolatileDurableTaskGrainStorage(
                 Request = request,
                 CreatedAt = _timeProvider.GetUtcNow(),
             };
+
+            // Persist the newly-created state immediately so that it is visible to subsequent TryGetTask/SetResponse
+            // calls even if no further Set* mutation is made on this instance (e.g. when 'request' is already
+            // non-null, the "state.Request is null" fast-path used by some callers to decide whether to call
+            // SetRequest will not fire, and this state would otherwise never be committed to the working copy).
+            // This mirrors Orleans.Journaling.DurableTasks.DurableTaskGrainStorage.GetOrCreateTask, which commits
+            // the newly-created state via _items.Add(taskId, result) immediately.
+            AddOrUpdateTask(taskId, (DurableTaskState)result);
         }
 
         return result;

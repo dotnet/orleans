@@ -35,7 +35,7 @@ public abstract class DurableTask
         var result = new List<ScheduledTask>();
         for (var i = 0; i < tasks.Count; i++)
         {
-            await tasks[i].ScheduleAsync($"{i}", cancellationToken);
+            result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken));
         }
 
         foreach (var task in result)
@@ -57,7 +57,7 @@ public abstract class DurableTask
         var result = new List<ScheduledTask<TResult>>();
         for (var i = 0; i < tasks.Count; i++)
         {
-            await tasks[i].ScheduleAsync($"{i}", cancellationToken: cancellationToken);
+            result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken: cancellationToken));
         }
 
         foreach (var task in result)
@@ -79,7 +79,7 @@ public abstract class DurableTask
         var result = new List<ScheduledTask>();
         for (var i = 0; i < tasks.Count; i++)
         {
-            await tasks[i].ScheduleAsync($"{i}", cancellationToken);
+            result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken));
         }
 
         var completions = new List<Task>(result.Count);
@@ -104,7 +104,7 @@ public abstract class DurableTask
         var result = new List<ScheduledTask<TResult>>();
         for (var i = 0; i < tasks.Count; i++)
         {
-            await tasks[i].ScheduleAsync($"{i}", cancellationToken);
+            result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken));
         }
 
         var completions = new List<Task>(result.Count);
