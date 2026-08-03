@@ -159,6 +159,23 @@ kubectl apply --namespace <namespace> --filename orleans.yaml
 
 The baseline disables service account token mounting because Orleans doesn't need to call the Kubernetes API. Add a service account and permissions only for application features that require them.
 
+## Deploy with Aspire
+
+[Aspire](../host/aspire-integration.md) can model an Orleans application and its backing resources in an AppHost. The `Aspire.Hosting.Kubernetes` integration can publish that application model as a Helm chart or deploy it to the Kubernetes cluster selected by the current `kubectl` context.
+
+Aspire doesn't change the Orleans networking and lifecycle requirements described on this page. Before deploying generated resources:
+
+- Configure a production clustering provider and durable state providers in the Orleans resource model.
+- Run multiple silo replicas across failure domains.
+- Ensure each silo receives its own pod name and pod IP and advertises that pod IP.
+- Expose the silo and gateway container ports to the required pod and client networks.
+- Add application-owned startup, readiness, and liveness probes.
+- Set resource requests, disruption budgets, rollout policy, and termination grace periods from measured behavior.
+
+Review the generated Helm chart before applying it. Use the Kubernetes integration's resource customization APIs when the generated workload doesn't include these Orleans-specific requirements.
+
+For the supported APIs and deployment commands, see [Orleans and Aspire integration](../host/aspire-integration.md), [Aspire Kubernetes integration](https://aspire.dev/integrations/compute/kubernetes/), and [Deploy with Aspire](https://aspire.dev/deployment/deploy-with-aspire/).
+
 ## Optional Kubernetes hosting package
 
 The `Microsoft.Orleans.Hosting.Kubernetes` package is optional and isn't generally recommended. Consider it only for a simple topology where exactly one Kubernetes `Deployment` object owns exactly one Orleans cluster.
@@ -210,6 +227,21 @@ The three paths in the manifest are placeholders that the application must imple
 - Liveness performs only a local forward-progress check and doesn't call grains or dependencies.
 
 The five-minute startup allowance is an example, not a universal default. Set it from measured startup and recovery time. Aggressive probes can turn provider latency or CPU pressure into a cluster-wide restart loop.
+
+## Resource requests and limits
+
+Set requests and limits from measurements under representative load, including a silo loss and rolling deployment. Kubernetes uses requests for scheduling and uses limits to constrain a running container; they aren't interchangeable capacity settings.
+
+- **CPU requests** reserve scheduling capacity. If requests are too low, Kubernetes can place too many silos on one node and create contention during bursts or failover.
+- **CPU limits** can throttle the .NET process even when the node has spare CPU. Tail latency, membership probes, garbage collection, and activation recovery can all suffer under throttling. The baseline intentionally specifies a CPU request without a CPU limit.
+- **Memory requests** should cover a representative working set, including activations, caches, serialization buffers, and expected failover growth.
+- **Memory limits** are enforced by terminating the container when it exceeds the cgroup limit. Leave headroom for bursts and failover; don't rely on a managed <xref:System.OutOfMemoryException> or graceful shutdown.
+
+Monitor CPU throttling, working set, allocation rate, garbage collection, scheduler delay, activation count, and pod restarts. Revisit resource settings when grain state, placement, traffic, runtime, or node sizes change.
+
+Namespace `ResourceQuota` and `LimitRange` policies can reject pods or inject defaults. Verify the effective pod specification after admission rather than assuming the submitted manifest is what runs.
+
+For workload sizing, overload protection, and scaling signals, see [Capacity planning and scaling](capacity-planning.md).
 
 ## Shutdown, rollouts, and scaling
 
