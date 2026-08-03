@@ -13,6 +13,7 @@ namespace Orleans.Analyzers
         public const string AliasAttributeFullyQualifiedName = "Orleans.AliasAttribute";
         public const string IdAttributeFullyQualifiedName = "Orleans.IdAttribute";
         public const string GenerateSerializerAttributeFullyQualifiedName = "Orleans.GenerateSerializerAttribute";
+        public const string VersionAttributeFullyQualifiedName = "Orleans.CodeGeneration.VersionAttribute";
 
         public const string SerializableAttributeFullyQualifiedName = "System.SerializableAttribute";
         public const string NonSerializedAttributeFullyQualifiedName = "System.NonSerializedAttribute";
@@ -21,5 +22,7 @@ namespace Orleans.Analyzers
         public const string IdAttributeSourceName = "global::Orleans.IdAttribute";
         public const string GenerateSerializerAttributeSourceName = "global::Orleans.GenerateSerializerAttribute";
         public const string NonSerializedAttributeSourceName = "global::System.NonSerializedAttribute";
+
+        public const string GrainInterfacesFileName = "GrainInterfaces.txt";
     }
 }

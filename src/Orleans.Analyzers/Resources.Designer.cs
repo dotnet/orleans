@@ -293,5 +293,193 @@ namespace Orleans.Analyzers {
                 return ResourceManager.GetString("ConfigureAwaitCodeFixTitle", resourceCulture);
             }
         }
+        /// <summary>
+        ///   Looks up a localized string similar to Add to GrainInterfaces.txt.
+        /// </summary>
+        internal static string AddToGrainInterfacesFileTitle {
+            get {
+                return ResourceManager.GetString("AddToGrainInterfacesFileTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Each grain interface should only be declared once in GrainInterfaces.txt..
+        /// </summary>
+        internal static string GrainInterfaceDuplicateDeclarationDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfaceDuplicateDeclarationDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface '{0}' is declared multiple times in GrainInterfaces.txt.
+        /// </summary>
+        internal static string GrainInterfaceDuplicateDeclarationMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfaceDuplicateDeclarationMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Duplicate grain interface declaration.
+        /// </summary>
+        internal static string GrainInterfaceDuplicateDeclarationTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfaceDuplicateDeclarationTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to When adding or modifying grain interface members, update GrainInterfaces.txt and increment the interface version..
+        /// </summary>
+        internal static string GrainInterfaceMemberNotDeclaredDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMemberNotDeclaredDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface member '{0}' is not declared in GrainInterfaces.txt for interface '{1}'.
+        /// </summary>
+        internal static string GrainInterfaceMemberNotDeclaredMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMemberNotDeclaredMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface member not declared in GrainInterfaces.txt.
+        /// </summary>
+        internal static string GrainInterfaceMemberNotDeclaredTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMemberNotDeclaredTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to All grain interfaces should be tracked in GrainInterfaces.txt to ensure version compatibility during rolling upgrades..
+        /// </summary>
+        internal static string GrainInterfaceNotDeclaredDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfaceNotDeclaredDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface '{0}' is not declared in GrainInterfaces.txt.
+        /// </summary>
+        internal static string GrainInterfaceNotDeclaredMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfaceNotDeclaredMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface not declared in GrainInterfaces.txt.
+        /// </summary>
+        internal static string GrainInterfaceNotDeclaredTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfaceNotDeclaredTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to When removing a grain interface, mark it as *RETIRED* in GrainInterfaces.txt to document that it has been intentionally removed..
+        /// </summary>
+        internal static string GrainInterfaceRemovedNotRetiredDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfaceRemovedNotRetiredDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface '{0}' is declared in GrainInterfaces.txt but no longer exists in code - mark it as *RETIRED*.
+        /// </summary>
+        internal static string GrainInterfaceRemovedNotRetiredMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfaceRemovedNotRetiredMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Removed grain interface not marked as retired.
+        /// </summary>
+        internal static string GrainInterfaceRemovedNotRetiredTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfaceRemovedNotRetiredTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Add a GrainInterfaces.txt file to track grain interface versions for compatibility during rolling upgrades..
+        /// </summary>
+        internal static string GrainInterfacesFileMissingDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfacesFileMissingDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The project contains grain interfaces but no {0} file to track them.
+        /// </summary>
+        internal static string GrainInterfacesFileMissingMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfacesFileMissingMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to GrainInterfaces.txt file is missing.
+        /// </summary>
+        internal static string GrainInterfacesFileMissingTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfacesFileMissingTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Version] attribute on the grain interface must match the version declared in GrainInterfaces.txt..
+        /// </summary>
+        internal static string GrainInterfaceVersionMismatchDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfaceVersionMismatchDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface '{0}' has [Version({1})] in GrainInterfaces.txt but [Version({2})] in code.
+        /// </summary>
+        internal static string GrainInterfaceVersionMismatchMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfaceVersionMismatchMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface version mismatch.
+        /// </summary>
+        internal static string GrainInterfaceVersionMismatchTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfaceVersionMismatchTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Mark as *RETIRED* in GrainInterfaces.txt.
+        /// </summary>
+        internal static string RetireGrainInterfaceTitle {
+            get {
+                return ResourceManager.GetString("RetireGrainInterfaceTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Update version in GrainInterfaces.txt.
+        /// </summary>
+        internal static string UpdateGrainInterfaceVersionTitle {
+            get {
+                return ResourceManager.GetString("UpdateGrainInterfaceVersionTitle", resourceCulture);
+            }
+        }
     }
 }
