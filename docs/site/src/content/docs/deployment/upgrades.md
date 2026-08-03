@@ -1,6 +1,6 @@
 ---
 title: Graceful shutdown and upgrades
-description: Scale in and deploy Orleans 10 applications using graceful, rolling, or blue-green strategies.
+description: Scale in and deploy Orleans applications using graceful, rolling, or blue-green strategies.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

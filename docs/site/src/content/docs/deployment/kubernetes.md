@@ -1,6 +1,6 @@
 ---
 title: Host Orleans on Kubernetes
-description: Configure networking, lifecycle, probes, and rollouts for an Orleans 10 cluster on Kubernetes.
+description: Configure networking, lifecycle, probes, and rollouts for an Orleans cluster on Kubernetes.
 ms.date: 08/02/2026
 ms.topic: how-to
 ms.custom: devops

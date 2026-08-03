@@ -1,6 +1,6 @@
 ---
 title: Host Orleans on Service Fabric
-description: Host and operate an Orleans 10 cluster as an application-authored Service Fabric stateless Reliable Service.
+description: Host and operate an Orleans cluster as an application-authored Service Fabric stateless Reliable Service.
 ms.date: 08/03/2026
 ms.topic: how-to
 ms.custom: devops
@@ -8,7 +8,7 @@ ms.custom: devops
 
 # Host Orleans on Service Fabric
 
-Orleans 10 can run on [Azure Service Fabric](/azure/service-fabric) as an unpartitioned stateless Reliable Service. Each Service Fabric service instance hosts one Orleans silo in a normal .NET generic host.
+Orleans can run on [Azure Service Fabric](/azure/service-fabric) as an unpartitioned stateless Reliable Service. Each Service Fabric service instance hosts one Orleans silo in a normal .NET generic host.
 
 There is no Orleans Service Fabric hosting or clustering package. The integration is application-authored using:
 

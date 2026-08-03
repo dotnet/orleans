@@ -1,6 +1,6 @@
 ---
 title: Platform requirements
-description: Evaluate whether a hosting platform can run an Orleans 10 production cluster safely.
+description: Evaluate whether a hosting platform can run an Orleans production cluster safely.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

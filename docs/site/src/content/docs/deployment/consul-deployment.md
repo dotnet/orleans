@@ -1,6 +1,6 @@
 ---
 title: Consul clustering provider
-description: Find current guidance for selecting and configuring Consul as an Orleans 10 clustering provider.
+description: Find current guidance for selecting and configuring Consul as an Orleans clustering provider.
 ms.date: 08/02/2026
 ms.topic: reference
 ---

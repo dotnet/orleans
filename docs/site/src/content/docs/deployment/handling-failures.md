@@ -1,6 +1,6 @@
 ---
 title: Failure handling
-description: Handle unknown outcomes, retries, deduplication, and partial failure in Orleans 10 applications.
+description: Handle unknown outcomes, retries, deduplication, and partial failure in Orleans applications.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

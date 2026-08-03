@@ -1,6 +1,6 @@
 ---
 title: Troubleshoot deployments
-description: Triage Orleans 10 deployment and production incidents.
+description: Triage Orleans deployment and production incidents.
 ms.date: 08/02/2026
 ms.topic: troubleshooting
 ms.custom: devops

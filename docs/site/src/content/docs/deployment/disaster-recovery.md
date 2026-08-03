@@ -1,6 +1,6 @@
 ---
 title: Backup, restore, and disaster recovery
-description: Protect Orleans 10 application state and recover a cluster after regional or provider failure.
+description: Protect Orleans application state and recover a cluster after regional or provider failure.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

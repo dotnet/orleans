@@ -1,6 +1,6 @@
 # Orleans shopping cart on Azure App Service
 
-This Orleans 10 sample deploys a multi-instance shopping cart to Azure App Service. It demonstrates:
+This Orleans sample deploys a multi-instance shopping cart to Azure App Service. It demonstrates:
 
 - Three Windows App Service workers running a cohosted ASP.NET Core app and Orleans silo.
 - Per-instance Orleans endpoints using `WEBSITE_PRIVATE_IP` and `WEBSITE_PRIVATE_PORTS`.

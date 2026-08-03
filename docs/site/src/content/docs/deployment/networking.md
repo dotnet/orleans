@@ -1,6 +1,6 @@
 ---
 title: Topology, networking, and clustering
-description: Configure Orleans 10 endpoints, network paths, and cluster discovery for production.
+description: Configure Orleans endpoints, network paths, and cluster discovery for production.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

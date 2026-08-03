@@ -1,6 +1,6 @@
 ---
 title: Health and observability
-description: Design Orleans 10 startup, readiness, liveness, dependency health, telemetry, and alerts.
+description: Design Orleans startup, readiness, liveness, dependency health, telemetry, and alerts.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

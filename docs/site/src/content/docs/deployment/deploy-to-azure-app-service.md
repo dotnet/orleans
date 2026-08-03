@@ -1,6 +1,6 @@
 ---
 title: Deploy Orleans to Azure App Service
-description: Deploy and operate an Orleans 10 cluster on Azure App Service using private instance endpoints and managed identity.
+description: Deploy and operate an Orleans cluster on Azure App Service using private instance endpoints and managed identity.
 ms.date: 08/03/2026
 ms.topic: tutorial
 ms.custom: devops
@@ -8,7 +8,7 @@ ms.custom: devops
 
 # Deploy Orleans to Azure App Service
 
-This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) as a multi-instance Orleans 10 cluster on Azure App Service.
+This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) as a multi-instance Orleans cluster on Azure App Service.
 
 The sample cohosts an ASP.NET Core Blazor app and an Orleans silo in each App Service worker. It uses:
 

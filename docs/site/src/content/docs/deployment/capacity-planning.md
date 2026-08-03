@@ -1,6 +1,6 @@
 ---
 title: Capacity planning and scaling
-description: Size and scale Orleans 10 clusters using measured workload and saturation signals.
+description: Size and scale Orleans clusters using measured workload and saturation signals.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

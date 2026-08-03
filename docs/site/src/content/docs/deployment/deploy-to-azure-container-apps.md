@@ -1,13 +1,13 @@
 ---
 title: Host Orleans on Azure Container Apps
-description: Assess Azure Container Apps networking and lifecycle requirements for an Orleans 10 cluster.
+description: Assess Azure Container Apps networking and lifecycle requirements for an Orleans cluster.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
 # Host Orleans on Azure Container Apps
 
-The previous shopping-cart deployment tutorial has been withdrawn. Its sample, Azure AD B2C configuration, secret-based GitHub Actions workflow, Bicep templates, and runtime versions aren't a validated Orleans 10 production baseline.
+The previous shopping-cart deployment tutorial has been withdrawn. Its sample, Azure AD B2C configuration, secret-based GitHub Actions workflow, Bicep templates, and runtime versions aren't a validated production baseline.
 
 Azure Container Apps revisions and HTTP ingress don't automatically provide the per-replica addressability Orleans requires. Before selecting this platform, validate direct TCP reachability to individual silo replicas and a stable way for each silo to advertise the address and ports that peers and Orleans clients can reach.
 
@@ -30,7 +30,7 @@ HTTP ingress can route application requests, but it doesn't replace Orleans silo
 
 ## Sample modernization required
 
-A future end-to-end Container Apps tutorial requires a maintained Orleans 10 sample that:
+A future end-to-end Container Apps tutorial requires a maintained Orleans sample that:
 
 1. Uses current .NET, Orleans, and Azure Container Apps capabilities.
 1. Demonstrates and tests per-replica advertised endpoint discovery.
