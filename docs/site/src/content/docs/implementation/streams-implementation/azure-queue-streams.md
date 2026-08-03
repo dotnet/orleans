@@ -1,6 +1,6 @@
 ---
 title: Azure Queue stream implementation
-description: Understand the Orleans 10 Azure Queue adapter, receiver acknowledgement, queue mapping, and current configuration surfaces.
+description: Understand the Orleans Azure Queue adapter, receiver acknowledgement, queue mapping, and configuration surfaces.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -9,7 +9,7 @@ ms.topic: concept-article
 
 The `Microsoft.Orleans.Streaming.AzureStorage` package implements a persistent stream adapter over Azure Queue Storage. It uses the common [persistent stream pulling architecture](index.md) and supplies Azure-specific queue mapping, encoding, receive, delete, and configuration behavior.
 
-## Current registration APIs
+## Registration APIs
 
 Both silo and client builders expose `AddAzureQueueStreams`. The concise overload configures named `AzureQueueOptions`. Both configurator types can replace the queue data adapter; only the silo configurator exposes the cache and pulling-agent components which run on silos.
 
@@ -31,7 +31,7 @@ siloBuilder.AddAzureQueueStreams(
     }));
 ```
 
-Applications can instead supply a keyed `QueueServiceClient` through configuration-driven provider registration. Current configuration supports a service key, connection name, connection string, or queue-service URI. Older `ConfigureQueueServiceClient*` methods and the `ClientOptions` property are obsolete and should not be used in new code.
+Applications can instead supply a keyed `QueueServiceClient` through configuration-driven provider registration. Configuration supports a service key, connection name, connection string, or queue-service URI. The `ConfigureQueueServiceClient*` methods and `ClientOptions` property are obsolete and should not be used in new code.
 
 Source: [`SiloBuilderExtensions`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Hosting/SiloBuilderExtensions.cs), [`AzureQueueStreamProviderBuilder`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Hosting/AzureQueueStreamProviderBuilder.cs), and [`AzureQueueOptions`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue/AzureQueueStreamOptions.cs).
 
@@ -39,7 +39,7 @@ Source: [`SiloBuilderExtensions`](https://github.com/dotnet/orleans/blob/main/sr
 
 `AzureQueueAdapter` is read-write and not rewindable. A producer encodes the stream identity, payload, request context, and sequence metadata using an `IAzureQueueDataAdapter`, then sends an Azure Queue message to the mapped queue.
 
-Because Azure Queue Storage does not expose a durable arbitrary stream offset, a non-null rewind token is rejected. The default `AzureQueueDataAdapterV2` is the current encoding. Version 1 remains for compatibility with existing messages, not as the preferred format for new providers.
+Because Azure Queue Storage does not expose a durable arbitrary stream offset, a non-null rewind token is rejected. `AzureQueueDataAdapterV2` is the default encoding. Version 1 remains for compatibility with existing messages, not as the preferred format for new providers.
 
 Source: [`AzureQueueAdapter`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue/AzureQueueAdapter.cs) and [`IAzureQueueDataAdapter`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue/IAzureQueueDataAdapter.cs).
 

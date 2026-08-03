@@ -1,6 +1,6 @@
 ---
 title: Persistent stream pulling architecture
-description: Understand Orleans 10 persistent stream providers, queue balancing, pulling agents, caches, cursors, pub-sub, and recovery.
+description: Understand Orleans persistent stream providers, queue balancing, pulling agents, caches, cursors, pub-sub, and recovery.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

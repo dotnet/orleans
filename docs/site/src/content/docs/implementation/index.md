@@ -1,13 +1,13 @@
 ---
 title: Orleans runtime architecture
-description: An advanced guide to the protocols, invariants, and extension points inside the Orleans 10 runtime.
+description: An advanced guide to the protocols, invariants, and extension points inside the Orleans runtime.
 ms.date: 08/02/2026
 ms.topic: overview
 ---
 
 # Orleans runtime architecture
 
-The implementation track explains how Orleans 10 realizes the virtual actor model. It is intended for runtime contributors, provider authors, and operators who need to reason about failure, consistency, scheduling, and extensibility. For application programming guidance, start with the conceptual and task-oriented sections of this documentation instead.
+The implementation track explains how Orleans realizes the virtual actor model. It is intended for runtime contributors, provider authors, and operators who need to reason about failure, consistency, scheduling, and extensibility. For application programming guidance, start with the conceptual and task-oriented sections of this documentation instead.
 
 The pages in this track use Orleans source and tests as the specification. Internal types are named so that readers can follow an operation through the repository, but those types are not public compatibility contracts unless the page explicitly identifies an extension point.
 
@@ -29,9 +29,9 @@ The pages in this track use Orleans source and tests as the specification. Inter
 - [Provider authoring](provider-authoring.md) describes named providers, configuration binding, lifecycle participation, and validation.
 - [TestingHost architecture](testing.md) explains the in-process cluster harness and its substitutions for production services.
 
-## Orleans 10 defaults that shape the architecture
+## Defaults that shape the architecture
 
-| Concern | Orleans 10 default |
+| Concern | Default |
 | --- | --- |
 | Placement | <xref:Orleans.Runtime.ResourceOptimizedPlacement> |
 | Grain directory | `LocalGrainDirectory`, using the membership ring |

@@ -1,6 +1,6 @@
 ---
 title: Scheduling and turn execution
-description: Understand Orleans 10 activation scheduling, request admission, continuations, and interleaving.
+description: Understand Orleans activation scheduling, request admission, continuations, and interleaving.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

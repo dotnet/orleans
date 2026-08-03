@@ -1,6 +1,6 @@
 ---
 title: Provider authoring architecture
-description: Design Orleans 10 providers with named services, configuration binding, validation, lifecycle, and runtime extension contracts.
+description: Design Orleans providers with named services, configuration binding, validation, lifecycle, and runtime extension contracts.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -36,7 +36,7 @@ public sealed class ExampleProviderBuilder : IProviderBuilder<ISiloBuilder>
 
 Provider packages associate a provider type string and category with a builder using assembly metadata. The host selects that builder from configuration, passes the provider name and section, and lets the builder call the same public registration API used by code-first configuration.
 
-The Azure Queue stream implementation is a current example: [`AzureQueueStreamProviderBuilder`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Hosting/AzureQueueStreamProviderBuilder.cs) implements builders for both `ISiloBuilder` and `IClientBuilder`.
+The Azure Queue stream implementation demonstrates this pattern: [`AzureQueueStreamProviderBuilder`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Hosting/AzureQueueStreamProviderBuilder.cs) implements builders for both `ISiloBuilder` and `IClientBuilder`.
 
 ## Named-service composition
 
@@ -102,4 +102,3 @@ Contract tests should cover more than successful round trips:
 - rolling-upgrade compatibility of stored or transmitted data.
 
 Use [TestingHost architecture](testing.md) to understand which runtime services a test cluster substitutes. Provider tests which depend on a real backend should state those preconditions and should not treat an emulator's weaker consistency as proof of the production contract.
-

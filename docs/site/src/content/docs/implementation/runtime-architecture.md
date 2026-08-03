@@ -1,6 +1,6 @@
 ---
 title: Runtime architecture
-description: Follow an Orleans 10 call through the client, messaging, placement, directory, activation, and scheduler.
+description: Follow an Orleans call through the client, messaging, placement, directory, activation, and scheduler.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -37,7 +37,7 @@ A silo is a .NET Generic Host with Orleans services registered in dependency inj
 - `InsideRuntimeClient` for invoking local targets and producing responses.
 - `DeploymentLoadPublisher` and environment statistics for placement and overload decisions.
 
-See [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs) for the current composition root and [`Silo`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Silo/Silo.cs) for lifecycle orchestration.
+See [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs) for the composition root and [`Silo`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Silo/Silo.cs) for lifecycle orchestration.
 
 An external client has no activation catalog or placement service. `ClusterClient` starts an `OutsideRuntimeClient`, discovers gateways, maintains gateway connections, and sends requests through a client `MessageCenter`. A silo also embeds a runtime client, but its `InsideRuntimeClient` can dispatch directly to local activations and system targets.
 
@@ -89,5 +89,4 @@ Prefer supported extension points over replacing internal runtime types:
 - <xref:Orleans.Providers.IProviderBuilder`1> integrates configuration-driven providers.
 - lifecycle participants order provider startup and shutdown.
 
-Internal names and algorithms can change between releases. Public APIs, analyzer warnings, and documented wire identities are the compatibility boundaries.
-
+Internal names and algorithms are not compatibility guarantees. Public APIs, analyzer warnings, and documented wire identities are the compatibility boundaries.

@@ -1,6 +1,6 @@
 ---
 title: Grain directory architecture
-description: Compare Orleans 10's default LocalGrainDirectory DHT with the experimental distributed directory.
+description: Compare the default LocalGrainDirectory DHT with the experimental distributed directory.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -9,7 +9,7 @@ ms.topic: concept-article
 
 The grain directory maps a grain identity to an activation address. It is on the critical path when a caller has no usable cached address and when the runtime creates, moves, or removes an activation. Placement chooses a silo; the directory coordinates which activation address is authoritative.
 
-Orleans 10 uses `LocalGrainDirectory` by default. The newer `DistributedGrainDirectory` is experimental and must be enabled explicitly.
+Orleans uses `LocalGrainDirectory` by default. `DistributedGrainDirectory` is experimental and must be enabled explicitly.
 
 ## Default: `LocalGrainDirectory`
 
@@ -61,7 +61,7 @@ siloBuilder.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP003
 ```
 
-It is not the Orleans 10 default. The experimental status allows its API and protocol to evolve.
+It is not the default. The experimental status allows its API and protocol to evolve.
 
 The implementation divides the hash ring into configurable ranges. `GrainDirectoryOptions.PartitionsPerSilo` defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer.
 
@@ -89,7 +89,7 @@ Source: [`AddDistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/
 
 | Property | Default `LocalGrainDirectory` | Experimental `DistributedGrainDirectory` |
 | --- | --- | --- |
-| Orleans 10 status | Default | Opt-in, `ORLEANSEXP003` |
+| Status | Default | Opt-in, `ORLEANSEXP003` |
 | Ownership | Membership consistent-hash ring | Versioned ranges over membership views |
 | Normal lookup | Owner partition plus per-silo cache | Owner partition plus view coordination |
 | View change | Partition split/merge and cache repair | Sealed ranges and snapshot transfer |

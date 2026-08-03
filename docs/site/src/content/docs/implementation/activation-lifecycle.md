@@ -1,6 +1,6 @@
 ---
 title: Activation lifecycle and migration
-description: Understand activation creation, activation, collection, deactivation, and migration in Orleans 10.
+description: Understand activation creation, activation, collection, deactivation, and migration in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -96,4 +96,3 @@ Components participating in activation creation or migration should preserve the
 - unregister stale addresses even when cleanup fails;
 - keep migration payloads backward-compatible across rolling upgrades; and
 - assume source or target failure can interrupt migration.
-

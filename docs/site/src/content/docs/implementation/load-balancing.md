@@ -1,6 +1,6 @@
 ---
 title: Placement and activation balancing
-description: Understand Orleans 10 resource-optimized placement, load signals, activation rebalancing, and repartitioning.
+description: Understand Orleans resource-optimized placement, load signals, activation rebalancing, and repartitioning.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -9,7 +9,7 @@ ms.topic: concept-article
 
 Placement chooses a silo when Orleans needs a new activation. Balancing can later move existing activations. Those are separate decisions with different information and costs.
 
-The Orleans 10 default placement strategy is <xref:Orleans.Runtime.ResourceOptimizedPlacement>, not random placement.
+The default placement strategy is <xref:Orleans.Runtime.ResourceOptimizedPlacement>, not random placement.
 
 ## Resource-optimized placement
 

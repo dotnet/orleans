@@ -1,6 +1,6 @@
 ---
 title: Serialization and code generation internals
-description: Understand Orleans 10 generated codecs, RPC proxies, manifests, wire identity, and serialization extension points.
+description: Understand Orleans generated codecs, RPC proxies, manifests, wire identity, and serialization extension points.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

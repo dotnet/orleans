@@ -1,6 +1,6 @@
 ---
 title: Messaging pipeline and delivery semantics
-description: Trace Orleans 10 requests and understand routing, forwarding, response timeouts, retries, and unknown outcomes.
+description: Trace Orleans requests and understand routing, forwarding, response timeouts, retries, and unknown outcomes.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -39,7 +39,7 @@ Source: [`GrainReferenceRuntime`](https://github.com/dotnet/orleans/blob/main/sr
 
 A message can encounter a stale activation address because an activation deactivated, moved, or its silo failed. The runtime can reject, invalidate, forward, or reroute that same logical request while locating the current activation. Forwarding is bounded by silo messaging options.
 
-This internal address repair must not be confused with retrying an application call after its response timeout. Orleans 10 does **not** automatically resubmit a call because the caller's response timer elapsed.
+This internal address repair must not be confused with retrying an application call after its response timeout. Orleans does **not** automatically resubmit a call because the caller's response timer elapsed.
 
 Transport code can also retry a failed socket send. That repairs a transport attempt using the same message identity; it is not a new application invocation policy.
 
