@@ -1,13 +1,13 @@
 ---
 title: Orleans Dashboard
-description: Securely deploy and operate the Orleans 10 dashboard for live cluster inspection.
+description: Securely deploy and operate the Orleans Dashboard for live cluster inspection.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
 # Orleans Dashboard
 
-The Orleans Dashboard is a released Orleans 10 feature for live inspection of silos, grain activations, calls, reminders, runtime counters, logs, and grain state. It is an administrative surface, not a public application endpoint or a replacement for retained OpenTelemetry data.
+The Orleans Dashboard provides live inspection of silos, grain activations, calls, reminders, runtime counters, logs, and grain state. It is an administrative surface, not a public application endpoint or a replacement for retained OpenTelemetry data.
 
 ## Secure the dashboard before exposing it
 

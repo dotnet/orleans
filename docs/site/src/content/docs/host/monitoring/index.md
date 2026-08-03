@@ -1,13 +1,13 @@
 ---
 title: Orleans observability
-description: Configure OpenTelemetry logging, metrics, and tracing for Orleans 10.
+description: Configure OpenTelemetry logging, metrics, and tracing for Orleans.
 ms.date: 08/02/2026
 ms.topic: overview
 ---
 
 # Orleans observability
 
-Orleans 10 uses standard .NET observability APIs:
+Orleans uses standard .NET observability APIs:
 
 - `Microsoft.Extensions.Logging` for structured logs.
 - A <xref:System.Diagnostics.Metrics.Meter> named `Microsoft.Orleans` for runtime metrics.
