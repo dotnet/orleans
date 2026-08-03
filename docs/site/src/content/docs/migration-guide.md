@@ -35,7 +35,7 @@ See [Upgrade deployment and rollback](migration/deployment-and-rollback.md) befo
 
 ## POCO grains and `IGrainBase` <a name="poco-grains-and-igrainbase"></a>
 
-POCO grains introduced in Orleans 7 remain supported in Orleans 10. A grain that doesn't inherit from <xref:Orleans.Grain> implements <xref:Orleans.IGrainBase> and receives its <xref:Orleans.Runtime.IGrainContext> through dependency injection. This also enables grain extension methods such as timers, reminders, streaming, deactivation, and migration.
+POCO grains remain supported. A grain that doesn't inherit from <xref:Orleans.Grain> implements <xref:Orleans.IGrainBase> and receives its <xref:Orleans.Runtime.IGrainContext> through dependency injection. This also enables grain extension methods such as timers, reminders, streaming, deactivation, and migration.
 
 ## Package version policy
 
