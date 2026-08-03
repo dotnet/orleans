@@ -1,6 +1,6 @@
 ---
 title: Orleans architecture design principles
-description: Understand the design principles behind Orleans 10.
+description: Understand the design principles behind Orleans.
 ms.date: 08/02/2026
 ms.topic: conceptual
 ---

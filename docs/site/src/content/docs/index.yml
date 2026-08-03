@@ -24,7 +24,7 @@ highlightedContent:
           title: Build your first Orleans app
           url: quickstarts/build-your-first-orleans-app.md
         - itemType: whats-new
-          title: Upgrade to Orleans 10
+          title: Migration guide
           url: migration-guide.md
         - itemType: concept
           title: Why Orleans?

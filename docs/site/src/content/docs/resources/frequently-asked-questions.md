@@ -1,6 +1,6 @@
 ---
 title: Frequently asked questions
-description: Answers to common questions about Orleans 10.
+description: Answers to common questions about Orleans.
 ms.date: 08/02/2026
 ms.topic: faq
 ---
@@ -17,9 +17,9 @@ Yes. Orleans is open source under the [MIT license](https://github.com/dotnet/or
 
 Yes. Orleans began in Microsoft Research and has powered production services since 2011. The project is developed in the open at [dotnet/orleans](https://github.com/dotnet/orleans).
 
-### Which .NET versions does Orleans 10 support?
+### Which .NET target frameworks does Orleans support?
 
-Orleans 10 libraries target .NET 8 and .NET 10. New Orleans applications should target .NET 10.
+Orleans libraries target `net8.0` and `net10.0`.
 
 ### Where do I get help?
 
@@ -81,4 +81,4 @@ Orleans uses cooperative scheduling and doesn't preempt grain code. Long synchro
 
 ### How do I upgrade an existing application?
 
-Follow the [migration guide](../migration-guide.md), which contains the version-specific upgrade history. Current conceptual and tutorial documentation describes Orleans 10 only.
+Follow the [migration guide](../migration-guide.md), which contains version-specific upgrade history. Conceptual and tutorial documentation describes the supported APIs without repeating upgrade history.

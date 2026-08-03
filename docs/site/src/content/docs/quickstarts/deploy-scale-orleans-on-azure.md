@@ -121,7 +121,7 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
 
 ::: zone pivot="azure-storage"
 
-1. Change your current working directory to _./src/web/_.
+1. Change the working directory to _./src/web/_.
 
    ```bash
    cd ./src/web
@@ -130,7 +130,7 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
 1. Import the `Azure.Identity` package from NuGet:
 
    ```dotnetcli
-   dotnet package add Azure.Identity --version 1.*
+   dotnet package add Azure.Identity
    ```
 
 1. Import the `Microsoft.Orleans.Clustering.AzureStorage` and `Microsoft.Orleans.Persistence.AzureStorage` packages.
@@ -141,8 +141,8 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
    | **Persistence** | `Microsoft.Orleans.Persistence.AzureStorage` |
 
    ```dotnetcli
-   dotnet package add Microsoft.Orleans.Clustering.AzureStorage --version 10.*
-   dotnet package add Microsoft.Orleans.Persistence.AzureStorage --version 10.*
+   dotnet package add Microsoft.Orleans.Clustering.AzureStorage
+   dotnet package add Microsoft.Orleans.Persistence.AzureStorage
    ```
 
 ::: zone-end
@@ -152,7 +152,7 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
 1. Import the `Azure.Identity` package from NuGet:
 
    ```dotnetcli
-   dotnet package add Azure.Identity --version 1.*
+   dotnet package add Azure.Identity
    ```
 
 1. Import the `Microsoft.Orleans.Clustering.Cosmos` and `Microsoft.Orleans.Persistence.Cosmos` packages.
@@ -163,17 +163,17 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
    | **Persistence** | `Microsoft.Orleans.Persistence.Cosmos` |
 
    ```dotnetcli
-   dotnet package add Microsoft.Orleans.Clustering.Cosmos --version 10.*
-   dotnet package add Microsoft.Orleans.Persistence.Cosmos --version 10.*
+   dotnet package add Microsoft.Orleans.Clustering.Cosmos
+   dotnet package add Microsoft.Orleans.Persistence.Cosmos
    ```
 
 ::: zone-end
 
 ## Configure and redeploy the sample app
 
-The sample app is currently configured to create a localhost cluster and persist grains in-memory. When hosted in Azure, Orleans can be configured to use more scalable, centralized state using a data service in Azure.
+The sample app initially creates a localhost cluster and persists grain state in memory. When hosted in Azure, Orleans can use a shared data service for cluster membership and durable grain state.
 
-1. Find and remove the current `builder` configuration code in the _src/web/Program.cs_ file.
+1. Find and remove the existing `builder` configuration code in the _src/web/Program.cs_ file.
 
    :::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="configuration":::
 

@@ -12,7 +12,7 @@ ms.topic: reference
 - [Orleans documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Orleans repository](https://github.com/dotnet/orleans)
 - [Maintained Orleans samples](https://github.com/dotnet/orleans/tree/main/samples)
-- [.NET API reference for Orleans](https://learn.microsoft.com/dotnet/api/?view=orleans-10.0)
+- [.NET API reference for Orleans](https://learn.microsoft.com/dotnet/api/)
 - [Orleans NuGet packages](https://www.nuget.org/profiles/Orleans)
 - [Release notes](https://github.com/dotnet/orleans/releases)
 - [Migration guide](../migration-guide.md)
@@ -33,4 +33,4 @@ Use GitHub issues for reproducible bugs and feature proposals. Use Discussions o
 - [Orleans: Distributed Virtual Actors for Programmability and Scalability](https://www.microsoft.com/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability/)
 - [Orleans: Virtual Actors](https://www.microsoft.com/research/project/orleans-virtual-actors/)
 
-Older posts and talks can be useful historical context, but their setup instructions and APIs might not apply to Orleans 10. Use the current documentation, repository samples, and API reference for implementation guidance.
+Older posts and talks can be useful historical context, but their setup instructions and APIs might no longer apply. Use the product documentation, repository samples, and API reference for implementation guidance.

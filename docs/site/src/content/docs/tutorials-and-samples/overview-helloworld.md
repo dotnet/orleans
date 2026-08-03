@@ -1,6 +1,6 @@
 ---
 title: Orleans Hello World sample
-description: Find the canonical Orleans 10 beginner quickstart and maintained Hello World sample.
+description: Find the canonical Orleans beginner quickstart and maintained Hello World sample.
 ms.date: 08/02/2026
 ms.topic: sample
 ---

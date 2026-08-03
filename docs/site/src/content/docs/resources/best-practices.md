@@ -1,6 +1,6 @@
 ---
 title: Orleans best practices
-description: Design, implement, and operate Orleans 10 applications effectively.
+description: Design, implement, and operate Orleans applications effectively.
 ms.date: 08/02/2026
 ms.topic: best-practice
 ---

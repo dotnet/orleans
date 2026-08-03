@@ -1,6 +1,6 @@
 ---
 title: Orleans tutorials and samples
-description: Learn Orleans 10 through maintained tutorials, explanations, and repository-backed samples.
+description: Learn Orleans through maintained tutorials, explanations, and repository-backed samples.
 ms.date: 08/02/2026
 ms.topic: sample
 ---
@@ -16,7 +16,7 @@ Use this page to choose the right kind of learning material:
 
 ## Start here
 
-New to Orleans? Complete [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md). It is the canonical Orleans 10 beginner path and builds a single-project ASP.NET Core URL shortener.
+New to Orleans? Complete [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md). It is the canonical beginner path and builds a single-project ASP.NET Core URL shortener.
 
 For the smallest complete grain call, see the maintained [Hello World sample](https://github.com/dotnet/orleans/tree/main/samples/HelloWorld). Unlike the quickstart, the sample is intended primarily as compact source code to clone and run.
 
