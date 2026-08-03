@@ -65,10 +65,15 @@ internal sealed class DurableTaskMessageTransport(
         T body,
         GrainId? replyTo)
     {
+        // Validate the task id and compute the correlation key before serializing the body: several message body
+        // types (see DurableTaskMessages.cs) embed the same TaskId, whose surrogate converter throws
+        // ArgumentOutOfRangeException for a default TaskId. Without this ordering, that lower-level exception would
+        // pre-empt the more specific ArgumentException below, since WithBody() executes eagerly.
+        var correlationKey = taskId.ToHierarchicalKey() ?? throw new ArgumentException("The task id must not be empty.", nameof(taskId));
         var builder = new DurableEnvelopeBuilder(sessionPool, sender)
         .To(target, route)
-        .WithBody(body)
-        .WithCorrelationKey(taskId.ToHierarchicalKey() ?? throw new ArgumentException("The task id must not be empty.", nameof(taskId)));
+        .WithCorrelationKey(correlationKey)
+        .WithBody(body);
 
         if (replyTo is { } address)
         {
