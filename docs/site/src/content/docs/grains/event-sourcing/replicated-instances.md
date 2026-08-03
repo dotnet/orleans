@@ -42,4 +42,4 @@ The protocol contains cluster-aware notification and concurrency mechanisms, but
 - A provider whose behavior fits the topology.
 - Application decisions for write regions, failover, latency, and conflict handling.
 
-The custom provider's `primaryCluster` registration argument currently doesn't restrict submissions. Don't rely on it as a write-region, replication, access-control, or failover mechanism.
+The custom provider's `primaryCluster` registration argument doesn't restrict submissions. Don't rely on it as a write-region, replication, access-control, or failover mechanism.

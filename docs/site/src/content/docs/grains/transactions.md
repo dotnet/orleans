@@ -155,7 +155,7 @@ The default <xref:Orleans.Configuration.TransactionalStateOptions> values are:
 | `ConfirmationRetryDelay` | 30 seconds |
 | `MaxLockGroupSize` | 20 |
 
-Commit confirmation has a retry limit of 3. A newly started transaction currently uses a 10-second transaction timeout when no debugger is attached.
+Commit confirmation has a retry limit of 3. A newly started transaction uses a 10-second transaction timeout when no debugger is attached.
 
 Configure state options consistently on participating silos:
 

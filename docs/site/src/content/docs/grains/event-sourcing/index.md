@@ -7,7 +7,7 @@ ms.topic: overview
 
 # Event sourcing overview
 
-The supported Orleans Event Sourcing model uses <xref:Orleans.EventSourcing.JournaledGrain`2> from the `Microsoft.Orleans.EventSourcing` package. A journaled grain represents changes as events and derives its current state by applying those events in order.
+Orleans Event Sourcing uses <xref:Orleans.EventSourcing.JournaledGrain`2> from the supported `Microsoft.Orleans.EventSourcing` package. A journaled grain represents changes as events and derives its state by applying those events in order.
 
 `JournaledGrain` separates:
 
