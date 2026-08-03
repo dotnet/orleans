@@ -1,6 +1,6 @@
 ---
 title: Grain identity
-description: Understand grain types, keys, and GrainId values in Orleans 10.
+description: Understand grain types, keys, and GrainId values in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

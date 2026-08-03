@@ -1,6 +1,6 @@
 ---
 title: Stateless worker grains
-description: Scale location-transparent worker pools with Orleans 10.
+description: Scale location-transparent worker pools with Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

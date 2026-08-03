@@ -1,6 +1,6 @@
 ---
 title: Develop Orleans grains
-description: Define grain contracts, implement grains, and call them in Orleans 10.
+description: Define grain contracts, implement grains, and call them in Orleans.
 ms.date: 08/02/2026
 ms.topic: article
 ---
@@ -35,7 +35,7 @@ public sealed record Receipt(
     [property: Id(0)] string OrderId);
 ```
 
-Orleans 10 supports these grain method return types:
+Orleans supports these grain method return types:
 
 - <xref:System.Threading.Tasks.Task>
 - <xref:System.Threading.Tasks.Task`1>

@@ -1,6 +1,6 @@
 ---
 title: Grain references
-description: Create, use, and reason about grain references in Orleans 10.
+description: Create, use, and reason about grain references in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

@@ -1,6 +1,6 @@
 ---
 title: Grain activation and lifecycle
-description: Understand grain activation, deactivation, collection, lifecycle participation, and migration in Orleans 10.
+description: Understand grain activation, deactivation, collection, lifecycle participation, and migration in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -145,6 +145,6 @@ public sealed class SessionGrain :
 
 Persistent-state components supplied by Orleans participate automatically. Migration isn't a replacement for durable storage: migrated state is still lost if the source process fails before transfer completes.
 
-Automatic activation repartitioning and rebalancing use migration to improve locality or cluster balance. Both are experimental in Orleans 10. See [Grain placement](grain-placement.md) for their status and configuration.
+Automatic activation repartitioning and rebalancing use migration to improve locality or cluster balance. Both are experimental. See [Grain placement](grain-placement.md) for their status and configuration.
 
 Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain type from automatic migration. It doesn't block an explicit `MigrateOnIdle()` request.

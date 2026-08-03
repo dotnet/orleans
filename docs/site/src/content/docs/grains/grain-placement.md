@@ -1,6 +1,6 @@
 ---
 title: Grain placement and migration
-description: Understand placement, resource-optimized defaults, and activation movement in Orleans 10.
+description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -11,7 +11,7 @@ When a grain isn't active, Orleans selects a compatible silo and creates an acti
 
 ## Default placement
 
-<xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default Orleans 10 placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations while avoiding overloaded silos. It considers CPU, memory, available memory, activation count, and a preference for the local silo.
+<xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations while avoiding overloaded silos. It considers CPU, memory, available memory, activation count, and a preference for the local silo.
 
 Configure its weights through <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>:
 
@@ -67,7 +67,7 @@ Per-grain attributes still take precedence.
 
 ## Placement filters
 
-Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on silo metadata. Placement filters are experimental in Orleans 10 and produce diagnostic `ORLEANSEXP004`.
+Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on silo metadata. Placement filters are experimental and produce diagnostic `ORLEANSEXP004`.
 
 See [Placement filters](grain-placement-filtering.md) for the built-in filters and experimental status.
 
@@ -100,7 +100,7 @@ The attribute doesn't prevent explicit `MigrateOnIdle()` calls.
 
 ## Experimental automatic movement
 
-Orleans 10 includes two opt-in experimental services:
+Orleans includes two opt-in experimental services:
 
 | Feature | Goal | Diagnostic |
 |---|---|---|

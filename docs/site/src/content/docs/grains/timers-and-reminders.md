@@ -1,6 +1,6 @@
 ---
 title: Grain timers and reminders
-description: Schedule activation-scoped and durable periodic work in Orleans 10.
+description: Schedule activation-scoped and durable periodic work in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---

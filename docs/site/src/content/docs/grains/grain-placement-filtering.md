@@ -1,6 +1,6 @@
 ---
 title: Grain placement filters
-description: Filter Orleans 10 grain placement candidates using silo metadata.
+description: Filter Orleans grain placement candidates using silo metadata.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
@@ -8,7 +8,7 @@ ms.topic: concept-article
 # Grain placement filters
 
 > [!WARNING]
-> Placement filtering is experimental in Orleans 10. Its APIs are annotated with `Experimental("ORLEANSEXP004")` and can change in a future release.
+> Placement filtering is experimental. Its APIs are annotated with `Experimental("ORLEANSEXP004")` and can change without notice.
 
 Placement first determines which silos are compatible with a grain type. Filters then reduce that candidate set, in order, before the grain's [placement strategy](grain-placement.md) selects a target.
 

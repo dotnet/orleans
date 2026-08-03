@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Cancel Orleans grain calls
 
-Orleans 10 supports <xref:System.Threading.CancellationToken> parameters on grain methods. Cancellation is cooperative: Orleans delivers a cancellation signal, and the grain implementation decides where it is safe to stop.
+Orleans supports <xref:System.Threading.CancellationToken> parameters on grain methods. Cancellation is cooperative: Orleans delivers a cancellation signal, and the grain implementation decides where it is safe to stop.
 
 ## Add cancellation to a contract
 
@@ -115,4 +115,4 @@ Cancellation callbacks registered from grain code execute in the grain's schedul
 
 Orleans treats a `CancellationToken` specially in generated request contracts. Adding or removing a token parameter is wire-compatible with callers compiled against the other form: a missing token is represented as `CancellationToken.None`, and an extra token from an older caller can be ignored. Making a newly added parameter optional also preserves C# source compatibility for common call sites.
 
-The older `GrainCancellationToken` API isn't needed for new Orleans 10 applications. Use the standard .NET token.
+The older `GrainCancellationToken` API isn't needed for new applications. Use the standard .NET token.

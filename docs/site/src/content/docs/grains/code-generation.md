@@ -1,13 +1,13 @@
 ---
 title: Orleans source generation
-description: Understand build-time code generation for grains and serialization in Orleans 10.
+description: Understand build-time code generation for grains and serialization in Orleans.
 ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
 # Orleans source generation
 
-Orleans 10 generates grain proxies, method dispatch code, serializers, and copiers at build time. There is no runtime or initialization-time code generation workflow for application code.
+Orleans generates grain proxies, method dispatch code, serializers, and copiers at build time. There is no runtime or initialization-time code generation workflow for application code.
 
 ## Reference the SDK
 
