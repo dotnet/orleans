@@ -5,3 +5,9 @@
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 ORLEANS0014 | Usage | Warning | ConfigureAwaitAnalyzer, Grain code should not use ConfigureAwait(false) or ConfigureAwait without ContinueOnCapturedContext
+ORLEANS0016 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface not declared in GrainInterfaces.txt
+ORLEANS0017 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface version mismatch between code and file
+ORLEANS0018 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface member not declared in GrainInterfaces.txt
+ORLEANS0019 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed interface not marked as *RETIRED*
+ORLEANS0020 | Orleans.Versioning | Info | GrainInterfaceVersionAnalyzer, GrainInterfaces.txt file is missing
+ORLEANS0021 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Duplicate interface declaration in file

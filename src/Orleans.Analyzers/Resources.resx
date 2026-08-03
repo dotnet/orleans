@@ -195,4 +195,68 @@
   <data name="ConfigureAwaitCodeFixTitle" xml:space="preserve">
     <value>Use ConfigureAwait with ContinueOnCapturedContext</value>
   </data>
+  <!-- Grain Interface Version Analyzer (ORLEANS0016-0021) -->
+  <data name="GrainInterfaceNotDeclaredTitle" xml:space="preserve">
+    <value>Grain interface not declared in GrainInterfaces.txt</value>
+  </data>
+  <data name="GrainInterfaceNotDeclaredMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' is not declared in GrainInterfaces.txt</value>
+  </data>
+  <data name="GrainInterfaceNotDeclaredDescription" xml:space="preserve">
+    <value>All grain interfaces should be tracked in GrainInterfaces.txt to ensure version compatibility during rolling upgrades.</value>
+  </data>
+  <data name="GrainInterfaceVersionMismatchTitle" xml:space="preserve">
+    <value>Grain interface version mismatch</value>
+  </data>
+  <data name="GrainInterfaceVersionMismatchMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' has [Version({1})] in GrainInterfaces.txt but [Version({2})] in code</value>
+  </data>
+  <data name="GrainInterfaceVersionMismatchDescription" xml:space="preserve">
+    <value>The [Version] attribute on the grain interface must match the version declared in GrainInterfaces.txt.</value>
+  </data>
+  <data name="GrainInterfaceMemberNotDeclaredTitle" xml:space="preserve">
+    <value>Grain interface member not declared in GrainInterfaces.txt</value>
+  </data>
+  <data name="GrainInterfaceMemberNotDeclaredMessageFormat" xml:space="preserve">
+    <value>Grain interface member '{0}' is not declared in GrainInterfaces.txt for interface '{1}'</value>
+  </data>
+  <data name="GrainInterfaceMemberNotDeclaredDescription" xml:space="preserve">
+    <value>When adding or modifying grain interface members, update GrainInterfaces.txt and increment the interface version.</value>
+  </data>
+  <data name="GrainInterfaceRemovedNotRetiredTitle" xml:space="preserve">
+    <value>Removed grain interface not marked as retired</value>
+  </data>
+  <data name="GrainInterfaceRemovedNotRetiredMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' is declared in GrainInterfaces.txt but no longer exists in code - mark it as *RETIRED*</value>
+  </data>
+  <data name="GrainInterfaceRemovedNotRetiredDescription" xml:space="preserve">
+    <value>When removing a grain interface, mark it as *RETIRED* in GrainInterfaces.txt to document that it has been intentionally removed.</value>
+  </data>
+  <data name="GrainInterfacesFileMissingTitle" xml:space="preserve">
+    <value>GrainInterfaces.txt file is missing</value>
+  </data>
+  <data name="GrainInterfacesFileMissingMessageFormat" xml:space="preserve">
+    <value>The project contains grain interfaces but no {0} file to track them</value>
+  </data>
+  <data name="GrainInterfacesFileMissingDescription" xml:space="preserve">
+    <value>Add a GrainInterfaces.txt file to track grain interface versions for compatibility during rolling upgrades.</value>
+  </data>
+  <data name="GrainInterfaceDuplicateDeclarationTitle" xml:space="preserve">
+    <value>Duplicate grain interface declaration</value>
+  </data>
+  <data name="GrainInterfaceDuplicateDeclarationMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' is declared multiple times in GrainInterfaces.txt</value>
+  </data>
+  <data name="GrainInterfaceDuplicateDeclarationDescription" xml:space="preserve">
+    <value>Each grain interface should only be declared once in GrainInterfaces.txt.</value>
+  </data>
+  <data name="AddToGrainInterfacesFileTitle" xml:space="preserve">
+    <value>Add to GrainInterfaces.txt</value>
+  </data>
+  <data name="RetireGrainInterfaceTitle" xml:space="preserve">
+    <value>Mark as *RETIRED* in GrainInterfaces.txt</value>
+  </data>
+  <data name="UpdateGrainInterfaceVersionTitle" xml:space="preserve">
+    <value>Update version in GrainInterfaces.txt</value>
+  </data>
 </root>
