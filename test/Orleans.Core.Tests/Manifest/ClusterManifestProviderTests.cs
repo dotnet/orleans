@@ -84,7 +84,8 @@ public class ClusterManifestProviderTests
     {
         var localSilo = CreateSiloAddress(11111, 1);
         var remoteSilo = CreateSiloAddress(11112, 1);
-        var remoteManifest = CreateGrainManifest();
+        var remoteManifest = CreateGrainManifest("2");
+        var remoteHash = ManifestHashCalculator.ComputeHash(remoteManifest);
         var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
             1,
             (localSilo, SiloStatus.Active),
@@ -97,6 +98,8 @@ public class ClusterManifestProviderTests
         {
             await Until(() => provider.Current.Version == new MajorMinorVersion(1, 1)
                 && provider.Current.Silos.ContainsKey(remoteSilo));
+            Assert.True(provider.IsManifestCached(remoteHash));
+            Assert.Equal(2, provider.ManifestCacheCount);
 
             membership.Update(CreateMembershipSnapshot(
                 2,
@@ -108,6 +111,8 @@ public class ClusterManifestProviderTests
             Assert.Equal(new MajorMinorVersion(2, 0), current.Version);
             Assert.Contains(localSilo, current.Silos.Keys);
             Assert.DoesNotContain(remoteSilo, current.Silos.Keys);
+            Assert.False(provider.IsManifestCached(remoteHash));
+            Assert.Equal(1, provider.ManifestCacheCount);
         }
         finally
         {
