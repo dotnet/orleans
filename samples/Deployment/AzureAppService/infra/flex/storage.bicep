@@ -1,18 +1,36 @@
 param name string
 param location string
+param allowedSubnetIds array
+param allowSharedKeyAccess bool = false
 
-resource storage 'Microsoft.Storage/storageAccounts@2021-08-01' = {
+resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: name
   location: location
   kind: 'StorageV2'
   sku: {
     name: 'Standard_LRS'
   }
+  properties: {
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: allowSharedKeyAccess
+    defaultToOAuthAuthentication: true
+    minimumTlsVersion: 'TLS1_2'
+    publicNetworkAccess: 'Enabled'
+    supportsHttpsTrafficOnly: true
+    networkAcls: {
+      bypass: 'None'
+      defaultAction: 'Deny'
+      ipRules: []
+      virtualNetworkRules: [
+        for subnetId in allowedSubnetIds: {
+          action: 'Allow'
+          id: subnetId
+        }
+      ]
+    }
+  }
 }
 
-var key = listKeys(storage.name, storage.apiVersion).keys[0].value
-var protocol = 'DefaultEndpointsProtocol=https'
-var accountBits = 'AccountName=${storage.name};AccountKey=${key}'
-var endpointSuffix = 'EndpointSuffix=${environment().suffixes.storage}'
-
-output connectionString string = '${protocol};${accountBits};${endpointSuffix}'
+output storageAccountId string = storage.id
+output storageAccountName string = storage.name
+output tableServiceUri string = storage.properties.primaryEndpoints.table

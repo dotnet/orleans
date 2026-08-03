@@ -1,54 +1,117 @@
-name: Deploy to Azure App Service
+name: Deploy Orleans shopping cart to Azure App Service
 
 on:
+  workflow_dispatch:
   push:
     branches:
-    - main
+      - main
+    paths:
+      - global.json
+      - samples/Deployment/AzureAppService/**
 
-env:
-  UNIQUE_APP_NAME: net7cart
-  AZURE_RESOURCE_GROUP_NAME: orleanscartrg
-  AZURE_RESOURCE_GROUP_LOCATION: westus
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: azure-app-service-production
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      APP_NAME: ${{ vars.AZURE_APP_NAME }}
+      AZURE_RESOURCE_GROUP_LOCATION: ${{ vars.AZURE_RESOURCE_GROUP_LOCATION }}
+      AZURE_RESOURCE_GROUP_NAME: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
+
     steps:
-    - uses: actions/checkout@v3
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
-    - name: Setup .NET 8.0
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 8.0.x
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
 
-    - name: .NET publish shopping cart app
-      run: dotnet publish ./samples/Deployment/AzureAppService/Silo/Orleans.ShoppingCart.Silo.csproj --configuration Release
+      - name: Publish application
+        shell: bash
+        run: |
+          dotnet publish \
+            samples/Deployment/AzureAppService/Silo/Orleans.ShoppingCart.Silo.csproj \
+            --configuration Release \
+            --framework net10.0 \
+            --output "$RUNNER_TEMP/publish"
+          cd "$RUNNER_TEMP/publish"
+          zip -q -r "$RUNNER_TEMP/orleans-shopping-cart.zip" .
 
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Sign in to Azure with OIDC
+        uses: Azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Flex bicep
-      run: |
-        az deployment group create \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP_NAME }} \
-          --template-file 'samples/Deployment/AzureAppService/infra/flex/main.bicep' \
-          --parameters location=${{ env.AZURE_RESOURCE_GROUP_LOCATION }} \
-            appName=${{ env.UNIQUE_APP_NAME }} \
-          --debug
+      - name: Deploy infrastructure
+        id: infrastructure
+        shell: bash
+        run: |
+          outputs=$(az deployment group create \
+            --name "orleans-shopping-cart-${GITHUB_RUN_ID}" \
+            --resource-group "$AZURE_RESOURCE_GROUP_NAME" \
+            --template-file samples/Deployment/AzureAppService/infra/flex/main.bicep \
+            --parameters \
+              appName="$APP_NAME" \
+              allowSharedKeyAccess=false \
+              assignStorageRoles=false \
+              location="$AZURE_RESOURCE_GROUP_LOCATION" \
+            --query properties.outputs \
+            --output json)
 
-    - name: Webapp deploy
-      run: |
-        az webapp deploy --name ${{ env.UNIQUE_APP_NAME }} \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP_NAME  }} \
-          --clean true --restart true \
-          --type zip --src-path samples/Deployment/AzureAppService/silo.zip --debug
+          echo "production_host=$(jq -r '.productionDefaultHostName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "staging_host=$(jq -r '.stagingDefaultHostName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "staging_slot=$(jq -r '.stagingSlotName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
 
-    - name: Staging deploy
-      run: |
-        az webapp deploy --name ${{ env.UNIQUE_APP_NAME }} \
-          --slot ${{ env.UNIQUE_APP_NAME }}stg \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP_NAME  }} \
-          --clean true --restart true \
-          --type zip --src-path samples/Deployment/AzureAppService/silo.zip --debug
+      - name: Deploy staging slot
+        shell: bash
+        run: |
+          az webapp deploy \
+            --name "$APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP_NAME" \
+            --slot "${{ steps.infrastructure.outputs.staging_slot }}" \
+            --type zip \
+            --src-path "$RUNNER_TEMP/orleans-shopping-cart.zip" \
+            --clean true \
+            --restart true
+
+      - name: Wait for staging readiness
+        shell: bash
+        run: |
+          curl \
+            --fail \
+            --retry 30 \
+            --retry-all-errors \
+            --retry-delay 10 \
+            "https://${{ steps.infrastructure.outputs.staging_host }}/health/ready"
+
+      - name: Swap staging into production
+        shell: bash
+        run: |
+          az webapp deployment slot swap \
+            --name "$APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP_NAME" \
+            --slot "${{ steps.infrastructure.outputs.staging_slot }}" \
+            --target-slot production
+
+      - name: Verify production readiness
+        shell: bash
+        run: |
+          curl \
+            --fail \
+            --retry 30 \
+            --retry-all-errors \
+            --retry-delay 10 \
+            "https://${{ steps.infrastructure.outputs.production_host }}/health/ready"
