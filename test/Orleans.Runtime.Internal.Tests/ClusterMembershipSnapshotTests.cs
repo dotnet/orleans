@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
 using Xunit;
 
 namespace UnitTests;
@@ -38,6 +39,54 @@ public class ClusterMembershipSnapshotTests
         var snapshot = CreateSnapshot(new ClusterMember(successor, SiloStatus.Active, "silo"), version: 2);
 
         Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(silo, new MembershipVersion(2)));
+    }
+
+    [Fact]
+    public void CreateUpdate_MarksMissingMemberAsDeclaredDead()
+    {
+        var silo = CreateSiloAddress(1);
+        var previous = CreateSnapshot(new ClusterMember(silo, SiloStatus.Active, "silo"), version: 1);
+        var current = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty,
+            new MembershipVersion(2));
+
+        var change = Assert.Single(current.CreateUpdate(previous).Changes);
+
+        Assert.Equal(SiloStatus.Dead, change.Status);
+        Assert.True(change.WasDeclaredDead);
+    }
+
+    [Fact]
+    public void GracefullyDeadMember_IsNotDeclaredDead()
+    {
+        var member = new ClusterMember(CreateSiloAddress(1), SiloStatus.Dead, "silo");
+
+        Assert.False(member.WasDeclaredDead);
+    }
+
+    [Fact]
+    public void MembershipTableSnapshot_PreservesDeathClassification()
+    {
+        var gracefulSilo = CreateSiloAddress(1);
+        var failedSilo = CreateSiloAddress(2);
+        var detectingSilo = CreateSiloAddress(3);
+        var entries = ImmutableDictionary<SiloAddress, MembershipEntry>.Empty
+            .Add(gracefulSilo, CreateDeadEntry(gracefulSilo, gracefulSilo))
+            .Add(failedSilo, CreateDeadEntry(failedSilo, detectingSilo));
+        var tableSnapshot = new MembershipTableSnapshot(new MembershipVersion(1), entries);
+
+        var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
+
+        Assert.False(snapshot.Members[gracefulSilo].WasDeclaredDead);
+        Assert.True(snapshot.Members[failedSilo].WasDeclaredDead);
+
+        static MembershipEntry CreateDeadEntry(SiloAddress address, SiloAddress suspectingSilo) => new()
+        {
+            SiloAddress = address,
+            SiloName = "silo",
+            Status = SiloStatus.Dead,
+            SuspectTimes = [Tuple.Create(suspectingSilo, DateTime.UtcNow)]
+        };
     }
 
     [Fact]

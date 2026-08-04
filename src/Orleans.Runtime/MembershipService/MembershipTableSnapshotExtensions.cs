@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -10,7 +11,13 @@ namespace Orleans.Runtime.MembershipService
             foreach (var member in membership.Entries)
             {
                 var entry = member.Value;
-                memberBuilder[entry.SiloAddress] = new ClusterMember(entry.SiloAddress, entry.Status, entry.SiloName);
+                memberBuilder[entry.SiloAddress] = new ClusterMember(
+                    entry.SiloAddress,
+                    entry.Status,
+                    entry.SiloName,
+                    entry.Status == SiloStatus.Dead
+                        && entry.SuspectTimes is { } suspectTimes
+                        && suspectTimes.Any(suspect => !suspect.Item1.Equals(entry.SiloAddress)));
             }
 
             return new ClusterMembershipSnapshot(memberBuilder.ToImmutable(), membership.Version);

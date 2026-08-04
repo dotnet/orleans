@@ -49,10 +49,13 @@ public class GrainDirectoryLeaseTests
             var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
             await cluster.KillSiloAsync(secondary);
             await leaseCreated;
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
 
             // Bypass the catalog and hit the directory directly to observe lease hold behavior.
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
+
+            // A stale deregistration must not remove the dead activation's lease tombstone.
+            await directory.Unregister(fakeAddress);
 
             // The registration should block while the lease hold is active.
             var registrationBlocked = WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
@@ -67,6 +70,63 @@ public class GrainDirectoryLeaseTests
 
             // The grain should now reactivate on the primary since it's the only silo alive.
             Assert.Equal(primary.SiloAddress, await leaseGrain.GetAddress());
+        }
+        finally
+        {
+            await DisposeClusterAsync(cluster);
+        }
+    }
+
+    [Fact]
+    public async Task CancelsRegistrationDuringActiveLeaseHold()
+    {
+        var (cluster, timeProvider) = CreateCluster();
+        using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
+        await cluster.DeployAsync();
+
+        try
+        {
+            var primary = cluster.Silos[0];
+            var secondary = cluster.Silos[1];
+
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
+            var leaseGrain = cluster.Client.GetGrain<ILeaseTestGrain>(1);
+            Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
+
+            var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
+            await cluster.KillSiloAsync(secondary);
+            await leaseCreated;
+
+            var grainLocator = primary.ServiceProvider.GetRequiredService<CachedGrainLocator>();
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
+            var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
+            using var cancellation = new CancellationTokenSource();
+
+            var registrationBlocked = WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
+            var registerTask = grainLocator.Register(fakeAddress, null, cancellation.Token);
+            await registrationBlocked;
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => registerTask);
+            timeProvider.Advance(LeaseHoldDuration);
+            Assert.Null(await directory.Lookup(leaseGrain.GetGrainId()));
+        }
+        finally
+        {
+            await DisposeClusterAsync(cluster);
+        }
+    }
+
+    [Fact]
+    public async Task InitialClusterStartup_DoesNotCreateRangeLeaseHold()
+    {
+        var (cluster, _) = CreateCluster();
+        using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
+        await cluster.DeployAsync();
+
+        try
+        {
+            Assert.DoesNotContain(events.Events, e => e.Payload is GrainDirectoryEvents.RangeLeaseHoldCreated);
         }
         finally
         {

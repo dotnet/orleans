@@ -29,9 +29,10 @@ internal sealed partial class GrainDirectoryPartition
         {
             var utcNow = _timeProvider.GetUtcNow();
             var rangeHash = address.GrainId.GetUniformHashCode();
+            var isExistingRegistration = currentRegistration is not null && address.Matches(currentRegistration);
 
             // Range lease holds
-            for (var i = _rangeLeaseHolds.Count - 1; i >= 0; i--)
+            for (var i = _rangeLeaseHolds.Count - 1; !isExistingRegistration && i >= 0; i--)
             {
                 var (lockedRange, expiration) = _rangeLeaseHolds[i];
 
@@ -110,7 +111,20 @@ internal sealed partial class GrainDirectoryPartition
 
     private bool DeregisterCore(GrainAddress address)
     {
-        if (_directory.TryGetValue(address.GrainId, out var existing) && (existing.Matches(address) || IsSiloDead(existing)))
+        if (!_directory.TryGetValue(address.GrainId, out var existing))
+        {
+            return false;
+        }
+
+        if (_leaseHoldDuration > TimeSpan.Zero
+            && existing.SiloAddress is { } siloAddress
+            && _siloLeaseHolds.TryGetValue(siloAddress, out var expiration)
+            && _timeProvider.GetUtcNow() < expiration)
+        {
+            return false;
+        }
+
+        if (existing.Matches(address) || IsSiloDead(existing))
         {
             return _directory.Remove(address.GrainId);
         }

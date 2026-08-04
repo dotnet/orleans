@@ -462,7 +462,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     {
         // Ensure all child tasks are completed before exiting, tracking them here.
         List<Task> tasks = [];
-        var previousUpdate = ClusterMembershipSnapshot.Default;
+        ClusterMembershipSnapshot? previousUpdate = null;
         while (!_stoppedCts.IsCancellationRequested)
         {
             try
@@ -473,16 +473,25 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 {
                     tasks.RemoveAll(t => t.IsCompleted);
                     _clusterMemberCancellationTokens.Update(update.ClusterMembershipSnapshot);
-                    var changes = update.ClusterMembershipSnapshot.CreateUpdate(previousUpdate);
-
-                    foreach (var change in changes.Changes)
+                    if (previousUpdate is not null)
                     {
-                        if (change.Status == SiloStatus.Dead)
+                        var changes = update.ClusterMembershipSnapshot.CreateUpdate(previousUpdate);
+                        foreach (var change in changes.Changes)
                         {
+                            if (change.Status != SiloStatus.Dead || change.SiloAddress.Equals(Silo))
+                            {
+                                continue;
+                            }
+
                             var previousStatus = previousUpdate.GetSiloStatus(change.SiloAddress);
+                            if (previousStatus == SiloStatus.Dead)
+                            {
+                                continue;
+                            }
+
                             foreach (var partition in _partitions)
                             {
-                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change, previousStatus)));
+                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change, previousStatus, previous)));
                             }
                         }
                     }
