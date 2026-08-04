@@ -78,6 +78,46 @@ public class GrainDirectoryLeaseTests
     }
 
     [Fact]
+    public async Task CancelsRegistrationDuringActiveLeaseHold()
+    {
+        var (cluster, timeProvider) = CreateCluster();
+        using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
+        await cluster.DeployAsync();
+
+        try
+        {
+            var primary = cluster.Silos[0];
+            var secondary = cluster.Silos[1];
+
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
+            var leaseGrain = cluster.Client.GetGrain<ILeaseTestGrain>(1);
+            Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
+
+            var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
+            await cluster.KillSiloAsync(secondary);
+            await leaseCreated;
+
+            var grainLocator = primary.ServiceProvider.GetRequiredService<CachedGrainLocator>();
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
+            var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
+            using var cancellation = new CancellationTokenSource();
+
+            var registrationBlocked = WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
+            var registerTask = grainLocator.Register(fakeAddress, null, cancellation.Token);
+            await registrationBlocked;
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => registerTask);
+            timeProvider.Advance(LeaseHoldDuration);
+            Assert.Null(await directory.Lookup(leaseGrain.GetGrainId()));
+        }
+        finally
+        {
+            await DisposeClusterAsync(cluster);
+        }
+    }
+
+    [Fact]
     public async Task InitialClusterStartup_DoesNotCreateRangeLeaseHold()
     {
         var (cluster, _) = CreateCluster();

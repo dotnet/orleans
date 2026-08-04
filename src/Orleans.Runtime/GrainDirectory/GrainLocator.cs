@@ -23,13 +23,18 @@ namespace Orleans.Runtime.GrainDirectory
 
         public ValueTask<GrainAddress?> Lookup(GrainId grainId) => GetGrainLocator(grainId.Type).Lookup(grainId);
 
-        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousRegistration)
+        public async Task<GrainAddress?> Register(
+            GrainAddress address,
+            GrainAddress? previousRegistration,
+            CancellationToken cancellationToken = default)
         {
             var grainLocator = GetGrainLocator(address.GrainId.Type);
             var metrics = RegistrationMetricTracker.Start(_directoryInstruments, grainLocator);
             try
             {
-                var result = await grainLocator.Register(address, previousRegistration);
+                var result = grainLocator is CachedGrainLocator cachedGrainLocator
+                    ? await cachedGrainLocator.Register(address, previousRegistration, cancellationToken)
+                    : await grainLocator.Register(address, previousRegistration).WaitAsync(cancellationToken);
                 metrics.RecordSucceeded();
                 return result;
             }
