@@ -53,6 +53,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         builder.Options.UseTestClusterGrainDirectory = false;
         var initialSiloCount = builder.Options.InitialSilosCount;
         var clusterId = builder.Options.ClusterId;
+        var handoffPhase = new RollingUpgradePhase("local-to-distributed", output);
+        var handoffLogs = new PhaseAwareLogCapture(handoffPhase);
         builder.ConfigureSilo((siloOptions, siloBuilder) =>
         {
             if (!ShouldUseDistributedDirectory(siloOptions.SiloName, initialSiloCount))
@@ -66,6 +68,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         });
         builder.ConfigureSiloHost((_, hostBuilder) => ConfigureErrorLogCapture(hostBuilder, clusterId));
         builder.ConfigureSiloHost((_, hostBuilder) => ConfigureRollingUpgradeDiagnosticCapture(hostBuilder, clusterId));
+        builder.ConfigureSiloHost((siloOptions, hostBuilder) =>
+            hostBuilder.Services.AddSingleton<ILoggerProvider>(
+                new PhaseAwareLoggerProvider(siloOptions.SiloName, handoffLogs)));
 
         var cluster = builder.Build();
         var errorLogs = ErrorLogCaptureRegistry.Get(cluster.Options.ClusterId);
@@ -125,6 +130,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 output.WriteLine("Phase 4: Verifying fully-upgraded DistributedGrainDirectory cluster...");
                 await DriveLoad(client, nextGrainId, count: 200, id => failingGrainKey = id);
                 await ValidateDirectoryIntegrityAsync(cluster, "after final verification");
+                AssertSplitPartitionHandoffsAreDurable(handoffLogs, requireNonEmptyHandoff: true);
             }
             catch
             {
@@ -883,7 +889,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     staleCacheEvidence);
             }
 
-            AssertSplitPartitionHandoffsAreDurable(logs);
+            AssertSplitPartitionHandoffsAreDurable(logs, requireNonEmptyHandoff: false);
             var finalWorkerProgress = traffic.GetWorkerProgress();
             phase.Set("all-distributed-final");
             Assert.Equal(SiloCount, cluster.Silos.Count);
@@ -1306,7 +1312,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         Assert.Empty(errors);
     }
 
-    private static void AssertSplitPartitionHandoffsAreDurable(PhaseAwareLogCapture logs)
+    private static void AssertSplitPartitionHandoffsAreDurable(
+        PhaseAwareLogCapture logs,
+        bool requireNonEmptyHandoff)
     {
         var completedHandoffs = new Dictionary<(string Silo, int Count), int>();
         var removedHandoffs = 0;
@@ -1343,7 +1351,10 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             }
         }
 
-        Assert.True(removedHandoffs > 0, "The rolling upgrade did not exercise a non-empty split-partition handoff.");
+        if (requireNonEmptyHandoff)
+        {
+            Assert.True(removedHandoffs > 0, "The rolling upgrade did not exercise a non-empty split-partition handoff.");
+        }
     }
 
     private static bool IsExpectedIntentionalRestartLog(PhaseAwareLogEntry entry)
