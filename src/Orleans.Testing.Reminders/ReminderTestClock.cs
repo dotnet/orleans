@@ -1,9 +1,9 @@
 #nullable enable
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
+using Orleans.Reminders;
 using Orleans.TestingHost;
 
 namespace Orleans.Testing.Reminders;
@@ -13,8 +13,8 @@ namespace Orleans.Testing.Reminders;
 /// </summary>
 /// <remarks>
 /// Attach an instance to an <see cref="InProcessTestClusterBuilder"/> before building the cluster.
-/// The attached clock replaces the silo <see cref="TimeProvider"/> and tunes
-/// <see cref="ReminderOptions"/> for deterministic reminder scheduling.
+/// The attached clock replaces the reminder subsystem's keyed <see cref="TimeProvider"/> and tunes
+/// <see cref="ReminderOptions"/> for deterministic reminder scheduling without affecting unrelated silo timers.
 /// </remarks>
 public sealed class ReminderTestClock : IDisposable
 {
@@ -74,7 +74,7 @@ public sealed class ReminderTestClock : IDisposable
 
         builder.ConfigureSilo((_, siloBuilder) =>
         {
-            siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(clock.TimeProvider));
+            siloBuilder.Services.AddKeyedSingleton<TimeProvider>(ReminderTimeProviderNames.Reminders, clock.TimeProvider);
             siloBuilder.Services.PostConfigure<ReminderOptions>(options =>
             {
                 options.MinimumReminderPeriod = clock.MinimumReminderPeriod;

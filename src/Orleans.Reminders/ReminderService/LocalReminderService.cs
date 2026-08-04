@@ -561,7 +561,10 @@ namespace Orleans.Runtime.ReminderService
         private void ReconcileTableEntry(ReminderEntry entry, long tableSequence, DateTime now, List<Task> stopTasks)
         {
             var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
-            var shouldLoad = IsReminderWithinLoadingWindow(entry, now, reminderOptions.ReminderLoadingWindow);
+            var nextTick = CalculateNextTickTime(entry, now);
+            // Keep distant schedules in storage; exact-due entries are intentionally skipped to simplify fake-time tests.
+            var isWithinLoadingWindow = nextTick <= now.AddClamped(reminderOptions.ReminderLoadingWindow);
+            var shouldLoad = nextTick > now && isWithinLoadingWindow;
             if (!localReminders.TryGetValue(key, out var localReminder))
             {
                 // Distant reminders remain exclusively in storage until a later refresh brings their next tick
@@ -592,7 +595,7 @@ namespace Orleans.Runtime.ReminderService
                 return;
             }
 
-            if (!shouldLoad)
+            if (!isWithinLoadingWindow || (state is LocalReminderState.Tombstone && !shouldLoad))
             {
                 LogTraceRemovingReminder(localReminder);
                 stopTasks.Add(
