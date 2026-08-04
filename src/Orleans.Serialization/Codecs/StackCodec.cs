@@ -82,10 +82,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
             {
                 case 0:
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                    if (length > 10240 && length > reader.Length)
-                    {
-                        ThrowInvalidSizeException(length);
-                    }
+                    reader.EnsureAvailable((uint)length);
 
                     array = new T[length];
                     i = length - 1;
@@ -109,9 +106,6 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
         ReferenceCodec.RecordObject(reader.Session, array, placeholderReferenceId);
         return result!;
     }
-
-    private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(Stack<T>)}, {length}, is greater than total length of input.");
 
     private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized stack is missing its length field.");
 }

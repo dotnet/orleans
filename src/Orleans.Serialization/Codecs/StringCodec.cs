@@ -47,6 +47,10 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string ReadRaw<TInput>(ref Reader<TInput> reader, uint numBytes)
         {
+            reader.EnsureAvailable(numBytes);
+            if (numBytes > int.MaxValue)
+                ThrowInvalidSizeException(numBytes);
+
             if (reader.TryReadBytes((int)numBytes, out var span))
                 return Encoding.UTF8.GetString(span);
 
@@ -62,6 +66,10 @@ namespace Orleans.Serialization.Codecs
             ArrayPool<byte>.Shared.Return(array);
             return res;
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidSizeException(uint numBytes) => throw new IndexOutOfRangeException(
+            $"The declared string length, {numBytes}, exceeds the maximum supported length.");
 
         void IFieldCodec<string>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] string value)
         {

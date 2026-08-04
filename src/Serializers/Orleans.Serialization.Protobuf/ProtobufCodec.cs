@@ -193,7 +193,9 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
                     }
 
                     ReferenceCodec.MarkValueField(reader.Session);
-                    var length = (int)reader.ReadVarUInt32();
+                    var encodedLength = reader.ReadVarUInt32();
+                    reader.EnsureAvailable(encodedLength);
+                    var length = checked((int)encodedLength);
 
                     using (var buffer = new PooledBuffer())
                     {

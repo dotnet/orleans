@@ -97,6 +97,7 @@ namespace Orleans.Serialization.Buffers
 
         public override long Position => _stream.Position;
         public override long Length => _stream.Length;
+        internal long Remaining => _stream.CanSeek ? _stream.Length - _stream.Position : long.MaxValue;
 
         public StreamReaderInput(Stream stream, ArrayPool<byte> memoryPool)
         {
@@ -435,6 +436,58 @@ namespace Orleans.Serialization.Buffers
                 {
                     return ThrowNotSupportedInput<long>();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Gets the number of unread bytes in the input.
+        /// </summary>
+        public long Remaining
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if (IsReadOnlySequenceInput)
+                {
+                    ref var input = ref Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input);
+                    return input.Sequence.Length - input.PreviousBuffersSize - _bufferPos;
+                }
+                else if (IsBufferSliceInput)
+                {
+                    ref var input = ref Unsafe.As<TInput, BufferSliceReaderInput>(ref _input);
+                    return input.Length - input.PreviousBuffersSize - _bufferPos;
+                }
+                else if (IsArcBufferInput)
+                {
+                    ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
+                    return input.Length - input.PreviousBuffersSize - _bufferPos;
+                }
+                else if (IsSpanInput)
+                {
+                    return _currentSpan.Length - _bufferPos;
+                }
+                else if (_input is ReaderInput readerInput)
+                {
+                    return readerInput is StreamReaderInput streamInput ? streamInput.Remaining : readerInput.Length - readerInput.Position;
+                }
+                else
+                {
+                    return ThrowNotSupportedInput<long>();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Throws if fewer than <paramref name="count"/> bytes remain in the input.
+        /// </summary>
+        /// <param name="count">The number of bytes which are required.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnsureAvailable(uint count)
+        {
+            var remaining = Remaining;
+            if (count > remaining)
+            {
+                ThrowInvalidSizeException(count, remaining);
             }
         }
 
@@ -850,6 +903,13 @@ namespace Orleans.Serialization.Buffers
         /// </summary>
         public void ReadBytes<TBufferWriter>(scoped ref TBufferWriter writer, int count) where TBufferWriter : IBufferWriter<byte>
         {
+            if (count < 0)
+            {
+                ThrowArgumentOutOfRangeException(count);
+            }
+
+            EnsureAvailable((uint)count);
+
             int chunkSize;
             for (var remaining = count; remaining > 0; remaining -= chunkSize)
             {
@@ -877,10 +937,7 @@ namespace Orleans.Serialization.Buffers
                 return Array.Empty<byte>();
             }
 
-            if (count > 10240 && count > Length)
-            {
-                ThrowInvalidSizeException(count);
-            }
+            EnsureAvailable(count);
 
             var bytes = new byte[count];
             if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput || IsArcBufferInput)
@@ -1160,7 +1217,14 @@ namespace Orleans.Serialization.Buffers
 
         private static void ThrowNotSupportedInput() => throw new NotSupportedException($"Type {typeof(TInput)} is not supported");
 
-        private static void ThrowInvalidSizeException(uint length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(byte[])}, {length}, is greater than total length of input.");
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidSizeException(uint length, long remaining) => throw new IndexOutOfRangeException(
+            $"Declared length, {length}, is greater than the remaining length of the input, {remaining}.");
+
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowArgumentOutOfRangeException(int count) => throw new ArgumentOutOfRangeException(
+            nameof(count), count, "The count must not be negative.");
     }
 }
