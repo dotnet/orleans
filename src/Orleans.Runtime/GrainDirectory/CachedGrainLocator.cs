@@ -126,6 +126,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache.AddOrUpdate(result!, (int)result!.MembershipVersion.Value);
 
             return result;
+
         }
 
         public async Task Unregister(GrainAddress address, UnregistrationCause cause)
