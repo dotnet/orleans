@@ -1538,15 +1538,10 @@ namespace Orleans.GrainDirectory
 
     public partial interface IGrainDirectory
     {
-        System.Threading.Tasks.Task<Runtime.GrainAddress?> Lookup(Runtime.GrainId grainId, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<Runtime.GrainAddress?> Lookup(Runtime.GrainId grainId);
-        System.Threading.Tasks.Task<Runtime.GrainAddress?> Register(Runtime.GrainAddress address, Runtime.GrainAddress? previousAddress, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<Runtime.GrainAddress?> Register(Runtime.GrainAddress address, Runtime.GrainAddress? previousAddress);
-        System.Threading.Tasks.Task<Runtime.GrainAddress?> Register(Runtime.GrainAddress address, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<Runtime.GrainAddress?> Register(Runtime.GrainAddress address);
-        System.Threading.Tasks.Task Unregister(Runtime.GrainAddress address, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Unregister(Runtime.GrainAddress address);
-        System.Threading.Tasks.Task UnregisterSilos(System.Collections.Generic.List<Runtime.SiloAddress> siloAddresses, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task UnregisterSilos(System.Collections.Generic.List<Runtime.SiloAddress> siloAddresses);
     }
 }

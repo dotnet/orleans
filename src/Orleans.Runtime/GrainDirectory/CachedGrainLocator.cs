@@ -84,13 +84,7 @@ namespace Orleans.Runtime.GrainDirectory
             return entry;
         }
 
-        public Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) =>
-            Register(address, previousAddress, CancellationToken.None);
-
-        internal async Task<GrainAddress?> Register(
-            GrainAddress address,
-            GrainAddress? previousAddress,
-            CancellationToken cancellationToken)
+        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
             var grainType = address.GrainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -106,8 +100,7 @@ namespace Orleans.Runtime.GrainDirectory
                 MembershipVersion = clusterMembershipService.CurrentSnapshot.Version
             };
 
-            var directory = GetGrainDirectory(grainType);
-            var result = await directory.Register(address, previousAddress, cancellationToken);
+            var result = await GetGrainDirectory(grainType).Register(address, previousAddress);
 
             if (result is null)
             {
@@ -118,14 +111,16 @@ namespace Orleans.Runtime.GrainDirectory
             // Check if the entry point to a dead silo
             if (IsKnownDeadSilo(result))
             {
-                // Conditionally replace the outdated entry.
-                result = await directory.Register(address, result, cancellationToken);
+                // Remove outdated entry and retry to register
+                await GetGrainDirectory(grainType).Unregister(result);
+                result = await GetGrainDirectory(grainType).Register(address, previousAddress);
             }
 
             // Cache update
             this.cache.AddOrUpdate(result!, (int)result!.MembershipVersion.Value);
 
             return result;
+
         }
 
         public async Task Unregister(GrainAddress address, UnregistrationCause cause)

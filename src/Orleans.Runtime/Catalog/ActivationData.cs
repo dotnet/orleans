@@ -1662,7 +1662,7 @@ internal sealed partial class ActivationData :
                             LogRegisteringGrain(_shared.Logger, this, previousRegistration);
 
                             var result = await _shared.InternalRuntime.GrainLocator
-                                .Register(Address, previousRegistration, cancellationToken);
+                                .Register(Address, previousRegistration).WaitAsync(cancellationToken);
                             if (Address.Matches(result))
                             {
                                 Address = result;

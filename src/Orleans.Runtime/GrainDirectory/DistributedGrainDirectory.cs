@@ -128,51 +128,19 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         DistributedRemoteGrainDirectory.Create(this, membershipService, shared);
     }
 
-    public Task<GrainAddress?> Lookup(GrainId grainId) => Lookup(grainId, _stoppedCts.Token);
+    public async Task<GrainAddress?> Lookup(GrainId grainId) => await LookupAsync(grainId, _stoppedCts.Token);
 
-    public async Task<GrainAddress?> Lookup(GrainId grainId, CancellationToken cancellationToken)
-    {
-        using var linkedCts = LinkWithStoppedToken(cancellationToken, out var effectiveCancellationToken);
-        return await LookupAsync(grainId, effectiveCancellationToken);
-    }
+    public async Task<GrainAddress?> Register(GrainAddress address) => await RegisterAsync(address, null, _stoppedCts.Token);
 
-    public Task<GrainAddress?> Register(GrainAddress address) => Register(address, _stoppedCts.Token);
+    public async Task Unregister(GrainAddress address) => await InvokeAsync(
+        address.GrainId,
+        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken),
+        address,
+        _stoppedCts.Token);
 
-    public async Task<GrainAddress?> Register(GrainAddress address, CancellationToken cancellationToken)
-    {
-        using var linkedCts = LinkWithStoppedToken(cancellationToken, out var effectiveCancellationToken);
-        return await RegisterAsync(address, null, effectiveCancellationToken);
-    }
+    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await RegisterAsync(address, previousAddress, _stoppedCts.Token);
 
-    public Task Unregister(GrainAddress address) => Unregister(address, _stoppedCts.Token);
-
-    public async Task Unregister(GrainAddress address, CancellationToken cancellationToken)
-    {
-        using var linkedCts = LinkWithStoppedToken(cancellationToken, out var effectiveCancellationToken);
-        await UnregisterAsync(address, effectiveCancellationToken);
-    }
-
-    public Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) =>
-        Register(address, previousAddress, _stoppedCts.Token);
-
-    public async Task<GrainAddress?> Register(
-        GrainAddress address,
-        GrainAddress? previousAddress,
-        CancellationToken cancellationToken)
-    {
-        using var linkedCts = LinkWithStoppedToken(cancellationToken, out var effectiveCancellationToken);
-        return await RegisterAsync(address, previousAddress, effectiveCancellationToken);
-    }
-
-    public Task UnregisterSilos(List<SiloAddress> siloAddresses) =>
-        UnregisterSilos(siloAddresses, _stoppedCts.Token);
-
-    public async Task UnregisterSilos(List<SiloAddress> siloAddresses, CancellationToken cancellationToken)
-    {
-        using var linkedCts = LinkWithStoppedToken(cancellationToken, out var effectiveCancellationToken);
-        effectiveCancellationToken.ThrowIfCancellationRequested();
-        await Task.CompletedTask;
-    }
+    public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
 
     internal Task<GrainAddress?> LookupAsync(GrainId grainId, CancellationToken cancellationToken) => InvokeAsync(
         grainId,
@@ -191,21 +159,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken),
         address,
         cancellationToken);
-
-    private CancellationTokenSource? LinkWithStoppedToken(
-        CancellationToken cancellationToken,
-        out CancellationToken effectiveCancellationToken)
-    {
-        if (cancellationToken == _stoppedCts.Token)
-        {
-            effectiveCancellationToken = cancellationToken;
-            return null;
-        }
-
-        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stoppedCts.Token);
-        effectiveCancellationToken = linkedCts.Token;
-        return linkedCts;
-    }
 
     private async Task<TResult?> InvokeAsync<TState, TResult>(
         GrainId grainId,
