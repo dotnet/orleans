@@ -51,7 +51,7 @@ public class GrainDirectoryLeaseTests
             await leaseCreated;
 
             // Bypass the catalog and hit the directory directly to observe lease hold behavior.
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
 
             // The registration should block while the lease hold is active.
@@ -95,7 +95,7 @@ public class GrainDirectoryLeaseTests
             // which does not create a silo lease hold.
             await cluster.StopSiloAsync(secondary);
 
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
 
             // Should succeed immediately — no lease hold for graceful shutdown.
@@ -141,7 +141,7 @@ public class GrainDirectoryLeaseTests
             await cluster.KillSiloAsync(secondary);
             await leaseCreated;
 
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
 
             var registrationBlocked = WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
@@ -182,7 +182,7 @@ public class GrainDirectoryLeaseTests
             // Ungraceful kill, but leases are disabled (duration = Zero).
             await cluster.KillSiloAsync(secondary);
 
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
 
             // Should succeed immediately — lease holds are disabled.
@@ -218,7 +218,7 @@ public class GrainDirectoryLeaseTests
             await cluster.KillSiloAsync(secondary);
             await leaseCreated;
 
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
 
             // Lookup should return null: the entry is retained for the lease hold,
             // but the silo is dead so the directory filters it out.
@@ -256,7 +256,7 @@ public class GrainDirectoryLeaseTests
             await cluster.KillSiloAsync(secondary);
             await leaseCreated;
 
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
 
             // All grains on the dead silo should be blocked by the lease hold.
             var blockedTasks = new[]
