@@ -40,6 +40,10 @@ internal sealed class CosmosGrainStorageProviderBuilder : IProviderBuilder<ISilo
                 if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
                 {
                     connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString(connectionName);
+                    if (string.IsNullOrEmpty(connectionString))
+                    {
+                        throw new InvalidOperationException($"Connection string '{connectionName}' was not found.");
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(connectionString))

@@ -59,6 +59,29 @@ public class CosmosHostingExtensionsTests
         Assert.Equal("configured-database", options.DatabaseName);
     }
 
+    [Fact]
+    public void CosmosGrainStorageProviderBuilder_ThrowsWhenNamedConnectionStringIsMissing()
+    {
+        const string storageName = "configured-storage";
+        const string connectionName = "missing";
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cosmos:ConnectionName"] = connectionName
+            })
+            .Build();
+
+        using var host = new HostBuilder()
+            .UseOrleans(builder =>
+                new CosmosGrainStorageProviderBuilder().Configure(builder, storageName, configuration.GetSection("Cosmos")))
+            .Build();
+
+        var options = host.Services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
+        var exception = Assert.Throws<InvalidOperationException>(() => options.Get(storageName));
+
+        Assert.Equal($"Connection string '{connectionName}' was not found.", exception.Message);
+    }
+
 #pragma warning disable CS0618 // Type or member is obsolete
     [Fact]
     public void AddCosmosGrainStorage_LegacyPartitionKeyProvidersAreRegisteredByKey()
