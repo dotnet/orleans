@@ -562,7 +562,7 @@ namespace Orleans.Runtime.ReminderService
         {
             var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
             var nextTick = CalculateNextTickTime(entry, now);
-            // Keep distant schedules in storage, and skip exact-due table loads to simplify fake-time tests.
+            // Keep distant schedules in storage; exact-due entries are intentionally skipped to simplify fake-time tests.
             var isWithinLoadingWindow = nextTick <= now.AddClamped(reminderOptions.ReminderLoadingWindow);
             var shouldLoad = nextTick > now && isWithinLoadingWindow;
             if (!localReminders.TryGetValue(key, out var localReminder))
