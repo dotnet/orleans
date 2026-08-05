@@ -1,8 +1,7 @@
-using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime.GrainDirectory;
 
@@ -25,6 +24,52 @@ internal sealed partial class GrainDirectoryPartition
         }
 
         DebugAssertOwnership(currentView, address.GrainId);
+
+        if (_deadSiloLeaseDuration > TimeSpan.Zero)
+        {
+            var utcNow = _timeProvider.GetUtcNow();
+            var rangeHash = address.GrainId.GetUniformHashCode();
+            var isExistingRegistration = currentRegistration is not null && address.Matches(currentRegistration);
+
+            // Range lease holds
+            for (var i = _rangeLeaseHolds.Count - 1; !isExistingRegistration && i >= 0; i--)
+            {
+                var (lockedRange, expiration) = _rangeLeaseHolds[i];
+
+                if (utcNow >= expiration)
+                {
+                    // We use this opportunity to cleanup this expired range lease hold.
+                    _rangeLeaseHolds.RemoveAt(i);
+                    continue;
+                }
+
+                // If it is still active, does it block this request?
+                if (lockedRange.Contains(rangeHash))
+                {
+                    var retryAfter = expiration - utcNow;
+                    GrainDirectoryEvents.EmitRegistrationBlockedByRangeLease(_id, address.GrainId, lockedRange, expiration, retryAfter);
+                    return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
+                }
+            }
+
+            // Grain lease holds
+            if (_directory.TryGetValue(address.GrainId, out var existingActivation))
+            {
+                if (_siloLeaseHolds.TryGetValue(existingActivation.SiloAddress!, out var expiration) && utcNow < expiration)
+                {
+                    // This grain belongs to this partition, and the activation is sitting on a silo that has an active lease hold.
+                    // We need to check if the request includes the previous activation id, and if it does it's a valid update/override,
+                    // otherwise it's a new activation trying to "steal" the id while the lease is active, so we reject it!
+                    if (currentRegistration is null || !existingActivation.Matches(currentRegistration))
+                    {
+                        var retryAfter = expiration - utcNow;
+                        GrainDirectoryEvents.EmitRegistrationBlockedBySiloLease(_id, address.GrainId, existingActivation.SiloAddress!, expiration, retryAfter);
+                        return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
+                    }
+                }
+            }
+        }
+
         return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version);
     }
 
@@ -66,7 +111,20 @@ internal sealed partial class GrainDirectoryPartition
 
     private bool DeregisterCore(GrainAddress address)
     {
-        if (_directory.TryGetValue(address.GrainId, out var existing) && (existing.Matches(address) || IsSiloDead(existing)))
+        if (!_directory.TryGetValue(address.GrainId, out var existing))
+        {
+            return false;
+        }
+
+        if (_deadSiloLeaseDuration > TimeSpan.Zero
+            && existing.SiloAddress is { } siloAddress
+            && _siloLeaseHolds.TryGetValue(siloAddress, out var expiration)
+            && _timeProvider.GetUtcNow() < expiration)
+        {
+            return false;
+        }
+
+        if (existing.Matches(address) || IsSiloDead(existing))
         {
             return _directory.Remove(address.GrainId);
         }

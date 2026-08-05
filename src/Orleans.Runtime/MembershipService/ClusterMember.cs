@@ -22,10 +22,16 @@ namespace Orleans.Runtime
         /// The silo name.
         /// </param>
         public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name)
+            : this(siloAddress, status, name, wasDeclaredDead: false)
+        {
+        }
+
+        internal ClusterMember(SiloAddress siloAddress, SiloStatus status, string name, bool wasDeclaredDead)
         {
             this.SiloAddress = siloAddress ?? throw new ArgumentNullException(nameof(siloAddress));
             this.Status = status;
             this.Name = name;
+            this.WasDeclaredDead = wasDeclaredDead;
         }
 
         /// <summary>
@@ -48,6 +54,9 @@ namespace Orleans.Runtime
         /// <value>The silo name.</value>
         [Id(2)]
         public string Name { get; }
+
+        [Id(3)]
+        internal bool WasDeclaredDead { get; }
 
         /// <inheritdoc/>
         public override bool Equals([NotNullWhen(true)] object? obj) => this.Equals(obj as ClusterMember);

@@ -184,7 +184,8 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
             try
             {
                 using var cts = CreateTimeoutCts(cancellationToken);
-                winners[index] = await _directory.RegisterAsync(pendingRegistrations[index], null, cts.Token);
+                var registration = pendingRegistrations[index];
+                winners[index] = await _directory.RegisterAsync(registration, registration, cts.Token);
             }
             catch (Exception exception)
             {

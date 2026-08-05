@@ -1,15 +1,15 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Timers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
@@ -65,6 +65,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly CancellationTokenSource _stoppedCts = new();
     private readonly ClusterMemberCancellationTokens _clusterMemberCancellationTokens;
     private readonly DirectoryInstruments _directoryInstruments;
+    private readonly TimeSpan _deadSiloLeaseDuration;
+    private readonly TimeProvider _timeProvider;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
@@ -83,6 +85,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private Task _runTask = Task.CompletedTask;
     private ActivationDirectory _localActivations;
     private GrainDirectoryResolver? _grainDirectoryResolver;
+    private Task? _leaseCleanupTask;
 
     public DistributedGrainDirectory(
         DirectoryMembershipService membershipService,
@@ -90,6 +93,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         IServiceProvider serviceProvider,
         IInternalGrainFactory grainFactory,
         DirectoryInstruments directoryInstruments,
+        IOptions<GrainDirectoryOptions> directoryOptions,
+        IOptions<ClusterMembershipOptions> membershipOptions,
+        TimeProvider timeProvider,
         SystemTargetShared shared) : base(Constants.GrainDirectoryType, shared)
     {
         _localActivations = shared.ActivationDirectory;
@@ -98,11 +104,28 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _logger = logger;
         _directoryInstruments = directoryInstruments;
         _clusterMemberCancellationTokens = new(_stoppedCts.Token);
+        _timeProvider = timeProvider;
+
+        var rangeLeaseDuration = directoryOptions.Value.RangeLeaseDuration;
+        if (rangeLeaseDuration < TimeSpan.Zero)
+        {
+            throw new InvalidOperationException("Range lease duration must be non-negative.");
+        }
+
+        _deadSiloLeaseDuration = CalculateDeadSiloLeaseDuration(rangeLeaseDuration, membershipOptions.Value);
+
         var partitionsPerSilo = membershipService.PartitionsPerSilo;
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
         for (var i = 0; i < partitionsPerSilo; i++)
         {
-            partitions.Add(new GrainDirectoryPartition(i, this, grainFactory, directoryInstruments, shared));
+            partitions.Add(new GrainDirectoryPartition(
+                i,
+                this,
+                _deadSiloLeaseDuration,
+                grainFactory,
+                directoryInstruments,
+                timeProvider,
+                shared));
         }
 
         _partitions = partitions.ToImmutable();
@@ -111,6 +134,16 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         // Register IRemoteGrainDirectory system targets so that silos running LocalGrainDirectory
         // can forward directory requests to this silo during a rolling upgrade.
         DistributedRemoteGrainDirectory.Create(this, membershipService, shared);
+    }
+
+    internal static TimeSpan CalculateDeadSiloLeaseDuration(
+        TimeSpan rangeLeaseDuration,
+        ClusterMembershipOptions membershipOptions)
+    {
+        var failureDetectionDuration = membershipOptions.ProbeTimeout * membershipOptions.NumMissedProbesLimit;
+        return rangeLeaseDuration > failureDetectionDuration
+            ? rangeLeaseDuration - failureDetectionDuration
+            : TimeSpan.Zero;
     }
 
     public Task<GrainAddress?> Lookup(GrainId grainId) => Lookup(grainId, _stoppedCts.Token);
@@ -250,8 +283,17 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                     continue;
                 }
 
-                await Task.Delay(delay, cancellationToken);
+                await Task.Delay(delay, _timeProvider, cancellationToken);
                 delay *= 1.5;
+                continue;
+            }
+
+            if (invokeResult.RetryAfterDelay > TimeSpan.Zero)
+            {
+                // A safety lease hold is active for this grain or range.
+                // Wait for the suggested duration before retrying.
+                GrainDirectoryEvents.EmitOperationDelayedByLeaseHold(Silo, grainId, operation, invokeResult.RetryAfterDelay);
+                await Task.Delay(invokeResult.RetryAfterDelay, _timeProvider, cancellationToken);
                 continue;
             }
 
@@ -393,7 +435,16 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
         {
             using var _ = new ExecutionContextSuppressor();
-            WorkItemGroup.QueueAction(() => _runTask = ProcessMembershipUpdates());
+
+            WorkItemGroup.QueueAction(() =>
+            {
+                _runTask = ProcessMembershipUpdates();
+
+                if (_deadSiloLeaseDuration > TimeSpan.Zero)
+                {
+                    _leaseCleanupTask = RequestExpiredLeaseCleanups();
+                }
+            });
 
             return Task.CompletedTask;
         }
@@ -401,10 +452,16 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
         {
             _stoppedCts.Cancel();
+
             if (_runTask is { } task)
             {
                 // Try to wait for hand-off to complete.
                 await this.RunOrQueueTask(async () => await task.WaitAsync(cancellationToken).SuppressThrowing());
+            }
+
+            if (_leaseCleanupTask is { } cleanupTask)
+            {
+                await cleanupTask.WaitAsync(cancellationToken).SuppressThrowing();
             }
         }
 
@@ -423,7 +480,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     {
         // Ensure all child tasks are completed before exiting, tracking them here.
         List<Task> tasks = [];
-        var previousUpdate = ClusterMembershipSnapshot.Default;
+        ClusterMembershipSnapshot? previousUpdate = null;
         while (!_stoppedCts.IsCancellationRequested)
         {
             try
@@ -434,15 +491,25 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 {
                     tasks.RemoveAll(t => t.IsCompleted);
                     _clusterMemberCancellationTokens.Update(update.ClusterMembershipSnapshot);
-                    var changes = update.ClusterMembershipSnapshot.CreateUpdate(previousUpdate);
-
-                    foreach (var change in changes.Changes)
+                    if (previousUpdate is not null)
                     {
-                        if (change.Status == SiloStatus.Dead)
+                        var changes = update.ClusterMembershipSnapshot.CreateUpdate(previousUpdate);
+                        foreach (var change in changes.Changes)
                         {
+                            if (change.Status != SiloStatus.Dead || change.SiloAddress.Equals(Silo))
+                            {
+                                continue;
+                            }
+
+                            var previousStatus = previousUpdate.GetSiloStatus(change.SiloAddress);
+                            if (previousStatus == SiloStatus.Dead)
+                            {
+                                continue;
+                            }
+
                             foreach (var partition in _partitions)
                             {
-                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change)));
+                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change, previous)));
                             }
                         }
                     }
@@ -487,6 +554,38 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         catch (Exception exception) when (!_stoppedCts.IsCancellationRequested)
         {
             LogErrorProcessingMembershipUpdates(exception);
+        }
+    }
+
+    private async Task RequestExpiredLeaseCleanups()
+    {
+        Debug.Assert(_deadSiloLeaseDuration > TimeSpan.Zero);
+
+        // We request cleanups periodically to not let expired leases linger in the directory for too long.
+        // We do it here as opposed to in the partitions to avoid having 30 (by default, maybe more) timers.
+        var period = 1.1 * _deadSiloLeaseDuration;
+
+        if (period < TimeSpan.FromMinutes(1))
+        {
+            // We create a lower-bound to avoid creating too much overhead in the partitions.
+            period = TimeSpan.FromMinutes(1);
+        }
+
+        using var timer = new PeriodicTimer(period, _timeProvider);
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stoppedCts.Token))
+            {
+                foreach (var partition in _partitions)
+                {
+                    partition.CleanupExpiredLeases();
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_stoppedCts.IsCancellationRequested)
+        {
+            // Ignore
         }
     }
 
