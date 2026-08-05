@@ -378,7 +378,8 @@ namespace Orleans.Runtime
 
             // snapshot to avoid concurrency collection modification issues
             var bucketSnapshot = buckets.ToArray();
-            foreach (var bucket in bucketSnapshot.OrderBy(b => b.Key))
+            Array.Sort(bucketSnapshot, static (left, right) => left.Key.CompareTo(right.Key));
+            foreach (var bucket in bucketSnapshot)
             {
                 foreach (var item in bucket.Value.Items)
                 {

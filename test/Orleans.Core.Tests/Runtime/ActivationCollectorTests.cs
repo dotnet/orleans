@@ -298,7 +298,7 @@ namespace UnitTests.Runtime
             });
 
             // Task 3: Run DeactivateInDueTimeOrder MANY times concurrently
-            // This is where OrderBy enumerates buckets and can race with add/remove
+            // This is where the collector snapshots and sorts buckets while they are being added and removed.
             var deactivateTasks = Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
             {
                 for (int i = 0; i < 100; i++)
