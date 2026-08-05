@@ -373,7 +373,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     }
 
     internal static bool ShouldCreateDeadSiloLease(SiloStatus previousStatus, ClusterMember change) =>
-        change.WasDeclaredDead && previousStatus is not (SiloStatus.ShuttingDown or SiloStatus.Stopping);
+        previousStatus == SiloStatus.Stopping
+        || change.WasDeclaredDead && previousStatus != SiloStatus.ShuttingDown;
 
     internal Task OnRecoveringPartition(MembershipVersion version, RingRange range, SiloAddress siloAddress, int partitionIndex) =>
         this.QueueTask(
@@ -633,6 +634,11 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         if (member is null)
         {
             return deadSiloLeaseDuration;
+        }
+
+        if (member.Status == SiloStatus.Stopping)
+        {
+            return rangeLeaseDuration;
         }
 
         return member.Status == SiloStatus.Dead && member.WasDeclaredDead
