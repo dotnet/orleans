@@ -13,6 +13,8 @@ Follow [Build your first Orleans app](../quickstarts/build-your-first-orleans-ap
 
 For a compact console application, use the maintained [Hello World sample](https://github.com/dotnet/orleans/tree/main/samples/HelloWorld).
 
-## Project setup
+<a id="project-setup"></a>
+
+## Choose a project structure
 
 The canonical quickstart uses one ASP.NET Core project so that beginners can focus on Orleans concepts before introducing a multi-project architecture. Production applications can separate grain contracts, implementations, hosts, and clients into projects as their deployment and dependency boundaries require.
