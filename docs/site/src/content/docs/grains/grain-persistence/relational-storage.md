@@ -55,21 +55,7 @@ SQLite is useful for local, single-process scenarios. Its file locking, deployme
 
 Configure <xref:Orleans.Configuration.AdoNetGrainStorageOptions.GrainStorageSerializer> when the default JSON representation doesn't meet application requirements:
 
-```csharp
-siloBuilder.Services.AddSingleton<IGrainStorageSerializer, MyStorageSerializer>();
-
-siloBuilder.AddAdoNetGrainStorage(
-    "stateStore",
-    (OptionsBuilder<AdoNetGrainStorageOptions> optionsBuilder) =>
-    {
-        optionsBuilder.Configure<IGrainStorageSerializer>((options, serializer) =>
-        {
-            options.Invariant = "Npgsql";
-            options.ConnectionString = connectionString;
-            options.GrainStorageSerializer = serializer;
-        });
-    });
-```
+:::code language="csharp" source="./snippets/persistence/StorageConfiguration.cs" id="configure_adonet_serializer":::
 
 Changing the serializer isn't a database migration. The new serializer must read existing payloads or the application must migrate them separately.
 

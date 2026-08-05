@@ -42,16 +42,7 @@ If a request reaches an existing activation whose version is incompatible, Orlea
 
 <xref:Orleans.Configuration.GrainVersioningOptions> defaults to `BackwardCompatible` and `AllCompatibleVersions`:
 
-```csharp
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<GrainVersioningOptions>(options =>
-    {
-        options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
-        options.DefaultVersionSelectorStrategy = nameof(AllCompatibleVersions);
-    });
-});
-```
+:::code language="csharp" source="./snippets/versioning/VersioningConfiguration.cs" id="configure_versioning":::
 
 The configured strategy names resolve registered Orleans strategy services. Configure every silo consistently before a heterogeneous deployment.
 

@@ -4,9 +4,11 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos;
+using Orleans.Storage;
 using StackExchange.Redis;
 
 namespace Orleans.Docs.Snippets.Persistence;
@@ -181,5 +183,31 @@ public static class StorageConfiguration
             options.IsResourceCreationEnabled = true;
         });
         // </configure_cosmos_default>
+    }
+
+    public static void ConfigureAdoNetSerializer()
+    {
+        // <configure_adonet_serializer>
+        var builder = Host.CreateApplicationBuilder();
+
+        builder.Services.AddSingleton<IGrainStorageSerializer, ExampleStorageSerializer>();
+        builder.UseOrleans(siloBuilder =>
+        {
+            siloBuilder.AddAdoNetGrainStorage(
+                "stateStore",
+                (OptionsBuilder<AdoNetGrainStorageOptions> optionsBuilder) =>
+                {
+                    optionsBuilder.Configure<IGrainStorageSerializer>((options, serializer) =>
+                    {
+                        options.Invariant = "Npgsql";
+                        options.ConnectionString =
+                            builder.Configuration.GetConnectionString("grainState")
+                            ?? throw new InvalidOperationException(
+                                "Connection string 'grainState' is required.");
+                        options.GrainStorageSerializer = serializer;
+                    });
+                });
+        });
+        // </configure_adonet_serializer>
     }
 }

@@ -9,6 +9,7 @@
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.0.0" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.0.0" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Cosmos" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Azure.Identity" Version="1.17.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.9.32" />

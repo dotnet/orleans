@@ -47,12 +47,7 @@ Assign the storage account identity the data-plane permissions required to read 
 
 Connection strings are useful for local emulators and constrained environments, but contain secrets and shouldn't be committed:
 
-```csharp
-siloBuilder.AddAzureTableGrainStorage(
-    "profileStore",
-    options => options.ConfigureTableServiceClient(
-        configuration.GetConnectionString("grainState")));
-```
+:::code language="csharp" source="./snippets/persistence/StorageConfiguration.cs" id="configure_connection_string":::
 
 Use a secret store when a connection string is unavoidable.
 
