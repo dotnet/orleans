@@ -10,7 +10,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Dashboard" Version="10.0.0" />
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.0.0" />
-    <PackageReference Include="OpenTelemetry.Api" Version="1.16.0" />
   </ItemGroup>
 
   <ItemGroup>
