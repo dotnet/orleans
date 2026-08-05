@@ -66,6 +66,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly ClusterMemberCancellationTokens _clusterMemberCancellationTokens;
     private readonly DirectoryInstruments _directoryInstruments;
     private readonly TimeSpan _rangeLeaseDuration;
+    private readonly TimeSpan _deadSiloLeaseDuration;
     private readonly TimeProvider _timeProvider;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
@@ -94,6 +95,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         IInternalGrainFactory grainFactory,
         DirectoryInstruments directoryInstruments,
         IOptions<GrainDirectoryOptions> directoryOptions,
+        IOptions<ClusterMembershipOptions> membershipOptions,
         TimeProvider timeProvider,
         SystemTargetShared shared) : base(Constants.GrainDirectoryType, shared)
     {
@@ -111,11 +113,21 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             throw new InvalidOperationException("Range lease duration must be non-negative.");
         }
 
+        _deadSiloLeaseDuration = CalculateDeadSiloLeaseDuration(_rangeLeaseDuration, membershipOptions.Value);
+
         var partitionsPerSilo = membershipService.PartitionsPerSilo;
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
         for (var i = 0; i < partitionsPerSilo; i++)
         {
-            partitions.Add(new GrainDirectoryPartition(i, this, _rangeLeaseDuration, grainFactory, directoryInstruments, timeProvider, shared));
+            partitions.Add(new GrainDirectoryPartition(
+                i,
+                this,
+                _rangeLeaseDuration,
+                _deadSiloLeaseDuration,
+                grainFactory,
+                directoryInstruments,
+                timeProvider,
+                shared));
         }
 
         _partitions = partitions.ToImmutable();
@@ -124,6 +136,16 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         // Register IRemoteGrainDirectory system targets so that silos running LocalGrainDirectory
         // can forward directory requests to this silo during a rolling upgrade.
         DistributedRemoteGrainDirectory.Create(this, membershipService, shared);
+    }
+
+    internal static TimeSpan CalculateDeadSiloLeaseDuration(
+        TimeSpan rangeLeaseDuration,
+        ClusterMembershipOptions membershipOptions)
+    {
+        var failureDetectionDuration = membershipOptions.ProbeTimeout * membershipOptions.NumMissedProbesLimit;
+        return rangeLeaseDuration > failureDetectionDuration
+            ? rangeLeaseDuration - failureDetectionDuration
+            : TimeSpan.Zero;
     }
 
     public Task<GrainAddress?> Lookup(GrainId grainId) => Lookup(grainId, _stoppedCts.Token);

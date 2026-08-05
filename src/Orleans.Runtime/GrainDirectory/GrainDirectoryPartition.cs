@@ -54,6 +54,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private RingRange _currentRange;
 
     private readonly TimeSpan _rangeLeaseDuration;
+    private readonly TimeSpan _deadSiloLeaseDuration;
     private readonly List<(RingRange Range, DateTimeOffset Expiration)> _rangeLeaseHolds = [];
     private readonly Dictionary<SiloAddress, DateTimeOffset> _siloLeaseHolds = [];
 
@@ -62,6 +63,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         int partitionIndex,
         DistributedGrainDirectory owner,
         TimeSpan rangeLeaseDuration,
+        TimeSpan deadSiloLeaseDuration,
         IInternalGrainFactory grainFactory,
         DirectoryInstruments directoryInstruments,
         TimeProvider timeProvider,
@@ -74,6 +76,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         _id = shared.SiloAddress;
         _logger = shared.LoggerFactory.CreateLogger<GrainDirectoryPartition>();
         _rangeLeaseDuration = rangeLeaseDuration;
+        _deadSiloLeaseDuration = deadSiloLeaseDuration;
         _timeProvider = timeProvider;
         shared.ActivationDirectory.RecordNewTarget(this);
     }
@@ -314,13 +317,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
         var isGracefulShutdown = previousStatus is SiloStatus.ShuttingDown || !change.WasDeclaredDead;
 
-        if (!isGracefulShutdown && _rangeLeaseDuration > TimeSpan.Zero)
+        if (!isGracefulShutdown && _deadSiloLeaseDuration > TimeSpan.Zero)
         {
             // Instead of just deleting, we mark it as tombstoned.
             // This prevents a new activation on a healthy silo from registering
             // until we are sure the dead silo has actually stopped processing.
 
-            var expiration = _timeProvider.GetUtcNow().Add(_rangeLeaseDuration);
+            var expiration = _timeProvider.GetUtcNow().Add(_deadSiloLeaseDuration);
 
             _siloLeaseHolds[change.SiloAddress] = expiration;
 
@@ -564,9 +567,10 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             var recovered = false;
             if (!success)
             {
-                if (_rangeLeaseDuration > TimeSpan.Zero && RequiresRangeLeaseHold(previous, current, addedRange))
+                var leaseDuration = GetRangeLeaseDuration(previous, current, addedRange);
+                if (leaseDuration > TimeSpan.Zero)
                 {
-                    var expiration = _timeProvider.GetUtcNow().Add(_rangeLeaseDuration);
+                    var expiration = _timeProvider.GetUtcNow().Add(leaseDuration);
                     AddRangeLeaseHold(addedRange, expiration);
                     LogWarningLeaseHoldForRange(_logger, addedRange, expiration);
                     GrainDirectoryEvents.EmitRangeLeaseHoldCreated(_id, addedRange, expiration);
@@ -590,34 +594,44 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    private bool RequiresRangeLeaseHold(
+    private TimeSpan GetRangeLeaseDuration(
         DirectoryMembershipSnapshot previous,
         DirectoryMembershipSnapshot current,
         RingRange addedRange)
     {
+        var result = TimeSpan.Zero;
         foreach (var previousOwner in previous.Members)
         {
             foreach (var range in previous.GetMemberRangesByPartition(previousOwner))
             {
-                if (range.Intersects(addedRange)
-                    && RequiresLeaseHold(previousOwner))
+                if (range.Intersects(addedRange))
                 {
-                    return true;
+                    var duration = GetLeaseDuration(previousOwner);
+                    if (duration > result)
+                    {
+                        result = duration;
+                    }
                 }
             }
         }
 
-        return false;
+        return result;
 
-        bool RequiresLeaseHold(SiloAddress previousOwner)
+        TimeSpan GetLeaseDuration(SiloAddress previousOwner)
         {
             if (!current.ClusterMembershipSnapshot.Members.TryGetValue(previousOwner, out var member))
             {
-                return true;
+                return _rangeLeaseDuration;
             }
 
-            return member.Status == SiloStatus.Stopping
-                || member.Status == SiloStatus.Dead && member.WasDeclaredDead;
+            if (member.Status == SiloStatus.Stopping)
+            {
+                return _rangeLeaseDuration;
+            }
+
+            return member.Status == SiloStatus.Dead && member.WasDeclaredDead
+                ? _deadSiloLeaseDuration
+                : TimeSpan.Zero;
         }
     }
 

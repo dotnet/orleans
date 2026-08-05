@@ -175,6 +175,18 @@ public class GrainDirectoryLeaseTests
         Assert.Equal(TimeSpan.FromSeconds(30), new GrainDirectoryOptions().RangeLeaseDuration);
 
     [Fact]
+    public void DefaultRangeLeaseDuration_LeavesFifteenSecondsAfterFailureDetection()
+    {
+        var membershipOptions = new ClusterMembershipOptions();
+
+        var duration = DistributedGrainDirectory.CalculateDeadSiloLeaseDuration(
+            new GrainDirectoryOptions().RangeLeaseDuration,
+            membershipOptions);
+
+        Assert.Equal(TimeSpan.FromSeconds(15), duration);
+    }
+
+    [Fact]
     public async Task DisabledLeaseHold_AllowsImmediateReregistration()
     {
         var (cluster, _) = CreateCluster(TimeSpan.Zero);
@@ -311,6 +323,11 @@ public class GrainDirectoryLeaseTests
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Services.AddSingleton<TimeProvider>(timeProvider);
+            siloBuilder.Services.Configure<ClusterMembershipOptions>(options =>
+            {
+                options.ProbeTimeout = TimeSpan.FromSeconds(1);
+                options.NumMissedProbesLimit = 1;
+            });
             siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);
 
 #pragma warning disable ORLEANSEXP003
