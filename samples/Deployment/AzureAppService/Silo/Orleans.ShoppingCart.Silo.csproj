@@ -27,4 +27,15 @@
     <ProjectReference Include="..\Grains\Orleans.ShoppingCart.Grains.csproj" />
   </ItemGroup>
 
+  <Target Name="RejectEmbeddedByteOrderMarks" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <SourceWithEmbeddedBom
+        Include="@(Compile)"
+        Condition="$([System.IO.File]::ReadAllText('%(Compile.FullPath)').IndexOf('$([System.Char]::ConvertFromUtf32(65279))', 1)) != -1" />
+    </ItemGroup>
+    <Error
+      Condition="'@(SourceWithEmbeddedBom)' != ''"
+      Text="Source files contain an embedded Unicode byte-order mark: @(SourceWithEmbeddedBom)" />
+  </Target>
+
 </Project>
