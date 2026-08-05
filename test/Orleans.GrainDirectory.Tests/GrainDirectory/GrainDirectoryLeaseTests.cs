@@ -191,7 +191,6 @@ public class GrainDirectoryLeaseTests
     public void MissingPreviousOwner_UsesPostDetectionLeaseDuration()
     {
         var duration = GrainDirectoryPartition.GetLeaseDurationForPreviousOwner(
-            rangeLeaseDuration: TimeSpan.FromSeconds(30),
             deadSiloLeaseDuration: TimeSpan.FromSeconds(15),
             member: null);
 
@@ -207,7 +206,6 @@ public class GrainDirectoryLeaseTests
             "shutting-down");
 
         var duration = GrainDirectoryPartition.GetLeaseDurationForPreviousOwner(
-            rangeLeaseDuration: TimeSpan.FromSeconds(30),
             deadSiloLeaseDuration: TimeSpan.FromSeconds(15),
             member);
 
@@ -215,7 +213,7 @@ public class GrainDirectoryLeaseTests
     }
 
     [Fact]
-    public void StoppingPreviousOwner_UsesFullRangeLeaseDuration()
+    public void StoppingPreviousOwner_DoesNotCreateRangeLease()
     {
         var member = new ClusterMember(
             SiloAddress.New(IPAddress.Loopback, port: 11111, generation: 1),
@@ -223,27 +221,26 @@ public class GrainDirectoryLeaseTests
             "stopping");
 
         var duration = GrainDirectoryPartition.GetLeaseDurationForPreviousOwner(
-            rangeLeaseDuration: TimeSpan.FromSeconds(30),
             deadSiloLeaseDuration: TimeSpan.FromSeconds(15),
             member);
 
-        Assert.Equal(TimeSpan.FromSeconds(30), duration);
+        Assert.Equal(TimeSpan.Zero, duration);
     }
 
     [Fact]
-    public void ShuttingDownSilo_DoesNotCreateDeadSiloLease()
+    public void PeerDeclaredDeadSilo_CreatesLease()
     {
         var change = new ClusterMember(
             SiloAddress.New(IPAddress.Loopback, port: 11111, generation: 1),
             SiloStatus.Dead,
-            "shutting-down",
+            "peer-declared",
             wasDeclaredDead: true);
 
-        Assert.False(GrainDirectoryPartition.ShouldCreateDeadSiloLease(SiloStatus.ShuttingDown, change));
+        Assert.True(GrainDirectoryPartition.ShouldCreateDeadSiloLease(change));
     }
 
     [Fact]
-    public void StoppingSilo_CreatesDeadSiloLease()
+    public void SelfDeclaredDeadSilo_DoesNotCreateLease()
     {
         var change = new ClusterMember(
             SiloAddress.New(IPAddress.Loopback, port: 11111, generation: 1),
@@ -251,7 +248,7 @@ public class GrainDirectoryLeaseTests
             "stopping",
             wasDeclaredDead: false);
 
-        Assert.True(GrainDirectoryPartition.ShouldCreateDeadSiloLease(SiloStatus.Stopping, change));
+        Assert.False(GrainDirectoryPartition.ShouldCreateDeadSiloLease(change));
     }
 
     [Fact]

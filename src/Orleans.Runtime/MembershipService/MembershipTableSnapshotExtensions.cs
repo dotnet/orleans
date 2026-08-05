@@ -16,8 +16,8 @@ namespace Orleans.Runtime.MembershipService
                     entry.Status,
                     entry.SiloName,
                     entry.Status == SiloStatus.Dead
-                        && entry.SuspectTimes is { } suspectTimes
-                        && suspectTimes.Any(suspect => !suspect.Item1.Equals(entry.SiloAddress)));
+                        && entry.SuspectTimes is { Count: > 0 } suspectTimes
+                        && suspectTimes.All(suspect => !suspect.Item1.Equals(entry.SiloAddress)));
             }
 
             return new ClusterMembershipSnapshot(memberBuilder.ToImmutable(), membership.Version);

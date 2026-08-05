@@ -3,7 +3,6 @@
     public interface ILivenessTestGrain : IGrainWithIntegerKey
     {
         // separate label that can be set
-        [ResponseTimeout("00:01:00")]
         Task<string> GetLabel();
 
         Task SetLabel(string label);

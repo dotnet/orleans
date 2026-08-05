@@ -511,7 +511,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
                             foreach (var partition in _partitions)
                             {
-                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change, previousStatus, previous)));
+                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change, previous)));
                             }
                         }
                     }

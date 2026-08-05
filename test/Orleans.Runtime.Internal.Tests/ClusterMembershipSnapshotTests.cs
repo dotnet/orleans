@@ -70,22 +70,25 @@ public class ClusterMembershipSnapshotTests
         var gracefulSilo = CreateSiloAddress(1);
         var failedSilo = CreateSiloAddress(2);
         var detectingSilo = CreateSiloAddress(3);
+        var mixedSilo = CreateSiloAddress(4);
         var entries = ImmutableDictionary<SiloAddress, MembershipEntry>.Empty
             .Add(gracefulSilo, CreateDeadEntry(gracefulSilo, gracefulSilo))
-            .Add(failedSilo, CreateDeadEntry(failedSilo, detectingSilo));
+            .Add(failedSilo, CreateDeadEntry(failedSilo, detectingSilo))
+            .Add(mixedSilo, CreateDeadEntry(mixedSilo, mixedSilo, detectingSilo));
         var tableSnapshot = new MembershipTableSnapshot(new MembershipVersion(1), entries);
 
         var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
 
         Assert.False(snapshot.Members[gracefulSilo].WasDeclaredDead);
         Assert.True(snapshot.Members[failedSilo].WasDeclaredDead);
+        Assert.False(snapshot.Members[mixedSilo].WasDeclaredDead);
 
-        static MembershipEntry CreateDeadEntry(SiloAddress address, SiloAddress suspectingSilo) => new()
+        static MembershipEntry CreateDeadEntry(SiloAddress address, params SiloAddress[] suspectingSilos) => new()
         {
             SiloAddress = address,
             SiloName = "silo",
             Status = SiloStatus.Dead,
-            SuspectTimes = [Tuple.Create(suspectingSilo, DateTime.UtcNow)]
+            SuspectTimes = [.. suspectingSilos.Select(silo => Tuple.Create(silo, DateTime.UtcNow))]
         };
     }
 

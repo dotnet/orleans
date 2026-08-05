@@ -297,25 +297,19 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     internal Task OnSiloRemovedFromClusterAsync(
         ClusterMember change,
-        SiloStatus previousStatus,
         DirectoryMembershipSnapshot previousView) =>
         this.QueueAction(
-            static state => state.Self.OnSiloRemovedFromCluster(state.Change, state.PreviousStatus, state.PreviousView),
-            (Self: this, Change: change, PreviousStatus: previousStatus, PreviousView: previousView),
+            static state => state.Self.OnSiloRemovedFromCluster(state.Change, state.PreviousView),
+            (Self: this, Change: change, PreviousView: previousView),
             nameof(OnSiloRemovedFromCluster));
 
     private void OnSiloRemovedFromCluster(
         ClusterMember change,
-        SiloStatus previousStatus,
         DirectoryMembershipSnapshot previousView)
     {
         GrainRuntime.CheckRuntimeContext(this);
 
-        // We need to detect the shutdown type:
-        // If it was ShuttingDown, it surrendered its ownership gracefully.
-        // If it was Active (or Joining) and suddenly became Dead, it crashed.
-
-        if (ShouldCreateDeadSiloLease(previousStatus, change) && _deadSiloLeaseDuration > TimeSpan.Zero)
+        if (ShouldCreateDeadSiloLease(change) && _deadSiloLeaseDuration > TimeSpan.Zero)
         {
             // Instead of just deleting, we mark it as tombstoned.
             // This prevents a new activation on a healthy silo from registering
@@ -372,9 +366,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             partnerFilter: (state, silo, partitionIndex) => silo.Equals(state));
     }
 
-    internal static bool ShouldCreateDeadSiloLease(SiloStatus previousStatus, ClusterMember change) =>
-        previousStatus == SiloStatus.Stopping
-        || change.WasDeclaredDead && previousStatus != SiloStatus.ShuttingDown;
+    internal static bool ShouldCreateDeadSiloLease(ClusterMember change) => change.WasDeclaredDead;
 
     internal Task OnRecoveringPartition(MembershipVersion version, RingRange range, SiloAddress siloAddress, int partitionIndex) =>
         this.QueueTask(
@@ -622,23 +614,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         TimeSpan GetLeaseDuration(SiloAddress previousOwner)
         {
             current.ClusterMembershipSnapshot.Members.TryGetValue(previousOwner, out var member);
-            return GetLeaseDurationForPreviousOwner(_rangeLeaseDuration, _deadSiloLeaseDuration, member);
+            return GetLeaseDurationForPreviousOwner(_deadSiloLeaseDuration, member);
         }
     }
 
     internal static TimeSpan GetLeaseDurationForPreviousOwner(
-        TimeSpan rangeLeaseDuration,
         TimeSpan deadSiloLeaseDuration,
         ClusterMember? member)
     {
         if (member is null)
         {
             return deadSiloLeaseDuration;
-        }
-
-        if (member.Status == SiloStatus.Stopping)
-        {
-            return rangeLeaseDuration;
         }
 
         return member.Status == SiloStatus.Dead && member.WasDeclaredDead
