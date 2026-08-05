@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Storage.Queues;
@@ -248,8 +249,28 @@ namespace Orleans.AzureUtils
                 // http://msdn.microsoft.com/en-us/library/ee758456.aspx
                 // If no messages are visible in the queue, GetMessage returns null.
                 var client = await GetQueueClient();
-                var messages = await client.ReceiveMessagesAsync(maxMessages: 1, messageVisibilityTimeout);
-                return messages.Value.FirstOrDefault();
+                QueueProperties properties = await client.GetPropertiesAsync();
+                if (properties.ApproximateMessagesCount > 0)
+                {
+                    var messages = await client.ReceiveMessagesAsync(maxMessages: 1, messageVisibilityTimeout);
+                    var msg = messages.Value.FirstOrDefault();
+                    if (msg == null)
+                    {
+                        // Wait until the message be visible again
+                        if (messageVisibilityTimeout == null)
+                            Thread.Sleep(30000);
+                        else 
+                            Thread.Sleep(Convert.ToInt32(messageVisibilityTimeout.Value.TotalMilliseconds)); 
+                        // Try second time
+                        messages = await client.ReceiveMessagesAsync(maxMessages: 1, messageVisibilityTimeout);
+                        msg = messages.Value.FirstOrDefault();
+                    }
+                    return msg;
+                }
+                else
+                {
+                    return null;
+                }
             }
             catch (Exception exc)
             {
