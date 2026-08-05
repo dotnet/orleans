@@ -198,13 +198,15 @@ public class GrainDirectoryLeaseTests
         Assert.Equal(TimeSpan.FromSeconds(15), duration);
     }
 
-    [Fact]
-    public void StoppingPreviousOwner_DoesNotCreateRangeLease()
+    [Theory]
+    [InlineData(SiloStatus.ShuttingDown)]
+    [InlineData(SiloStatus.Stopping)]
+    public void GracefullyTerminatingPreviousOwner_DoesNotCreateRangeLease(SiloStatus status)
     {
         var member = new ClusterMember(
             SiloAddress.New(IPAddress.Loopback, port: 11111, generation: 1),
-            SiloStatus.Stopping,
-            "stopping");
+            status,
+            "terminating");
 
         var duration = GrainDirectoryPartition.GetLeaseDurationForPreviousOwner(
             rangeLeaseDuration: TimeSpan.FromSeconds(30),
@@ -212,6 +214,20 @@ public class GrainDirectoryLeaseTests
             member);
 
         Assert.Equal(TimeSpan.Zero, duration);
+    }
+
+    [Theory]
+    [InlineData(SiloStatus.ShuttingDown)]
+    [InlineData(SiloStatus.Stopping)]
+    public void GracefullyTerminatingSilo_DoesNotCreateDeadSiloLease(SiloStatus previousStatus)
+    {
+        var change = new ClusterMember(
+            SiloAddress.New(IPAddress.Loopback, port: 11111, generation: 1),
+            SiloStatus.Dead,
+            "terminating",
+            wasDeclaredDead: true);
+
+        Assert.False(GrainDirectoryPartition.ShouldCreateDeadSiloLease(previousStatus, change));
     }
 
     [Fact]

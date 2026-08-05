@@ -315,9 +315,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         // If it was ShuttingDown, it surrendered its ownership gracefully.
         // If it was Active (or Joining) and suddenly became Dead, it crashed.
 
-        var isGracefulShutdown = previousStatus is SiloStatus.ShuttingDown || !change.WasDeclaredDead;
-
-        if (!isGracefulShutdown && _deadSiloLeaseDuration > TimeSpan.Zero)
+        if (ShouldCreateDeadSiloLease(previousStatus, change) && _deadSiloLeaseDuration > TimeSpan.Zero)
         {
             // Instead of just deleting, we mark it as tombstoned.
             // This prevents a new activation on a healthy silo from registering
@@ -373,6 +371,9 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             snapshotFilter: (state, snapshot) => true,
             partnerFilter: (state, silo, partitionIndex) => silo.Equals(state));
     }
+
+    internal static bool ShouldCreateDeadSiloLease(SiloStatus previousStatus, ClusterMember change) =>
+        change.WasDeclaredDead && previousStatus is not (SiloStatus.ShuttingDown or SiloStatus.Stopping);
 
     internal Task OnRecoveringPartition(MembershipVersion version, RingRange range, SiloAddress siloAddress, int partitionIndex) =>
         this.QueueTask(
