@@ -1,0 +1,33 @@
+interface Orleans.Core.Internal.IGrainManagementExtension [Version(0)]
+  DeactivateOnIdle() -> ValueTask
+  MigrateOnIdle() -> ValueTask
+
+interface Orleans.IGrain [Version(0)]
+
+interface Orleans.IGrainObserver [Version(0)]
+
+interface Orleans.IGrainWithGuidCompoundKey [Version(0)]
+
+interface Orleans.IGrainWithGuidKey [Version(0)]
+
+interface Orleans.IGrainWithIntegerCompoundKey [Version(0)]
+
+interface Orleans.IGrainWithIntegerKey [Version(0)]
+
+interface Orleans.IGrainWithStringKey [Version(0)]
+
+interface Orleans.ISystemTarget [Version(0)]
+
+interface Orleans.Runtime.IAsyncEnumerableGrainExtension [Version(0)]
+  DisposeAsync(System.Guid) -> ValueTask
+  MoveNext(System.Guid) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  MoveNext(System.Guid, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  StartEnumeration(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  StartEnumeration(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+
+interface Orleans.Runtime.ICancellationSourcesExtension [Version(0)]
+  CancelRemoteToken(System.Guid) -> Task
+
+interface Orleans.Runtime.IGrainExtension [Version(0)]
+
+interface Orleans.Services.IGrainService [Version(0)]

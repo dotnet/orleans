@@ -1,0 +1,3 @@
+interface Orleans.BroadcastChannel.IBroadcastChannelConsumerExtension [Version(0)]
+  OnError(Orleans.BroadcastChannel.InternalChannelId, System.Exception) -> Task
+  OnPublished(Orleans.BroadcastChannel.InternalChannelId, object) -> Task

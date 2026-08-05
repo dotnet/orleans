@@ -294,16 +294,16 @@ namespace Orleans.Analyzers {
             }
         }
         /// <summary>
-        ///   Looks up a localized string similar to Add to GrainInterfaces.txt.
+        ///   Looks up a localized string similar to Add to OrleansContracts.txt.
         /// </summary>
-        internal static string AddToGrainInterfacesFileTitle {
+        internal static string AddToOrleansContractsFileTitle {
             get {
-                return ResourceManager.GetString("AddToGrainInterfacesFileTitle", resourceCulture);
+                return ResourceManager.GetString("AddToOrleansContractsFileTitle", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Each grain interface should only be declared once in GrainInterfaces.txt..
+        ///   Looks up a localized string similar to Each grain interface should only be declared once in OrleansContracts.txt..
         /// </summary>
         internal static string GrainInterfaceDuplicateDeclarationDescription {
             get {
@@ -312,7 +312,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Grain interface '{0}' is declared multiple times in GrainInterfaces.txt.
+        ///   Looks up a localized string similar to Grain interface '{0}' is declared multiple times in OrleansContracts.txt.
         /// </summary>
         internal static string GrainInterfaceDuplicateDeclarationMessageFormat {
             get {
@@ -330,7 +330,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to When adding or modifying grain interface members, update GrainInterfaces.txt and increment the interface version..
+        ///   Looks up a localized string similar to When adding or modifying grain interface members, update OrleansContracts.txt and increment the interface version..
         /// </summary>
         internal static string GrainInterfaceMemberNotDeclaredDescription {
             get {
@@ -339,7 +339,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Grain interface member '{0}' is not declared in GrainInterfaces.txt for interface '{1}'.
+        ///   Looks up a localized string similar to Grain interface member '{0}' is not declared in OrleansContracts.txt for interface '{1}'.
         /// </summary>
         internal static string GrainInterfaceMemberNotDeclaredMessageFormat {
             get {
@@ -348,7 +348,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Grain interface member not declared in GrainInterfaces.txt.
+        ///   Looks up a localized string similar to Grain interface member not declared in OrleansContracts.txt.
         /// </summary>
         internal static string GrainInterfaceMemberNotDeclaredTitle {
             get {
@@ -357,7 +357,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to All grain interfaces should be tracked in GrainInterfaces.txt to ensure version compatibility during rolling upgrades..
+        ///   Looks up a localized string similar to All grain interfaces should have an active declaration in OrleansContracts.txt to ensure version compatibility during rolling upgrades..
         /// </summary>
         internal static string GrainInterfaceNotDeclaredDescription {
             get {
@@ -366,7 +366,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Grain interface '{0}' is not declared in GrainInterfaces.txt.
+        ///   Looks up a localized string similar to Grain interface '{0}' does not have an active declaration in OrleansContracts.txt.
         /// </summary>
         internal static string GrainInterfaceNotDeclaredMessageFormat {
             get {
@@ -375,7 +375,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Grain interface not declared in GrainInterfaces.txt.
+        ///   Looks up a localized string similar to Grain interface is not active in OrleansContracts.txt.
         /// </summary>
         internal static string GrainInterfaceNotDeclaredTitle {
             get {
@@ -384,7 +384,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to When removing a grain interface, mark it as *RETIRED* in GrainInterfaces.txt to document that it has been intentionally removed..
+        ///   Looks up a localized string similar to When removing a grain interface, mark it as *RETIRED* in OrleansContracts.txt to document that it has been intentionally removed..
         /// </summary>
         internal static string GrainInterfaceRemovedNotRetiredDescription {
             get {
@@ -393,7 +393,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Grain interface '{0}' is declared in GrainInterfaces.txt but no longer exists in code - mark it as *RETIRED*.
+        ///   Looks up a localized string similar to Grain interface '{0}' is declared in OrleansContracts.txt but no longer exists in code - mark it as *RETIRED*.
         /// </summary>
         internal static string GrainInterfaceRemovedNotRetiredMessageFormat {
             get {
@@ -411,34 +411,34 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add a GrainInterfaces.txt file to track grain interface versions for compatibility during rolling upgrades..
+        ///   Looks up a localized string similar to Add an OrleansContracts.txt file to track Orleans contracts for compatibility during rolling upgrades..
         /// </summary>
-        internal static string GrainInterfacesFileMissingDescription {
+        internal static string OrleansContractsFileMissingDescription {
             get {
-                return ResourceManager.GetString("GrainInterfacesFileMissingDescription", resourceCulture);
+                return ResourceManager.GetString("OrleansContractsFileMissingDescription", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to The project contains grain interfaces but no {0} file to track them.
         /// </summary>
-        internal static string GrainInterfacesFileMissingMessageFormat {
+        internal static string OrleansContractsFileMissingMessageFormat {
             get {
-                return ResourceManager.GetString("GrainInterfacesFileMissingMessageFormat", resourceCulture);
+                return ResourceManager.GetString("OrleansContractsFileMissingMessageFormat", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to GrainInterfaces.txt file is missing.
+        ///   Looks up a localized string similar to OrleansContracts.txt file is missing.
         /// </summary>
-        internal static string GrainInterfacesFileMissingTitle {
+        internal static string OrleansContractsFileMissingTitle {
             get {
-                return ResourceManager.GetString("GrainInterfacesFileMissingTitle", resourceCulture);
+                return ResourceManager.GetString("OrleansContractsFileMissingTitle", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The [Version] attribute on the grain interface must match the version declared in GrainInterfaces.txt..
+        ///   Looks up a localized string similar to The [Version] attribute on the grain interface must match the version declared in OrleansContracts.txt..
         /// </summary>
         internal static string GrainInterfaceVersionMismatchDescription {
             get {
@@ -447,7 +447,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Grain interface '{0}' has [Version({1})] in GrainInterfaces.txt but [Version({2})] in code.
+        ///   Looks up a localized string similar to Grain interface '{0}' has [Version({1})] in OrleansContracts.txt but [Version({2})] in code.
         /// </summary>
         internal static string GrainInterfaceVersionMismatchMessageFormat {
             get {
@@ -465,7 +465,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Mark as *RETIRED* in GrainInterfaces.txt.
+        ///   Looks up a localized string similar to Mark as *RETIRED* in OrleansContracts.txt.
         /// </summary>
         internal static string RetireGrainInterfaceTitle {
             get {
@@ -474,11 +474,95 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Update version in GrainInterfaces.txt.
+        ///   Looks up a localized string similar to Update version in OrleansContracts.txt.
         /// </summary>
         internal static string UpdateGrainInterfaceVersionTitle {
             get {
                 return ResourceManager.GetString("UpdateGrainInterfaceVersionTitle", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassNotDeclaredTitle {
+            get {
+                return ResourceManager.GetString("GrainClassNotDeclaredTitle", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassNotDeclaredMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainClassNotDeclaredMessageFormat", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassNotDeclaredDescription {
+            get {
+                return ResourceManager.GetString("GrainClassNotDeclaredDescription", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassAliasMismatchTitle {
+            get {
+                return ResourceManager.GetString("GrainClassAliasMismatchTitle", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassAliasMismatchMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainClassAliasMismatchMessageFormat", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassAliasMismatchDescription {
+            get {
+                return ResourceManager.GetString("GrainClassAliasMismatchDescription", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassRemovedNotRetiredTitle {
+            get {
+                return ResourceManager.GetString("GrainClassRemovedNotRetiredTitle", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassRemovedNotRetiredMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainClassRemovedNotRetiredMessageFormat", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassRemovedNotRetiredDescription {
+            get {
+                return ResourceManager.GetString("GrainClassRemovedNotRetiredDescription", resourceCulture);
+            }
+        }
+
+        internal static string UpdateGrainClassAliasTitle {
+            get {
+                return ResourceManager.GetString("UpdateGrainClassAliasTitle", resourceCulture);
+            }
+        }
+
+        internal static string RetireGrainClassTitle {
+            get {
+                return ResourceManager.GetString("RetireGrainClassTitle", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassDuplicateDeclarationTitle {
+            get {
+                return ResourceManager.GetString("GrainClassDuplicateDeclarationTitle", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassDuplicateDeclarationMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainClassDuplicateDeclarationMessageFormat", resourceCulture);
+            }
+        }
+
+        internal static string GrainClassDuplicateDeclarationDescription {
+            get {
+                return ResourceManager.GetString("GrainClassDuplicateDeclarationDescription", resourceCulture);
             }
         }
     }
