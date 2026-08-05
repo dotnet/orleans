@@ -80,7 +80,7 @@ Stopping a host gracefully exercises shutdown. Disposing or terminating a handle
 
 `TestClusterBuilder` is the class-configurator-based harness. It defaults to two silos, in-memory transport, generated cluster identity, test membership, client initialization, file logging, and homogeneous-silo assumptions. It also installs `ConfigureDistributedGrainDirectory`, so its silos opt into the experimental distributed grain directory instead of the production runtime's default `LocalGrainDirectory`.
 
-`ISiloConfigurator`, `IHostConfigurator`, and `IClientBuilderConfigurator` types are serializable configuration identities which can be applied to every host. Supplying a custom `CreateSiloAsync` switches the connection transport to TCP because the custom path cannot use the harness's in-memory transport.
+`ISiloConfigurator`, `IHostConfigurator`, and `IClientBuilderConfigurator` types are serializable configuration identities which can be applied to every host. Assigning `TestClusterBuilder.CreateSiloAsync` sets `ConnectionTransport` to `TcpSocket`, so the built-in client uses its TCP transport instead of the harness's in-memory transport. The delegate bypasses `DefaultCreateSiloAsync` and cannot access the harness's private in-memory transport hub, so it must configure the custom silo host with a compatible transport.
 
 `TestCluster` supports suites built around `SiloHandle` and configurator types. It does not use separate application domains; its hosts run in-process unless a custom silo creation path provides different isolation.
 
