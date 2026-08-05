@@ -14,7 +14,7 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 | Provider | Package | Status | External event durability | Rewindable | External prerequisites |
 |---|---|---|---|---|---|
 | Memory | `Microsoft.Orleans.Streaming` | Stable | No; silo memory only | Yes, within the transient in-memory cache | None |
-| Azure Queue Storage | `Microsoft.Orleans.Streaming.AzureStorage` | Stable | Yes, in Azure Storage queues | No | Azure Storage account or Azurite; queue names and credentials |
+| Azure Queue Storage | `Microsoft.Orleans.Streaming.AzureStorage` | Stable | Yes, in Azure Storage queues | No | Azure Storage account or Azurite; credentials and a stable Orleans service ID |
 | Azure Event Hubs | `Microsoft.Orleans.Streaming.EventHubs` | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
 | Amazon SQS | `Microsoft.Orleans.Streaming.SQS` | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
 | ADO.NET | `Microsoft.Orleans.Streaming.AdoNet` | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
@@ -33,7 +33,7 @@ Register memory streams with `AddMemoryStreams`. They use silo memory for queues
 
 Register Azure Queue streams with `AddAzureQueueStreams`. The provider uses multiple Azure Storage queues and persistent-stream pulling agents. It isn't rewindable, and Azure Queue retries can produce duplicates or reorder delivery after failures.
 
-Configure the current <xref:Azure.Storage.Queues.QueueServiceClient> directly on `AzureQueueOptions` and supply queue names:
+Configure the current <xref:Azure.Storage.Queues.QueueServiceClient> directly on `AzureQueueOptions`. When `QueueNames` is unset, Orleans generates names from the Orleans service ID, provider name, and queue ID. Keep the service ID and provider name stable across restarts. Set `QueueNames` explicitly only when you need to manage an existing queue topology, and keep those names unique across clusters that share a storage account.
 
 ### Managed identity
 

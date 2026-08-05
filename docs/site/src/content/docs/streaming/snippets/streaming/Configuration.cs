@@ -86,14 +86,8 @@ public static class StreamConfiguration
                     "AzureQueue",
                     streams => streams.ConfigureAzureQueue(
                         optionsBuilder => optionsBuilder.Configure(options =>
-                        {
                             options.QueueServiceClient =
-                                new QueueServiceClient(queueEndpoint, credential);
-                            options.QueueNames =
-                                Enumerable.Range(0, 8)
-                                    .Select(index => $"orleans-stream-{index}")
-                                    .ToList();
-                        })))
+                                new QueueServiceClient(queueEndpoint, credential))))
                 .AddAzureTableGrainStorage(
                     "PubSubStore",
                     options => options.TableServiceClient =
@@ -116,14 +110,8 @@ public static class StreamConfiguration
                     "AzureQueue",
                     streams => streams.ConfigureAzureQueue(
                         optionsBuilder => optionsBuilder.Configure(options =>
-                        {
                             options.QueueServiceClient =
-                                new QueueServiceClient(connectionString);
-                            options.QueueNames =
-                                Enumerable.Range(0, 8)
-                                    .Select(index => $"orleans-stream-{index}")
-                                    .ToList();
-                        })))
+                                new QueueServiceClient(connectionString))))
                 .AddAzureTableGrainStorage(
                     "PubSubStore",
                     options => options.TableServiceClient =
