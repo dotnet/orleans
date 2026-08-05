@@ -26,7 +26,7 @@ public class LeaseTestGrain : Grain, ILeaseTestGrain
 public class GrainDirectoryLeaseTests
 {
     private static readonly DateTimeOffset InitialTime = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-    private static readonly TimeSpan LeaseHoldDuration = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan RangeLeaseDuration = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan EventTimeout = TimeSpan.FromSeconds(30);
 
     [Fact]
@@ -64,7 +64,7 @@ public class GrainDirectoryLeaseTests
             Assert.False(registerTask.IsCompleted, "Registration should be blocked by the lease hold.");
 
             // Advance time past the lease duration so the retry succeeds.
-            timeProvider.Advance(LeaseHoldDuration);
+            timeProvider.Advance(RangeLeaseDuration);
             var result = await registerTask.WaitAsync(EventTimeout);
             Assert.NotNull(result);
 
@@ -108,7 +108,7 @@ public class GrainDirectoryLeaseTests
             cancellation.Cancel();
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => registerTask);
-            timeProvider.Advance(LeaseHoldDuration);
+            timeProvider.Advance(RangeLeaseDuration);
             Assert.Null(await directory.Lookup(leaseGrain.GetGrainId()));
         }
         finally
@@ -171,13 +171,13 @@ public class GrainDirectoryLeaseTests
     }
 
     [Fact]
-    public async Task DefaultLeaseHoldDuration_UsesMembershipProbeWindow()
+    public async Task DefaultRangeLeaseDuration_UsesMembershipProbeWindow()
     {
         var probeTimeout = TimeSpan.FromSeconds(1);
         var missedProbeLimit = 4;
         var expectedLeaseDuration = probeTimeout * missedProbeLimit;
         var (cluster, timeProvider) = CreateCluster(
-            useDefaultLeaseHoldDuration: true,
+            useDefaultRangeLeaseDuration: true,
             configureMembershipOptions: options =>
             {
                 options.ProbeTimeout = probeTimeout;
@@ -335,7 +335,7 @@ public class GrainDirectoryLeaseTests
             Assert.False(task3.IsCompleted, "Registration for grain3 should be blocked by the lease hold.");
 
             // After the lease expires, all registrations should complete.
-            timeProvider.Advance(LeaseHoldDuration);
+            timeProvider.Advance(RangeLeaseDuration);
             var registrations = await Task.WhenAll(task1, task2, task3).WaitAsync(EventTimeout);
 
             Assert.All(registrations, registration =>
@@ -351,8 +351,8 @@ public class GrainDirectoryLeaseTests
     }
 
     private static (InProcessTestCluster Cluster, FakeTimeProvider TimeProvider) CreateCluster(
-        TimeSpan? leaseHoldDuration = null,
-        bool useDefaultLeaseHoldDuration = false,
+        TimeSpan? rangeLeaseDuration = null,
+        bool useDefaultRangeLeaseDuration = false,
         Action<ClusterMembershipOptions>? configureMembershipOptions = null)
     {
         var timeProvider = new FakeTimeProvider(InitialTime);
@@ -366,9 +366,9 @@ public class GrainDirectoryLeaseTests
                 siloBuilder.Services.Configure(configureMembershipOptions);
             }
 
-            if (!useDefaultLeaseHoldDuration)
+            if (!useDefaultRangeLeaseDuration)
             {
-                siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.SafetyLeaseHoldDuration = leaseHoldDuration ?? LeaseHoldDuration);
+                siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);
             }
 
 #pragma warning disable ORLEANSEXP003

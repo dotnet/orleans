@@ -65,7 +65,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly CancellationTokenSource _stoppedCts = new();
     private readonly ClusterMemberCancellationTokens _clusterMemberCancellationTokens;
     private readonly DirectoryInstruments _directoryInstruments;
-    private readonly TimeSpan _leaseHoldDuration;
+    private readonly TimeSpan _rangeLeaseDuration;
     private readonly TimeProvider _timeProvider;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
@@ -106,7 +106,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _clusterMemberCancellationTokens = new(_stoppedCts.Token);
         _timeProvider = timeProvider;
 
-        _leaseHoldDuration = directoryOptions.Value.SafetyLeaseHoldDuration switch
+        _rangeLeaseDuration = directoryOptions.Value.RangeLeaseDuration switch
         {
             null => membershipOptions.Value.ProbeTimeout * membershipOptions.Value.NumMissedProbesLimit,
             TimeSpan duration when duration >= TimeSpan.Zero => duration,
@@ -117,7 +117,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
         for (var i = 0; i < partitionsPerSilo; i++)
         {
-            partitions.Add(new GrainDirectoryPartition(i, this, _leaseHoldDuration, grainFactory, directoryInstruments, timeProvider, shared));
+            partitions.Add(new GrainDirectoryPartition(i, this, _rangeLeaseDuration, grainFactory, directoryInstruments, timeProvider, shared));
         }
 
         _partitions = partitions.ToImmutable();
@@ -422,7 +422,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 _runTask = ProcessMembershipUpdates();
 
-                if (_leaseHoldDuration > TimeSpan.Zero)
+                if (_rangeLeaseDuration > TimeSpan.Zero)
                 {
                     _leaseCleanupTask = RequestExpiredLeaseCleanups();
                 }
@@ -541,11 +541,11 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     private async Task RequestExpiredLeaseCleanups()
     {
-        Debug.Assert(_leaseHoldDuration > TimeSpan.Zero);
+        Debug.Assert(_rangeLeaseDuration > TimeSpan.Zero);
 
         // We request cleanups periodically to not let expired leases linger in the directory for too long.
         // We do it here as opposed to in the partitions to avoid having 30 (by default, maybe more) timers.
-        var period = 1.1 * _leaseHoldDuration;
+        var period = 1.1 * _rangeLeaseDuration;
 
         if (period < TimeSpan.FromMinutes(1))
         {

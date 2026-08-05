@@ -53,7 +53,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     private RingRange _currentRange;
 
-    private readonly TimeSpan _leaseHoldDuration;
+    private readonly TimeSpan _rangeLeaseDuration;
     private readonly List<(RingRange Range, DateTimeOffset Expiration)> _rangeLeaseHolds = [];
     private readonly Dictionary<SiloAddress, DateTimeOffset> _siloLeaseHolds = [];
 
@@ -61,7 +61,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     public GrainDirectoryPartition(
         int partitionIndex,
         DistributedGrainDirectory owner,
-        TimeSpan leaseHoldDuration,
+        TimeSpan rangeLeaseDuration,
         IInternalGrainFactory grainFactory,
         DirectoryInstruments directoryInstruments,
         TimeProvider timeProvider,
@@ -73,7 +73,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         _directoryInstruments = directoryInstruments;
         _id = shared.SiloAddress;
         _logger = shared.LoggerFactory.CreateLogger<GrainDirectoryPartition>();
-        _leaseHoldDuration = leaseHoldDuration;
+        _rangeLeaseDuration = rangeLeaseDuration;
         _timeProvider = timeProvider;
         shared.ActivationDirectory.RecordNewTarget(this);
     }
@@ -314,13 +314,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
         var isGracefulShutdown = previousStatus is SiloStatus.ShuttingDown || !change.WasDeclaredDead;
 
-        if (!isGracefulShutdown && _leaseHoldDuration > TimeSpan.Zero)
+        if (!isGracefulShutdown && _rangeLeaseDuration > TimeSpan.Zero)
         {
             // Instead of just deleting, we mark it as tombstoned.
             // This prevents a new activation on a healthy silo from registering
             // until we are sure the dead silo has actually stopped processing.
 
-            var expiration = _timeProvider.GetUtcNow().Add(_leaseHoldDuration);
+            var expiration = _timeProvider.GetUtcNow().Add(_rangeLeaseDuration);
 
             _siloLeaseHolds[change.SiloAddress] = expiration;
 
@@ -564,9 +564,9 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             var recovered = false;
             if (!success)
             {
-                if (_leaseHoldDuration > TimeSpan.Zero && RequiresRangeLeaseHold(previous, current, addedRange))
+                if (_rangeLeaseDuration > TimeSpan.Zero && RequiresRangeLeaseHold(previous, current, addedRange))
                 {
-                    var expiration = _timeProvider.GetUtcNow().Add(_leaseHoldDuration);
+                    var expiration = _timeProvider.GetUtcNow().Add(_rangeLeaseDuration);
                     AddRangeLeaseHold(addedRange, expiration);
                     LogWarningLeaseHoldForRange(_logger, addedRange, expiration);
                     GrainDirectoryEvents.EmitRangeLeaseHoldCreated(_id, addedRange, expiration);

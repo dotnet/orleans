@@ -106,7 +106,7 @@ public class GrainDirectoryOptions
     public static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// Gets or sets the duration for the safety lease hold applied after an ungraceful silo failure.
+    /// Gets or sets the range lease duration applied after an ungraceful silo failure.
     /// This duration applies in two scenarios:
     /// <list type="bullet">
     /// <item>When a specific silo crashes ungracefully, grain lease holds prevent individual re-registration of its grains for this duration.</item>
@@ -116,13 +116,13 @@ public class GrainDirectoryOptions
     /// <remarks>
     /// Depending on the value of this, the duration is understood as:
     /// <list type="bullet">
-    /// <item><c>SafetyLeaseHoldDuration > TimeSpan.Zero</c> - The lease duration is explicitly controlled by the user.</item>
-    /// <item><c>SafetyLeaseHoldDuration = TimeSpan.Zero</c>. No leases are placed at all, effectively nullifying this safety option.</item>
-    /// <item><c>SafetyLeaseHoldDuration = null</c> - The system computes a lease duration as:
+    /// <item><c>RangeLeaseDuration > TimeSpan.Zero</c> - The lease duration is explicitly controlled by the user.</item>
+    /// <item><c>RangeLeaseDuration = TimeSpan.Zero</c>. No leases are placed at all, effectively nullifying this safety option.</item>
+    /// <item><c>RangeLeaseDuration = null</c> - The system computes a lease duration as:
     /// <c><see cref="ClusterMembershipOptions.ProbeTimeout"/> × <see cref="ClusterMembershipOptions.NumMissedProbesLimit"/></c>.
     /// This is the default value, and is designed to allow for cluster stabilization after failure detection completes.
     /// </item>
     /// </list>
     /// </remarks>
-    public TimeSpan? SafetyLeaseHoldDuration { get; set; }
+    public TimeSpan? RangeLeaseDuration { get; set; }
 }
