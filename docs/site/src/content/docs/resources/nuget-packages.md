@@ -276,14 +276,6 @@ Install-Package Microsoft.Orleans.Clustering.AdoNet
 
 Includes the plugin for using ADO.NET for storing cluster membership data in one of the supported databases.
 
-### [Orleans Consul Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansConsulUtils/)
-
-```powershell
-Install-Package Microsoft.Orleans.OrleansConsulUtils
-```
-
-Includes the plugin for using Consul for storing cluster membership data.
-
 ### [Orleans ZooKeeper Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansZooKeeperUtils/)
 
 ```powershell
