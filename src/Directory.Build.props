@@ -32,6 +32,15 @@
     <AssemblyAttribute Include="Orleans.Metadata.FrameworkPartAttribute" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <OrleansContractsPath Condition="'$(OrleansContractsPath)' == ''">$(MSBuildProjectDirectory)\OrleansContracts.txt</OrleansContractsPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(OrleansContractsPath)')">
+    <AdditionalFiles Include="$(OrleansContractsPath)" OrleansContractsFile="true" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="OrleansContractsFile" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.DotNet.GenAPI.Task" PrivateAssets="All" />
   </ItemGroup>

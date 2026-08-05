@@ -28,14 +28,23 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     public const string RuleId0019 = "ORLEANS0019";
     public const string RuleId0020 = "ORLEANS0020";
     public const string RuleId0021 = "ORLEANS0021";
+    public const string RuleId0022 = "ORLEANS0022";
+    public const string RuleId0023 = "ORLEANS0023";
+    public const string RuleId0024 = "ORLEANS0024";
+    public const string RuleId0025 = "ORLEANS0025";
 
     // Property bag keys for code fixes
     internal const string InterfaceNamePropertyKey = "InterfaceName";
     internal const string MemberNamePropertyKey = "MemberName";
+    internal const string MemberAliasPropertyKey = "MemberAlias";
+    internal const string MemberClrSignaturePropertyKey = "MemberClrSignature";
     internal const string ExpectedVersionPropertyKey = "ExpectedVersion";
     internal const string ActualVersionPropertyKey = "ActualVersion";
     internal const string ExpectedSignaturePropertyKey = "ExpectedSignature";
     internal const string ActualSignaturePropertyKey = "ActualSignature";
+    internal const string ClassNamePropertyKey = "ClassName";
+    internal const string ActualAliasPropertyKey = "ActualAlias";
+    internal const string GrainInterfaceTypePropertyKey = "GrainInterfaceType";
 
     internal const string RetiredPrefix = "*RETIRED*";
 
@@ -76,14 +85,14 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceRemovedNotRetiredDescription), Resources.ResourceManager, typeof(Resources)),
         customTags: WellKnownDiagnosticTags.CompilationEnd);
 
-    private static readonly DiagnosticDescriptor GrainInterfacesFileMissingRule = new(
+    private static readonly DiagnosticDescriptor OrleansContractsFileMissingRule = new(
         id: RuleId0020,
-        title: new LocalizableResourceString(nameof(Resources.GrainInterfacesFileMissingTitle), Resources.ResourceManager, typeof(Resources)),
-        messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfacesFileMissingMessageFormat), Resources.ResourceManager, typeof(Resources)),
+        title: new LocalizableResourceString(nameof(Resources.OrleansContractsFileMissingTitle), Resources.ResourceManager, typeof(Resources)),
+        messageFormat: new LocalizableResourceString(nameof(Resources.OrleansContractsFileMissingMessageFormat), Resources.ResourceManager, typeof(Resources)),
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainInterfacesFileMissingDescription), Resources.ResourceManager, typeof(Resources)),
+        description: new LocalizableResourceString(nameof(Resources.OrleansContractsFileMissingDescription), Resources.ResourceManager, typeof(Resources)),
         customTags: WellKnownDiagnosticTags.CompilationEnd);
 
     internal static readonly DiagnosticDescriptor DuplicateInterfaceDeclarationRule = new(
@@ -95,14 +104,55 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)));
 
+    private static readonly DiagnosticDescriptor GrainClassNotDeclaredRule = new(
+        id: RuleId0022,
+        title: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredTitle), Resources.ResourceManager, typeof(Resources)),
+        messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredMessageFormat), Resources.ResourceManager, typeof(Resources)),
+        category: "Orleans.Versioning",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)));
+
+    private static readonly DiagnosticDescriptor GrainClassAliasMismatchRule = new(
+        id: RuleId0023,
+        title: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchTitle), Resources.ResourceManager, typeof(Resources)),
+        messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchMessageFormat), Resources.ResourceManager, typeof(Resources)),
+        category: "Orleans.Versioning",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchDescription), Resources.ResourceManager, typeof(Resources)));
+
+    private static readonly DiagnosticDescriptor RemovedGrainClassNotRetiredRule = new(
+        id: RuleId0024,
+        title: new LocalizableResourceString(nameof(Resources.GrainClassRemovedNotRetiredTitle), Resources.ResourceManager, typeof(Resources)),
+        messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassRemovedNotRetiredMessageFormat), Resources.ResourceManager, typeof(Resources)),
+        category: "Orleans.Versioning",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: new LocalizableResourceString(nameof(Resources.GrainClassRemovedNotRetiredDescription), Resources.ResourceManager, typeof(Resources)),
+        customTags: WellKnownDiagnosticTags.CompilationEnd);
+
+    internal static readonly DiagnosticDescriptor DuplicateGrainClassDeclarationRule = new(
+        id: RuleId0025,
+        title: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationTitle), Resources.ResourceManager, typeof(Resources)),
+        messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationMessageFormat), Resources.ResourceManager, typeof(Resources)),
+        category: "Orleans.Versioning",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)));
+
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(
             InterfaceNotDeclaredRule,
             InterfaceVersionMismatchRule,
             MemberNotDeclaredRule,
             RemovedInterfaceNotRetiredRule,
-            GrainInterfacesFileMissingRule,
-            DuplicateInterfaceDeclarationRule);
+            OrleansContractsFileMissingRule,
+            DuplicateInterfaceDeclarationRule,
+            GrainClassNotDeclaredRule,
+            GrainClassAliasMismatchRule,
+            RemovedGrainClassNotRetiredRule,
+            DuplicateGrainClassDeclarationRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -113,9 +163,13 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
     private void OnCompilationStart(CompilationStartAnalysisContext context)
     {
-        // Try to find the GrainInterfaces.txt file
+        // Try to find the OrleansContracts.txt file
         var grainInterfacesFile = context.Options.AdditionalFiles
-            .FirstOrDefault(f => Path.GetFileName(f.Path).Equals(Constants.GrainInterfacesFileName, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(file =>
+                Path.GetFileName(file.Path).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase)
+                || context.Options.AnalyzerConfigOptionsProvider.GetOptions(file)
+                    .TryGetValue("build_metadata.AdditionalFiles.OrleansContractsFile", out var value)
+                    && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase));
 
         GrainInterfaceData? data = null;
         List<Diagnostic>? fileParseErrors = null;
@@ -142,8 +196,11 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         private readonly AdditionalText? _grainInterfacesFile;
         private readonly List<Diagnostic>? _fileParseErrors;
         private readonly ConcurrentDictionary<string, bool> _visitedInterfaces = new(StringComparer.Ordinal);
-        private readonly INamedTypeSymbol? _iGrainType;
+        private readonly ConcurrentDictionary<string, bool> _visitedClasses = new(StringComparer.Ordinal);
+        private readonly INamedTypeSymbol? _iAddressableType;
         private readonly INamedTypeSymbol? _aliasAttributeType;
+        private readonly INamedTypeSymbol? _grainInterfaceTypeAttributeType;
+        private readonly INamedTypeSymbol? _grainTypeAttributeType;
         private readonly INamedTypeSymbol? _versionAttributeType;
 
         public Impl(
@@ -157,8 +214,10 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             _grainInterfacesFile = grainInterfacesFile;
             _fileParseErrors = fileParseErrors;
 
-            _iGrainType = compilation.GetTypeByMetadataName(Constants.IGrainFullyQualifiedName);
+            _iAddressableType = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
             _aliasAttributeType = compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
+            _grainInterfaceTypeAttributeType = compilation.GetTypeByMetadataName(Constants.GrainInterfaceTypeAttributeFullyQualifiedName);
+            _grainTypeAttributeType = compilation.GetTypeByMetadataName(Constants.GrainTypeAttributeFullyQualifiedName);
             _versionAttributeType = compilation.GetTypeByMetadataName(Constants.VersionAttributeFullyQualifiedName);
         }
 
@@ -166,20 +225,19 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         {
             var namedType = (INamedTypeSymbol)context.Symbol;
 
-            // Only analyze interfaces
+            if (namedType.TypeKind == TypeKind.Class && !namedType.IsAbstract && namedType.IsGrainClass())
+            {
+                AnalyzeGrainClass(context, namedType);
+                return;
+            }
+
             if (namedType.TypeKind != TypeKind.Interface)
             {
                 return;
             }
 
-            // Check if this is a grain interface (extends IGrain)
-            if (!IsGrainInterface(namedType))
-            {
-                return;
-            }
-
-            // Skip IGrain itself and its base interfaces
-            if (IsBaseGrainInterface(namedType))
+            // Check if this is an RPC contract (extends IAddressable)
+            if (!IsRpcContract(namedType))
             {
                 return;
             }
@@ -187,21 +245,24 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             var interfaceName = namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                 .Replace("global::", "");
 
-            _visitedInterfaces.TryAdd(interfaceName, true);
-
             // If no file exists, report that interfaces are not being tracked
             if (_data is null)
             {
+                _visitedInterfaces.TryAdd(interfaceName, true);
                 // We'll report file missing at compilation end
                 return;
             }
 
             // Check if interface is declared in the file
-            if (!_data.Interfaces.TryGetValue(interfaceName, out var declaredInterface))
+            var grainInterfaceType = GetGrainInterfaceTypeFromAttribute(namedType);
+            var declaredInterface = FindDeclaredInterface(interfaceName, grainInterfaceType);
+            if (declaredInterface is null)
             {
+                _visitedInterfaces.TryAdd(interfaceName, true);
                 // Interface not found in file
                 var properties = ImmutableDictionary<string, string?>.Empty
-                    .Add(InterfaceNamePropertyKey, interfaceName);
+                    .Add(InterfaceNamePropertyKey, interfaceName)
+                    .Add(GrainInterfaceTypePropertyKey, grainInterfaceType);
 
                 foreach (var location in namedType.Locations.Where(l => l.IsInSource))
                 {
@@ -214,13 +275,16 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
+            _visitedInterfaces.TryAdd(declaredInterface.Name, true);
+
             // Check if retired
             if (declaredInterface.IsRetired)
             {
                 // Interface exists in code but is marked as retired in file
                 // This could be a diagnostic, but for now we treat it as a mismatch
                 var properties = ImmutableDictionary<string, string?>.Empty
-                    .Add(InterfaceNamePropertyKey, interfaceName);
+                    .Add(InterfaceNamePropertyKey, interfaceName)
+                    .Add(GrainInterfaceTypePropertyKey, grainInterfaceType);
 
                 foreach (var location in namedType.Locations.Where(l => l.IsInSource))
                 {
@@ -239,6 +303,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             {
                 var properties = ImmutableDictionary<string, string?>.Empty
                     .Add(InterfaceNamePropertyKey, interfaceName)
+                    .Add(GrainInterfaceTypePropertyKey, grainInterfaceType)
                     .Add(ExpectedVersionPropertyKey, declaredInterface.Version.ToString())
                     .Add(ActualVersionPropertyKey, codeVersion.ToString());
 
@@ -264,7 +329,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             // Check members
             foreach (var member in namedType.GetMembers().OfType<IMethodSymbol>())
             {
-                if (member.MethodKind != MethodKind.Ordinary)
+                if (member.MethodKind != MethodKind.Ordinary || member.IsStatic)
                 {
                     continue;
                 }
@@ -272,12 +337,35 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 var memberSignature = GetMethodSignature(member);
                 var memberAlias = GetAliasFromAttribute(member);
 
-                if (!declaredInterface.Members.TryGetValue(memberSignature, out var declaredMember))
+                if (!declaredInterface.Members.ContainsKey(memberSignature)
+                    && !declaredInterface.Members.Keys.Any(signature =>
+                    {
+                        if (string.Equals(
+                            NormalizeStoredMemberSignature(signature, declaredInterface.Name),
+                            memberSignature,
+                            StringComparison.Ordinal))
+                        {
+                            return true;
+                        }
+
+                        var normalized = NormalizeLegacyMethodSignature(signature);
+                        var clrSignature = GetClrMethodSignature(member);
+                        var containingTypePrefix =
+                            $"{member.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "")}.";
+                        return string.Equals(normalized, NormalizeLegacyMethodSignature(clrSignature), StringComparison.Ordinal)
+                            || string.Equals(
+                                normalized,
+                                NormalizeLegacyMethodSignature(clrSignature.Substring(containingTypePrefix.Length)),
+                                StringComparison.Ordinal);
+                    }))
                 {
                     // Member not found - interface has changed
                     var properties = ImmutableDictionary<string, string?>.Empty
                         .Add(InterfaceNamePropertyKey, interfaceName)
-                        .Add(MemberNamePropertyKey, memberSignature);
+                        .Add(GrainInterfaceTypePropertyKey, grainInterfaceType)
+                        .Add(MemberNamePropertyKey, memberSignature)
+                        .Add(MemberAliasPropertyKey, memberAlias)
+                        .Add(MemberClrSignaturePropertyKey, RequiresClrComment(member) ? GetClrMethodSignature(member) : null);
 
                     foreach (var location in member.Locations.Where(l => l.IsInSource))
                     {
@@ -304,12 +392,12 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             }
 
             // Report file missing if any grain interfaces were found but no file exists
-            if (_data is null && _visitedInterfaces.Count > 0)
+            if (_data is null && (_visitedInterfaces.Count > 0 || _visitedClasses.Count > 0))
             {
                 context.ReportDiagnostic(Diagnostic.Create(
-                    GrainInterfacesFileMissingRule,
+                    OrleansContractsFileMissingRule,
                     Location.None,
-                    Constants.GrainInterfacesFileName));
+                    Constants.OrleansContractsFileName));
             }
 
             // Check for removed interfaces (in file but not in code)
@@ -340,26 +428,119 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                                 kvp.Key));
                         }
                     }
+
+                    foreach (var kvp in _data.Classes)
+                    {
+                        if (kvp.Value.IsRetired || _visitedClasses.ContainsKey(kvp.Key))
+                        {
+                            continue;
+                        }
+
+                        var location = kvp.Value.GetLocation(sourceText, _grainInterfacesFile.Path);
+                        var properties = ImmutableDictionary<string, string?>.Empty
+                            .Add(ClassNamePropertyKey, kvp.Key);
+
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            RemovedGrainClassNotRetiredRule,
+                            location,
+                            properties,
+                            kvp.Key));
+                    }
                 }
             }
         }
 
-        private bool IsGrainInterface(INamedTypeSymbol type)
+        private void AnalyzeGrainClass(SymbolAnalysisContext context, INamedTypeSymbol namedType)
         {
-            if (_iGrainType is null)
+            var className = namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
+
+            if (_data is null)
+            {
+                _visitedClasses.TryAdd(className, true);
+                return;
+            }
+
+            var codeAlias = GetGrainTypeAliasFromAttribute(namedType);
+            var declaredClass = FindDeclaredClass(className, codeAlias);
+            if (declaredClass is null || declaredClass.IsRetired)
+            {
+                _visitedClasses.TryAdd(className, true);
+                var properties = ImmutableDictionary<string, string?>.Empty.Add(ClassNamePropertyKey, className);
+                foreach (var location in namedType.Locations.Where(location => location.IsInSource))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(GrainClassNotDeclaredRule, location, properties, className));
+                }
+
+                return;
+            }
+
+            _visitedClasses.TryAdd(declaredClass.Name, true);
+            if (string.Equals(codeAlias, declaredClass.Alias, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var aliasProperties = ImmutableDictionary<string, string?>.Empty
+                .Add(ClassNamePropertyKey, className)
+                .Add(ActualAliasPropertyKey, codeAlias);
+            foreach (var location in namedType.Locations.Where(location => location.IsInSource))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    GrainClassAliasMismatchRule,
+                    location,
+                    aliasProperties,
+                    className,
+                    declaredClass.Alias ?? "<none>",
+                    codeAlias ?? "<none>"));
+            }
+        }
+
+        private bool IsRpcContract(INamedTypeSymbol type)
+        {
+            if (_iAddressableType is null)
             {
                 return false;
             }
 
-            return type.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, _iGrainType))
-                   || SymbolEqualityComparer.Default.Equals(type, _iGrainType);
+            return !SymbolEqualityComparer.Default.Equals(type, _iAddressableType)
+                && type.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, _iAddressableType));
         }
 
-        private static bool IsBaseGrainInterface(INamedTypeSymbol type)
+        private DeclaredGrainInterface? FindDeclaredInterface(string interfaceName, string? grainInterfaceType)
         {
-            var fullName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            return fullName.StartsWith("global::Orleans.IGrain", StringComparison.Ordinal)
-                   || fullName.StartsWith("global::Orleans.Runtime.IAddressable", StringComparison.Ordinal);
+            if (grainInterfaceType is not null)
+            {
+                var stableMatch = _data!.Interfaces.Values.FirstOrDefault(candidate =>
+                    string.Equals(candidate.GrainInterfaceType, grainInterfaceType, StringComparison.Ordinal));
+                if (stableMatch is not null)
+                {
+                    return stableMatch;
+                }
+
+                return _data.Interfaces.TryGetValue(interfaceName, out var legacyMatch)
+                    && legacyMatch.GrainInterfaceType is null
+                        ? legacyMatch
+                        : null;
+            }
+
+            return _data!.Interfaces.TryGetValue(interfaceName, out var result) ? result : null;
+        }
+
+        private DeclaredGrainClass? FindDeclaredClass(string className, string? alias)
+        {
+            if (alias is not null)
+            {
+                var stableMatch = _data!.Classes.Values.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Alias, alias, StringComparison.Ordinal));
+                if (stableMatch is not null)
+                {
+                    return stableMatch;
+                }
+
+                return _data.Classes.TryGetValue(className, out var exactNameMatch) ? exactNameMatch : null;
+            }
+
+            return _data!.Classes.TryGetValue(className, out var result) ? result : null;
         }
 
         private ushort GetVersionFromAttribute(INamedTypeSymbol type)
@@ -406,42 +587,238 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             return null;
         }
 
-        private static string GetMethodSignature(IMethodSymbol method)
+        private string? GetGrainTypeAliasFromAttribute(ISymbol symbol)
         {
-            var sb = new StringBuilder();
-            sb.Append(method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", ""));
-            sb.Append('.');
-            sb.Append(method.Name);
-            sb.Append('(');
-
-            for (int i = 0; i < method.Parameters.Length; i++)
+            if (_grainTypeAttributeType is null)
             {
-                if (i > 0) sb.Append(", ");
-                var param = method.Parameters[i];
-                sb.Append(param.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
-                sb.Append(' ');
-                sb.Append(param.Name);
+                return null;
             }
 
-            sb.Append(')');
-            sb.Append(" -> ");
-            sb.Append(method.ReturnType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+            foreach (var attribute in symbol.GetAttributes())
+            {
+                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, _grainTypeAttributeType)
+                    && attribute.ConstructorArguments.Length > 0
+                    && attribute.ConstructorArguments[0].Value is string alias)
+                {
+                    return alias;
+                }
+            }
 
-            return sb.ToString();
+            return null;
+        }
+
+        private string? GetGrainInterfaceTypeFromAttribute(ISymbol symbol)
+        {
+            if (_grainInterfaceTypeAttributeType is null)
+            {
+                return null;
+            }
+
+            foreach (var attribute in symbol.GetAttributes())
+            {
+                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, _grainInterfaceTypeAttributeType)
+                    && attribute.ConstructorArguments.Length > 0
+                    && attribute.ConstructorArguments[0].Value is string value)
+                {
+                    return value;
+                }
+            }
+
+            return null;
         }
     }
+
+    internal static string GetMethodSignature(IMethodSymbol method)
+    {
+        var sb = new StringBuilder();
+        var methodId = GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName);
+        var methodAlias = GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName);
+        sb.Append(methodId ?? methodAlias ?? method.Name);
+        sb.Append('(');
+
+        for (int i = 0; i < method.Parameters.Length; i++)
+        {
+            if (i > 0) sb.Append(", ");
+            sb.Append(GetContractTypeName(method.Parameters[i].Type));
+        }
+
+        sb.Append(')');
+        sb.Append(" -> ");
+        sb.Append(GetContractTypeName(method.ReturnType));
+
+        return sb.ToString();
+    }
+
+    internal static string GetClrMethodSignature(IMethodSymbol method)
+    {
+        var sb = new StringBuilder();
+        sb.Append(method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", ""));
+        sb.Append('.');
+        sb.Append(method.Name);
+        sb.Append('(');
+
+        for (var i = 0; i < method.Parameters.Length; i++)
+        {
+            if (i > 0) sb.Append(", ");
+            sb.Append(method.Parameters[i].Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+            sb.Append(' ');
+            sb.Append(method.Parameters[i].Name);
+        }
+
+        sb.Append(") -> ");
+        sb.Append(method.ReturnType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+        return sb.ToString();
+    }
+
+    internal static bool RequiresClrComment(IMethodSymbol method)
+    {
+        var methodId = GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName)?.ToString();
+        var methodAlias = GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName);
+        if (methodId is not null && !string.Equals(methodId, method.Name, StringComparison.Ordinal)
+            || methodAlias is not null && !string.Equals(methodAlias, method.Name, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return method.Parameters.Any(parameter => HasMeaningfulTypeAlias(parameter.Type))
+            || HasMeaningfulTypeAlias(method.ReturnType);
+    }
+
+    internal static bool IdentityDiffersFromClrName(string? identity, INamedTypeSymbol type)
+    {
+        if (identity is null)
+        {
+            return false;
+        }
+
+        var fullName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
+        return !string.Equals(identity, type.Name, StringComparison.Ordinal)
+            && !string.Equals(identity, type.MetadataName, StringComparison.Ordinal)
+            && !string.Equals(identity, fullName, StringComparison.Ordinal);
+    }
+
+    internal static string NormalizeLegacyMethodSignature(string signature)
+        => Regex.Replace(signature, @"\s+[A-Za-z_]\w*(?=\s*[,)\]])", "");
+
+    internal static string NormalizeStoredMemberSignature(string signature, string interfaceName)
+    {
+        var result = signature;
+        if (result.StartsWith($"{interfaceName}.", StringComparison.Ordinal))
+        {
+            result = result.Substring(interfaceName.Length + 1);
+        }
+
+        result = Regex.Replace(result, @"^grain-interface\(""[^""]+""\)\.", "");
+        return Regex.Replace(result, @"alias\(""([^""]+)""\)", "$1");
+    }
+
+    private static string GetContractTypeName(ITypeSymbol type)
+    {
+        if (type is IArrayTypeSymbol array)
+        {
+            return $"{GetContractTypeName(array.ElementType)}[{new string(',', array.Rank - 1)}]";
+        }
+
+        if (type is ITypeParameterSymbol typeParameter)
+        {
+            return typeParameter.Name;
+        }
+
+        if (type is not INamedTypeSymbol namedType)
+        {
+            return type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        }
+
+        if (namedType.IsTupleType)
+        {
+            return $"({string.Join(", ", namedType.TupleElements.Select(element => GetContractTypeName(element.Type)))})";
+        }
+
+        var alias = GetStringAttributeValue(namedType.OriginalDefinition, Constants.AliasAttributeFullyQualifiedName);
+        if (alias is not null)
+        {
+            return namedType.TypeArguments.IsEmpty
+                ? alias
+                : $"{alias}<{string.Join(", ", namedType.TypeArguments.Select(GetContractTypeName))}>";
+        }
+
+        if (namedType is
+        {
+            Name: "Task" or "ValueTask",
+            ContainingNamespace: { } containingNamespace
+        }
+            && containingNamespace.ToDisplayString() == "System.Threading.Tasks")
+        {
+            if (namedType.TypeArguments.IsEmpty)
+            {
+                return namedType.Name;
+            }
+
+            return $"{namedType.Name}<{string.Join(", ", namedType.TypeArguments.Select(GetContractTypeName))}>";
+        }
+
+        if (namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
+            return $"{GetContractTypeName(namedType.TypeArguments[0])}?";
+        }
+
+        if (namedType.TypeArguments.IsEmpty)
+        {
+            return namedType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        }
+
+        var genericName = namedType.ConstructedFrom.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        var typeArgumentStart = genericName.IndexOf('<');
+        if (typeArgumentStart >= 0)
+        {
+            genericName = genericName.Substring(0, typeArgumentStart);
+        }
+
+        return $"{genericName}<{string.Join(", ", namedType.TypeArguments.Select(GetContractTypeName))}>";
+    }
+
+    private static bool HasMeaningfulTypeAlias(ITypeSymbol type)
+    {
+        if (type is IArrayTypeSymbol array)
+        {
+            return HasMeaningfulTypeAlias(array.ElementType);
+        }
+
+        if (type is not INamedTypeSymbol namedType)
+        {
+            return false;
+        }
+
+        var alias = GetStringAttributeValue(namedType.OriginalDefinition, Constants.AliasAttributeFullyQualifiedName);
+        if (IdentityDiffersFromClrName(alias, namedType.OriginalDefinition))
+        {
+            return true;
+        }
+
+        return namedType.TypeArguments.Any(HasMeaningfulTypeAlias);
+    }
+
+    private static object? GetAttributeValue(ISymbol symbol, string attributeName)
+        => symbol.GetAttributes()
+            .FirstOrDefault(attribute => string.Equals(attribute.AttributeClass?.ToDisplayString(), attributeName, StringComparison.Ordinal))
+            ?.ConstructorArguments.FirstOrDefault().Value;
+
+    private static string? GetStringAttributeValue(ISymbol symbol, string attributeName)
+        => GetAttributeValue(symbol, attributeName) as string;
 }
 
 /// <summary>
-/// Represents the parsed data from a GrainInterfaces.txt file.
+/// Represents the parsed data from an OrleansContracts.txt file.
 /// </summary>
 internal sealed class GrainInterfaceData
 {
     public Dictionary<string, DeclaredGrainInterface> Interfaces { get; } = new(StringComparer.Ordinal);
+
+    public Dictionary<string, DeclaredGrainClass> Classes { get; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
-/// Represents a declared grain interface in the GrainInterfaces.txt file.
+/// Represents a declared grain interface in the OrleansContracts.txt file.
 /// </summary>
 internal sealed class DeclaredGrainInterface
 {
@@ -452,6 +829,8 @@ internal sealed class DeclaredGrainInterface
 
     public string Name { get; }
     public string? Alias { get; set; }
+
+    public string? GrainInterfaceType { get; set; }
     public ushort Version { get; set; }
     public bool IsRetired { get; set; }
     public TextSpan Span { get; set; }
@@ -465,7 +844,7 @@ internal sealed class DeclaredGrainInterface
 }
 
 /// <summary>
-/// Represents a declared grain interface member in the GrainInterfaces.txt file.
+/// Represents a declared grain interface member in the OrleansContracts.txt file.
 /// </summary>
 internal sealed class DeclaredGrainMember
 {
@@ -480,23 +859,123 @@ internal sealed class DeclaredGrainMember
 }
 
 /// <summary>
-/// Parses GrainInterfaces.txt files.
+/// Represents a declared grain class in the OrleansContracts.txt file.
+/// </summary>
+internal sealed class DeclaredGrainClass
+{
+    public DeclaredGrainClass(string name)
+    {
+        Name = name;
+    }
+
+    public string Name { get; }
+
+    public string? Alias { get; set; }
+
+    public bool IsRetired { get; set; }
+
+    public TextSpan Span { get; set; }
+
+    public Location GetLocation(SourceText sourceText, string filePath)
+    {
+        var lineSpan = sourceText.Lines.GetLinePositionSpan(Span);
+        return Location.Create(filePath, Span, lineSpan);
+    }
+}
+
+/// <summary>
+/// Parses OrleansContracts.txt files.
 /// </summary>
 internal static class GrainInterfaceFileParser
 {
     // Regex patterns for parsing
-    // Interface line: [Alias("x")] Namespace.IInterface<T> [Version(N)]
-    // Or with retired: *RETIRED* [Alias("x")] Namespace.IInterface<T> [Version(N)]
+    // Interface line: interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
+    // Or with retired: *RETIRED* interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
     // The name can include generic type parameters like IMyGrain<T> or IMyGrain<TKey, TValue>
     private static readonly Regex InterfacePattern = new(
-        @"^(?<retired>\*RETIRED\*\s*)?(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w.]+(?:<[\w,\s]+>)?)\s*\[Version\((?<version>\d+)\)\]$",
+        @"^(?<retired>\*RETIRED\*\s*)?(?:interface\s+)?(\[GrainInterfaceType\(""(?<grainInterfaceType>[^""]+)""\)\]\s*)?(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w.]+(?:<[\w,\s]+>)?)\s*\[Version\((?<version>\d+)\)\]$",
+        RegexOptions.Compiled);
+
+    // Grain class line: class [GrainType("x")] Namespace.GrainClass
+    // Or with retired: *RETIRED* class [GrainType("x")] Namespace.GrainClass
+    private static readonly Regex GrainClassPattern = new(
+        @"^(?<retired>\*RETIRED\*\s*)?class\s+(\[(?:GrainType|Alias)\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w.]+(?:<[\w,\s]+>)?)$",
         RegexOptions.Compiled);
 
     // Member line: [Alias("x")] Namespace.IInterface<T>.Method(params) -> ReturnType
     // The signature includes the full interface name (possibly generic) and method
     private static readonly Regex MemberPattern = new(
-        @"^(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<signature>[\w.]+(?:<[\w,\s]+>)?\.[^(]+\([^)]*\)\s*->\s*.+)$",
+        @"^(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<signature>.+\(.*\)\s*->\s*.+)$",
         RegexOptions.Compiled);
+
+    internal static bool TryGetInterfaceName(string line, out string name)
+    {
+        var match = InterfacePattern.Match(StripClrComment(line));
+        if (match.Success)
+        {
+            name = match.Groups["name"].Value;
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
+
+    internal static bool TryGetGrainInterfaceType(string line, out string grainInterfaceType)
+    {
+        var match = InterfacePattern.Match(StripClrComment(line));
+        if (match.Success && match.Groups["grainInterfaceType"].Success)
+        {
+            grainInterfaceType = match.Groups["grainInterfaceType"].Value;
+            return true;
+        }
+
+        grainInterfaceType = string.Empty;
+        return false;
+    }
+
+    internal static bool TryGetGrainClassName(string line, out string name)
+    {
+        var match = GrainClassPattern.Match(StripClrComment(line));
+        if (match.Success)
+        {
+            name = match.Groups["name"].Value;
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
+
+    internal static bool TryGetContractName(string line, out string name)
+        => TryGetGrainClassName(line, out name) || TryGetInterfaceName(line, out name);
+
+    internal static bool TryGetMemberSignature(string line, out string signature)
+    {
+        var match = MemberPattern.Match(StripClrComment(line));
+        if (match.Success)
+        {
+            signature = match.Groups["signature"].Value;
+            return true;
+        }
+
+        signature = string.Empty;
+        return false;
+    }
+
+    internal static string GetClrComment(string line)
+    {
+        const string Prefix = " # CLR: ";
+        var index = line.IndexOf(Prefix, StringComparison.Ordinal);
+        return index < 0 ? string.Empty : line.Substring(index);
+    }
+
+    internal static string StripClrComment(string line)
+    {
+        const string Prefix = " # CLR: ";
+        var index = line.IndexOf(Prefix, StringComparison.Ordinal);
+        return (index < 0 ? line : line.Substring(0, index)).Trim();
+    }
 
     public static (GrainInterfaceData Data, List<Diagnostic>? Errors) Parse(SourceText sourceText, string filePath)
     {
@@ -506,11 +985,39 @@ internal static class GrainInterfaceFileParser
 
         foreach (var textLine in sourceText.Lines)
         {
-            var lineText = textLine.ToString().Trim();
+            var lineText = StripClrComment(textLine.ToString());
 
             // Skip empty lines and comments
             if (string.IsNullOrWhiteSpace(lineText) || lineText.StartsWith("#", StringComparison.Ordinal))
             {
+                continue;
+            }
+
+            // Try to match interface declaration
+            var grainClassMatch = GrainClassPattern.Match(lineText);
+            if (grainClassMatch.Success)
+            {
+                currentInterface = null;
+                var name = grainClassMatch.Groups["name"].Value;
+                var alias = grainClassMatch.Groups["alias"].Success ? grainClassMatch.Groups["alias"].Value : null;
+                if (data.Classes.ContainsKey(name)
+                    || alias is not null && data.Classes.Values.Any(candidate => string.Equals(candidate.Alias, alias, StringComparison.Ordinal)))
+                {
+                    errors ??= new List<Diagnostic>();
+                    var location = Location.Create(
+                        filePath,
+                        textLine.Span,
+                        sourceText.Lines.GetLinePositionSpan(textLine.Span));
+                    errors.Add(Diagnostic.Create(GrainInterfaceVersionAnalyzer.DuplicateGrainClassDeclarationRule, location, name));
+                    continue;
+                }
+
+                data.Classes[name] = new DeclaredGrainClass(name)
+                {
+                    Alias = alias,
+                    IsRetired = grainClassMatch.Groups["retired"].Success,
+                    Span = textLine.Span
+                };
                 continue;
             }
 
@@ -520,10 +1027,17 @@ internal static class GrainInterfaceFileParser
             {
                 var name = interfaceMatch.Groups["name"].Value;
                 var alias = interfaceMatch.Groups["alias"].Success ? interfaceMatch.Groups["alias"].Value : null;
-                var version = ushort.Parse(interfaceMatch.Groups["version"].Value);
+                var grainInterfaceType = interfaceMatch.Groups["grainInterfaceType"].Success ? interfaceMatch.Groups["grainInterfaceType"].Value : null;
+                if (!ushort.TryParse(interfaceMatch.Groups["version"].Value, out var version))
+                {
+                    currentInterface = null;
+                    continue;
+                }
                 var isRetired = interfaceMatch.Groups["retired"].Success;
 
-                if (data.Interfaces.ContainsKey(name))
+                if (data.Interfaces.ContainsKey(name)
+                    || grainInterfaceType is not null
+                    && data.Interfaces.Values.Any(candidate => string.Equals(candidate.GrainInterfaceType, grainInterfaceType, StringComparison.Ordinal)))
                 {
                     // Duplicate declaration
                     errors ??= new List<Diagnostic>();
@@ -541,6 +1055,7 @@ internal static class GrainInterfaceFileParser
                 currentInterface = new DeclaredGrainInterface(name)
                 {
                     Alias = alias,
+                    GrainInterfaceType = grainInterfaceType,
                     Version = version,
                     IsRetired = isRetired,
                     Span = textLine.Span
@@ -556,27 +1071,11 @@ internal static class GrainInterfaceFileParser
                 var signature = memberMatch.Groups["signature"].Value;
                 var alias = memberMatch.Groups["alias"].Success ? memberMatch.Groups["alias"].Value : null;
 
-                // Extract interface name from signature to verify it belongs to current interface
-                // Signature format: Namespace.IInterface<T>.Method(params) -> ReturnType
-                // We need to find the last '.' before the '(' to get the method separator
-                var parenIndex = signature.IndexOf('(');
-                if (parenIndex > 0)
+                currentInterface.Members[signature] = new DeclaredGrainMember(signature)
                 {
-                    var methodPartBeforeParen = signature.Substring(0, parenIndex);
-                    var dotIndex = methodPartBeforeParen.LastIndexOf('.');
-                    if (dotIndex > 0)
-                    {
-                        var memberInterfaceName = signature.Substring(0, dotIndex);
-                        if (memberInterfaceName == currentInterface.Name)
-                        {
-                            currentInterface.Members[signature] = new DeclaredGrainMember(signature)
-                            {
-                                Alias = alias,
-                                Span = textLine.Span
-                            };
-                        }
-                    }
-                }
+                    Alias = alias,
+                    Span = textLine.Span
+                };
             }
         }
 

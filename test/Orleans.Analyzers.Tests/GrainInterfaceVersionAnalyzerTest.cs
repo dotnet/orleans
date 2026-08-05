@@ -22,14 +22,15 @@ namespace Analyzers.Tests;
 [TestCategory("BVT"), TestCategory("Analyzer")]
 public class GrainInterfaceVersionAnalyzerTest
 {
-    private const string GrainInterfacesFileName = "GrainInterfaces.txt";
+    private const string OrleansContractsFileName = "OrleansContracts.txt";
 
     private static readonly string[] Usings = new[]
     {
         "System",
         "System.Threading.Tasks",
         "Orleans",
-        "Orleans.CodeGeneration"
+        "Orleans.CodeGeneration",
+        "Orleans.Runtime"
     };
 
     #region Test Infrastructure
@@ -46,7 +47,7 @@ public class GrainInterfaceVersionAnalyzerTest
 
         // Build analyzer options with additional files
         var additionalFiles = grainInterfacesFileContent is not null
-            ? ImmutableArray.Create<AdditionalText>(new TestAdditionalText(GrainInterfacesFileName, grainInterfacesFileContent))
+            ? ImmutableArray.Create<AdditionalText>(new TestAdditionalText(OrleansContractsFileName, grainInterfacesFileContent))
             : ImmutableArray<AdditionalText>.Empty;
 
         var analyzerOptions = new AnalyzerOptions(additionalFiles);
@@ -143,7 +144,7 @@ public interface IMyGrain : IGrain
 ";
         // Use *RETIRED* for the dummy interface so it doesn't trigger ORLEANS0019
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 *RETIRED* SomeOther.IGrain [Version(1)]
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
@@ -164,7 +165,7 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task
 ";
@@ -186,13 +187,31 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 [Alias(""my-grain"")] IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
         Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0016);
+    }
+
+    [Fact]
+    public async Task InterfaceMarkedRetired_ReportsActiveDeclarationDiagnostic()
+    {
+        const string source = @"
+public interface IMyGrain : IGrain
+{
+}
+";
+        const string grainInterfacesFile = @"
+*RETIRED* IMyGrain [Version(0)]
+";
+        var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0016, diagnostic.Id);
+        Assert.Contains("does not have an active declaration", diagnostic.GetMessage());
     }
 
     #endregion
@@ -210,7 +229,7 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task
 ";
@@ -234,7 +253,7 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task
 ";
@@ -253,7 +272,7 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(0)]
 IMyGrain.DoSomething() -> Task
 ";
@@ -278,7 +297,7 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task
 ";
@@ -300,7 +319,7 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task
 ";
@@ -320,9 +339,93 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething(string name, int count) -> Task
+";
+        var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+    }
+
+    [Fact]
+    public async Task LegacyMemberParameterRename_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task DoSomething(string renamed, int newCount);
+}
+";
+        const string contractsFile = @"
+IMyGrain [Version(1)]
+IMyGrain.DoSomething(string original, int oldCount) -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+    }
+
+    [Fact]
+    public async Task MemberWithTupleParameter_InFile_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task DoSomething((int X, int Y) value);
+}
+";
+        const string grainInterfacesFile = @"
+# OrleansContracts.txt
+IMyGrain [Version(1)]
+IMyGrain.DoSomething((int X, int Y) value) -> Task
+";
+        var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+    }
+
+    [Fact]
+    public async Task MemberTypeNamespaceChanged_ReportsDiagnostic()
+    {
+        const string source = @"
+namespace NamespaceA
+{
+    public sealed class Request { }
+}
+
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task DoSomething(NamespaceA.Request request);
+}
+";
+        const string grainInterfacesFile = @"
+# OrleansContracts.txt
+IMyGrain [Version(1)]
+IMyGrain.DoSomething(NamespaceB.Request request) -> Task
+";
+        var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
+
+        Assert.Contains(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+    }
+
+    [Fact]
+    public async Task StaticMember_NotInFile_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    static Task Utility() => Task.CompletedTask;
+}
+";
+        const string grainInterfacesFile = @"
+# OrleansContracts.txt
+IMyGrain [Version(1)]
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -341,7 +444,7 @@ IMyGrain.DoSomething(string name, int count) -> Task
 public class SomeClass { }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IOldGrain [Version(1)]
 IOldGrain.DoSomething() -> Task
 ";
@@ -360,7 +463,7 @@ IOldGrain.DoSomething() -> Task
 public class SomeClass { }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 *RETIRED* IOldGrain [Version(1)]
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
@@ -383,7 +486,8 @@ public interface IMyGrain : IGrain
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFileContent: null);
 
-        Assert.Contains(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0020);
+        var diagnostic = Assert.Single(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0020);
+        Assert.Contains(OrleansContractsFileName, diagnostic.GetMessage());
     }
 
     [Fact]
@@ -416,7 +520,7 @@ public interface IMyGrain : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain [Version(2)]
 ";
@@ -445,6 +549,25 @@ public interface IMyService
         Assert.Empty(diagnostics);
     }
 
+    [Fact]
+    public async Task ObserverInterface_InFile_NoDiagnostic()
+    {
+        const string source = @"
+public interface IMyObserver : IGrainObserver
+{
+    void OnEvent(string value);
+}
+";
+        const string grainInterfacesFile = @"
+# OrleansContracts.txt
+IMyObserver [Version(0)]
+IMyObserver.OnEvent(string value) -> void
+";
+        var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
+
+        Assert.Empty(diagnostics);
+    }
+
     #endregion
 
     #region Base Grain Interfaces
@@ -458,7 +581,7 @@ public interface IMyService
 public class SomeClass { }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -484,7 +607,7 @@ namespace MyApp.Grains
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 MyApp.Grains.IMyGrain [Version(1)]
 MyApp.Grains.IMyGrain.DoSomething() -> Task
 ";
@@ -547,6 +670,258 @@ IMyGrain.DoSomething() -> Task
         Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0016);
     }
 
+    [Fact]
+    public async Task VersionOutsideUShortRange_DoesNotCrashAnalyzer()
+    {
+        const string source = @"
+public interface IMyGrain : IGrain
+{
+}
+";
+        const string grainInterfacesFile = @"
+IMyGrain [Version(65536)]
+";
+        var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == "AD0001");
+    }
+
+    #endregion
+
+    #region Grain Class Contracts
+
+    [Fact]
+    public async Task GrainClassNotInFile_ReportsDiagnostic()
+    {
+        const string source = @"
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = "# OrleansContracts.txt\n";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0022, diagnostic.Id);
+        Assert.Contains("MyGrain", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task GrainClassWithMatchingAlias_NoDiagnostic()
+    {
+        const string source = @"
+[GrainType(""my-grain"")]
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = @"
+class [GrainType(""my-grain"")] MyGrain
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task GrainClassAliasMismatch_ReportsDiagnostic()
+    {
+        const string source = @"
+[GrainType(""new-alias"")]
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = @"
+class [GrainType(""old-alias"")] MyGrain
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0023, diagnostic.Id);
+        Assert.Contains("old-alias", diagnostic.GetMessage());
+        Assert.Contains("new-alias", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task RemovedGrainClass_NotRetired_ReportsDiagnostic()
+    {
+        const string source = "public class SomeClass { }";
+        const string contractsFile = "class [GrainType(\"my-grain\")] MyGrain";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0024, diagnostic.Id);
+    }
+
+    [Fact]
+    public async Task AbstractGrainClass_IsNotTracked()
+    {
+        const string source = @"
+public abstract class MyGrainBase : Grain
+{
+}
+";
+        const string contractsFile = "# OrleansContracts.txt\n";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task PocoGrainClass_IsTracked()
+    {
+        const string source = @"
+public interface IPocoGrain : IGrain
+{
+}
+
+public class PocoGrain : IGrainBase, IPocoGrain
+{
+    public Orleans.Runtime.IGrainContext GrainContext => throw new NotImplementedException();
+}
+";
+        const string contractsFile = @"
+IPocoGrain [Version(0)]
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        var diagnostic = Assert.Single(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0022);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0022, diagnostic.Id);
+    }
+
+    [Fact]
+    public async Task DuplicateGrainClassDeclaration_ReportsDiagnostic()
+    {
+        const string source = @"
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = @"
+class MyGrain
+class MyGrain
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0025, diagnostic.Id);
+    }
+
+    [Fact]
+    public async Task GrainClassRename_WithStableGrainType_NoDiagnostic()
+    {
+        const string oldSource = @"
+[GrainType(""stable-grain"")]
+public class OldGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string newSource = @"
+[GrainType(""stable-grain"")]
+public class NewGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        Assert.Empty(diagnostics);
+        Assert.Contains("# OldGrain\nclass [GrainType(\"stable-grain\")] OldGrain", contractsFile);
+    }
+
+    [Fact]
+    public async Task RpcContractRefactor_WithStableIdentities_NoDiagnostic()
+    {
+        const string oldSource = @"
+[Alias(""request"")]
+public sealed class OldRequest { }
+
+[Alias(""response"")]
+public sealed class OldResponse { }
+
+[GrainInterfaceType(""stable-interface"")]
+public interface IOldGrain : IGrain
+{
+    [Alias(""stable-method"")]
+    Task<OldResponse> OldMethod(OldRequest request);
+}
+";
+        const string newSource = @"
+[Alias(""request"")]
+public sealed class NewRequest { }
+
+[Alias(""response"")]
+public sealed class NewResponse { }
+
+[GrainInterfaceType(""stable-interface"")]
+public interface INewGrain : IGrain
+{
+    [Alias(""stable-method"")]
+    Task<NewResponse> NewMethod(NewRequest renamedParameter);
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        Assert.Empty(diagnostics);
+        Assert.Contains("# IOldGrain\ninterface [GrainInterfaceType(\"stable-interface\")] IOldGrain [Version(0)]", contractsFile);
+        Assert.Contains(
+            "  stable-method(request) -> Task<response>",
+            contractsFile);
+        Assert.Contains("# IOldGrain", contractsFile);
+        Assert.Contains("# IOldGrain.OldMethod", contractsFile);
+    }
+
+    [Fact]
+    public async Task StableInterfaceIdentityChange_IsBreaking()
+    {
+        const string source = @"
+[GrainInterfaceType(""new-identity"")]
+public interface IMyGrain : IGrain
+{
+}
+";
+        const string contractsFile = @"
+[GrainInterfaceType(""old-identity"")] IMyGrain [Version(0)]
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0016);
+    }
+
+    [Fact]
+    public async Task StableGrainTypeChange_IsBreaking()
+    {
+        const string source = @"
+[GrainType(""new-identity"")]
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = "class [GrainType(\"old-identity\")] MyGrain";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0023);
+    }
+
     #endregion
 
     #region Code Fix Tests Infrastructure
@@ -568,7 +943,7 @@ IMyGrain.DoSomething() -> Task
 
         // Build analyzer options with additional files
         var additionalFiles = grainInterfacesFileContent is not null
-            ? ImmutableArray.Create<AdditionalText>(new TestAdditionalText(GrainInterfacesFileName, grainInterfacesFileContent))
+            ? ImmutableArray.Create<AdditionalText>(new TestAdditionalText(OrleansContractsFileName, grainInterfacesFileContent))
             : ImmutableArray<AdditionalText>.Empty;
 
         var analyzerOptions = new AnalyzerOptions(additionalFiles);
@@ -601,6 +976,20 @@ IMyGrain.DoSomething() -> Task
         var additionalDocumentId = changedSolution.GetProject(project.Id)?.AdditionalDocumentIds.FirstOrDefault();
 
         return (changedSolution, additionalDocumentId);
+    }
+
+    private async Task<string> ApplyCodeFixAndGetContractsAsync(
+        string source,
+        string contractsFileContent,
+        string expectedDiagnosticId)
+    {
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, contractsFileContent, expectedDiagnosticId);
+        Assert.NotNull(additionalDocumentId);
+
+        var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
+        Assert.NotNull(changedDocument);
+
+        return (await changedDocument!.GetTextAsync()).ToString();
     }
 
     private static Project CreateProjectWithAdditionalFilesForCodeFix(string source, string? grainInterfacesFileContent)
@@ -652,12 +1041,130 @@ IMyGrain.DoSomething() -> Task
         // Add additional document if content is provided
         if (grainInterfacesFileContent is not null)
         {
-            var additionalDocumentId = DocumentId.CreateNewId(projectId, GrainInterfacesFileName);
-            solution = solution.AddAdditionalDocument(additionalDocumentId, GrainInterfacesFileName, SourceText.From(grainInterfacesFileContent));
+            var additionalDocumentId = DocumentId.CreateNewId(projectId, OrleansContractsFileName);
+            solution = solution.AddAdditionalDocument(additionalDocumentId, OrleansContractsFileName, SourceText.From(grainInterfacesFileContent));
         }
 
         return solution.GetProject(projectId)!
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    #endregion
+
+    #region Code Fix Tests - Grain Classes
+
+    [Fact]
+    public async Task CodeFix_AddGrainClass()
+    {
+        const string source = @"
+[GrainType(""my-grain"")]
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = @"# OrleansContracts.txt
+IZulu [Version(1)]";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        Assert.Contains("class [GrainType(\"my-grain\")] MyGrain", content);
+        Assert.True(
+            content.IndexOf("IZulu [Version(1)]", StringComparison.Ordinal)
+                < content.IndexOf("class [GrainType(\"my-grain\")] MyGrain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CodeFix_AddRecordGrainClass()
+    {
+        const string source = @"
+[GrainType(""my-grain"")]
+public record MyGrain : IGrainBase, IGrainWithStringKey
+{
+    public Orleans.Runtime.IGrainContext GrainContext => throw new NotImplementedException();
+}
+";
+        const string contractsFile = "# OrleansContracts.txt\n";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        Assert.Contains("class [GrainType(\"my-grain\")] MyGrain", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddGrainClass_OmitsMatchingIdentityComment()
+    {
+        const string source = @"
+[GrainType(""MyGrain"")]
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        Assert.Equal("class [GrainType(\"MyGrain\")] MyGrain\n", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_UpdateGrainClassAlias()
+    {
+        const string source = @"
+[GrainType(""new-alias"")]
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = "class [GrainType(\"old-alias\")] MyGrain";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0023);
+
+        Assert.Contains("class [GrainType(\"new-alias\")] MyGrain", content);
+        Assert.DoesNotContain("old-alias", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_RetireGrainClass()
+    {
+        const string source = "public class SomeClass { }";
+        const string contractsFile = "class [GrainType(\"my-grain\")] MyGrain";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0024);
+
+        Assert.Contains("*RETIRED* class [GrainType(\"my-grain\")] MyGrain", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddGrainClass_ReactivatesRetiredDeclaration()
+    {
+        const string source = @"
+[GrainType(""my-grain"")]
+public class MyGrain : Grain, IGrainWithStringKey
+{
+}
+";
+        const string contractsFile = "*RETIRED* class [GrainType(\"old-alias\")] MyGrain";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        Assert.Equal("# MyGrain\nclass [GrainType(\"my-grain\")] MyGrain\n", content);
     }
 
     #endregion
@@ -672,9 +1179,10 @@ IMyGrain.DoSomething() -> Task
 public interface IMyGrain : IGrain
 {
     Task DoSomething();
+    static Task Utility() => Task.CompletedTask;
 }
 ";
-        const string grainInterfacesFile = @"# GrainInterfaces.txt
+        const string grainInterfacesFile = @"# OrleansContracts.txt
 *RETIRED* SomeOther.IOldGrain [Version(1)]";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0016);
@@ -688,7 +1196,8 @@ public interface IMyGrain : IGrain
 
         // Should contain the new interface
         Assert.Contains("IMyGrain [Version(1)]", content);
-        Assert.Contains("IMyGrain.DoSomething() -> Task", content);
+        Assert.Contains("\n  DoSomething() -> Task", content);
+        Assert.DoesNotContain("Utility", content);
     }
 
     [Fact]
@@ -702,7 +1211,7 @@ public interface IMyGrain : IGrain
     Task DoSomething(string name);
 }
 ";
-        const string grainInterfacesFile = @"# GrainInterfaces.txt
+        const string grainInterfacesFile = @"# OrleansContracts.txt
 *RETIRED* SomeOther.IOldGrain [Version(1)]";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0016);
@@ -714,10 +1223,116 @@ public interface IMyGrain : IGrain
         var changedText = await changedDocument!.GetTextAsync();
         var content = changedText.ToString();
 
-        // Should contain the alias
-        Assert.Contains("[Alias(\"my-grain\")]", content);
+        Assert.DoesNotContain("[Alias(", content);
         Assert.Contains("IMyGrain [Version(2)]", content);
-        Assert.Contains("IMyGrain.DoSomething(string name) -> Task", content);
+        Assert.Contains("\n  DoSomething(string) -> Task", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddInterface_SortsContractsAndMembers()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMiddle : IGrain
+{
+    Task Zeta();
+    Task Alpha();
+}
+";
+        const string grainInterfacesFile = "# OrleansContracts.txt\n" +
+            "IZulu [Version(1)]\n" +
+            "IZulu.Method() -> Task\n\n" +
+            "interface IAlpha [Version(1)]\n" +
+            "IAlpha.Method() -> Task";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.NotNull(additionalDocumentId);
+        var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
+        Assert.NotNull(changedDocument);
+
+        var changedText = await changedDocument!.GetTextAsync();
+        var content = changedText.ToString();
+
+        var alphaInterface = content.IndexOf("IAlpha [Version(1)]", StringComparison.Ordinal);
+        var middleInterface = content.IndexOf("IMiddle [Version(1)]", StringComparison.Ordinal);
+        var zuluInterface = content.IndexOf("IZulu [Version(1)]", StringComparison.Ordinal);
+        var alphaMember = content.IndexOf("  Alpha() -> Task", StringComparison.Ordinal);
+        var zetaMember = content.IndexOf("  Zeta() -> Task", StringComparison.Ordinal);
+
+        Assert.True(alphaInterface < middleInterface);
+        Assert.True(middleInterface < zuluInterface);
+        Assert.True(alphaMember < zetaMember);
+        Assert.Equal(
+            "interface IAlpha [Version(1)]\n" +
+            "  Method() -> Task\n\n" +
+            "interface IMiddle [Version(1)]\n" +
+            "  Alpha() -> Task\n" +
+            "  Zeta() -> Task\n\n" +
+            "interface IZulu [Version(1)]\n" +
+            "  Method() -> Task\n",
+            content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddInterface_ProducesSameContentRegardlessOfApplicationOrder()
+    {
+        const string alphaSource = @"
+[Version(1)]
+public interface IAlpha : IGrain
+{
+    Task Method();
+}
+";
+        const string zuluSource = @"
+[Version(1)]
+public interface IZulu : IGrain
+{
+    Task Method();
+}
+";
+
+        var alphaThenZulu = await ApplyCodeFixAndGetContractsAsync(
+            zuluSource,
+            await ApplyCodeFixAndGetContractsAsync(
+                alphaSource,
+                "# OrleansContracts.txt\n",
+                GrainInterfaceVersionAnalyzer.RuleId0016),
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var zuluThenAlpha = await ApplyCodeFixAndGetContractsAsync(
+            alphaSource,
+            await ApplyCodeFixAndGetContractsAsync(
+                zuluSource,
+                "# OrleansContracts.txt\n",
+                GrainInterfaceVersionAnalyzer.RuleId0016),
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.Equal(alphaThenZulu, zuluThenAlpha);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddInterface_ReactivatesByStableIdentity()
+    {
+        const string source = @"
+[GrainInterfaceType(""stable-interface"")]
+public interface INewGrain : IGrain
+{
+}
+";
+        const string contractsFile =
+            "*RETIRED* [GrainInterfaceType(\"stable-interface\")] IOldGrain [Version(0)] # CLR: IOldGrain\n";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.Contains(
+            "# INewGrain\ninterface [GrainInterfaceType(\"stable-interface\")] INewGrain [Version(0)]",
+            content);
+        Assert.DoesNotContain("*RETIRED*", content);
+        Assert.Equal(1, content.Split(new[] { "stable-interface" }, StringSplitOptions.None).Length - 1);
     }
 
     #endregion
@@ -734,7 +1349,7 @@ public interface IMyGrain : IGrain
     Task DoSomething();
 }
 ";
-        const string grainInterfacesFile = @"# GrainInterfaces.txt
+        const string grainInterfacesFile = @"# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task";
 
@@ -752,6 +1367,67 @@ IMyGrain.DoSomething() -> Task";
         Assert.DoesNotContain("[Version(1)]", content);
     }
 
+    [Fact]
+    public async Task CodeFix_UpdateVersion_UsesExactInterfaceName()
+    {
+        const string source = @"
+[Version(2)]
+public interface IFoo : IGrain
+{
+    Task DoSomething();
+}
+
+[Version(1)]
+public interface IFooBar : IGrain
+{
+    Task DoSomething();
+}
+";
+        const string grainInterfacesFile = @"# OrleansContracts.txt
+IFooBar [Version(1)]
+IFooBar.DoSomething() -> Task
+
+IFoo [Version(1)]
+IFoo.DoSomething() -> Task";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0017);
+
+        Assert.NotNull(additionalDocumentId);
+        var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
+        Assert.NotNull(changedDocument);
+
+        var changedText = await changedDocument!.GetTextAsync();
+        var content = changedText.ToString();
+
+        Assert.Contains("IFooBar [Version(1)]", content);
+        Assert.Contains("IFoo [Version(2)]", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_UpdateVersion_PreservesLfLineEndings()
+    {
+        const string source = @"
+[Version(2)]
+public interface IMyGrain : IGrain
+{
+    Task DoSomething();
+}
+";
+        const string grainInterfacesFile = "# OrleansContracts.txt\nIMyGrain [Version(1)]\nIMyGrain.DoSomething() -> Task\n";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0017);
+
+        Assert.NotNull(additionalDocumentId);
+        var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
+        Assert.NotNull(changedDocument);
+
+        var changedText = await changedDocument!.GetTextAsync();
+        var content = changedText.ToString();
+
+        Assert.DoesNotContain("\r", content);
+        Assert.Equal("interface IMyGrain [Version(2)]\n  DoSomething() -> Task\n", content);
+    }
+
     #endregion
 
     #region Code Fix Tests - ORLEANS0018 Add Member
@@ -767,7 +1443,7 @@ public interface IMyGrain : IGrain
     Task NewMethod(int value);
 }
 ";
-        const string grainInterfacesFile = @"# GrainInterfaces.txt
+        const string grainInterfacesFile = @"# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task";
 
@@ -781,7 +1457,117 @@ IMyGrain.DoSomething() -> Task";
         var content = changedText.ToString();
 
         // Should contain the new member
-        Assert.Contains("IMyGrain.NewMethod(int value) -> Task", content);
+        Assert.Contains("\n  NewMethod(int) -> Task", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddMember_WithAlias()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task DoSomething();
+
+    [Alias(""new-method"")]
+    Task NewMethod(int value);
+}
+";
+        const string grainInterfacesFile = @"# OrleansContracts.txt
+IMyGrain [Version(1)]
+IMyGrain.DoSomething() -> Task";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0018);
+
+        Assert.NotNull(additionalDocumentId);
+        var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
+        Assert.NotNull(changedDocument);
+
+        var changedText = await changedDocument!.GetTextAsync();
+        var content = changedText.ToString();
+
+        Assert.Contains("\n  new-method(int) -> Task", content);
+        Assert.Contains("  # IMyGrain.NewMethod(int value) -> Task", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddMember_OmitsMatchingAliasComment()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""NewMethod"")]
+    Task NewMethod();
+}
+";
+        const string contractsFile = "IMyGrain [Version(1)]";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0018);
+
+        Assert.Equal("interface IMyGrain [Version(1)]\n  NewMethod() -> Task\n", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddMember_InsertsBeforeNextInterface()
+    {
+        const string source = @"
+[Version(1)]
+public interface IFoo : IGrain
+{
+    Task NewMethod();
+}
+
+[Version(1)]
+public interface IFooBar : IGrain
+{
+    Task ExistingMethod();
+}
+";
+        const string grainInterfacesFile = @"# OrleansContracts.txt
+IFoo [Version(1)]
+IFooBar [Version(1)]
+IFooBar.ExistingMethod() -> Task";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0018);
+
+        Assert.NotNull(additionalDocumentId);
+        var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
+        Assert.NotNull(changedDocument);
+
+        var changedText = await changedDocument!.GetTextAsync();
+        var content = changedText.ToString();
+
+        Assert.True(
+            content.IndexOf("  NewMethod() -> Task", StringComparison.Ordinal)
+                < content.IndexOf("IFooBar [Version(1)]", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CodeFix_AddMember_InsertsBeforeNextGrainClass()
+    {
+        const string source = @"
+[Version(1)]
+public interface IFoo : IGrain
+{
+    Task NewMethod();
+}
+";
+        const string contractsFile = @"# OrleansContracts.txt
+IFoo [Version(1)]
+class SomeGrain";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0018);
+
+        Assert.True(
+            content.IndexOf("  NewMethod() -> Task", StringComparison.Ordinal)
+                < content.IndexOf("class SomeGrain", StringComparison.Ordinal));
     }
 
     #endregion
@@ -799,7 +1585,7 @@ public interface IMyGrain<T> : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain<T> [Version(1)]
 IMyGrain<T>.DoSomething(T value) -> Task
 ";
@@ -821,7 +1607,7 @@ public interface IMyGrain<T> : IGrain where T : class
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain<T> [Version(1)]
 IMyGrain<T>.DoSomething(T value) -> Task
 ";
@@ -841,7 +1627,7 @@ public interface IMyGrain<TKey, TValue> : IGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain<TKey, TValue> [Version(1)]
 IMyGrain<TKey, TValue>.DoSomething(TKey key, TValue value) -> Task
 ";
@@ -861,7 +1647,7 @@ IMyGrain<TKey, TValue>.DoSomething(TKey key, TValue value) -> Task
 // No grain interfaces - IOldGrain was removed
 public class SomeClass { }
 ";
-        const string grainInterfacesFile = @"# GrainInterfaces.txt
+        const string grainInterfacesFile = @"# OrleansContracts.txt
 IOldGrain [Version(1)]
 IOldGrain.DoSomething() -> Task";
 
@@ -875,7 +1661,31 @@ IOldGrain.DoSomething() -> Task";
         var content = changedText.ToString();
 
         // Should have *RETIRED* prefix
-        Assert.Contains("*RETIRED* IOldGrain [Version(1)]", content);
+        Assert.Contains("*RETIRED* interface IOldGrain [Version(1)]", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_RetireInterface_UsesExactInterfaceName()
+    {
+        const string source = @"
+public class SomeClass { }
+";
+        const string grainInterfacesFile = @"# OrleansContracts.txt
+IFoo [Version(1)]
+IFooBar [Version(1)]";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0019);
+
+        Assert.NotNull(additionalDocumentId);
+        var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
+        Assert.NotNull(changedDocument);
+
+        var changedText = await changedDocument!.GetTextAsync();
+        var content = changedText.ToString();
+
+        Assert.Contains("*RETIRED* interface IFoo [Version(1)]", content);
+        Assert.Contains("\ninterface IFooBar [Version(1)]", content);
+        Assert.DoesNotContain("*RETIRED* interface IFooBar", content);
     }
 
     #endregion
@@ -899,7 +1709,7 @@ public interface IDerivedGrain : IBaseGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IBaseGrain [Version(1)]
 IBaseGrain.DoBase() -> Task
 
@@ -931,7 +1741,7 @@ public interface IDerivedGrain : IBaseGrain
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IBaseGrain [Version(1)]
 IBaseGrain.DoBase() -> Task
 ";
@@ -954,7 +1764,7 @@ public interface IMyGrain : IGrainWithStringKey
 }
 ";
         const string grainInterfacesFile = @"
-# GrainInterfaces.txt
+# OrleansContracts.txt
 IMyGrain [Version(1)]
 IMyGrain.DoSomething() -> Task
 ";
