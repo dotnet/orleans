@@ -24,7 +24,7 @@ Every silo and external client must use the same `ServiceId`, `ClusterId`, and c
 | Redis | `Microsoft.Orleans.Clustering.Redis` | Can share a managed or self-hosted Redis service. |
 | Azure Cosmos DB | `Microsoft.Orleans.Clustering.Cosmos` | Uses a Cosmos DB container for membership. |
 | DynamoDB | `Microsoft.Orleans.Clustering.DynamoDB` | Common for AWS deployments. |
-| Consul | `Microsoft.Orleans.Clustering.Consul` | Uses Consul sessions and key/value storage. |
+| Consul | `Microsoft.Orleans.Clustering.Consul` | Uses Consul key/value storage. |
 | ZooKeeper | `Microsoft.Orleans.Clustering.ZooKeeper` | Uses a ZooKeeper ensemble. |
 
 Use `UseLocalhostClustering`, development clustering, or static gateways only for local development and tests.
