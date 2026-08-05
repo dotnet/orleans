@@ -25,7 +25,7 @@ internal sealed partial class GrainDirectoryPartition
 
         DebugAssertOwnership(currentView, address.GrainId);
 
-        if (_rangeLeaseDuration > TimeSpan.Zero)
+        if (_deadSiloLeaseDuration > TimeSpan.Zero)
         {
             var utcNow = _timeProvider.GetUtcNow();
             var rangeHash = address.GrainId.GetUniformHashCode();
@@ -116,7 +116,7 @@ internal sealed partial class GrainDirectoryPartition
             return false;
         }
 
-        if (_rangeLeaseDuration > TimeSpan.Zero
+        if (_deadSiloLeaseDuration > TimeSpan.Zero
             && existing.SiloAddress is { } siloAddress
             && _siloLeaseHolds.TryGetValue(siloAddress, out var expiration)
             && _timeProvider.GetUtcNow() < expiration)

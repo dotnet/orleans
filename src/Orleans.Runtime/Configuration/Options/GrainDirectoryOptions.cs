@@ -113,7 +113,6 @@ public class GrainDirectoryOptions
     /// <item>When a directory partition can not acquire a snapshot from a previous owner, range lease holds prevent new registrations in that whole range for this duration.</item>
     /// </list>
     /// For a declared-dead silo, the lease begins at its estimated failure time by subtracting the configured failure-detection window from the declaration time.
-    /// Snapshot-transfer failures without a corresponding death declaration use the full duration from the time the failure is observed.
     /// Set this value to <see cref="TimeSpan.Zero"/> to disable range leases.
     /// </summary>
     public TimeSpan RangeLeaseDuration { get; set; } = DEFAULT_RANGE_LEASE_DURATION;

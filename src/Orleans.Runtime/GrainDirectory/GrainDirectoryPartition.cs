@@ -53,7 +53,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     private RingRange _currentRange;
 
-    private readonly TimeSpan _rangeLeaseDuration;
     private readonly TimeSpan _deadSiloLeaseDuration;
     private readonly List<(RingRange Range, DateTimeOffset Expiration)> _rangeLeaseHolds = [];
     private readonly Dictionary<SiloAddress, DateTimeOffset> _siloLeaseHolds = [];
@@ -62,7 +61,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     public GrainDirectoryPartition(
         int partitionIndex,
         DistributedGrainDirectory owner,
-        TimeSpan rangeLeaseDuration,
         TimeSpan deadSiloLeaseDuration,
         IInternalGrainFactory grainFactory,
         DirectoryInstruments directoryInstruments,
@@ -75,7 +73,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         _directoryInstruments = directoryInstruments;
         _id = shared.SiloAddress;
         _logger = shared.LoggerFactory.CreateLogger<GrainDirectoryPartition>();
-        _rangeLeaseDuration = rangeLeaseDuration;
         _deadSiloLeaseDuration = deadSiloLeaseDuration;
         _timeProvider = timeProvider;
         shared.ActivationDirectory.RecordNewTarget(this);
