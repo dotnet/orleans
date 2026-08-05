@@ -270,6 +270,17 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         output.WriteLine($"  Validating grain directory integrity {stage}...");
 
         var activations = GetDirectoryActivations(cluster);
+        var duplicateActivations = activations
+            .GroupBy(static activation => activation.Address.GrainId)
+            .Where(static group => group.Count() > 1)
+            .ToArray();
+        Assert.True(
+            duplicateActivations.Length == 0,
+            $"Found duplicate activations during '{stage}': "
+            + string.Join(
+                "; ",
+                duplicateActivations.Select(static group =>
+                    $"{group.Key}=[{string.Join(", ", group.Select(static activation => activation.Address.ToFullString()))}]")));
         var distributedPartitions = new List<IGrainDirectoryTestHooks>();
         foreach (var silo in cluster.Silos)
         {
@@ -293,13 +304,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
         else
         {
-            var integrityChecks = distributedPartitions.Select(static partition => partition.RecoverAndCheckIntegrityAsync().AsTask()).ToArray();
-            await Task.WhenAll(integrityChecks);
-            foreach (var task in integrityChecks)
-            {
-                await task;
-            }
-
             var activationAddresses = activations.Select(static activation => activation.Address).ToList().AsImmutable();
             var activationChecks = distributedPartitions.Select(partition => partition.CheckActivationsAsync(activationAddresses).AsTask()).ToArray();
             await Task.WhenAll(activationChecks);
@@ -329,6 +333,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 await task;
             }
+
+            var integrityChecks = distributedPartitions.Select(static partition => partition.CheckIntegrityAsync().AsTask()).ToArray();
+            await Task.WhenAll(integrityChecks);
         }
 
         output.WriteLine($"  Validated {activations.Count} activations and {distributedPartitions.Count} DistributedGrainDirectory partitions {stage}.");
@@ -929,6 +936,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 staleCacheEvidence);
             await WaitForClusterMembershipConvergenceAsync(cluster, retiredAddresses, phase.Current, operationTimeout);
             await WaitForDirectoryConvergenceAsync(cluster, "in the final all-DistributedGrainDirectory phase");
+            await ValidateDirectoryIntegrityAsync(cluster, phase.Current);
 
             Assert.Equal(SiloCount, traffic.MaximumObservedSiloCount);
             Assert.True(traffic.MaximumObservedSiloCount <= SiloCount);
@@ -1075,7 +1083,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             staleCacheEvidence);
 
         var integrityChecks = distributedPartitions
-            .Select(static partition => partition.RecoverAndCheckIntegrityAsync().AsTask())
+            .Select(static partition => partition.CheckIntegrityAsync().AsTask())
             .ToArray();
         await Task.WhenAll(integrityChecks);
         output.WriteLine(
