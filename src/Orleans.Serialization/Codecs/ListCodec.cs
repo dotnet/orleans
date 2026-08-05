@@ -73,10 +73,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = new(length);
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -103,9 +100,6 @@ namespace Orleans.Serialization.Codecs
 
             return result!;
         }
-
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(List<T>)}, {length}, is greater than total length of input.");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
@@ -143,10 +137,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
 #if NET6_0_OR_GREATER
                         value.EnsureCapacity(length);

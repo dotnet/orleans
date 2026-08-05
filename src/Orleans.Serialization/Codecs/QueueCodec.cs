@@ -78,6 +78,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
+                        reader.EnsureAvailable((uint)length);
                         result = new Queue<T>(length);
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                         break;

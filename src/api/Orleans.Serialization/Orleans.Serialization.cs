@@ -1017,7 +1017,11 @@ namespace Orleans.Serialization.Buffers
 
         public long Position { get { throw null; } }
 
+        public long Remaining { get { throw null; } }
+
         public Session.SerializerSession Session { get { throw null; } }
+
+        public void EnsureAvailable(uint count) { }
 
         public void ForkFrom(long position, out Reader<TInput> forked) { throw null; }
 

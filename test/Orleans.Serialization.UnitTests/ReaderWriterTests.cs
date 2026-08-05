@@ -38,10 +38,47 @@ namespace Orleans.Serialization.UnitTests
             var reader = Reader.Create(new byte[] { 0x12, 0x34 }, session: null!);
 
             Assert.Equal(0, reader.Position);
+            Assert.Equal(2, reader.Remaining);
             Assert.Equal(0x12, reader.PeekByte());
             Assert.Equal(0, reader.Position);
+            Assert.Equal(2, reader.Remaining);
             Assert.Equal(0x12, reader.ReadByte());
             Assert.Equal(1, reader.Position);
+            Assert.Equal(1, reader.Remaining);
+        }
+
+        [Fact]
+        public void Remaining_IsRelativeToForkedInput()
+        {
+            var reader = Reader.Create(new byte[10], session: null!);
+            reader.ForkFrom(4, out var forked);
+
+            Assert.Equal(6, forked.Remaining);
+            forked.ReadByte();
+            Assert.Equal(5, forked.Remaining);
+        }
+
+        [Fact]
+        public void ReadBytes_RejectsLengthGreaterThanRemainingInput()
+        {
+            var exception = Assert.Throws<IndexOutOfRangeException>(() => ReadBytes(new byte[4], 5));
+            Assert.Contains("remaining length of the input, 4", exception.Message);
+        }
+
+        [Fact]
+        public void StringCodec_RejectsLengthGreaterThanRemainingInput()
+        {
+            var exception = Assert.Throws<IndexOutOfRangeException>(() => ReadString(new byte[4], 5));
+            Assert.Contains("remaining length of the input, 4", exception.Message);
+        }
+
+        [Fact]
+        public void StringCodec_ReadsFromNonSeekableStream()
+        {
+            using var stream = new NonSeekableStream([0x74, 0x65, 0x73, 0x74]);
+            var reader = Reader.Create(stream, session: null!);
+
+            Assert.Equal("test", StringCodec.ReadRaw(ref reader, 4));
         }
 
         [Fact]
@@ -95,6 +132,18 @@ namespace Orleans.Serialization.UnitTests
             return reader.ReadVarUInt64();
         }
 
+        private static byte[] ReadBytes(byte[] bytes, uint count)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return reader.ReadBytes(count);
+        }
+
+        private static string ReadString(byte[] bytes, uint count)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return StringCodec.ReadRaw(ref reader, count);
+        }
+
         private static byte[] WriteVarUInt32(uint value)
         {
             var output = new ArrayBufferWriter<byte>();
@@ -111,6 +160,37 @@ namespace Orleans.Serialization.UnitTests
             writer.WriteVarUInt64(value);
             writer.Commit();
             return output.WrittenSpan.ToArray();
+        }
+
+        private sealed class NonSeekableStream(byte[] buffer) : Stream
+        {
+            private readonly MemoryStream _inner = new(buffer);
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position
+            {
+                get => throw new NotSupportedException();
+                set => throw new NotSupportedException();
+            }
+
+            public override void Flush() { }
+            public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+            public override int Read(Span<byte> buffer) => _inner.Read(buffer);
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    _inner.Dispose();
+                }
+
+                base.Dispose(disposing);
+            }
         }
     }
 

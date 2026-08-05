@@ -45,6 +45,12 @@ namespace Orleans.Serialization.Codecs
 
             field.EnsureWireType(WireType.LengthPrefixed);
             var numBytes = reader.ReadVarUInt32();
+            reader.EnsureAvailable(numBytes);
+            if (numBytes > int.MaxValue / 8)
+            {
+                ThrowInvalidSizeException(numBytes);
+            }
+
             var result = new BitArray((int)numBytes * 8, false);
 #if NET10_0_OR_GREATER
             reader.ReadBytes(CollectionsMarshal.AsBytes(result)[..(int)numBytes]);
@@ -56,6 +62,10 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result);
             return result!;
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidSizeException(uint numBytes) => throw new IndexOutOfRangeException(
+            $"The declared BitArray length, {numBytes} bytes, exceeds the maximum supported length.");
 
         void IFieldCodec<BitArray>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] BitArray value)
         {
@@ -429,9 +439,16 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(reader.Session);
             field.EnsureWireType(WireType.LengthPrefixed);
-            var value = new PooledBuffer();
             const int MaxSpanLength = 4096;
-            var length = (int)reader.ReadVarUInt32();
+            var encodedLength = reader.ReadVarUInt32();
+            if (encodedLength > int.MaxValue)
+            {
+                ThrowInvalidSizeException(encodedLength);
+            }
+
+            reader.EnsureAvailable(encodedLength);
+            var length = (int)encodedLength;
+            var value = new PooledBuffer();
             while (length > 0)
             {
                 var copied = Math.Min(length, MaxSpanLength);
@@ -444,6 +461,11 @@ namespace Orleans.Serialization.Codecs
             Debug.Assert(length == 0);
             return value;
         }
+
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidSizeException(uint length) => throw new IndexOutOfRangeException(
+            $"The declared PooledBuffer length, {length}, exceeds the maximum supported length, {int.MaxValue}.");
     }
 
     /// <summary>

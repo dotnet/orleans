@@ -105,10 +105,7 @@ namespace Orleans.Serialization.Codecs
                         break;
                     case 1:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
                         break;
@@ -143,9 +140,6 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
             return result;
         }
-
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
     }
@@ -297,10 +291,7 @@ namespace Orleans.Serialization.Codecs
                         break;
                     case 1:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         hasLengthField = true;
                         if (comparer is not null)
@@ -336,9 +327,6 @@ namespace Orleans.Serialization.Codecs
                 }
             }
         }
-
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
 

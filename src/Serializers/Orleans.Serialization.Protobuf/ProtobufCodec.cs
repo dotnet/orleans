@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization;
 
@@ -193,7 +194,14 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
                     }
 
                     ReferenceCodec.MarkValueField(reader.Session);
-                    var length = (int)reader.ReadVarUInt32();
+                    var encodedLength = reader.ReadVarUInt32();
+                    if (encodedLength > int.MaxValue)
+                    {
+                        ThrowInvalidSizeException(encodedLength);
+                    }
+
+                    reader.EnsureAvailable(encodedLength);
+                    var length = (int)encodedLength;
 
                     using (var buffer = new PooledBuffer())
                     {
@@ -213,6 +221,11 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     }
 
     private static void ThrowTypeFieldMissing() => throw new RequiredFieldMissingException("Serialized value is missing its type field.");
+
+    [DoesNotReturn]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowInvalidSizeException(uint length) => throw new IndexOutOfRangeException(
+        $"The declared protobuf payload length, {length}, exceeds the maximum supported length, {int.MaxValue}.");
 
     /// <inheritdoc/>
     void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] object? value)

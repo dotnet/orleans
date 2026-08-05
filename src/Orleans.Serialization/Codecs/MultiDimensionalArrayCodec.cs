@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -116,6 +117,7 @@ namespace Orleans.Serialization.Codecs
                         {
                             lengths = _intArrayCodec.ReadValue(ref reader, header)!;
                             rank = lengths.Length;
+                            EnsureSufficientData(ref reader, lengths);
 
                             // Multi-dimensional arrays must be indexed using indexing arrays, so create one now.
                             indices = new int[rank];
@@ -157,6 +159,31 @@ namespace Orleans.Serialization.Codecs
 
         private void ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {CodecElementType} with declared lengths {string.Join(", ", lengths)}.");
+
+        private static void EnsureSufficientData<TInput>(ref Reader<TInput> reader, int[] lengths)
+        {
+            var remaining = (ulong)reader.Remaining;
+            ulong elementCount = 1;
+            foreach (var length in lengths)
+            {
+                if (length < 0)
+                {
+                    return;
+                }
+
+                if (length != 0 && elementCount > remaining / (uint)length)
+                {
+                    ThrowInvalidSizeException(lengths, reader.Remaining);
+                }
+
+                elementCount *= (uint)length;
+            }
+        }
+
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidSizeException(int[] lengths, long remaining) => throw new IndexOutOfRangeException(
+            $"Declared dimensions [{string.Join(", ", lengths)}] require more elements than the remaining length of the input, {remaining}.");
 
         private static void ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
     }
