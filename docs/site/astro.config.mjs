@@ -21,6 +21,9 @@ sidebar.push({
 export default defineConfig({
   site: 'https://dotnet.github.io/orleans/',
   base: '/orleans/',
+  redirects: {
+    '/docs/deployment/consul-deployment': '/orleans/docs/host/configuration-guide/clustering/consul/',
+  },
   integrations: [
     starlight({
       title: 'Microsoft Orleans',

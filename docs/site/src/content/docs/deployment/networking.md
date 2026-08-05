@@ -59,7 +59,7 @@ Choose a provider already operated reliably in the target environment:
 - Amazon DynamoDB: `Microsoft.Orleans.Clustering.DynamoDB`
 - Redis: `Microsoft.Orleans.Clustering.Redis`
 - Apache ZooKeeper: `Microsoft.Orleans.Clustering.ZooKeeper`
-- Consul: `Microsoft.Orleans.Clustering.Consul`
+- Consul: [`Microsoft.Orleans.Clustering.Consul`](../host/configuration-guide/clustering/consul.md)
 
 See [Typical configurations](../host/configuration-guide/typical-configurations.md) and the [Orleans packages list](../resources/nuget-packages.md) for configuration and package links. Orleans doesn't require the Kubernetes hosting package. If used for a simple one-`Deployment`-per-cluster topology, it supplements a clustering provider; it doesn't replace one.
 
