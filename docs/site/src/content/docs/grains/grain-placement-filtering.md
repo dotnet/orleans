@@ -100,7 +100,16 @@ A custom filter consists of:
 1. A `PlacementFilterStrategy` carrying serializable configuration and a unique order.
 1. A `PlacementFilterAttribute` that attaches the strategy to a grain class.
 1. An `IPlacementFilterDirector` that returns a subset of candidate `SiloAddress` values.
-1. Registration using `AddPlacementFilter<TStrategy, TDirector>()`.
+1. Registration from the silo's service collection, including the strategy lifetime:
+
+    ```csharp
+    siloBuilder.Services.AddPlacementFilter<
+        ExamplePlacementFilterStrategy,
+        ExamplePlacementFilterDirector>(
+            ServiceLifetime.Transient);
+    ```
+
+    The `ServiceLifetime` argument controls the placement strategy lifetime. Orleans always registers the director as a keyed singleton.
 
 Custom filters are part of the same `ORLEANSEXP004` API surface. Keep directors deterministic and fast, don't return silos outside the input candidate set, and define behavior for no matches. Prefer the built-in metadata filters unless custom logic is essential.
 
