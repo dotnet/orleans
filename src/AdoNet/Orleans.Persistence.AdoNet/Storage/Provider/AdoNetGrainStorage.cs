@@ -145,7 +145,7 @@ namespace Orleans.Storage
         }
 
         /// <summary>Clear state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
+        /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>.
         public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
@@ -213,7 +213,7 @@ namespace Orleans.Storage
 
 
         /// <summary> Read state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>.
+        /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>.
         public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
@@ -278,7 +278,7 @@ namespace Orleans.Storage
 
 
         /// <summary> Write state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
+        /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
