@@ -112,17 +112,12 @@ public class GrainDirectoryOptions
     /// <item>When a specific silo crashes ungracefully, grain lease holds prevent individual re-registration of its grains for this duration.</item>
     /// <item>When a directory partition can not acquire a snapshot from a previous owner, range lease holds prevent new registrations in that whole range for this duration.</item>
     /// </list>
+    /// Set this value to <see cref="TimeSpan.Zero"/> to disable range leases.
     /// </summary>
-    /// <remarks>
-    /// Depending on the value of this, the duration is understood as:
-    /// <list type="bullet">
-    /// <item><c>RangeLeaseDuration > TimeSpan.Zero</c> - The lease duration is explicitly controlled by the user.</item>
-    /// <item><c>RangeLeaseDuration = TimeSpan.Zero</c>. No leases are placed at all, effectively nullifying this safety option.</item>
-    /// <item><c>RangeLeaseDuration = null</c> - The system computes a lease duration as:
-    /// <c><see cref="ClusterMembershipOptions.ProbeTimeout"/> × <see cref="ClusterMembershipOptions.NumMissedProbesLimit"/></c>.
-    /// This is the default value, and is designed to allow for cluster stabilization after failure detection completes.
-    /// </item>
-    /// </list>
-    /// </remarks>
-    public TimeSpan? RangeLeaseDuration { get; set; }
+    public TimeSpan RangeLeaseDuration { get; set; } = DEFAULT_RANGE_LEASE_DURATION;
+
+    /// <summary>
+    /// The default value for <see cref="RangeLeaseDuration"/>.
+    /// </summary>
+    public static readonly TimeSpan DEFAULT_RANGE_LEASE_DURATION = TimeSpan.FromSeconds(30);
 }

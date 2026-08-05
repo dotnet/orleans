@@ -94,7 +94,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         IInternalGrainFactory grainFactory,
         DirectoryInstruments directoryInstruments,
         IOptions<GrainDirectoryOptions> directoryOptions,
-        IOptions<ClusterMembershipOptions> membershipOptions,
         TimeProvider timeProvider,
         SystemTargetShared shared) : base(Constants.GrainDirectoryType, shared)
     {
@@ -106,12 +105,11 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _clusterMemberCancellationTokens = new(_stoppedCts.Token);
         _timeProvider = timeProvider;
 
-        _rangeLeaseDuration = directoryOptions.Value.RangeLeaseDuration switch
+        _rangeLeaseDuration = directoryOptions.Value.RangeLeaseDuration;
+        if (_rangeLeaseDuration < TimeSpan.Zero)
         {
-            null => membershipOptions.Value.ProbeTimeout * membershipOptions.Value.NumMissedProbesLimit,
-            TimeSpan duration when duration >= TimeSpan.Zero => duration,
-            _ => throw new InvalidOperationException("Lease hold duration must be non-negative.")
-        };
+            throw new InvalidOperationException("Range lease duration must be non-negative.");
+        }
 
         var partitionsPerSilo = membershipService.PartitionsPerSilo;
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);

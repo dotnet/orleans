@@ -171,56 +171,8 @@ public class GrainDirectoryLeaseTests
     }
 
     [Fact]
-    public async Task DefaultRangeLeaseDuration_UsesMembershipProbeWindow()
-    {
-        var probeTimeout = TimeSpan.FromSeconds(1);
-        var missedProbeLimit = 4;
-        var expectedLeaseDuration = probeTimeout * missedProbeLimit;
-        var (cluster, timeProvider) = CreateCluster(
-            useDefaultRangeLeaseDuration: true,
-            configureMembershipOptions: options =>
-            {
-                options.ProbeTimeout = probeTimeout;
-                options.NumMissedProbesLimit = missedProbeLimit;
-            });
-
-        using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync();
-
-        try
-        {
-            var primary = cluster.Silos[0];
-            var secondary = cluster.Silos[1];
-
-            RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
-
-            var leaseGrain = cluster.Client.GetGrain<ILeaseTestGrain>(11);
-            Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
-
-            var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
-            await cluster.KillSiloAsync(secondary);
-            await leaseCreated;
-
-            var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
-            var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
-
-            var registrationBlocked = WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
-            var registerTask = directory.Register(fakeAddress);
-            await registrationBlocked;
-
-            timeProvider.Advance(expectedLeaseDuration - TimeSpan.FromTicks(1));
-            Assert.False(registerTask.IsCompleted, "Registration should wait for the computed lease hold duration.");
-
-            timeProvider.Advance(TimeSpan.FromTicks(1));
-            var result = await registerTask.WaitAsync(EventTimeout);
-            Assert.NotNull(result);
-            Assert.Equal(primary.SiloAddress, result.SiloAddress);
-        }
-        finally
-        {
-            await DisposeClusterAsync(cluster);
-        }
-    }
+    public void DefaultRangeLeaseDuration_IsThirtySeconds() =>
+        Assert.Equal(TimeSpan.FromSeconds(30), new GrainDirectoryOptions().RangeLeaseDuration);
 
     [Fact]
     public async Task DisabledLeaseHold_AllowsImmediateReregistration()
@@ -351,9 +303,7 @@ public class GrainDirectoryLeaseTests
     }
 
     private static (InProcessTestCluster Cluster, FakeTimeProvider TimeProvider) CreateCluster(
-        TimeSpan? rangeLeaseDuration = null,
-        bool useDefaultRangeLeaseDuration = false,
-        Action<ClusterMembershipOptions>? configureMembershipOptions = null)
+        TimeSpan? rangeLeaseDuration = null)
     {
         var timeProvider = new FakeTimeProvider(InitialTime);
         var builder = new InProcessTestClusterBuilder(2);
@@ -361,15 +311,7 @@ public class GrainDirectoryLeaseTests
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Services.AddSingleton<TimeProvider>(timeProvider);
-            if (configureMembershipOptions is not null)
-            {
-                siloBuilder.Services.Configure(configureMembershipOptions);
-            }
-
-            if (!useDefaultRangeLeaseDuration)
-            {
-                siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);
-            }
+            siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);
 
 #pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
