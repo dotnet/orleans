@@ -1,5 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Hosting;
+using Orleans.Connections.Security;
 using Orleans.Hosting;
 
 Console.WriteLine("TLS configuration examples");
@@ -17,11 +18,16 @@ internal static class TlsExamples
                 .UseLocalhostClustering()
                 .UseTls(options =>
                 {
+                    options.RemoteCertificateMode =
+                        RemoteCertificateMode.RequireCertificate;
+                    options.ClientCertificateMode =
+                        RemoteCertificateMode.NoCertificate;
                     options.OnAuthenticateAsClient = (_, sslOptions) =>
                     {
                         sslOptions.TargetHost = "orleans.example.net";
+                        sslOptions.CertificateRevocationCheckMode =
+                            X509RevocationMode.Online;
                     };
-                    options.CheckCertificateRevocation = true;
                 });
         });
 
@@ -40,11 +46,16 @@ internal static class TlsExamples
                 .UseLocalhostClustering()
                 .UseTls(clientCertificate, options =>
                 {
+                    options.RemoteCertificateMode =
+                        RemoteCertificateMode.RequireCertificate;
+                    options.ClientCertificateMode =
+                        RemoteCertificateMode.RequireCertificate;
                     options.OnAuthenticateAsClient = (_, sslOptions) =>
                     {
                         sslOptions.TargetHost = "orleans.example.net";
+                        sslOptions.CertificateRevocationCheckMode =
+                            X509RevocationMode.Online;
                     };
-                    options.CheckCertificateRevocation = true;
                 });
         });
 

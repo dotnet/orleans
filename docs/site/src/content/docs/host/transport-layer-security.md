@@ -10,24 +10,31 @@ ms.topic: how-to
 Orleans can protect client-to-silo and silo-to-silo connections with Transport Layer Security (TLS). TLS encrypts traffic and authenticates the endpoint acting as the TLS server. Mutual TLS (mTLS) additionally requires and authenticates the endpoint acting as the TLS client.
 
 > [!IMPORTANT]
-> Calling `UseTls` doesn't enable mTLS by itself. <xref:Orleans.Connections.Security.TlsOptions.ClientCertificateMode> defaults to `AllowCertificate`, so a client certificate is optional. Set it to <xref:Orleans.Connections.Security.RemoteCertificateMode.RequireCertificate> on every silo to require mTLS.
+> <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode> defaults to `RequireCertificate`. On a silo's inbound connections, this default requires the connecting silo or Orleans client to present a certificate. To configure server-authenticated TLS without client certificates, explicitly set `RemoteCertificateMode` to `NoCertificate` on every silo.
 
 Install [Microsoft.Orleans.Connections.Security](https://www.nuget.org/packages/Microsoft.Orleans.Connections.Security) in every silo and client process.
 
 ## Choose an authentication model
 
-| Model | What is authenticated | Silo setting | Typical boundary |
+| Model | Inbound silo policy | Outbound local-certificate policy | Typical boundary |
 |---|---|---|---|
-| Server-authenticated TLS | The endpoint accepting each connection | Default `ClientCertificateMode` (`AllowCertificate`) | Clients already authenticate at an application gateway or another trusted layer |
-| mTLS | Both endpoints in each TLS connection | `ClientCertificateMode = RequireCertificate` | Direct connections across a network where both workloads need cryptographic identity |
+| Server-authenticated TLS | `RemoteCertificateMode = NoCertificate` | `ClientCertificateMode = NoCertificate` | Clients already authenticate at an application gateway or another trusted layer |
+| mTLS | `RemoteCertificateMode = RequireCertificate` (the default) | `ClientCertificateMode = RequireCertificate` | Direct connections across a network where both workloads need cryptographic identity |
 
-Every silo both accepts and initiates connections. A silo certificate therefore commonly needs the Server Authentication extended key usage (EKU) for inbound connections and the Client Authentication EKU for outbound connections. An Orleans client certificate needs Client Authentication. Certificate identity, issuance, and trust should reflect workload roles rather than reusing one certificate and private key across the cluster.
+The two similarly named options apply at different stages:
+
+- <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode> controls whether the remote endpoint must present a certificate. In server middleware, `RequireCertificate` requires a certificate from an inbound Orleans client or silo, `AllowCertificate` requests one but permits none, and `NoCertificate` doesn't request one. Silo configuration uses this same value for outbound middleware; the TLS server still presents a certificate and platform validation authenticates it when no custom callback is installed.
+- <xref:Orleans.Connections.Security.TlsOptions.ClientCertificateMode> controls selection of the local client certificate in client middleware. On a silo, it applies when the silo initiates a silo-to-silo connection. On an Orleans client, it applies when the client initiates a gateway connection. It doesn't control inbound silo behavior.
+
+`ClientCertificateMode` defaults to `AllowCertificate`: a configured local certificate is sent when it's valid for client authentication, but a missing or unsuitable local certificate is tolerated. Setting it to `RequireCertificate` makes the outbound requirement explicit and fails configuration or connection setup when an appropriate local certificate isn't available.
+
+Every silo both accepts and initiates connections. For mTLS, a silo certificate therefore needs the Server Authentication extended key usage (EKU) for inbound connections and the Client Authentication EKU for outbound connections. For server-authenticated TLS, the silo certificate only needs Server Authentication. An Orleans client certificate used for mTLS needs Client Authentication. Certificate identity, issuance, and trust should reflect workload roles rather than reusing one certificate and private key across the cluster.
 
 TLS provides confidentiality, integrity, and certificate-based peer authentication for the Orleans transport. It doesn't authorize grain calls, isolate tenants, protect data after either process receives it, or secure membership/storage provider traffic unless those providers are separately configured. Compromise of a trusted certificate or private key can let an attacker impersonate that workload.
 
 ## Configure server-authenticated TLS
 
-The silo presents a server certificate. Clients validate its chain, validity period, EKU, and DNS name but don't need to present a certificate.
+The silo presents a server certificate. Connecting clients and silos validate its chain, validity period, EKU, and DNS name but don't present a client certificate. The silo configuration explicitly disables remote certificates for inbound connections and local client certificates for outbound silo-to-silo connections.
 
 :::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="ServerAuthenticatedTls":::
 
@@ -39,7 +46,7 @@ Configure an Orleans client without a local certificate:
 
 ## Configure mutual TLS
 
-For mTLS, silos require a client certificate and clients provide one:
+For mTLS, silos require a certificate from every inbound Orleans client or silo and require a local client certificate for every outbound silo-to-silo connection:
 
 :::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="MutualTls":::
 
@@ -64,7 +71,7 @@ Keep trust stores narrow. Don't place unrelated public or corporate roots in a w
 
 <xref:Orleans.Connections.Security.TlsOptions.SslProtocols> defaults to TLS 1.2 and TLS 1.3. Retain those defaults unless an interoperability or policy requirement calls for a narrower set. Orleans doesn't enable TLS 1.0 or TLS 1.1 by default.
 
-Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> according to your public key infrastructure (PKI). Before enabling it, verify that every workload can reach the certificate revocation list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how outages should affect availability.
+Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> to check remote certificates on inbound silo connections. For outbound connections, set <xref:Orleans.Connections.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode> in <xref:Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient>. Before enabling revocation checks, verify that every workload can reach the certificate revocation list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how outages should affect availability.
 
 ## Rotate certificates
 
@@ -83,7 +90,8 @@ Certificate selectors are called during authentication, but certificate loading,
 - Give private-key files or key-store entries only to the workload identity that needs them.
 - Prefer separate certificates per workload or instance over one exported cluster-wide private key.
 - Validate SANs, EKUs, chain trust, validity, and revocation behavior.
-- Set `ClientCertificateMode` to `RequireCertificate` everywhere mTLS is required.
+- For server-authenticated TLS, set `RemoteCertificateMode` and `ClientCertificateMode` to `NoCertificate` on silos.
+- For mTLS, set `RemoteCertificateMode` and `ClientCertificateMode` to `RequireCertificate` on silos and configure a client-authentication certificate on every connecting Orleans client.
 - Protect gateway and silo ports with network policy even when TLS is enabled.
 - Keep clocks synchronized because certificate validity checks depend on time.
 - Monitor TLS handshake failures and certificate expiration; don't log private keys or certificate passwords.

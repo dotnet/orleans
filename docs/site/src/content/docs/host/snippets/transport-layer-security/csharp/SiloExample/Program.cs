@@ -18,11 +18,16 @@ internal static class TlsExamples
                 .UseLocalhostClustering()
                 .UseTls(serverCertificate, options =>
                 {
+                    options.RemoteCertificateMode =
+                        RemoteCertificateMode.NoCertificate;
+                    options.ClientCertificateMode =
+                        RemoteCertificateMode.NoCertificate;
                     options.OnAuthenticateAsClient = (_, sslOptions) =>
                     {
                         sslOptions.TargetHost = "orleans.example.net";
+                        sslOptions.CertificateRevocationCheckMode =
+                            X509RevocationMode.Online;
                     };
-                    options.CheckCertificateRevocation = true;
                 });
         });
 
@@ -41,11 +46,15 @@ internal static class TlsExamples
                 .UseLocalhostClustering()
                 .UseTls(siloCertificate, options =>
                 {
+                    options.RemoteCertificateMode =
+                        RemoteCertificateMode.RequireCertificate;
                     options.ClientCertificateMode =
                         RemoteCertificateMode.RequireCertificate;
                     options.OnAuthenticateAsClient = (_, sslOptions) =>
                     {
                         sslOptions.TargetHost = "orleans.example.net";
+                        sslOptions.CertificateRevocationCheckMode =
+                            X509RevocationMode.Online;
                     };
                     options.CheckCertificateRevocation = true;
                 });
