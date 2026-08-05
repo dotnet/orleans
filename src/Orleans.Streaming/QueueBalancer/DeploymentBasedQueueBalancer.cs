@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Streaming.Diagnostics;
 
 namespace Orleans.Streams
 {
@@ -26,6 +27,7 @@ namespace Orleans.Streams
         private readonly TimeProvider _timeProvider;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private List<QueueId> allQueues = null!; // Initialized in Initialize.
+        private string _name;
         private bool isStarting;
         
         public DeploymentBasedQueueBalancer(
@@ -40,6 +42,7 @@ namespace Orleans.Streams
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
             this.options = options;
             _timeProvider = services.GetKeyedService<TimeProvider>(StreamingTimeProviderNames.Streaming) ?? TimeProvider.System;
+            _name = string.Empty;
 
             isStarting = true;
 
@@ -54,7 +57,9 @@ namespace Orleans.Streams
         public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
         {
             var options = services.GetRequiredService<IOptionsMonitor<DeploymentBasedQueueBalancerOptions>>().Get(name);
-            return ActivatorUtilities.CreateInstance<DeploymentBasedQueueBalancer>(services, options, deploymentConfiguration);
+            var balancer = ActivatorUtilities.CreateInstance<DeploymentBasedQueueBalancer>(services, options, deploymentConfiguration);
+            balancer._name = name;
+            return balancer;
         }
 
         public override Task Initialize(IStreamQueueMapper queueMapper)
@@ -73,13 +78,15 @@ namespace Orleans.Streams
             await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
             isStarting = false;
             await NotifyListeners();
+            StreamingEvents.EmitQueueBalancerMaturityCompleted(_name, SiloAddress, siloStatusOracle.SiloAddress, isLocalSilo: true, this);
         }
 
-        private async Task RecordImmatureSilo(SiloAddress updatedSilo)
+        private async Task<SiloAddress> RecordImmatureSilo(SiloAddress updatedSilo)
         {
             immatureSilos[updatedSilo] = true;      // record as immature
             await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
             immatureSilos[updatedSilo] = false;     // record as mature
+            return updatedSilo;
         }
 
         public override IEnumerable<QueueId> GetMyQueues()
@@ -159,7 +166,7 @@ namespace Orleans.Streams
 
         private async Task SignalClusterChange(HashSet<SiloAddress> activeSilos)
         {
-            List<Task> tasks = new List<Task>();
+            List<Task<SiloAddress>> tasks = new List<Task<SiloAddress>>();
             // look at all currently active silos not including myself
             foreach (var silo in activeSilos)
             {
@@ -175,8 +182,12 @@ namespace Orleans.Streams
             }
             if (tasks.Count > 0)
             {
-                await Task.WhenAll(tasks);
+                var maturedSilos = await Task.WhenAll(tasks);
                 await this.NotifyListeners(); // notify, uncoditionaly, and deal with changes it in GetMyQueues()
+                foreach (var maturedSilo in maturedSilos)
+                {
+                    StreamingEvents.EmitQueueBalancerMaturityCompleted(_name, SiloAddress, maturedSilo, isLocalSilo: false, this);
+                }
             }
         }
     }

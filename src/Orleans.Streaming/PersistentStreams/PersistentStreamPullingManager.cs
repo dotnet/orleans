@@ -142,6 +142,7 @@ namespace Orleans.Streams
             await AddNewQueues(myQueues, true);
             EmitAgentQueueChange(previousQueues);
             LogInfoStarted();
+            EmitPullingAgentManagerState();
         }
 
         public async Task StopAgents()
@@ -218,6 +219,7 @@ namespace Orleans.Streams
                     notificationSeqNumber,
                     NumberRunningAgents,
                     new(queuesToAgentsMap.Keys));
+                EmitPullingAgentManagerState();
             }
         }
 
@@ -402,6 +404,11 @@ namespace Orleans.Streams
                     NumberRunningAgents,
                     new(queuesToAgentsMap.Keys));
             }
+        }
+
+        private void EmitPullingAgentManagerState()
+        {
+            StreamingEvents.EmitPullingAgentManagerState(streamProviderName, Silo, queuesToAgentsMap.Keys, NumberRunningAgents);
         }
 
         public async Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg)
