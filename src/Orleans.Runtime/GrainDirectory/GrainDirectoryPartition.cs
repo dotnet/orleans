@@ -856,45 +856,35 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             {
                 if (!range.Contains(entry.Key))
                 {
-                    Debug.Fail($"Invariant violated. This host is not the owner of grain '{entry.Key}'.");
+                    throw new InvalidOperationException($"Invariant violated. This host is not the owner of grain '{entry.Key}'.");
                 }
 
                 DebugAssertOwnership(current, entry.Key);
             }
 
-            var missing = 0;
-            var mismatched = 0;
-            var total = 0;
             await foreach (var activationList in GetRegisteredActivations(current, range, isValidation: true))
             {
-                total += activationList.Count;
                 foreach (var entry in activationList)
                 {
                     if (!IsOwner(current, entry.GrainId))
                     {
-                        // The view has been refreshed since the request for registered activations was made.
-                        if (current.Version <= current.Version)
-                        {
-                            Debug.Fail("Invariant violated. This host was sent a registration which it should not have been.");
-                        }
-
-                        continue;
+                        throw new InvalidOperationException(
+                            $"Invariant violated. This host was sent a registration for grain '{entry.GrainId}' which it should not own.");
                     }
 
                     if (_directory.TryGetValue(entry.GrainId, out var existingEntry))
                     {
                         if (!existingEntry.Equals(entry))
                         {
-                            ++mismatched;
                             LogErrorIntegrityViolation(_logger, entry, existingEntry);
-                            Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
+                            throw new InvalidOperationException(
+                                $"Integrity violation: activation '{entry}' does not match existing directory entry '{existingEntry}'.");
                         }
                     }
                     else
                     {
-                        ++missing;
                         LogErrorIntegrityViolation(_logger, entry);
-                        Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
+                        throw new InvalidOperationException($"Integrity violation: activation '{entry}' not found in directory.");
                     }
                 }
             }
@@ -964,13 +954,14 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                     if (!existingEntry.Equals(activation))
                     {
                         LogErrorIntegrityViolation(_logger, activation, existingEntry);
-                        Debug.Fail($"Integrity violation: activation '{activation}' does not match existing directory entry '{existingEntry}'.");
+                        throw new InvalidOperationException(
+                            $"Integrity violation: activation '{activation}' does not match existing directory entry '{existingEntry}'.");
                     }
                 }
                 else
                 {
                     LogErrorIntegrityViolation(_logger, activation);
-                    Debug.Fail($"Integrity violation: activation '{activation}' not found in directory.");
+                    throw new InvalidOperationException($"Integrity violation: activation '{activation}' not found in directory.");
                 }
             }
 
