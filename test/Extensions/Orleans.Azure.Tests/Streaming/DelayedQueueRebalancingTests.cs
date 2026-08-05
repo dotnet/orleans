@@ -4,10 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Streaming.Diagnostics;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -18,19 +17,21 @@ namespace Tester.AzureUtils.Streaming
     public class DelayedQueueRebalancingTests : TestClusterPerTest
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-#pragma warning disable 618
-        private readonly string adapterType = typeof(PersistentStreamProvider).FullName!;
-#pragma warning restore 618
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan AGENT_STATE_TIMEOUT = SILO_IMMATURE_PERIOD + TimeSpan.FromSeconds(20);
-        private static readonly TimeSpan AGENT_STATE_POLL_INTERVAL = TimeSpan.FromMilliseconds(500);
         private const int queueCount = 8;
+        private StreamQueueDiagnosticObserver diagnosticObserver = null!;
+
+        public override async Task InitializeAsync()
+        {
+            diagnosticObserver = StreamQueueDiagnosticObserver.Create(adapterName);
+            await base.InitializeAsync();
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
 
-            // Define a cluster of 4, but 2 will be stopped.
-            builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
             builder.Options.InitialSilosCount = 2;
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         }
@@ -67,72 +68,225 @@ namespace Tester.AzureUtils.Streaming
 
         public override async Task DisposeAsync()
         {
-            await base.DisposeAsync();
+            var cluster = this.HostedCluster;
             try
             {
-                TestUtils.CheckForAzureStorage();
-                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    new AzureQueueOptions().ConfigureTestDefaults());
+                await base.DisposeAsync();
             }
-            catch (SkipException) { }
+            finally
+            {
+                diagnosticObserver?.Dispose();
+                if (cluster is not null)
+                {
+                    try
+                    {
+                        TestUtils.CheckForAzureStorage();
+                        await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                            AzureQueueUtilities.GenerateQueueNames(cluster.Options.ClusterId, queueCount),
+                            new AzureQueueOptions().ConfigureTestDefaults());
+                    }
+                    catch (SkipException) { }
+                }
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_1()
         {
-            await WaitForAgentsState(2, 2, "1");
+            await WaitForAgentsState(2, "1");
 
-            await WaitForAgentsState(2, 4, "2");
+            await WaitForAgentsState(4, "2");
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_2()
         {
-            await WaitForAgentsState(2, 2, "1");
+            await WaitForAgentsState(2, "1");
 
-            await this.HostedCluster.StartAdditionalSilosAsync(2, true);
-            await WaitForAgentsState(4, 2, "2");
+            var existingSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
+            var addedSilos = await this.HostedCluster.StartAdditionalSilosAsync(2, true);
+            var addedSiloAddresses = addedSilos.Select(silo => silo.SiloAddress).ToArray();
+            var activeSiloAddresses = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
 
-            // The expected queue distribution is unchanged after maturity, so there is no provider state transition to poll for.
-            await Task.Delay(SILO_IMMATURE_PERIOD);
-            await WaitForAgentsState(4, 2, "3");
+            await WaitForAgentsState(2, "2");
+
+            await diagnosticObserver.WaitForLocalMaturityAsync(activeSiloAddresses, AGENT_STATE_TIMEOUT, "3");
+            await diagnosticObserver.WaitForRemoteMaturityAsync(existingSilos, addedSiloAddresses, AGENT_STATE_TIMEOUT, "3");
+            await WaitForAgentsState(2, "3");
         }
 
-        private Task WaitForAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo, string callContext)
+        private Task WaitForAgentsState(int numExpectedAgentsPerSilo, string callContext)
         {
-            return TestingUtils.WaitUntilAsync(
-                assertIsTrue => ValidateAgentsState(numExpectedSilos, numExpectedAgentsPerSilo, callContext, assertIsTrue),
-                AGENT_STATE_TIMEOUT,
-                AGENT_STATE_POLL_INTERVAL);
+            var activeSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
+            return diagnosticObserver.WaitForAgentsStateAsync(activeSilos, numExpectedAgentsPerSilo, AGENT_STATE_TIMEOUT, callContext);
         }
 
-        private async Task<bool> ValidateAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo, string callContext, bool assertIsTrue)
+        private sealed class StreamQueueDiagnosticObserver : IDisposable, IObserver<StreamingEvents.StreamingEvent>
         {
-            try
+            private readonly string streamProvider;
+            private readonly IDisposable subscription;
+            private readonly object lockObj = new();
+            private readonly Dictionary<SiloAddress, StreamingEvents.PullingAgentManagerState> agentStates = [];
+            private readonly HashSet<SiloAddress> locallyMaturedSilos = [];
+            private readonly HashSet<(SiloAddress LocalSilo, SiloAddress MaturedSilo)> remotelyMaturedSilos = [];
+            private readonly List<ConditionWaiter> waiters = [];
+
+            private StreamQueueDiagnosticObserver(string streamProvider)
             {
-                var mgmt = this.GrainFactory.GetGrain<IManagementGrain>(0);
+                this.streamProvider = streamProvider;
+                subscription = StreamingEvents.AllEvents.Subscribe(this);
+            }
 
-                object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
+            public static StreamQueueDiagnosticObserver Create(string streamProvider)
+            {
+                return new StreamQueueDiagnosticObserver(streamProvider);
+            }
 
-                // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
-                // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824
-                var numAgents = results.Select(Convert.ToInt32).ToArray();
-                logger.LogInformation("Call {CallContext}: Got back RunningAgentCounts: {RunningAgentCounts}", callContext, Utils.EnumerableToString(numAgents));
+            public Task WaitForAgentsStateAsync(SiloAddress[] expectedSilos, int expectedAgentsPerSilo, TimeSpan timeout, string callContext)
+            {
+                return WaitUntilAsync(
+                    () => HasAgentState(expectedSilos, expectedAgentsPerSilo),
+                    timeout,
+                    () => $"Call {callContext}: expected silos {Utils.EnumerableToString(expectedSilos)} to have {expectedAgentsPerSilo} agents each, got {FormatAgentStates(expectedSilos)}.");
+            }
 
-                var isValid = results.Length == numExpectedSilos && numAgents.All(agents => agents == numExpectedAgentsPerSilo);
-                if (!isValid && assertIsTrue)
+            public Task WaitForLocalMaturityAsync(SiloAddress[] siloAddresses, TimeSpan timeout, string callContext)
+            {
+                return WaitUntilAsync(
+                    () => siloAddresses.All(locallyMaturedSilos.Contains),
+                    timeout,
+                    () => $"Call {callContext}: timed out waiting for local queue balancer maturity on silos {Utils.EnumerableToString(siloAddresses)}. Matured silos: {Utils.EnumerableToString(locallyMaturedSilos)}.");
+            }
+
+            public Task WaitForRemoteMaturityAsync(SiloAddress[] localSilos, SiloAddress[] maturedSilos, TimeSpan timeout, string callContext)
+            {
+                var expectedMaturities =
+                    (from localSilo in localSilos
+                     from maturedSilo in maturedSilos
+                     select (LocalSilo: localSilo, MaturedSilo: maturedSilo)).ToArray();
+
+                return WaitUntilAsync(
+                    () => expectedMaturities.All(remotelyMaturedSilos.Contains),
+                    timeout,
+                    () => $"Call {callContext}: timed out waiting for remote queue balancer maturity. Expected: {FormatMaturities(expectedMaturities)}. Completed: {FormatMaturities(remotelyMaturedSilos)}.");
+            }
+
+            public void OnNext(StreamingEvents.StreamingEvent value)
+            {
+                if (value.StreamProvider != streamProvider)
                 {
-                    Assert.True(
-                        isValid,
-                        $"Call {callContext}: expected {numExpectedSilos} silos with {numExpectedAgentsPerSilo} agents each, got {results.Length} silos with agents {Utils.EnumerableToString(numAgents)}.");
+                    return;
                 }
 
-                return isValid;
+                lock (lockObj)
+                {
+                    switch (value)
+                    {
+                        case StreamingEvents.PullingAgentManagerState state when state.SiloAddress is not null:
+                            agentStates[state.SiloAddress] = state;
+                            break;
+                        case StreamingEvents.QueueBalancerMaturityCompleted maturity when maturity.SiloAddress is not null:
+                            if (maturity.IsLocalSilo)
+                            {
+                                locallyMaturedSilos.Add(maturity.SiloAddress);
+                            }
+                            else
+                            {
+                                remotelyMaturedSilos.Add((maturity.SiloAddress, maturity.MaturedSiloAddress));
+                            }
+                            break;
+                    }
+
+                    SignalWaiters();
+                }
             }
-            catch when (!assertIsTrue)
+
+            public void OnError(Exception error)
             {
-                return false;
+            }
+
+            public void OnCompleted()
+            {
+            }
+
+            public void Dispose()
+            {
+                subscription.Dispose();
+            }
+
+            private bool HasAgentState(SiloAddress[] expectedSilos, int expectedAgentsPerSilo)
+            {
+                return expectedSilos.All(silo => agentStates.TryGetValue(silo, out var state) && state.RunningAgents == expectedAgentsPerSilo);
+            }
+
+            private Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout, Func<string> timeoutMessage)
+            {
+                lock (lockObj)
+                {
+                    if (predicate())
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    var waiter = new ConditionWaiter(predicate);
+                    waiters.Add(waiter);
+                    return WaitWithTimeoutAsync(waiter, timeout, timeoutMessage);
+                }
+            }
+
+            private async Task WaitWithTimeoutAsync(ConditionWaiter waiter, TimeSpan timeout, Func<string> timeoutMessage)
+            {
+                try
+                {
+                    await waiter.Task.WaitAsync(timeout);
+                }
+                catch (TimeoutException)
+                {
+                    RemoveWaiter(waiter);
+                    throw new TimeoutException(timeoutMessage());
+                }
+            }
+
+            private void RemoveWaiter(ConditionWaiter waiter)
+            {
+                lock (lockObj)
+                {
+                    waiters.Remove(waiter);
+                }
+            }
+
+            private void SignalWaiters()
+            {
+                for (var i = waiters.Count - 1; i >= 0; i--)
+                {
+                    if (waiters[i].TryComplete())
+                    {
+                        waiters.RemoveAt(i);
+                    }
+                }
+            }
+
+            private string FormatAgentStates(SiloAddress[] expectedSilos)
+            {
+                var states = expectedSilos.Select(silo => agentStates.TryGetValue(silo, out var state) ? $"{silo}: {state.RunningAgents}" : $"{silo}: <missing>");
+                return $"{agentStates.Count} silos with agents {Utils.EnumerableToString(states)}";
+            }
+
+            private static string FormatMaturities(IEnumerable<(SiloAddress LocalSilo, SiloAddress MaturedSilo)> maturities)
+            {
+                return Utils.EnumerableToString(maturities.Select(maturity => $"{maturity.LocalSilo}->{maturity.MaturedSilo}"));
+            }
+
+            private sealed class ConditionWaiter(Func<bool> predicate)
+            {
+                private readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                public Task Task => completion.Task;
+
+                public bool TryComplete()
+                {
+                    return predicate() && completion.TrySetResult();
+                }
             }
         }
     }
