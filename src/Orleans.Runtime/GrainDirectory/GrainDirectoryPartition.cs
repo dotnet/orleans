@@ -619,20 +619,29 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
         TimeSpan GetLeaseDuration(SiloAddress previousOwner)
         {
-            if (!current.ClusterMembershipSnapshot.Members.TryGetValue(previousOwner, out var member))
-            {
-                return _rangeLeaseDuration;
-            }
-
-            if (member.Status == SiloStatus.Stopping)
-            {
-                return _rangeLeaseDuration;
-            }
-
-            return member.Status == SiloStatus.Dead && member.WasDeclaredDead
-                ? _deadSiloLeaseDuration
-                : TimeSpan.Zero;
+            current.ClusterMembershipSnapshot.Members.TryGetValue(previousOwner, out var member);
+            return GetLeaseDurationForPreviousOwner(_rangeLeaseDuration, _deadSiloLeaseDuration, member);
         }
+    }
+
+    internal static TimeSpan GetLeaseDurationForPreviousOwner(
+        TimeSpan rangeLeaseDuration,
+        TimeSpan deadSiloLeaseDuration,
+        ClusterMember? member)
+    {
+        if (member is null)
+        {
+            return deadSiloLeaseDuration;
+        }
+
+        if (member.Status == SiloStatus.Stopping)
+        {
+            return rangeLeaseDuration;
+        }
+
+        return member.Status == SiloStatus.Dead && member.WasDeclaredDead
+            ? deadSiloLeaseDuration
+            : TimeSpan.Zero;
     }
 
     private (TaskCompletionSource Lock, ValueStopwatch Stopwatch) LockRange(RingRange range, MembershipVersion version, string operationName)

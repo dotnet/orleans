@@ -187,6 +187,17 @@ public class GrainDirectoryLeaseTests
     }
 
     [Fact]
+    public void MissingPreviousOwner_UsesPostDetectionLeaseDuration()
+    {
+        var duration = GrainDirectoryPartition.GetLeaseDurationForPreviousOwner(
+            rangeLeaseDuration: TimeSpan.FromSeconds(30),
+            deadSiloLeaseDuration: TimeSpan.FromSeconds(15),
+            member: null);
+
+        Assert.Equal(TimeSpan.FromSeconds(15), duration);
+    }
+
+    [Fact]
     public async Task DisabledLeaseHold_AllowsImmediateReregistration()
     {
         var (cluster, _) = CreateCluster(TimeSpan.Zero);
