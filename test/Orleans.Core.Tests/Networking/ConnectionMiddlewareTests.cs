@@ -172,7 +172,7 @@ namespace Orleans.Core.Tests.Networking
             public override string ConnectionId { get; set; } = Guid.NewGuid().ToString();
             public override IDuplexPipe Transport { get => _transport; set => throw new NotSupportedException(); }
             public override IFeatureCollection Features { get; } = new FeatureCollection();
-            public override IDictionary<object, object> Items { get; set; } = new Dictionary<object, object>();
+            public override IDictionary<object, object?> Items { get; set; } = new Dictionary<object, object?>();
 
             private sealed class DuplexPipe : IDuplexPipe
             {
@@ -186,17 +186,6 @@ namespace Orleans.Core.Tests.Networking
                 public PipeWriter Output { get; }
             }
 
-            private sealed class FeatureCollection : IFeatureCollection
-            {
-                public object this[Type key] { get => null; set { } }
-                public bool IsReadOnly => false;
-                public int Revision => 0;
-                public TFeature Get<TFeature>() => default;
-                public void Set<TFeature>(TFeature instance) { }
-                public IEnumerator<KeyValuePair<Type, object>> GetEnumerator()
-                    => Enumerable.Empty<KeyValuePair<Type, object>>().GetEnumerator();
-                System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
-            }
         }
     }
 }
