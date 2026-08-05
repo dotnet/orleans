@@ -60,14 +60,7 @@ Metadata is fixed for the lifetime of a silo instance. Restart the silo to publi
 
 Inject `ISiloMetadataCache` into a silo service or Orleans component:
 
-```csharp
-var metadata = siloMetadataCache.GetSiloMetadata(siloAddress);
-
-if (metadata.Metadata.TryGetValue("role", out var role))
-{
-    logger.LogInformation("Silo {Silo} has role {Role}", siloAddress, role);
-}
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="read_silo_metadata":::
 
 The cache follows cluster membership and fetches metadata from active silos. `GetSiloMetadata` returns the locally cached value, so it doesn't add a remote call to the request path.
 

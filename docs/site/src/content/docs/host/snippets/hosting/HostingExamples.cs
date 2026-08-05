@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.Runtime.Messaging;
 using StackExchange.Redis;
 
@@ -221,6 +222,24 @@ public static class HostingExamples
         });
         // </activation_collection>
     }
+
+    public static void ReadSiloMetadata(
+        ISiloMetadataCache siloMetadataCache,
+        SiloAddress siloAddress,
+        ILogger logger)
+    {
+        // <read_silo_metadata>
+        var metadata = siloMetadataCache.GetSiloMetadata(siloAddress);
+
+        if (metadata.Metadata.TryGetValue("role", out var role))
+        {
+            logger.LogInformation(
+                "Silo {Silo} has role {Role}",
+                siloAddress,
+                role);
+        }
+        // </read_silo_metadata>
+    }
 }
 
 public sealed class CacheLifecycleParticipant
@@ -297,15 +316,27 @@ public interface IHealthGrain : IGrainWithStringKey
     Task Ping();
 }
 
-public interface IShoppingCartGrain : IGrainWithStringKey;
+public interface IShoppingCartGrain : IGrainWithStringKey
+{
+}
 
 [GrainDirectory("durable-directory")]
-public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain;
+public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
+{
+}
 
-public interface IRecommendationGrain : IGrainWithStringKey;
+public interface IRecommendationGrain : IGrainWithStringKey
+{
+}
 
-public sealed class RecommendationGrain : Grain, IRecommendationGrain;
+public sealed class RecommendationGrain : Grain, IRecommendationGrain
+{
+}
 
-public interface IModelRegistryGrain : IGrainWithStringKey;
+public interface IModelRegistryGrain : IGrainWithStringKey
+{
+}
 
-public sealed class ModelRegistryGrain : Grain, IModelRegistryGrain;
+public sealed class ModelRegistryGrain : Grain, IModelRegistryGrain
+{
+}
