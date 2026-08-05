@@ -634,11 +634,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             return deadSiloLeaseDuration;
         }
 
-        if (member.Status == SiloStatus.Stopping)
-        {
-            return rangeLeaseDuration;
-        }
-
         return member.Status == SiloStatus.Dead && member.WasDeclaredDead
             ? deadSiloLeaseDuration
             : TimeSpan.Zero;

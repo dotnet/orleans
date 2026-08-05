@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
@@ -195,6 +196,22 @@ public class GrainDirectoryLeaseTests
             member: null);
 
         Assert.Equal(TimeSpan.FromSeconds(15), duration);
+    }
+
+    [Fact]
+    public void StoppingPreviousOwner_DoesNotCreateRangeLease()
+    {
+        var member = new ClusterMember(
+            SiloAddress.New(IPAddress.Loopback, port: 11111, generation: 1),
+            SiloStatus.Stopping,
+            "stopping");
+
+        var duration = GrainDirectoryPartition.GetLeaseDurationForPreviousOwner(
+            rangeLeaseDuration: TimeSpan.FromSeconds(30),
+            deadSiloLeaseDuration: TimeSpan.FromSeconds(15),
+            member);
+
+        Assert.Equal(TimeSpan.Zero, duration);
     }
 
     [Fact]
