@@ -11,10 +11,10 @@ namespace Orleans.Reminders.GoogleFirestore.Tests;
 
 [TestCategory("Reminders"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-public class FirestoreRemindersTests : ReminderTableTestsBase
+public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<TestEnvironmentFixture>
 {
-    public FirestoreRemindersTests(ConnectionStringFixture fixture)
-        : base(fixture, new TestEnvironmentFixture(), new LoggerFilterOptions())
+    public FirestoreRemindersTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
+        : base(fixture, environment, new LoggerFilterOptions())
     {
     }
 
@@ -35,24 +35,19 @@ public class FirestoreRemindersTests : ReminderTableTestsBase
     protected override Task<string> GetConnectionString() => Task.FromResult(GoogleEmulatorHost.FirestoreEndpoint);
 
     [SkippableFact]
-    public void Init()
-    {
-    }
-
-    [SkippableFact]
-    public async Task Range()
+    public async Task ReadsReminderRanges()
     {
         await RemindersRange(50);
     }
 
     [SkippableFact]
-    public async Task ParallelUpsert()
+    public async Task SupportsParallelUpserts()
     {
         await RemindersParallelUpsert();
     }
 
     [SkippableFact]
-    public async Task Simple()
+    public async Task SupportsReminderLifecycle()
     {
         await ReminderSimple();
     }
@@ -60,7 +55,7 @@ public class FirestoreRemindersTests : ReminderTableTestsBase
     [SkippableFact]
     public async Task ReminderIdsDoNotCollide()
     {
-        var startAt = DateTime.UtcNow;
+        var startAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var period = TimeSpan.FromMinutes(1);
         var first = new ReminderEntry
         {

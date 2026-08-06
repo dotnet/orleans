@@ -15,7 +15,7 @@ namespace Orleans.GrainDirectory.GoogleFirestore;
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 
-public abstract class FirestoreEntity
+internal abstract class FirestoreEntity
 {
     [FirestoreDocumentId]
     public string Id { get; set; } = default!;

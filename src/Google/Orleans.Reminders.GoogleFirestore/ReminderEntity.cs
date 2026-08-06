@@ -5,7 +5,7 @@ using Google.Cloud.Firestore;
 namespace Orleans.Reminders.GoogleFirestore;
 
 [FirestoreData]
-public class ReminderEntity : FirestoreEntity
+internal class ReminderEntity : FirestoreEntity
 {
     [FirestoreProperty("Name")]
     public string Name { get; set; } = default!;

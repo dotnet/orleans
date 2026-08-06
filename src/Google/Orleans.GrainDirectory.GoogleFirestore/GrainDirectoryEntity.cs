@@ -5,7 +5,7 @@ using Google.Cloud.Firestore;
 namespace Orleans.GrainDirectory.GoogleFirestore;
 
 [FirestoreData]
-public class GrainDirectoryEntity : FirestoreEntity
+internal class GrainDirectoryEntity : FirestoreEntity
 {
     [FirestoreProperty("SiloAddress")]
     public string SiloAddress { get; set; } = default!;

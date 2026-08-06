@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 
 namespace Orleans.Tests.GoogleFirestore;
@@ -18,7 +19,7 @@ public static class GoogleEmulatorHost
             if (_storageEndpoint is null)
             {
                 EnsureEmulator(STORAGE_PORT);
-                _storageEndpoint = $"http://localhost:{STORAGE_PORT}";
+                _storageEndpoint = $"http://127.0.0.1:{STORAGE_PORT}";
                 Environment.SetEnvironmentVariable("STORAGE_EMULATOR_HOST", _storageEndpoint);
             }
 
@@ -26,7 +27,7 @@ public static class GoogleEmulatorHost
         }
     }
 
-    public static string? _pubSubEndpoint;
+    private static string? _pubSubEndpoint;
     public static string PubSubEndpoint
     {
         get
@@ -34,7 +35,7 @@ public static class GoogleEmulatorHost
             if (_pubSubEndpoint is null)
             {
                 EnsureEmulator(PUBSUB_PORT);
-                _pubSubEndpoint = $"http://localhost:{PUBSUB_PORT}";
+                _pubSubEndpoint = $"http://127.0.0.1:{PUBSUB_PORT}";
                 Environment.SetEnvironmentVariable("PUBSUB_EMULATOR_HOST", _pubSubEndpoint);
             }
 
@@ -42,7 +43,7 @@ public static class GoogleEmulatorHost
         }
     }
 
-    public static string? _firestoreEndpoint;
+    private static string? _firestoreEndpoint;
     public static string FirestoreEndpoint
     {
         get
@@ -50,7 +51,7 @@ public static class GoogleEmulatorHost
             if (_firestoreEndpoint is null)
             {
                 EnsureEmulator(FIRESTORE_PORT);
-                _firestoreEndpoint = $"http://localhost:{FIRESTORE_PORT}";
+                _firestoreEndpoint = $"http://127.0.0.1:{FIRESTORE_PORT}";
                 Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", _firestoreEndpoint);
             }
 
@@ -61,18 +62,14 @@ public static class GoogleEmulatorHost
     private static void EnsureEmulator(int port)
     {
         using var client = new TcpClient();
-        var result = client.BeginConnect("localhost", port, null, null);
-        var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
-        if (!success)
-        {
-            throw new SkipException();
-        }
-
         try
         {
-            client.EndConnect(result);
+            client.ConnectAsync(IPAddress.Loopback, port)
+                .WaitAsync(TimeSpan.FromSeconds(1))
+                .GetAwaiter()
+                .GetResult();
         }
-        catch (SocketException)
+        catch (Exception exception) when (exception is SocketException or TimeoutException)
         {
             throw new SkipException();
         }

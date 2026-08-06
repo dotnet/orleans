@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Xunit.Abstractions;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -18,8 +20,8 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
 {
     private readonly IProviderRuntime _providerRuntime;
     private readonly ITestOutputHelper _output;
-    private readonly Dictionary<string, string> _providerCfgProps = new();
-    private GoogleFirestoreStorage _storage = default!;
+    private readonly List<ISiloLifecycleSubject> _lifecycles = [];
+    private string _rootCollectionName = default!;
 
     public FirestoreStorageProviderTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
     {
@@ -43,8 +45,9 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
             nameof(useJson), useJson);
 
         var grainState = TestStoreGrainState.NewRandomState(stringLength);
+        var storage = await CreateStorage(useJson);
 
-        await Test_PersistenceProvider_WriteRead(testName, this._storage, grainState);
+        await Test_PersistenceProvider_WriteRead(testName, storage, grainState);
     }
 
     [SkippableTheory, TestCategory("Functional")]
@@ -60,24 +63,26 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
             nameof(useJson), useJson);
 
         var grainState = TestStoreGrainState.NewRandomState(stringLength);
+        var storage = await CreateStorage(useJson);
 
-        await Test_PersistenceProvider_WriteClearRead(testName, this._storage, grainState);
+        await Test_PersistenceProvider_WriteClearRead(testName, storage, grainState);
     }
 
     [SkippableFact]
     public async Task StateNamesUseIndependentRecords()
     {
+        var storage = await CreateStorage();
         var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
         var first = TestStoreGrainState.NewRandomState();
         var second = TestStoreGrainState.NewRandomState();
 
-        await this._storage.WriteStateAsync("first", grainId, first);
-        await this._storage.WriteStateAsync("second", grainId, second);
+        await storage.WriteStateAsync("first", grainId, first);
+        await storage.WriteStateAsync("second", grainId, second);
 
         var firstRead = new GrainState<TestStoreGrainState>(new());
         var secondRead = new GrainState<TestStoreGrainState>(new());
-        await this._storage.ReadStateAsync("first", grainId, firstRead);
-        await this._storage.ReadStateAsync("second", grainId, secondRead);
+        await storage.ReadStateAsync("first", grainId, firstRead);
+        await storage.ReadStateAsync("second", grainId, secondRead);
 
         var firstState = Assert.IsType<TestStoreGrainState>(first.State);
         var secondState = Assert.IsType<TestStoreGrainState>(second.State);
@@ -94,11 +99,12 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
     [SkippableFact]
     public async Task MissingReadResetsState()
     {
+        var storage = await CreateStorage();
         var grainState = TestStoreGrainState.NewRandomState();
         grainState.ETag = "stale";
         grainState.RecordExists = true;
 
-        await this._storage.ReadStateAsync(
+        await storage.ReadStateAsync(
             "missing",
             GrainId.Create("test", Guid.NewGuid().ToString("N")),
             grainState);
@@ -114,9 +120,10 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
     [SkippableFact]
     public async Task ClearBeforeWriteSucceeds()
     {
+        var storage = await CreateStorage();
         var grainState = TestStoreGrainState.NewRandomState();
 
-        await this._storage.ClearStateAsync(
+        await storage.ClearStateAsync(
             "never-written",
             GrainId.Create("test", Guid.NewGuid().ToString("N")),
             grainState);
@@ -127,6 +134,34 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(default, state.A);
         Assert.Equal(default, state.B);
         Assert.Equal(default, state.C);
+    }
+
+    [SkippableFact]
+    public async Task ClearedDocumentCanBeRewritten()
+    {
+        var storage = await CreateStorage(deleteStateOnClear: false);
+        var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
+        var grainState = TestStoreGrainState.NewRandomState();
+
+        await storage.WriteStateAsync("state", grainId, grainState);
+        await storage.ClearStateAsync("state", grainId, grainState);
+
+        var clearedState = new GrainState<TestStoreGrainState>(new());
+        await storage.ReadStateAsync("state", grainId, clearedState);
+        Assert.False(clearedState.RecordExists);
+        Assert.NotNull(clearedState.ETag);
+
+        clearedState.State = TestStoreGrainState.NewRandomState().State;
+        await storage.WriteStateAsync("state", grainId, clearedState);
+
+        var rewrittenState = new GrainState<TestStoreGrainState>(new());
+        await storage.ReadStateAsync("state", grainId, rewrittenState);
+        Assert.True(rewrittenState.RecordExists);
+        var expected = Assert.IsType<TestStoreGrainState>(clearedState.State);
+        var actual = Assert.IsType<TestStoreGrainState>(rewrittenState.State);
+        Assert.Equal(expected.A, actual.A);
+        Assert.Equal(expected.B, actual.B);
+        Assert.Equal(expected.C, actual.C);
     }
 
     [SkippableTheory, TestCategory("Functional")]
@@ -144,11 +179,13 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
 
         var grainState = TestStoreGrainState.NewRandomState(stringLength);
         var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
+        var writeStorage = await CreateStorage(useJsonForWrite, useFallback: true);
 
-        grainState = await Test_PersistenceProvider_WriteRead(testName, this._storage,
+        grainState = await Test_PersistenceProvider_WriteRead(testName, writeStorage,
             grainState, grainId);
 
-        await Test_PersistenceProvider_Read(testName, this._storage, grainState, grainId);
+        var readStorage = await CreateStorage(useJsonForRead, useFallback: true);
+        await Test_PersistenceProvider_Read(testName, readStorage, grainState, grainId);
     }
 
     private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
@@ -238,24 +275,50 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         return storedGrainState;
     }
 
-    public async Task InitializeAsync()
+    private async Task<GoogleFirestoreStorage> CreateStorage(
+        bool useJson = false,
+        bool useFallback = false,
+        bool deleteStateOnClear = true)
     {
-        var id = $"orleans-test-{Guid.NewGuid():N}";
-
         var options = new FirestoreStateStorageOptions
         {
-            DeleteStateOnClear = true,
+            DeleteStateOnClear = deleteStateOnClear,
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
-            ProjectId = id,
-            GrainStorageSerializer = new OrleansGrainStorageSerializer(this._providerRuntime.ServiceProvider.GetRequiredService<Serializer>()),
+            ProjectId = GoogleEmulatorHost.ProjectId,
+            RootCollectionName = _rootCollectionName,
         };
+
+        var binarySerializer = new OrleansGrainStorageSerializer(
+            this._providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
+        var jsonOptions = this._providerRuntime.ServiceProvider
+            .GetRequiredService<IOptions<OrleansJsonSerializerOptions>>();
+        var jsonSerializer = new JsonGrainStorageSerializer(new OrleansJsonSerializer(jsonOptions));
+        options.GrainStorageSerializer = useFallback
+            ? useJson
+                ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
+                : new GrainStorageSerializer(binarySerializer, jsonSerializer)
+            : useJson ? jsonSerializer : binarySerializer;
 
         var store = ActivatorUtilities.CreateInstance<GoogleFirestoreStorage>(this._providerRuntime.ServiceProvider, "StorageProviderTests", options);
         ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this._providerRuntime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
         store.Participate(lifecycle);
         await lifecycle.OnStart();
-        this._storage = store;
+        _lifecycles.Add(lifecycle);
+        return store;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task InitializeAsync()
+    {
+        _rootCollectionName = $"orleans-test-{Guid.NewGuid():N}";
+        _ = GoogleEmulatorHost.FirestoreEndpoint;
+        return Task.CompletedTask;
+    }
+
+    public async Task DisposeAsync()
+    {
+        foreach (var lifecycle in Enumerable.Reverse(_lifecycles))
+        {
+            await lifecycle.OnStop();
+        }
+    }
 }

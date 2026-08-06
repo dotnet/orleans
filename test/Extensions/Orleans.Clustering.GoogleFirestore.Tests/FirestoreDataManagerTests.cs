@@ -20,17 +20,11 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         var data = GetDummyEntity();
         var eTag = await this._manager.CreateEntity(data);
 
-        try
-        {
-            var data2 = data.Clone();
-            data2.Age = 99;
-            await this._manager.CreateEntity(data2);
-            Assert.Fail("Should have thrown RpcException.");
-        }
-        catch (RpcException exc)
-        {
-            Assert.Equal(StatusCode.AlreadyExists, exc.StatusCode);  // "Creating an already existing entry."
-        }
+        var data2 = data.Clone();
+        data2.Age = 99;
+        var exception = await Assert.ThrowsAsync<RpcException>(() => this._manager.CreateEntity(data2));
+        Assert.Equal(StatusCode.AlreadyExists, exception.StatusCode);
+
         var returned = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.NotNull(returned);
         Assert.Equal(data.Id, returned.Id);
@@ -59,49 +53,59 @@ public class FirestoreDataManagerTests : IAsyncLifetime
     }
 
     [SkippableFact]
-    public async Task UpdateEntry()
+    public async Task UpdateEntryRequiresIdAndEtag()
     {
         var data = GetDummyEntity();
         data.Id = default!;
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.Update(data));
+
         data.Id = Guid.NewGuid().ToString();
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.Update(data));
+    }
+
+    [SkippableFact]
+    public async Task UpdateMissingEntryFails()
+    {
+        var data = GetDummyEntity();
         data.ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
         var found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.Null(found);
 
-        try
-        {
-            await this._manager.Update(data);
-            Assert.Fail("Should have thrown RpcException.");
-        }
-        catch (RpcException exc)
-        {
-            Assert.Equal(StatusCode.FailedPrecondition, exc.StatusCode);  // "Updating a non-existing entry."
-        }
+        var exception = await Assert.ThrowsAsync<RpcException>(() => this._manager.Update(data));
+        Assert.Equal(StatusCode.FailedPrecondition, exception.StatusCode);
+    }
 
+    [SkippableFact]
+    public async Task UpdateWithStaleEtagFails()
+    {
+        var data = GetDummyEntity();
         var eTag = await this._manager.CreateEntity(data);
 
         var data2 = data.Clone();
         data2.Age = 99;
         data2.ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
-        string eTag2 = default!;
+        var exception = await Assert.ThrowsAsync<RpcException>(() => this._manager.Update(data2));
+        Assert.Equal(StatusCode.FailedPrecondition, exception.StatusCode);
 
-        try
-        {
-            eTag2 = await this._manager.Update(data2);
-            Assert.Fail("Should have thrown RpcException.");
-        }
-        catch (RpcException exc)
-        {
-            Assert.Equal(StatusCode.FailedPrecondition, exc.StatusCode);  // "Wrong eTag."
-        }
+        var returned = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
+        Assert.NotNull(returned);
+        Assert.Equal(data.Age, returned.Age);
+        Assert.Equal(Utils.ParseTimestamp(eTag), returned.ETag);
+    }
 
+    [SkippableFact]
+    public async Task UpdateEntry()
+    {
+        var data = GetDummyEntity();
+        var eTag = await this._manager.CreateEntity(data);
+
+        var data2 = data.Clone();
+        data2.Age = 99;
         data2.ETag = Utils.ParseTimestamp(eTag);
 
-        eTag2 = await this._manager.Update(data2);
+        var eTag2 = await this._manager.Update(data2);
 
         var returned = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.NotNull(returned);
@@ -117,7 +121,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         var data = GetDummyEntity();
 
         var result = await this._manager.DeleteEntity(data.Id);
-        Assert.False(result, "Should have thrown RpcException.");
+        Assert.False(result, "A missing entry should not be deleted.");
 
         await this._manager.CreateEntity(data);
 
@@ -125,16 +129,16 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.NotNull(found);
 
         result = await this._manager.DeleteEntity(data.Id, Utils.FormatTimestamp(Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero))));
-        Assert.False(result, "Should have not deleted.");
+        Assert.False(result, "An entry with a stale ETag should not be deleted.");
 
         result = await this._manager.DeleteEntity(data.Id, Utils.FormatTimestamp(found.ETag!.Value));
-        Assert.True(result, "Should have deleted.");
+        Assert.True(result, "An entry with the current ETag should be deleted.");
 
         found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.Null(found);
 
         result = await this._manager.DeleteEntity(data.Id);
-        Assert.False(result, "Should have not deleted as it wasn't found.");
+        Assert.False(result, "A previously deleted entry should not be deleted again.");
     }
 
     [SkippableFact]
@@ -197,7 +201,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
     }
 
     [SkippableFact]
-    public async Task DeleteEntities()
+    public async Task DeleteEntitiesRejectsOversizedBatch()
     {
         var tasks = Enumerable.Range(0, 501).Select(x =>
         {
@@ -208,35 +212,49 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await Task.WhenAll(tasks);
 
         var entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
+        Assert.Equal(501, entities.Length);
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this._manager.DeleteEntities(entities)); // "Deleting more than 500 entries at once."
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this._manager.DeleteEntities(entities));
+    }
 
-        await this._manager.DeleteEntity(entities[0].Id, Utils.FormatTimestamp(entities[0].ETag!.Value));
+    [SkippableFact]
+    public async Task DeleteEntitiesRejectsStaleEtag()
+    {
+        await Task.WhenAll(Enumerable.Range(0, 2)
+            .Select(_ => this._manager.CreateEntity(GetDummyEntity())));
 
-        entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
-        var correctEtag = entities[0].ETag;
+        var entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
+        entities[0].ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
-        try
-        {
-            entities[0].ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
-            await this._manager.DeleteEntities(entities);
-            Assert.Fail("Should have thrown RpcException.");
-        }
-        catch (RpcException exc)
-        {
-            Assert.Equal(StatusCode.FailedPrecondition, exc.StatusCode);  // "Wrong eTag."
-        }
+        var exception = await Assert.ThrowsAsync<RpcException>(() => this._manager.DeleteEntities(entities));
+        Assert.Equal(StatusCode.FailedPrecondition, exception.StatusCode);
+        Assert.Equal(2, (await this._manager.ReadAllEntities<DummyFirestoreEntity>()).Length);
+    }
 
+    [SkippableFact]
+    public async Task DeleteEntitiesRejectsInvalidEntity()
+    {
+        var data = GetDummyEntity();
+        await this._manager.CreateEntity(data);
 
+        var entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
         entities[0].ETag = Timestamp.FromDateTimeOffset(DateTimeOffset.MinValue);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.DeleteEntities(entities)); // "Deleting an entry with a wrong data."
 
-        entities[0].ETag = correctEtag;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.DeleteEntities(entities));
+        Assert.Single(await this._manager.ReadAllEntities<DummyFirestoreEntity>());
+    }
 
+    [SkippableFact]
+    public async Task DeleteEntities()
+    {
+        await Task.WhenAll(Enumerable.Range(0, 3)
+            .Select(_ => this._manager.CreateEntity(GetDummyEntity())));
+
+        var entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
+        Assert.Equal(3, entities.Length);
         await this._manager.DeleteEntities(entities);
 
         entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
-
         Assert.Empty(entities);
 
         await this._manager.DeleteEntities(entities);

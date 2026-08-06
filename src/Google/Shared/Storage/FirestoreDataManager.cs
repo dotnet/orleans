@@ -257,7 +257,7 @@ internal class FirestoreDataManager
 
             if (!snapshot.Exists)
             {
-                if (this.Logger.IsEnabled(LogLevel.Debug)) this.Logger.LogTrace("Entity {id} not found on collection {collection}", id, this._partition);
+                if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Entity {id} not found on collection {collection}", id, this._partition);
 
                 return null;
             }

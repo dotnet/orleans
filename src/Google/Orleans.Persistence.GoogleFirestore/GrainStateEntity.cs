@@ -4,7 +4,7 @@ using Google.Cloud.Firestore;
 namespace Orleans.Persistence.GoogleFirestore;
 
 [FirestoreData]
-public class GrainStateEntity : FirestoreEntity
+internal class GrainStateEntity : FirestoreEntity
 {
     [FirestoreProperty("Name")]
     public string Name { get; set; } = default!;

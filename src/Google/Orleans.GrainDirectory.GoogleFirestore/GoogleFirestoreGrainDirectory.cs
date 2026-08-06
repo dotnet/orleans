@@ -60,7 +60,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
             await this._dataManager.CreateEntity(entry).ConfigureAwait(false);
             return address;
         }
-        catch (RpcException)
+        catch (RpcException exception) when (exception.StatusCode == StatusCode.AlreadyExists)
         {
             var result = await this.Lookup(address.GrainId);
             return result;

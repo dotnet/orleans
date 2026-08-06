@@ -57,7 +57,7 @@ public static class GoogleFirestoreReminderServiceExtensions
     }
 
     /// <summary>
-    /// Adds reminder storage backed by Azure Table Storage.
+    /// Adds reminder storage backed by Google Cloud Firestore.
     /// </summary>
     /// <param name="builder">
     /// The builder.
@@ -76,7 +76,7 @@ public static class GoogleFirestoreReminderServiceExtensions
     }
 
     /// <summary>
-    /// Adds reminder storage backed by Azure Table Storage.
+    /// Adds reminder storage backed by Google Cloud Firestore.
     /// </summary>
     /// <param name="builder">
     /// The builder.
