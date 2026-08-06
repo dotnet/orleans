@@ -43,6 +43,7 @@
     private bool _isSaving;
     private MudForm? _form;
 
+    [Parameter]
     public ProductDetails Product { get; set; } = new();
 
     [CascadingParameter]
@@ -54,23 +55,46 @@
     [Inject]
     private IDialogService DialogService { get; set; } = null!;
 
-    public async Task OpenAsync(string title, Func<ProductDetails, Task> onProductUpdated) =>
+    [Inject]
+    private ILogger<ManageProductModal> Logger { get; set; } = null!;
+
+    [Inject]
+    private ToastService ToastService { get; set; } = null!;
+
+    public async Task OpenAsync(
+        string title,
+        Func<ProductDetails, Task> onProductUpdated,
+        ProductDetails? product = null)
+    {
+        var parameters = new DialogParameters
+        {
+            {
+                nameof(ProductUpdated),
+                new EventCallbackFactory().Create(
+                    this,
+                    new Func<ProductDetails, Task>(onProductUpdated))
+            },
+            {
+                nameof(Product),
+                product is null ? new ProductDetails() : product with { }
+            },
+        };
+
         await DialogService.ShowAsync<ManageProductModal>(
             title,
-            new DialogParameters
-            {
-                {
-                    nameof(ProductUpdated),
-                    new EventCallbackFactory().Create(
-                        this,
-                        new Func<ProductDetails, Task>(onProductUpdated))
-                },
-            });
+            parameters);
+    }
 
     public void Close() => MudDialog?.Cancel();
 
-    private void PopulateWithSampleData() =>
-        Product = ProductDetailsExtensions.ProductDetailsFaker.Generate();
+    private void PopulateWithSampleData()
+    {
+        var productId = Product.Id;
+        Product = ProductDetailsExtensions.ProductDetailsFaker.Generate() with
+        {
+            Id = productId,
+        };
+    }
 
     private async Task SaveAsync()
     {
@@ -89,11 +113,32 @@
         {
             _isSaving = true;
             await ProductUpdated.InvokeAsync(Product);
+            Close();
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Logger.LogWarning(exception, "Product update authorization failed.");
+            await ToastService.ShowToastAsync(
+                "Product wasn't saved",
+                "Your account isn't authorized to manage products.");
+        }
+        catch (OrleansException exception)
+        {
+            Logger.LogError(exception, "Orleans failed to save the product.");
+            await ToastService.ShowToastAsync(
+                "Product save outcome is unknown",
+                "Refresh the catalog before retrying the change.");
+        }
+        catch (TimeoutException exception)
+        {
+            Logger.LogError(exception, "The product update timed out.");
+            await ToastService.ShowToastAsync(
+                "Product save outcome is unknown",
+                "Refresh the catalog before retrying the change.");
         }
         finally
         {
             _isSaving = false;
-            Close();
         }
     }
 }

@@ -46,7 +46,7 @@ services.AddSingleton<ShoppingCartService>();
 services.AddSingleton<InventoryService>();
 services.AddScoped<ProductService>();
 services.AddScoped<ComponentStateChangedObserver>();
-services.AddSingleton<ToastService>();
+services.AddScoped<ToastService>();
 services.AddLocalStorageServices();
 services.AddApplicationInsights("ShoppingCart");
 services.AddHostedService<ProductStoreSeeder>();
@@ -103,12 +103,11 @@ static void ConfigureProductionOrleans(WebApplicationBuilder builder)
     var privatePorts = GetRequiredSetting(builder, "WEBSITE_PRIVATE_PORTS")
         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    if (privatePorts.Length < 2
-        || !int.TryParse(privatePorts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var siloPort)
-        || !int.TryParse(privatePorts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var gatewayPort))
+    if (privatePorts.Length < 1
+        || !int.TryParse(privatePorts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var siloPort))
     {
         throw new InvalidOperationException(
-            "WEBSITE_PRIVATE_PORTS must contain at least two comma-separated TCP ports.");
+            "WEBSITE_PRIVATE_PORTS must contain at least one TCP port.");
     }
 
     var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
@@ -133,7 +132,7 @@ static void ConfigureProductionOrleans(WebApplicationBuilder builder)
             .ConfigureEndpoints(
                 privateIp,
                 siloPort,
-                gatewayPort,
+                gatewayPort: 0,
                 listenOnAnyHostAddress: true)
             .UseAzureStorageClustering(options =>
             {

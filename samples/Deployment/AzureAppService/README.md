@@ -12,7 +12,7 @@ This sample deploys a multi-instance Orleans shopping cart to either Windows or 
 - GitHub Actions deployment using OpenID Connect (OIDC) instead of a deployment client secret.
 
 > [!IMPORTANT]
-> App Service HTTP scale-out isn't sufficient for Orleans by itself. The sample allocates two private ports per instance and uses regional virtual network integration so silos can connect directly over TCP.
+> App Service HTTP scale-out isn't sufficient for Orleans by itself. The sample allocates one private silo port per instance and uses regional virtual network integration so silos can connect directly over TCP.
 
 ## Choose a platform
 
@@ -52,7 +52,7 @@ Create a Microsoft Entra app registration for App Service Authentication:
 
 The exact production and staging hostnames are deployment outputs. You can deploy the infrastructure first, add those redirect URIs, and then deploy the application.
 
-App Service Authentication allows anonymous storefront traffic. The application trusts only the platform-injected principal header, protects the `/products` route, hides its navigation item from unauthorized users, and repeats authorization in `ProductService` before mutating grain state.
+App Service Authentication allows anonymous storefront traffic. The application trusts only the platform-injected principal header, protects the `/products` route, hides its navigation item from unauthorized users, and repeats authorization in `ProductService` before mutating grain state. The silo disables its Orleans client gateway, so catalog mutations can't bypass those checks through a direct Orleans client connection.
 
 ## Deploy manually
 
@@ -189,7 +189,7 @@ Don't change an existing App Service plan between Windows and Linux. Deploy a se
 - Each cluster uses separate Azure Table membership and grain-state tables.
 - The app returns readiness only after the host and silo start, and removes readiness before shutdown.
 - The host allows up to 30 seconds for Orleans shutdown. App Service can terminate a worker sooner, so correctness must tolerate silo loss and unknown call outcomes.
-- HTTPS and TLS settings protect HTTP ingress. Orleans private silo and gateway TCP traffic isn't encrypted by this sample; add Orleans TLS if the threat model requires transport encryption inside the virtual network.
+- HTTPS and TLS settings protect HTTP ingress. Orleans private silo TCP traffic isn't encrypted by this sample; add Orleans TLS if the threat model requires transport encryption inside the virtual network.
 - Application Insights receives ASP.NET Core, dependency, exception, application, and Orleans logs.
 - Linux App Service runs Easy Auth in a sidecar container; Windows uses the in-process App Service module. Both inject the same principal header contract.
 - `DOTNETCORE|10.0`, `v10.0`, and `net10.0` are deployment literals, not Orleans product-version branding.

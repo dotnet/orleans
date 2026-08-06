@@ -13,7 +13,7 @@ This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotn
 The sample cohosts an ASP.NET Core Blazor app and an Orleans silo in each worker. It uses:
 
 - A three-worker Premium v3 Windows App Service plan.
-- Regional virtual network integration and two private TCP ports per instance.
+- Regional virtual network integration and one private silo TCP port per instance.
 - Azure Table Storage for Orleans membership and grain state.
 - A user-assigned managed identity with Microsoft Entra authorization and no storage account keys.
 - App Service Authentication and a `ProductAdministrator` app role for catalog changes.
@@ -25,10 +25,11 @@ The sample cohosts an ASP.NET Core Blazor app and an Orleans silo in each worker
 
 Orleans silos communicate directly with individual silos over long-lived TCP connections. The App Service HTTP load balancer doesn't provide this connectivity.
 
-Regional virtual network integration gives each worker a private address in `WEBSITE_PRIVATE_IP`. With `vnetPrivatePortsCount: 2`, App Service exposes two dynamically allocated ports in `WEBSITE_PRIVATE_PORTS`. The read-only `WEBSITE_INSTANCE_ID` becomes the Orleans silo name for diagnostics. The application:
+Regional virtual network integration gives each worker a private address in `WEBSITE_PRIVATE_IP`. With `vnetPrivatePortsCount: 1`, App Service exposes a dynamically allocated port in `WEBSITE_PRIVATE_PORTS`. The read-only `WEBSITE_INSTANCE_ID` becomes the Orleans silo name for diagnostics. The application:
 
-1. Advertises the private address and allocated silo and gateway ports.
+1. Advertises the private address and allocated silo port.
 1. Listens on all local interfaces because the advertised address might not be locally bindable.
+1. Disables the Orleans client gateway because the cohosted web application uses the silo's local client.
 1. Uses Azure Table Storage as the external clustering provider and durable grain store.
 1. Integrates production and staging with separate delegated subnets.
 
@@ -36,14 +37,16 @@ Regional virtual network integration gives each worker a private address in `WEB
 siloBuilder.ConfigureEndpoints(
     privateIp,
     siloPort,
-    gatewayPort,
+    gatewayPort: 0,
     listenOnAnyHostAddress: true);
 ```
 
-Every silo must reach every advertised silo endpoint. External Orleans clients must run in the same virtual network or a connected network that can reach every private gateway endpoint.
+Every silo must reach every advertised silo endpoint. Disabling the gateway also ensures that catalog mutations enter through the Easy Auth-protected web application instead of an unauthenticated Orleans client connection.
+
+Orleans gateways aren't an end-user authentication boundary. If the application needs external Orleans clients, enable and advertise a second private port only for fully trusted application clients. Keep untrusted clients behind an authenticated API, and enforce authorization at the operation that mutates grain state.
 
 > [!IMPORTANT]
-> Virtual network integration is primarily an outbound feature. Validate the private-port behavior on a scaled-out plan before production: confirm that every worker receives two ports and can connect to every advertised endpoint.
+> Virtual network integration is primarily an outbound feature. Validate the private-port behavior on a scaled-out plan before production: confirm that every worker receives a private silo port and can connect to every advertised endpoint.
 
 Use a dedicated tier that supports virtual network integration and deployment slots. Size each integration subnet for at least twice the planned maximum scale; `/26` is a practical minimum for a new deployment with room for replacement workers.
 
@@ -207,7 +210,7 @@ The host allows up to 30 seconds for Orleans to leave membership. App Service ca
 
 The deployment enforces HTTPS, TLS 1.2 or later, disables FTPS, disables storage shared-key authorization, and restricts storage network access to the integration subnets. Managed identity authorizes table access.
 
-HTTPS protects the public web endpoint. The private Orleans silo and gateway TCP connections aren't encrypted by this sample. Use network controls and configure Orleans TLS when the threat model requires encryption inside the virtual network.
+HTTPS protects the public web endpoint. The private Orleans silo connections aren't encrypted by this sample. Use network controls and configure Orleans TLS when the threat model requires encryption inside the virtual network.
 
 Application Insights receives request, dependency, exception, application, and Orleans logs. Monitor ready worker and silo counts, membership changes, latency, rejections, storage authorization/throttling, worker resources, restarts, and slot operations.
 

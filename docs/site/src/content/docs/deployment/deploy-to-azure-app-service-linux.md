@@ -21,20 +21,20 @@ The Bicep entry point `infra/linux/main.bicep` creates:
 - Azure Table Storage clustering and durable grain state authorized by managed identity.
 - App Service Authentication, Application Insights, Log Analytics, health checks, and warm-up settings.
 
-App Service's HTTP front end can't route Orleans silo-to-silo connections. Each worker reads `WEBSITE_PRIVATE_IP` and the first two values in `WEBSITE_PRIVATE_PORTS`, then advertises those dynamically allocated silo and gateway endpoints. It uses the read-only `WEBSITE_INSTANCE_ID` as its Orleans silo name for diagnostics. It listens on all local interfaces because the advertised address isn't guaranteed to be locally bindable:
+App Service's HTTP front end can't route Orleans silo-to-silo connections. Each worker reads `WEBSITE_PRIVATE_IP` and the first value in `WEBSITE_PRIVATE_PORTS`, then advertises that dynamically allocated silo endpoint. It uses the read-only `WEBSITE_INSTANCE_ID` as its Orleans silo name for diagnostics. It listens on all local interfaces because the advertised address isn't guaranteed to be locally bindable:
 
 ```csharp
 siloBuilder.ConfigureEndpoints(
     privateIp,
     siloPort,
-    gatewayPort,
+    gatewayPort: 0,
     listenOnAnyHostAddress: true);
 ```
 
 The private address and ports are documented common App Service settings, not Windows-only settings. However, Microsoft doesn't document an Orleans-specific Linux mapping guarantee. Treat deployment validation as mandatory:
 
 1. Scale to at least three workers.
-1. Confirm every worker receives a distinct `WEBSITE_PRIVATE_IP` and at least two `WEBSITE_PRIVATE_PORTS`.
+1. Confirm every worker receives a distinct `WEBSITE_PRIVATE_IP` and at least one `WEBSITE_PRIVATE_PORTS` value.
 1. Inspect Orleans membership and confirm that each silo advertises those values.
 1. Test bidirectional TCP connections among every advertised silo endpoint.
 1. Repeat during scale-out, scale-in, restart, and slot swap.
@@ -42,7 +42,7 @@ The private address and ports are documented common App Service settings, not Wi
 > [!IMPORTANT]
 > Regional virtual network integration is primarily outbound connectivity. Don't assume that enabling it alone proves inbound private-port reachability.
 
-External Orleans clients must have private network routes to every advertised gateway. An HTTP-only client behind the App Service front end doesn't need an Orleans gateway connection.
+The sample disables the Orleans client gateway because the web app uses the cohosted silo's local client. This prevents a private Orleans client from bypassing the Easy Auth and `ProductAdministrator` checks around catalog mutations. Orleans gateways aren't an end-user authentication boundary. If external Orleans clients are required, enable a second private port only for fully trusted application clients; keep untrusted callers behind an authenticated API.
 
 ## Linux-specific requirements
 
@@ -104,7 +104,7 @@ az deployment group create `
     authenticationClientSecret=$authenticationClientSecret
 ```
 
-The template requests two private ports per worker, assigns production and staging to separate delegated `/24` subnets, and restricts storage network access to those subnets. It disables storage shared-key authorization and grants the application's user-assigned identity **Storage Table Data Contributor**.
+The template requests one private silo port per worker, assigns production and staging to separate delegated `/24` subnets, and restricts storage network access to those subnets. It disables storage shared-key authorization and grants the application's user-assigned identity **Storage Table Data Contributor**.
 
 The first deployment needs resource creation and constrained role-assignment permission. Later deployments can use `assignStorageRoles=false`. Identity assignments can take several minutes to propagate.
 
@@ -181,7 +181,7 @@ The Azure deployment identity uses OIDC, not a stored Azure credential. The Easy
 
 The template requires HTTPS, TLS 1.2 or later, disables FTPS, and uses managed identity for storage without account keys. Client affinity remains enabled for Blazor Server; Orleans doesn't depend on HTTP affinity.
 
-HTTPS terminates at the App Service front end. The sample's private Orleans silo/gateway connections aren't encrypted. Add Orleans TLS if the virtual network isn't a sufficient trust boundary.
+HTTPS terminates at the App Service front end. The sample's private Orleans silo connections aren't encrypted. Add Orleans TLS if the virtual network isn't a sufficient trust boundary.
 
 App Service can replace workers without delivering the full shutdown interval. Size integration subnets for planned scale plus replacement capacity, preserve at least three workers, and validate failure recovery and rolling upgrades under load. Back up durable grain state independently from membership data.
 

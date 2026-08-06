@@ -150,7 +150,10 @@ See [Container Apps revisions](/azure/container-apps/revisions) and [traffic spl
 
 A public route that maps arbitrary input to a grain key can create an effectively unbounded number of activations. Validate and authorize the identity before obtaining or invoking a grain reference.
 
-The sample's [bounded hello-grain update](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps/pull/18) applies this rule:
+> [!WARNING]
+> The sample's default branch still accepts arbitrary string hello-grain keys. Apply and validate the open [bounded hello-grain update](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps/pull/18) before exposing that endpoint. Until the change is merged and deployed, the public route can create an unbounded number of grain activations.
+
+The proposed update applies this rule:
 
 - `IHelloGrain` uses integer grain keys.
 - `/hello/{grain:int}` matches integer route values and rejects values outside the inclusive `0` through `255` range with HTTP 400 before invoking Orleans.
@@ -191,8 +194,8 @@ Complete these checks in a production-like environment:
 - [ ] Graceful scale-in completes within the configured termination grace period; forced termination also recovers safely.
 - [ ] Rolling revisions preserve compatibility, capacity, and gateway reachability.
 - [ ] Blue and green clusters remain isolated unless coexistence and shared state are explicitly designed.
-- [ ] `/hello/0` and `/hello/255` succeed, `/hello/-1` and `/hello/256` return HTTP 400, and non-integers don't match.
-- [ ] `/providers` returns numeric keys and inactive hello activations are eligible for collection after two minutes.
+- [ ] After applying the bounded hello-grain update, `/hello/0` and `/hello/255` succeed, `/hello/-1` and `/hello/256` return HTTP 400, and non-integers don't match.
+- [ ] After applying the update, `/providers` returns numeric keys and inactive hello activations are eligible for collection after two minutes.
 - [ ] Logs and metrics identify the replica and revision without exposing secrets or unbounded identifiers.
 
 The sample's custom activation-count scaler and its value of 300 grains per silo are demonstrations, not capacity guidance. A [reported scaler regression](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps/issues/17) also means that this component must be revalidated or replaced. Base production scaling on measured CPU, memory, scheduler delay, request latency, provider capacity, and loss-of-replica tests, with conservative scale-in.

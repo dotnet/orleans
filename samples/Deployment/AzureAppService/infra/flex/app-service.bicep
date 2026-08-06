@@ -80,7 +80,7 @@ var commonSiteConfig = {
   http20Enabled: true
   minTlsVersion: '1.2'
   numberOfWorkers: workerCount
-  vnetPrivatePortsCount: 2
+  vnetPrivatePortsCount: 1
   webSocketsEnabled: true
 }
 var platformSiteConfig = isLinux

@@ -11,6 +11,7 @@ global using Microsoft.AspNetCore.Components;
 global using Microsoft.AspNetCore.Components.Authorization;
 global using MudBlazor;
 global using MudBlazor.Services;
+global using Orleans;
 global using Orleans.Configuration;
 global using Orleans.ShoppingCart.Abstractions;
 global using Orleans.ShoppingCart.Silo.Authorization;

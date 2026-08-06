@@ -26,21 +26,26 @@ public sealed partial class Products
     {
         if (_modal is not null)
         {
-            await _modal.OpenAsync("Create Product", CreateProductAsync);
+            var generated = ProductDetailsExtensions.ProductDetailsFaker.Generate();
+            var newProduct = new ProductDetails
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ImageUrl = generated.ImageUrl,
+                DetailsUrl = generated.DetailsUrl,
+            };
+            await _modal.OpenAsync("Create Product", CreateProductAsync, newProduct);
         }
     }
 
-    private async Task CreateProductAsync(ProductDetails product)
+    private async Task EditProductAsync(ProductDetails product)
     {
-        var generated = ProductDetailsExtensions.ProductDetailsFaker.Generate();
-        var newProduct = product with
+        if (_modal is not null)
         {
-            Id = Guid.NewGuid().ToString("N"),
-            ImageUrl = generated.ImageUrl,
-            DetailsUrl = generated.DetailsUrl,
-        };
-        await SaveProductAsync(newProduct);
+            await _modal.OpenAsync("Edit Product", UpdateProductAsync, product);
+        }
     }
+
+    private Task CreateProductAsync(ProductDetails product) => SaveProductAsync(product);
 
     private Task UpdateProductAsync(ProductDetails product) => SaveProductAsync(product);
 
