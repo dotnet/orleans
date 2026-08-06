@@ -19,11 +19,7 @@ namespace Orleans
             }
 
             var loggerFactory = builder.ApplicationServices.GetService(typeof(ILoggerFactory)) as ILoggerFactory ?? NullLoggerFactory.Instance;
-            builder.Use(next =>
-            {
-                var middleware = new TlsServerConnectionMiddleware(next, options, loggerFactory);
-                return middleware.OnConnectionAsync;
-            });
+            builder.UseMiddleware(new TlsServerConnectionMiddleware(options, loggerFactory));
         }
 
         public static void UseClientTls(
@@ -36,11 +32,7 @@ namespace Orleans
             }
 
             var loggerFactory = builder.ApplicationServices.GetService(typeof(ILoggerFactory)) as ILoggerFactory ?? NullLoggerFactory.Instance;
-            builder.Use(next =>
-            {
-                var middleware = new TlsClientConnectionMiddleware(next, options, loggerFactory);
-                return middleware.OnConnectionAsync;
-            });
+            builder.UseMiddleware(new TlsClientConnectionMiddleware(options, loggerFactory));
         }
 
         internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName)
