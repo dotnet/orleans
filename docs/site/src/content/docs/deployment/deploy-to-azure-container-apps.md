@@ -11,7 +11,7 @@ Azure Container Apps can host Orleans, but the topology must preserve Orleans en
 
 To build a cluster from documented Container Apps endpoints, use a virtual-network-integrated internal environment and its private static IP. Deploy each silo as a separate Container App with exactly one replica and assign each app a unique pair of TCP ingress ports on that private IP. Repeat that resource to add silos. You must still complete the production acceptance tests on this page. A single Container App scaled to multiple silo replicas can work in a particular environment, and the Azure sample demonstrates that design, but direct replica addresses aren't part of the documented Container Apps networking contract.
 
-Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The [Orleans cluster on Azure Container Apps sample](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps) is also useful for studying a multi-component topology and custom scaling. Review the [sample limitations](#understand-the-azure-sample) before adapting either resource for production.
+Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The maintained [Orleans cluster on Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) is also useful for studying a multi-component topology and custom scaling. Review the [sample limitations](#understand-the-maintained-sample) before adapting either resource for production.
 
 ## Choose a topology
 
@@ -247,9 +247,9 @@ Complete these acceptance tests before production and after platform or network 
 
 For the multiple-replica-in-one-app topology, add a blocking test that matches every active Orleans membership endpoint to one Container Apps replica and tests every advertised address from every peer. A successful test establishes evidence for that environment, but it doesn't turn the observed replica IP into a documented Container Apps contract.
 
-## Understand the Azure sample
+## Understand the maintained sample
 
-The [Azure sample](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps) demonstrates:
+The [in-repo sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps), imported from the [original Azure sample](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps), demonstrates:
 
 - Separate silo, dashboard, Minimal API client, worker client, and external scaler Container Apps in one environment.
 - Bicep that provisions Azure Container Registry, Azure Storage, a Container Apps environment, Application Insights, Log Analytics, and the five Container Apps.
@@ -259,11 +259,8 @@ The [Azure sample](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Con
 - A dashboard process that is also an Orleans silo, fixed silo and gateway ports, Application Insights, and Log Analytics.
 - Clients that discover individual gateways through Orleans membership rather than using HTTP ingress as an Orleans transport.
 
-> [!WARNING]
-> [Sample pull request 18](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps/pull/18) is open. The sample's default branch still accepts arbitrary string hello-grain keys and can create an unbounded number of activations. Apply and validate the proposed change before exposing that endpoint.
+The maintained sample incorporates the bounded-input design from open [Azure-Samples pull request 18](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps/pull/18). Its hello grain uses an integer key, the public route accepts only keys from 0 through 255 before calling Orleans, the provider endpoint returns numeric keys, and inactive hello grains have a two-minute collection age. Preserve that bounded-input pattern when adapting the API. A collection age alone doesn't make an unbounded key space safe.
 
-The proposed change hardens the HTTP API against uncontrolled grain activation. It changes the hello grain to an integer key, accepts only keys from 0 through 255 before calling Orleans, returns numeric provider keys, and applies a two-minute collection age to inactive hello grains. Preserve that bounded-input pattern when adapting the API.
-
-The sample is an architecture demonstration, not a production deployment manifest. At pull request 18's head commit, `a5482c70519fd39b2001b4d71e39d111fe41cd7a`, it uses .NET 6, Orleans 3.6, preview-era Container Apps Bicep resources, an Azure service-principal secret with broad **Contributor** access, storage account and registry keys, registry admin access, mutable placeholder images, and older GitHub Actions. It doesn't register durable grain storage, define health probes, configure a termination grace period, or prove that observed replica IPs are a supported Container Apps endpoint contract. Its minimum silo count is one, and its scaling threshold isn't a capacity recommendation.
+The sample is an architecture demonstration, not a production deployment manifest. Its application projects reference the Orleans source in this repository, but the imported deployment assets still use preview-era Container Apps Bicep resources, an Azure service-principal secret with broad **Contributor** access, storage account and registry keys, registry admin access, mutable placeholder images, and older GitHub Actions. It doesn't register durable grain storage, define production health probes, configure a termination grace period, or prove that observed replica IPs are a supported Container Apps endpoint contract. Its minimum silo count is one, and its scaling threshold isn't a capacity recommendation.
 
 Use the sample to understand component relationships, Orleans membership-based gateway discovery, workload generation, and scaling experiments. Replace its identity, infrastructure, provider, health, lifecycle, CI, and endpoint assumptions using the guidance on this page.
